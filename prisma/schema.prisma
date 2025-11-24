@@ -1,0 +1,735 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  name        String?
+  email       String   @unique
+  password    String?   // Optional for passwordless/PIN users
+  pin         String?   // Hashed 4-digit PIN for quick login
+  image       String?
+  role        String   @default("USER") // USER, PROVIDER, FRANCHISEE, FRANCHISOR, ADMINPLOYEE
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Employee Permissions (configurable by franchise owner)
+  canAddServices      Boolean @default(false)  // Can create/edit services
+  canAddProducts      Boolean @default(false)  // Can create/edit products
+  canManageInventory  Boolean @default(false)  // Can update stock levels
+  canViewReports      Boolean @default(false)  // Can access reports dashboard
+  canProcessRefunds   Boolean @default(false)  // Can refund transactions
+  canManageSchedule   Boolean @default(false)  // Can create/edit employee schedules
+  canManageEmployees  Boolean @default(false)  // Can add/edit employees
+
+  // Relations
+  franchiseId String?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
+  locationId  String?
+  location    Location?  @relation(fields: [locationId], references: [id])
+  
+  franchisor  Franchisor? @relation("FranchisorOwner")
+  magicLinks  MagicLink[]
+  appointments Appointment[] // As employee
+  schedules   Schedule[]
+
+  // Community
+  posts       Post[]
+  comments    Comment[]
+  votes       Vote[]
+  badges      UserBadge[]
+  processedTransactions  Transaction[] @relation("ProcessedTransactions")
+  performedServices      TransactionLineItem[] @relation("PerformedServices")
+  activeCart             ActiveCart?
+
+  // New Relations
+  timeEntries   TimeEntry[]
+  commissionRuleId String?
+  commissionRule CommissionRule? @relation(fields: [commissionRuleId], references: [id])
+  cashDrawerSessions CashDrawerSession[]
+}
+
+// Franchisor = The franchise company/brand (e.g., "Aura Salon", "Beauty Co")
+model Franchisor {
+  id          String   @id @default(cuid())
+  name        String   // Company name
+  ownerId     String?  @unique
+  owner       User?    @relation("FranchisorOwner", fields: [ownerId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  franchises     Franchise[] // Franchisees under this franchisor
+  royaltyConfig  RoyaltyConfig?
+  
+  // Global Catalog (Centralized Management)
+  globalServices GlobalService[]
+  globalProducts GlobalProduct[]
+}
+
+
+model Franchise {
+  id          String   @id @default(cuid())
+  name        String
+  franchisorId String
+  franchisor  Franchisor @relation(fields: [franchisorId], references: [id])
+  
+  users       User[]
+  locations   Location[]
+  services    Service[]
+  products    Product[]
+  transactions Transaction[]
+  
+  royaltyRecords RoyaltyRecord[]
+  splitPayoutConfig SplitPayoutConfig?
+  membershipPlans MembershipPlan[]
+  suppliers   Supplier[]
+  purchaseOrders PurchaseOrder[]
+  commissionRules CommissionRule[]
+  loyaltyProgram LoyaltyProgram?
+  giftCards   GiftCard[]
+  discounts   Discount[]
+  clients     Client[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Location {
+  id          String   @id @default(cuid())
+  name        String
+  address     String?
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  
+  users       User[]
+  terminals   Terminal[]
+  purchaseOrders PurchaseOrder[]
+  stockAdjustments StockAdjustment[]
+  timeEntries TimeEntry[]
+  cashDrawerSessions CashDrawerSession[]
+  appointments Appointment[]
+  schedules   Schedule[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============ GLOBAL CATALOG (FRANCHISOR MANAGED) ============
+
+model GlobalService {
+  id          String   @id @default(cuid())
+  franchisorId String
+  franchisor  Franchisor @relation(fields: [franchisorId], references: [id])
+  
+  name        String
+  description String?
+  duration    Int      // in minutes
+  defaultPrice Decimal
+  category    String?
+  isArchived  Boolean  @default(false)
+  
+  // Relations: One global service spawns many local instances
+  localInstances Service[] 
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model GlobalProduct {
+  id          String   @id @default(cuid())
+  franchisorId String
+  franchisor  Franchisor @relation(fields: [franchisorId], references: [id])
+  
+  name        String
+  description String?
+  defaultPrice Decimal
+  defaultCost Decimal?
+  sku         String?
+  category    String?
+  isArchived  Boolean  @default(false)
+  
+  localInstances Product[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============ LOCAL INSTANCES ============
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  duration    Int      // in minutes
+  price       Decimal
+  category    String?  // e.g., "Hair", "Nails", "Spa"
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  
+  // Link to Global Catalog (Optional - allows for local-only services too)
+  globalServiceId String?
+  globalService   GlobalService? @relation(fields: [globalServiceId], references: [id])
+  
+  appointments Appointment[]
+  transactionLineItems TransactionLineItem[]
+}
+
+
+model Client {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String?
+  
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  
+  appointments Appointment[]
+  memberships ClientMembership[]
+  loyalty     ClientLoyalty?
+  transactions Transaction[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id])
+  
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  
+  serviceId   String
+  service     Service  @relation(fields: [serviceId], references: [id])
+  
+  employeeId  String
+  employee    User     @relation(fields: [employeeId], references: [id])
+  
+  startTime   DateTime
+  endTime     DateTime
+  status      String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED, NO_SHOW
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Schedule {
+  id          String   @id @default(cuid())
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id])
+  
+  employeeId  String
+  employee    User     @relation(fields: [employeeId], references: [id])
+  
+  date        DateTime // The date of the shift
+  startTime   DateTime
+  endTime     DateTime
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Products for retail sale
+model Product {
+  id            String   @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  
+  name          String
+  description   String?
+  price         Decimal
+  cost          Decimal?  // Cost to franchise
+  stock         Int       @default(0)
+  category      String?   // "Hair Care", "Styling Products", etc.
+  sku           String?
+  isActive      Boolean   @default(true)
+  
+  // Link to Global Catalog
+  globalProductId String?
+  globalProduct   GlobalProduct? @relation(fields: [globalProductId], references: [id])
+  
+  lineItems     TransactionLineItem[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // New Relations
+  suppliers     ProductSupplier[]
+  purchaseOrderItems PurchaseOrderItem[]
+  stockAdjustments StockAdjustment[]
+}
+
+// POS Transaction (sale/checkout)
+model Transaction {
+  id            String   @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  
+  clientId      String?
+  client        Client?   @relation(fields: [clientId], references: [id])
+  
+  employeeId    String?  // Who processed the sale
+  employee      User?    @relation("ProcessedTransactions", fields: [employeeId], references: [id])
+  
+  subtotal      Decimal
+  tax           Decimal   @default(0)
+  tip           Decimal   @default(0)
+  discount      Decimal   @default(0)
+  cardFee       Decimal   @default(0)  // Card processing fee if applicable
+  total         Decimal
+  
+  paymentMethod String   // CASH, DEBIT_CARD, CREDIT_CARD
+  processingPlan String?  // STANDARD, SURCHARGE, DUAL_PRICE (from merchant config)
+  
+  status        String   @default("COMPLETED") // COMPLETED, REFUNDED, VOIDED
+  
+  cashDrawerSessionId String?
+  cashDrawerSession   CashDrawerSession? @relation(fields: [cashDrawerSessionId], references: [id])
+
+  // Refund Linking
+  originalTransactionId String?
+  originalTransaction   Transaction? @relation("RefundRelation", fields: [originalTransactionId], references: [id])
+  refunds               Transaction[] @relation("RefundRelation")
+
+  lineItems     TransactionLineItem[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Line items in a transaction
+model TransactionLineItem {
+  id              String   @id @default(cuid())
+  transactionId   String
+  transaction     Transaction @relation(fields: [transactionId], references: [id])
+  
+  type            String   // SERVICE, PRODUCT
+  
+  // If service
+  serviceId       String?
+  service         Service? @relation(fields: [serviceId], references: [id])
+  staffId         String?  // Who performed the service
+  staff           User?    @relation("PerformedServices", fields: [staffId], references: [id])
+  
+  // If product
+  productId       String?
+  product         Product? @relation(fields: [productId], references: [id])
+  quantity        Int      @default(1)
+  
+  price           Decimal  // Price per item
+  discount        Decimal  @default(0)
+  total           Decimal  // Total for this line item
+  
+  createdAt       DateTime @default(now())
+}
+
+// Royalty Configuration (customizable by each franchisor)
+model RoyaltyConfig {
+  id                String   @id @default(cuid())
+  franchisorId      String   @unique
+  franchisor        Franchisor @relation(fields: [franchisorId], references: [id])
+  
+  percentage        Decimal  // e.g., 6.0 for 6%
+  minimumMonthlyFee Decimal? // Optional minimum fee
+  calculationPeriod String   @default("MONTHLY") // MONTHLY, WEEKLY, DAILY
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Royalty Records (calculated periodically)
+model RoyaltyRecord {
+  id             String   @id @default(cuid())
+  franchiseId    String
+  franchise      Franchise @relation(fields: [franchiseId], references: [id])
+  
+  periodStart    DateTime
+  periodEnd      DateTime
+  
+  grossRevenue   Decimal  // Total revenue for period
+  royaltyAmount  Decimal  // Calculated royalty
+  status         String   @default("PENDING") // PENDING, PAID, OVERDUE
+  
+  paidAt         DateTime?
+  notes          String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+
+// Real-time POS Mirroring
+model ActiveCart {
+  id          String   @id @default(cuid())
+  userId      String   @unique // The employee operating the POS
+  user        User     @relation(fields: [userId], references: [id])
+  
+  items       String   // JSON string of cart items
+  subtotal    Decimal
+  tax         Decimal
+  total       Decimal
+  
+  customerName String? // To show "Hi, John" on display
+  status       String   @default("IDLE") // IDLE, ACTIVE, REVIEW
+  
+  updatedAt   DateTime @updatedAt
+}
+// ============ FINTECH & PAYMENTS (PAX INTEGRATION) ============
+
+model Terminal {
+  id            String   @id @default(cuid())
+  serialNumber  String   @unique
+  model         String   // e.g., "PAX A920"
+  locationId    String
+  location      Location @relation(fields: [locationId], references: [id])
+  status        String   @default("ONLINE") // ONLINE, OFFLINE, ERROR
+  ipAddress     String?
+  macAddress    String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SplitPayoutConfig {
+  id              String   @id @default(cuid())
+  franchiseId     String   @unique
+  franchise       Franchise @relation(fields: [franchiseId], references: [id])
+  
+  isEnabled       Boolean  @default(false) // OPTIONAL as requested
+  royaltyPercent  Decimal  // e.g., 6.0
+  marketingPercent Decimal @default(0)
+  
+  // Banking info for routing (encrypted in real app)
+  franchisorAccountId String?
+  franchiseeAccountId String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============ MEMBERSHIPS & RECURRING REVENUE ============
+
+model MembershipPlan {
+  id            String   @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  
+  name          String   // e.g., "VIP Gold"
+  price         Decimal
+  billingInterval String // MONTHLY, YEARLY
+  description   String?
+  
+  // Perks
+  discountPercent Decimal @default(0)
+  includedServices String? // JSON list of service IDs
+  
+  isActive      Boolean  @default(true)
+  memberships   ClientMembership[]
+  createdAt     DateTime @default(now())
+}
+
+model ClientMembership {
+  id              String   @id @default(cuid())
+  clientId        String
+  client          Client   @relation(fields: [clientId], references: [id])
+  planId          String
+  plan            MembershipPlan @relation(fields: [planId], references: [id])
+  
+  status          String   @default("ACTIVE") // ACTIVE, CANCELLED, PAST_DUE
+  startDate       DateTime @default(now())
+  nextBillingDate DateTime
+  paymentMethodId String?  // Tokenized card ID
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============ ADVANCED INVENTORY & SUPPLY CHAIN ============
+
+model Supplier {
+  id            String   @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  
+  name          String
+  contactName   String?
+  email         String?
+  phone         String?
+  address       String?
+  
+  products      ProductSupplier[]
+  purchaseOrders PurchaseOrder[]
+  
+  createdAt     DateTime @default(now())
+}
+
+model ProductSupplier {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+  
+  cost        Decimal
+  sku         String?
+  
+  @@unique([productId, supplierId])
+}
+
+model PurchaseOrder {
+  id            String   @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  locationId    String
+  location      Location  @relation(fields: [locationId], references: [id])
+  supplierId    String
+  supplier      Supplier  @relation(fields: [supplierId], references: [id])
+  
+  status        String    @default("DRAFT") // DRAFT, ORDERED, RECEIVED, CANCELLED
+  totalCost     Decimal
+  expectedDate  DateTime?
+  
+  items         PurchaseOrderItem[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  
+  quantity        Int
+  unitCost        Decimal
+  totalCost       Decimal
+}
+
+model StockAdjustment {
+  id            String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+  locationId    String
+  location      Location @relation(fields: [locationId], references: [id])
+  
+  quantity      Int      // Positive (add) or Negative (remove)
+  reason        String   // "SALE", "RESTOCK", "DAMAGE", "THEFT", "TRANSFER"
+  notes         String?
+  
+  performedBy   String
+  createdAt     DateTime @default(now())
+}
+
+// ============ WORKFORCE MANAGEMENT ============
+
+model TimeEntry {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  locationId    String
+  location      Location @relation(fields: [locationId], references: [id])
+  
+  clockIn       DateTime
+  clockOut      DateTime?
+  breakDuration Int      @default(0) // in minutes
+  
+  totalHours    Decimal?
+  status        String   @default("OPEN") // OPEN, CLOSED, APPROVED
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model CommissionRule {
+  id            String   @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  
+  name          String   // e.g., "Senior Stylist Tier"
+  servicePercent Decimal // e.g., 40.0
+  productPercent Decimal // e.g., 10.0
+  
+  users         User[]
+  
+  createdAt     DateTime @default(now())
+}
+
+// ============ LOYALTY & GIFT CARDS ============
+
+model LoyaltyProgram {
+  id            String   @id @default(cuid())
+  franchiseId   String   @unique
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  
+  isEnabled     Boolean  @default(true)
+  pointsPerDollar Decimal @default(1.0)
+  redemptionRatio Decimal @default(0.01) // 100 points = $1.00
+  
+  createdAt     DateTime @default(now())
+}
+
+model ClientLoyalty {
+  id            String   @id @default(cuid())
+  clientId      String   @unique
+  client        Client   @relation(fields: [clientId], references: [id])
+  
+  pointsBalance Int      @default(0)
+  lifetimePoints Int     @default(0)
+  
+  updatedAt     DateTime @updatedAt
+}
+
+model GiftCard {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  
+  initialAmount Decimal
+  currentBalance Decimal
+  
+  purchaserId   String?
+  recipientEmail String?
+  
+  isActive      Boolean  @default(true)
+  expiresAt     DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ============ CASH MANAGEMENT (SHIFTS) ============
+
+model CashDrawerSession {
+  id            String    @id @default(cuid())
+  locationId    String
+  location      Location  @relation(fields: [locationId], references: [id])
+  employeeId    String
+  employee      User      @relation(fields: [employeeId], references: [id])
+  
+  startTime     DateTime  @default(now())
+  endTime       DateTime?
+  
+  startingCash  Decimal
+  endingCash    Decimal?  // Actual cash counted
+  expectedCash  Decimal?  // Calculated cash (Start + Cash Sales - Drops)
+  variance      Decimal?  // Ending - Expected
+  
+  status        String    @default("OPEN") // OPEN, CLOSED
+  notes         String?
+  
+  cashDrops     CashDrop[]
+  transactions  Transaction[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model CashDrop {
+  id              String            @id @default(cuid())
+  sessionId       String
+  session         CashDrawerSession @relation(fields: [sessionId], references: [id])
+  
+  amount          Decimal
+  reason          String            // "SAFE_DROP", "PAYOUT", "OTHER"
+  droppedBy       String            // Employee ID
+  
+  createdAt       DateTime          @default(now())
+}
+
+// ============ PROMOTIONS & DISCOUNTS ============
+
+model Discount {
+  id            String    @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  
+  name          String
+  code          String?   // Optional promo code
+  type          String    // PERCENTAGE, FIXED_AMOUNT
+  value         Decimal   // e.g., 20.0 for 20% or 10.0 for $10
+  
+  appliesTo     String    // ALL, SERVICE, PRODUCT, SPECIFIC_ITEM
+  itemIds       String?   // JSON array of specific Service/Product IDs if applicable
+  
+  startDate     DateTime?
+  endDate       DateTime?
+  isActive      Boolean   @default(true)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// ============ COMMUNITY & AUTH ============
+
+model MagicLink {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  franchiseId String?
+  
+  comments  Comment[]
+  votes     Vote[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Vote {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // UPVOTE, DOWNVOTE
+  
+  @@unique([postId, userId])
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  name      String   // e.g., "Top Seller", "Early Adopter"
+  icon      String?
+  awardedAt DateTime @default(now())
+}

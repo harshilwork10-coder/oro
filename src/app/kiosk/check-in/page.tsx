@@ -1,0 +1,228 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { User, Check, ChevronRight } from 'lucide-react'
+import BreadLogo from '@/components/ui/BreadLogo'
+
+export default function KioskCheckInPage() {
+    const router = useRouter()
+    const [step, setStep] = useState<'phone' | 'name' | 'welcome'>('phone')
+    const [phone, setPhone] = useState('')
+    const [firstName, setFirstName] = useState('')
+    const [lastName, setLastName] = useState('')
+    const [loading, setLoading] = useState(false)
+
+    const handlePhoneSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setLoading(true)
+
+        try {
+            // Check if customer exists
+            const res = await fetch(`/api/franchise/customers/search?phone=${phone}`)
+            if (res.ok) {
+                const data = await res.json()
+                if (data.length > 0) {
+                    // Customer found
+                    setFirstName(data[0].name.split(' ')[0])
+                    setStep('welcome')
+                    // TODO: Add to check-in queue
+                } else {
+                    // New customer
+                    setStep('name')
+                }
+            }
+        } catch (error) {
+            console.error('Error searching customer:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleNameSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setLoading(true)
+
+        try {
+            // Create new customer
+            const res = await fetch('/api/franchise/customers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: `${firstName} ${lastName}`,
+                    phone: phone
+                })
+            })
+
+            if (res.ok) {
+                setStep('welcome')
+                // TODO: Add to check-in queue
+            }
+        } catch (error) {
+            console.error('Error creating customer:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (step === 'welcome') {
+        return (
+            <div className="min-h-screen bg-stone-950 flex items-center justify-center p-6 text-white text-center relative overflow-hidden">
+                {/* Background Glow */}
+                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-orange-900/20 to-stone-900/50 z-0" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-orange-500/10 blur-[100px] rounded-full z-0" />
+
+                <div className="max-w-md w-full space-y-8 animate-in fade-in zoom-in duration-500 relative z-10">
+                    <div className="mx-auto w-24 h-24 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(249,115,22,0.4)]">
+                        <Check className="h-12 w-12 text-white" />
+                    </div>
+                    <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-200 to-amber-100">Welcome, {firstName}!</h1>
+                    <p className="text-xl text-stone-300">You're all checked in. Please have a seat, and we'll be with you shortly.</p>
+                    <button
+                        onClick={() => {
+                            setStep('phone')
+                            setPhone('')
+                            setFirstName('')
+                            setLastName('')
+                        }}
+                        className="mt-12 px-8 py-3 bg-stone-800/50 hover:bg-stone-800 border border-stone-700 hover:border-orange-500/50 rounded-full text-sm font-medium transition-all text-stone-300 hover:text-white"
+                    >
+                        Check in another person
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="min-h-screen bg-stone-950 flex flex-col relative overflow-hidden">
+            {/* Background Glows */}
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-stone-900 to-stone-950 z-0" />
+            <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-orange-600/10 blur-[120px] rounded-full z-0" />
+            <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-amber-600/5 blur-[120px] rounded-full z-0" />
+
+            {/* Header */}
+            <div className="relative z-10 bg-stone-900/50 backdrop-blur-md border-b border-stone-800 p-6 shadow-lg flex items-center justify-center">
+                <div className="flex items-center gap-3 group">
+                    <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                        <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                        <BreadLogo size={32} className="relative z-10 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
+                    </div>
+                    <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-amber-200 to-orange-400 bg-clip-text text-transparent bg-[length:200%_auto] animate-text-shimmer">
+                        Aura Salon
+                    </span>
+                </div>
+            </div>
+
+            <div className="flex-1 flex items-center justify-center p-6 relative z-10">
+                <div className="max-w-md w-full glass-panel rounded-3xl shadow-2xl p-8 border border-stone-800">
+                    {step === 'phone' ? (
+                        <form onSubmit={handlePhoneSubmit} className="space-y-6">
+                            <div className="text-center mb-8">
+                                <h2 className="text-2xl font-bold text-stone-100">Welcome! 👋</h2>
+                                <p className="text-stone-400">Please enter your mobile number to check in.</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-stone-400 mb-2">Mobile Number</label>
+                                <input
+                                    type="tel"
+                                    value={phone}
+                                    readOnly
+                                    className="w-full text-3xl font-bold p-4 bg-stone-900/50 border-2 border-stone-800 rounded-2xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 text-center tracking-widest text-white placeholder-stone-700 transition-all cursor-default"
+                                    placeholder="(555) 555-5555"
+                                />
+                            </div>
+
+                            {/* Numeric Keypad */}
+                            <div className="grid grid-cols-3 gap-3 mb-6">
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                                    <button
+                                        key={num}
+                                        type="button"
+                                        onClick={() => setPhone(prev => prev.length < 10 ? prev + num : prev)}
+                                        className="h-16 text-2xl font-bold bg-stone-800/50 hover:bg-stone-700 text-stone-200 rounded-xl transition-all active:scale-95 border border-stone-700 hover:border-orange-500/50"
+                                    >
+                                        {num}
+                                    </button>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => setPhone('')}
+                                    className="h-16 text-sm font-medium bg-stone-800/30 hover:bg-red-900/20 text-stone-400 hover:text-red-400 rounded-xl transition-all active:scale-95 border border-stone-700 hover:border-red-500/30"
+                                >
+                                    Clear
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPhone(prev => prev.length < 10 ? prev + '0' : prev)}
+                                    className="h-16 text-2xl font-bold bg-stone-800/50 hover:bg-stone-700 text-stone-200 rounded-xl transition-all active:scale-95 border border-stone-700 hover:border-orange-500/50"
+                                >
+                                    0
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPhone(prev => prev.slice(0, -1))}
+                                    className="h-16 flex items-center justify-center bg-stone-800/30 hover:bg-stone-700 text-stone-400 hover:text-white rounded-xl transition-all active:scale-95 border border-stone-700"
+                                >
+                                    <ChevronRight className="h-6 w-6 rotate-180" />
+                                </button>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading || phone.length < 10}
+                                className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+                            >
+                                {loading ? 'Checking...' : 'Continue'}
+                                {!loading && <ChevronRight className="h-5 w-5" />}
+                            </button>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleNameSubmit} className="space-y-6">
+                            <div className="text-center mb-8">
+                                <h2 className="text-2xl font-bold text-stone-100">Nice to meet you!</h2>
+                                <p className="text-stone-400">Please tell us your name.</p>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-stone-400 mb-2">First Name</label>
+                                    <input
+                                        type="text"
+                                        value={firstName}
+                                        onChange={(e) => setFirstName(e.target.value)}
+                                        className="w-full text-xl p-4 bg-stone-900/50 border-2 border-stone-800 rounded-2xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 text-white placeholder-stone-700 transition-all"
+                                        placeholder="Jane"
+                                        autoFocus
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-stone-400 mb-2">Last Name</label>
+                                    <input
+                                        type="text"
+                                        value={lastName}
+                                        onChange={(e) => setLastName(e.target.value)}
+                                        className="w-full text-xl p-4 bg-stone-900/50 border-2 border-stone-800 rounded-2xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 text-white placeholder-stone-700 transition-all"
+                                        placeholder="Doe"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading || !firstName || !lastName}
+                                className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+                            >
+                                {loading ? 'Saving...' : 'Check In'}
+                                {!loading && <Check className="h-5 w-5" />}
+                            </button>
+                        </form>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
