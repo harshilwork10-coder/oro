@@ -29,6 +29,11 @@ model User {
   canProcessRefunds   Boolean @default(false)  // Can refund transactions
   canManageSchedule   Boolean @default(false)  // Can create/edit employee schedules
   canManageEmployees  Boolean @default(false)  // Can add/edit employees
+  
+  // Shift Management Permissions
+  canManageShifts     Boolean @default(false)  // Can open/close cash drawer shifts
+  canClockIn          Boolean @default(true)   // Can clock in for work
+  canClockOut         Boolean @default(true)   // Can clock out from work
 
   // Relations
   franchiseId String?
@@ -99,8 +104,28 @@ model Franchise {
   discounts   Discount[]
   clients     Client[]
   
+  settings    FranchiseSettings?
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Franchise-specific settings for pricing and features
+model FranchiseSettings {
+  id                String    @id @default(cuid())
+  franchiseId       String    @unique
+  franchise         Franchise @relation(fields: [franchiseId], references: [id])
+  
+  // Pricing Model Configuration
+  pricingModel      String    @default("DUAL_PRICING") // STANDARD, DUAL_PRICING
+  cardSurchargeType String    @default("PERCENTAGE")   // PERCENTAGE, FLAT_AMOUNT
+  cardSurcharge     Decimal   @default(3.99)           // Percentage (e.g., 3.99 for 3.99%) or flat amount (e.g., 0.50 for $0.50)
+  
+  // Display Options
+  showDualPricing   Boolean   @default(true)           // Show both cash/card prices
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 model Location {
