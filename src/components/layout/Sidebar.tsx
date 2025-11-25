@@ -118,6 +118,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
         { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock },
         { name: 'My Schedule', href: '/dashboard/schedule/me', icon: Calendar },
+        { name: 'Services', href: '/dashboard/services', icon: Briefcase },
+        { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
         { name: 'My Performance', href: '/dashboard/employee/me', icon: UserCircle },
         { name: 'Z Report', href: '/dashboard/reports/z-report', icon: FileText },
         { name: 'Customers', href: '/dashboard/customers', icon: Users },
@@ -229,7 +231,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                         </div>
                     </div>
                     <button
-                        onClick={() => signOut()}
+                        onClick={() => signOut({ callbackUrl: '/login' })}
                         className="flex w-full items-center justify-center rounded-lg bg-red-500/5 border border-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/30 transition-all duration-200 group"
                     >
                         <LogOut className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />

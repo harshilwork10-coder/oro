@@ -16,6 +16,7 @@ import {
 export default function LoyaltyPage() {
     const [pointsPerDollar, setPointsPerDollar] = useState(1)
     const [redemptionRate, setRedemptionRate] = useState(100) // 100 points = $1
+    const [showConfigModal, setShowConfigModal] = useState(false)
 
     return (
         <div className="p-4 md:p-8 space-y-8">
@@ -28,7 +29,10 @@ export default function LoyaltyPage() {
                     </h1>
                     <p className="text-stone-400 mt-2">Manage rewards and boost customer retention</p>
                 </div>
-                <button className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-100 rounded-lg border border-stone-700 flex items-center gap-2 transition-colors">
+                <button
+                    onClick={() => setShowConfigModal(true)}
+                    className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-100 rounded-lg border border-stone-700 flex items-center gap-2 transition-colors"
+                >
                     <Settings className="h-4 w-4" />
                     Configure Rules
                 </button>
@@ -145,6 +149,107 @@ export default function LoyaltyPage() {
                     </table>
                 </div>
             </div>
+
+            {/* Configuration Modal */}
+            {showConfigModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-2xl bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
+                        <div className="p-6 border-b border-stone-800 flex items-center justify-between">
+                            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                                <Settings className="h-6 w-6 text-pink-500" />
+                                Advanced Loyalty Configuration
+                            </h2>
+                            <button
+                                onClick={() => setShowConfigModal(false)}
+                                className="text-stone-400 hover:text-white transition-colors"
+                            >
+                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                            {/* Tier Configuration */}
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <Crown className="h-5 w-5 text-amber-500" />
+                                    Loyalty Tiers
+                                </h3>
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between p-4 bg-stone-950 rounded-lg border border-stone-800">
+                                        <div className="flex items-center gap-3">
+                                            <div className="px-2 py-1 bg-stone-500/10 border border-stone-500/20 rounded text-xs font-medium text-stone-400">
+                                                Silver
+                                            </div>
+                                            <span className="text-sm text-stone-300">0 - 4,999 points</span>
+                                        </div>
+                                        <div className="text-sm text-stone-400">Base rewards</div>
+                                    </div>
+                                    <div className="flex items-center justify-between p-4 bg-stone-950 rounded-lg border border-stone-800">
+                                        <div className="flex items-center gap-3">
+                                            <div className="px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-xs font-medium text-amber-400">
+                                                Gold
+                                            </div>
+                                            <span className="text-sm text-stone-300">5,000 - 14,999 points</span>
+                                        </div>
+                                        <div className="text-sm text-emerald-400">+10% bonus</div>
+                                    </div>
+                                    <div className="flex items-center justify-between p-4 bg-stone-950 rounded-lg border border-stone-800">
+                                        <div className="flex items-center gap-3">
+                                            <div className="px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded text-xs font-medium text-purple-400">
+                                                Platinum
+                                            </div>
+                                            <span className="text-sm text-stone-300">15,000+ points</span>
+                                        </div>
+                                        <div className="text-sm text-emerald-400">+25% bonus</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Advanced Settings */}
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <Zap className="h-5 w-5 text-pink-500" />
+                                    Bonus Multipliers
+                                </h3>
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between p-4 bg-stone-950 rounded-lg border border-stone-800">
+                                        <span className="text-sm text-stone-300">Birthday Month Bonus</span>
+                                        <span className="text-sm font-bold text-pink-400">2x Points</span>
+                                    </div>
+                                    <div className="flex items-center justify-between p-4 bg-stone-950 rounded-lg border border-stone-800">
+                                        <span className="text-sm text-stone-300">Referral Bonus</span>
+                                        <span className="text-sm font-bold text-emerald-400">500 Points</span>
+                                    </div>
+                                    <div className="flex items-center justify-between p-4 bg-stone-950 rounded-lg border border-stone-800">
+                                        <span className="text-sm text-stone-300">Points Expiration</span>
+                                        <span className="text-sm font-bold text-stone-400">12 Months</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-stone-800 flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowConfigModal(false)}
+                                className="px-6 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    // Save configuration logic here
+                                    setShowConfigModal(false)
+                                }}
+                                className="px-6 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-lg font-semibold transition-colors"
+                            >
+                                Save Configuration
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

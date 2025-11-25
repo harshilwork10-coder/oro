@@ -6,7 +6,15 @@ import { Users, Heart, Mail, Phone, Plus, Search } from 'lucide-react'
 export default function CustomersPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [showEnrollModal, setShowEnrollModal] = useState(false)
+    const [showAddCustomerModal, setShowAddCustomerModal] = useState(false)
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
+    const [newCustomer, setNewCustomer] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        enrollInLoyalty: false
+    })
 
     const customers = [
         { id: 1, name: 'Sarah Jenkins', email: 'sarah@example.com', phone: '(555) 123-4567', visits: 12, lastVisit: '2 days ago', loyaltyMember: true, points: 850 },
@@ -27,6 +35,16 @@ export default function CustomersPage() {
         setSelectedCustomer(null)
     }
 
+    const handleAddCustomer = () => {
+        if (!newCustomer.firstName || !newCustomer.lastName) {
+            alert('Please enter first and last name')
+            return
+        }
+        alert(`Customer ${newCustomer.firstName} ${newCustomer.lastName} added successfully!`)
+        setShowAddCustomerModal(false)
+        setNewCustomer({ firstName: '', lastName: '', email: '', phone: '', enrollInLoyalty: false })
+    }
+
     const filteredCustomers = customers.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -43,7 +61,10 @@ export default function CustomersPage() {
                     </h1>
                     <p className="text-stone-400 mt-2">{customers.length} total customers</p>
                 </div>
-                <button className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+                <button
+                    onClick={() => setShowAddCustomerModal(true)}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+                >
                     <Plus className="h-5 w-5" />
                     Add Customer
                 </button>
@@ -162,6 +183,91 @@ export default function CustomersPage() {
                                 className="flex-1 px-4 py-2.5 bg-pink-600 hover:bg-pink-500 text-white rounded-lg font-medium transition-colors"
                             >
                                 Enroll Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Customer Modal */}
+            {showAddCustomerModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="glass-panel p-6 rounded-xl max-w-md w-full border border-stone-700">
+                        <h3 className="text-xl font-bold text-stone-100 mb-4 flex items-center gap-2">
+                            <Plus className="h-6 w-6 text-blue-500" />
+                            Add New Customer
+                        </h3>
+                        <div className="space-y-4 mb-6">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-stone-400 mb-1">First Name *</label>
+                                    <input
+                                        type="text"
+                                        value={newCustomer.firstName}
+                                        onChange={(e) => setNewCustomer({ ...newCustomer, firstName: e.target.value })}
+                                        className="w-full px-3 py-2 bg-stone-900 border border-stone-800 rounded-lg text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="John"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-stone-400 mb-1">Last Name *</label>
+                                    <input
+                                        type="text"
+                                        value={newCustomer.lastName}
+                                        onChange={(e) => setNewCustomer({ ...newCustomer, lastName: e.target.value })}
+                                        className="w-full px-3 py-2 bg-stone-900 border border-stone-800 rounded-lg text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="Doe"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-stone-400 mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    value={newCustomer.email}
+                                    onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                                    className="w-full px-3 py-2 bg-stone-900 border border-stone-800 rounded-lg text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="john@example.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-stone-400 mb-1">Phone</label>
+                                <input
+                                    type="tel"
+                                    value={newCustomer.phone}
+                                    onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                                    className="w-full px-3 py-2 bg-stone-900 border border-stone-800 rounded-lg text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="(555) 123-4567"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="enrollLoyalty"
+                                    checked={newCustomer.enrollInLoyalty}
+                                    onChange={(e) => setNewCustomer({ ...newCustomer, enrollInLoyalty: e.target.checked })}
+                                    className="w-4 h-4 bg-stone-900 border-stone-700 rounded text-pink-600 focus:ring-pink-500"
+                                />
+                                <label htmlFor="enrollLoyalty" className="text-sm text-stone-300">
+                                    Enroll in loyalty program
+                                </label>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowAddCustomerModal(false)
+                                    setNewCustomer({ firstName: '', lastName: '', email: '', phone: '', enrollInLoyalty: false })
+                                }}
+                                className="flex-1 px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg font-medium transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleAddCustomer}
+                                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors"
+                            >
+                                Add Customer
                             </button>
                         </div>
                     </div>

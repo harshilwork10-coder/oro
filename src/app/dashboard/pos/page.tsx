@@ -18,9 +18,19 @@ import {
     ShoppingBag,
     Tag,
     RotateCcw,
-    ChevronRight
+    ChevronRight,
+    UserPlus,
+    DollarSign
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+
+const LOCATION_NAMES: Record<string, string> = {
+    'cmieuizt9000iwk1l80537w38': 'Downtown Location'
+}
+
+const FRANCHISE_NAMES: Record<string, string> = {
+    'cmieuizro0008wk1lc1q5fvvy': 'Downtown Franchise'
+}
 
 // Types
 interface CartItem {
@@ -43,126 +53,60 @@ interface MenuData {
 interface Transaction {
     id: string
     total: number
-    createdAt: string
     status: string
     paymentMethod: string
+    createdAt: string
+    client?: {
+        firstName: string
+        lastName: string
+    }
     lineItems: any[]
-    client?: { firstName: string, lastName: string }
+}
+
+const SERVICE_CATEGORIES: Record<string, any> = {
+    'THREADING': { icon: Scissors, color: 'text-pink-400', bg: 'bg-pink-400/10', border: 'border-pink-400/20' },
+    'WAXING': { icon: Scissors, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20' },
+    'SPA': { icon: Scissors, color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20' },
+    'ADDITIONS': { icon: Plus, color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20' },
+    'PRODUCTS': { icon: ShoppingBag, color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/20' }
 }
 
 export default function POSPage() {
     const { data: session } = useSession()
-    const [isLoading, setIsLoading] = useState(true)
     const [view, setView] = useState<'POS' | 'HISTORY'>('POS')
-    const [itemView, setItemView] = useState<'SERVICES' | 'PRODUCTS'>('SERVICES')
-
-    const [shift, setShift] = useState<any>(null)
-    const [menu, setMenu] = useState<MenuData>({ services: [], products: [], discounts: [] })
     const [cart, setCart] = useState<CartItem[]>([])
-    const [activeCategory, setActiveCategory] = useState('ALL')
-    const [searchQuery, setSearchQuery] = useState('')
-    const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-
-    const SERVICE_CATEGORIES = {
-        'THREADING': ['Eyebrows', 'Upper & Lower Lips', 'Chin, Neck & Forehead', 'Side Burn Half/Full', 'Full Face (No Neck)'],
-        'WAXING': ['Full Face (No Neck)', 'Arm Half/full Waxing', 'Under Arm Waxing', 'Leg Half/Full Waxing'],
-        'SPA': ['Express Facial', 'Deluxe Facial', 'Anti-Ageing Facial', 'Acne Facial'],
-        'ADDITIONS': ['Eyebrow Tinting', 'Henna Tattoo', 'Natural/Full Eyelashes', 'Touch-ups', 'Eyelash Extension']
-    }
-
-    // History State
+    const [menu, setMenu] = useState<MenuData>({ services: [], products: [], discounts: [] })
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
-
-    // Modals
+    const [isLoading, setIsLoading] = useState(true)
+    const [shift, setShift] = useState<any>(null)
     const [showShiftModal, setShowShiftModal] = useState(false)
+    const [denominations, setDenominations] = useState({
+        hundreds: 0, fifties: 0, twenties: 0, tens: 0, fives: 0, ones: 0,
+        quarters: 0, dimes: 0, nickels: 0, pennies: 0
+    })
+    const [shiftAmount, setShiftAmount] = useState('')
     const [showCheckoutModal, setShowCheckoutModal] = useState(false)
     const [showDiscountModal, setShowDiscountModal] = useState(false)
     const [selectedCartIndex, setSelectedCartIndex] = useState<number | null>(null)
     const [discountValue, setDiscountValue] = useState('')
-    const [shiftAmount, setShiftAmount] = useState('')
-    const [denominations, setDenominations] = useState({
-        hundreds: 0,
-        fifties: 0,
-        twenties: 0,
-        tens: 0,
-        fives: 0,
-        ones: 0,
-        quarters: 0,
-        dimes: 0,
-        nickels: 0,
-        pennies: 0
-    })
+    const [activeCategory, setActiveCategory] = useState('ALL')
+    const [searchQuery, setSearchQuery] = useState('')
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
     useEffect(() => {
-        fetchInitialData()
+        fetchMenu()
+        fetchTransactions()
+        checkShift()
     }, [])
 
-
-    useEffect(() => {
-        if (view === 'HISTORY') {
-            fetchTransactions()
-        }
-    }, [view])
-
-    // Sync cart to kiosk display whenever it changes
-    useEffect(() => {
-        const syncCart = async () => {
-            if (!shift) return // Only sync when shift is open
-
-            const { subtotal, tax, totalCash, totalCard } = calculateTotal()
-
-            try {
-                await fetch('/api/pos/cart', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        items: cart.map(item => {
-                            const itemSubtotal = getItemPrice(item)
-                            return {
-                                name: item.name,
-                                type: item.type,
-                                price: itemSubtotal / item.quantity, // Per-item discounted price
-                                cashPrice: itemSubtotal / item.quantity, // Same as price for cash
-                                cardPrice: (itemSubtotal / item.quantity) * 1.0399, // Card surcharge per item
-                                quantity: item.quantity,
-                                icon: item.type === 'SERVICE' ? '✂️' : '🛍️'
-                            }
-                        }),
-                        subtotal,
-                        tax,
-                        total: totalCash,
-                        totalCard,
-                        status: cart.length > 0 ? 'ACTIVE' : 'IDLE'
-                    })
-                })
-            } catch (error) {
-                console.error('Failed to sync cart to kiosk:', error)
-            }
-        }
-
-        syncCart()
-    }, [cart, shift])
-
-    const fetchInitialData = async () => {
+    const fetchMenu = async () => {
         try {
-            const [menuRes, shiftRes] = await Promise.all([
-                fetch('/api/pos/menu'),
-                fetch('/api/pos/shift')
-            ])
-
-            if (menuRes.ok) {
-                const menuData = await menuRes.json()
-                setMenu(menuData)
-            }
-
-            if (shiftRes.ok) {
-                const shiftData = await shiftRes.json()
-                setShift(shiftData.session)
-                if (!shiftData.session) setShowShiftModal(true)
-            }
+            const res = await fetch('/api/pos/menu')
+            const data = await res.json()
+            setMenu(data)
         } catch (error) {
-            console.error('Error fetching POS data:', error)
+            console.error('Failed to fetch menu:', error)
         } finally {
             setIsLoading(false)
         }
@@ -170,37 +114,55 @@ export default function POSPage() {
 
     const fetchTransactions = async () => {
         try {
-            const res = await fetch('/api/pos/transactions')
-            if (res.ok) {
-                const data = await res.json()
-                setTransactions(data)
-            }
+            const res = await fetch('/api/pos/transaction')
+            const data = await res.json()
+            setTransactions(data)
         } catch (error) {
-            console.error('Error fetching transactions:', error)
+            console.error('Failed to fetch transactions:', error)
         }
     }
 
-    const handleShiftAction = async (action: 'OPEN' | 'CLOSE') => {
+    const checkShift = async () => {
+        try {
+            const res = await fetch('/api/pos/shift')
+            const data = await res.json()
+            if (data.shift) {
+                setShift(data.shift)
+            } else {
+                setShift(null)
+                setShowShiftModal(true)
+            }
+        } catch (error) {
+            console.error('Failed to check shift:', error)
+        }
+    }
+
+    const handleShiftAction = async (action: 'OPEN' | 'CLOSE' | 'DROP') => {
         try {
             const res = await fetch('/api/pos/shift', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action,
-                    amount: parseFloat(shiftAmount) || 0,
-                    notes: action === 'CLOSE' ? 'Closed via POS' : 'Opened via POS'
+                    amount: parseFloat(shiftAmount),
+                    denominations
                 })
             })
 
             if (res.ok) {
                 const data = await res.json()
-                setShift(action === 'OPEN' ? data : null)
+                setShift(data.shift)
                 setShowShiftModal(false)
+                setDenominations({
+                    hundreds: 0, fifties: 0, twenties: 0, tens: 0, fives: 0, ones: 0,
+                    quarters: 0, dimes: 0, nickels: 0, pennies: 0
+                })
+                setShiftAmount('')
                 if (action === 'CLOSE') {
                     setCart([])
-                    setView('POS')
-                } else if (action === 'OPEN') {
-                    // Auto-open customer display on second screen
+                    alert('Shift Closed Successfully')
+                }
+                if (action === 'OPEN') {
                     const kioskUrl = window.location.origin + '/kiosk'
                     window.open(kioskUrl, 'CustomerDisplay', 'width=1920,height=1080,left=1920,top=0')
                 }
@@ -211,6 +173,11 @@ export default function POSPage() {
     }
 
     const addToCart = (item: any, type: 'SERVICE' | 'PRODUCT') => {
+        if (!shift) {
+            alert('Please open a shift first')
+            setShowShiftModal(true)
+            return
+        }
         const newItem: CartItem = {
             id: item.id,
             type,
@@ -460,6 +427,19 @@ export default function POSPage() {
 
     const { subtotal, tax, totalCash, totalCard } = calculateTotal()
 
+    const getFilteredItems = () => {
+        if (searchQuery) {
+            return [...menu.services, ...menu.products].filter(item =>
+                item.name.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+        }
+        if (!selectedCategory) return []
+        if (selectedCategory === 'PRODUCTS') return menu.products
+        return menu.services.filter(s => s.category === selectedCategory)
+    }
+
+    const filteredItems = getFilteredItems()
+
     return (
         <div className="flex h-screen bg-stone-950 overflow-hidden">
             {/* Left Side: Content Area */}
@@ -494,172 +474,148 @@ export default function POSPage() {
                                 />
                             </div>
                         )}
+
+                        {view === 'HISTORY' && (
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
+                                <input
+                                    type="text"
+                                    placeholder="Search transactions..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="bg-stone-800 border-none rounded-lg pl-10 pr-4 py-2 text-stone-200 focus:ring-1 focus:ring-orange-500 w-64"
+                                />
+                            </div>
+                        )}
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="text-right hidden lg:block">
-                            <p className="text-sm font-medium text-white">{session?.user?.name}</p>
-                            <p className="text-xs text-emerald-400">Shift Open</p>
-                        </div>
-                        <button
-                            onClick={() => { setShowShiftModal(true); setShift(null); }}
-                            className="p-2 bg-stone-800 hover:bg-red-900/20 hover:text-red-400 text-stone-400 rounded-lg transition-colors"
-                            title="Close Shift"
-                        >
-                            <LogOut className="h-5 w-5" />
-                        </button>
+                    <div className="flex flex-col items-end mr-4 text-xs text-stone-500">
+                        {(session?.user as any)?.locationId && (
+                            <div>
+                                <span className="font-medium text-stone-400">Loc: </span>
+                                {LOCATION_NAMES[(session?.user as any).locationId] || (session?.user as any).locationId}
+                            </div>
+                        )}
+                        {(session?.user as any)?.franchiseId && (
+                            <div>
+                                <span className="font-medium text-stone-400">Fran: </span>
+                                {FRANCHISE_NAMES[(session?.user as any).franchiseId] || (session?.user as any).franchiseId}
+                            </div>
+                        )}
                     </div>
+
+                    {view === 'POS' && (
+                        <button
+                            onClick={() => {
+                                if (!shift) {
+                                    setShowShiftModal(true)
+                                } else {
+                                    // Logic to add a new customer or other POS actions
+                                }
+                            }}
+                            className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
+                        >
+                            <UserPlus className="h-4 w-4" />
+                            New Customer
+                        </button>
+                    )}
+
+                    {view === 'HISTORY' && (
+                        <button
+                            onClick={() => setShowShiftModal(true)}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
+                        >
+                            <DollarSign className="h-4 w-4" />
+                            {shift ? 'Close Shift' : 'Open Shift'}
+                        </button>
+                    )}
                 </div>
 
-                {/* Main Content */}
+                {/* Main Content Area */}
                 <div className="flex-1 overflow-y-auto p-6">
                     {view === 'POS' ? (
-                        <div className="space-y-6">
-                            {/* Services/Products Toggle */}
-                            <div className="flex justify-center">
-                                <div className="flex bg-stone-800 rounded-lg p-1.5">
-                                    <button
-                                        onClick={() => { setItemView('SERVICES'); setSelectedCategory(null); }}
-                                        className={`px-8 py-3 rounded-lg text-base font-semibold transition-all ${itemView === 'SERVICES' ? 'bg-orange-600 text-white shadow-lg' : 'text-stone-400 hover:text-white'}`}
-                                    >
-                                        Services
-                                    </button>
-                                    <button
-                                        onClick={() => { setItemView('PRODUCTS'); setSelectedCategory(null); }}
-                                        className={`px-8 py-3 rounded-lg text-base font-semibold transition-all ${itemView === 'PRODUCTS' ? 'bg-emerald-600 text-white shadow-lg' : 'text-stone-400 hover:text-white'}`}
-                                    >
-                                        Products
-                                    </button>
+                        <>
+                            {!selectedCategory && !searchQuery ? (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {Object.keys(SERVICE_CATEGORIES).map(cat => (
+                                        <button
+                                            key={cat}
+                                            onClick={() => setSelectedCategory(cat)}
+                                            className="h-32 bg-stone-900 rounded-xl border border-stone-800 hover:border-orange-500 transition-all flex flex-col items-center justify-center gap-3 group"
+                                        >
+                                            <span className="font-bold text-xl text-stone-300 group-hover:text-white">{cat}</span>
+                                        </button>
+                                    ))}
                                 </div>
-                            </div>
-
-                            {/* Content based on itemView */}
-                            {itemView === 'SERVICES' ? (
-                                !selectedCategory ? (
-                                    /* Service Categories */
-                                    <div className="flex justify-center items-start">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-6xl w-full">
-                                            {Object.keys(SERVICE_CATEGORIES).map((category) => (
-                                                <button
-                                                    key={category}
-                                                    onClick={() => setSelectedCategory(category)}
-                                                    className="aspect-[3/4] bg-stone-900 hover:bg-stone-800 border border-stone-800 hover:border-orange-500/50 rounded-2xl p-8 flex flex-col items-center justify-center gap-6 transition-all group"
-                                                >
-                                                    <div className="h-20 w-20 rounded-full bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-                                                        {category === 'THREADING' && <Scissors className="h-10 w-10 text-orange-400" />}
-                                                        {category === 'WAXING' && <Tag className="h-10 w-10 text-orange-400" />}
-                                                        {category === 'SPA' && <User className="h-10 w-10 text-orange-400" />}
-                                                        {category === 'ADDITIONS' && <Plus className="h-10 w-10 text-orange-400" />}
-                                                    </div>
-                                                    <h3 className="text-2xl font-bold text-white tracking-wider">{category}</h3>
-                                                    <p className="text-stone-500 text-sm font-medium uppercase tracking-widest">Select Category</p>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    /* Services in Selected Category */
-                                    <div className="space-y-6">
-                                        <div className="flex items-center gap-4">
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-4">
+                                        {selectedCategory && (
                                             <button
                                                 onClick={() => setSelectedCategory(null)}
-                                                className="p-3 bg-stone-800 hover:bg-stone-700 rounded-xl text-stone-400 hover:text-white transition-colors"
+                                                className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 transition-colors"
                                             >
                                                 <ChevronRight className="h-6 w-6 rotate-180" />
                                             </button>
-                                            <h2 className="text-3xl font-bold text-white tracking-wide">{selectedCategory}</h2>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                                            {menu.services
-                                                .filter(s => {
-                                                    const categoryServices = SERVICE_CATEGORIES[selectedCategory as keyof typeof SERVICE_CATEGORIES] || []
-                                                    return categoryServices.includes(s.name)
-                                                })
-                                                .map(service => (
-                                                    <button
-                                                        key={service.id}
-                                                        onClick={() => addToCart(service, 'SERVICE')}
-                                                        className="bg-stone-900 hover:bg-stone-800 border border-stone-800 hover:border-orange-500/50 rounded-xl p-4 flex flex-col justify-between gap-3 transition-all group min-h-[160px]"
-                                                    >
-                                                        <div className="w-full text-left">
-                                                            <p className="font-bold text-lg text-stone-200 line-clamp-2 leading-tight">{service.name}</p>
-                                                        </div>
-
-                                                        {/* Dual Pricing */}
-                                                        <div className="flex justify-between w-full gap-2 mt-auto">
-                                                            <div className="flex-1 bg-emerald-900/20 border border-emerald-900/30 p-2 rounded-lg text-center">
-                                                                <div className="text-[10px] text-emerald-500/70 font-bold uppercase tracking-wider mb-0.5">Cash</div>
-                                                                <div className="font-bold text-emerald-400">{formatCurrency(service.price)}</div>
-                                                            </div>
-                                                            <div className="flex-1 bg-blue-900/20 border border-blue-900/30 p-2 rounded-lg text-center">
-                                                                <div className="text-[10px] text-blue-500/70 font-bold uppercase tracking-wider mb-0.5">Card</div>
-                                                                <div className="font-bold text-blue-400">{formatCurrency(service.price * 1.0399)}</div>
-                                                            </div>
-                                                        </div>
-                                                    </button>
-                                                ))}
-                                        </div>
+                                        )}
+                                        <h2 className="text-xl font-bold text-white">{selectedCategory || 'Search Results'}</h2>
                                     </div>
-                                )
-                            ) : (
-                                /* Products Grid - Direct Display */
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                                    {menu.products
-                                        .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                                        .map(product => (
-                                            <button
-                                                key={product.id}
-                                                onClick={() => addToCart(product, 'PRODUCT')}
-                                                className="bg-stone-900 hover:bg-stone-800 border border-stone-800 hover:border-emerald-500/50 rounded-xl p-4 flex flex-col justify-between gap-3 transition-all group min-h-[160px]"
-                                            >
-                                                <div className="w-full text-left">
-                                                    <p className="font-bold text-lg text-stone-200 line-clamp-2 leading-tight">{product.name}</p>
-                                                </div>
 
-                                                {/* Dual Pricing */}
-                                                <div className="flex justify-between w-full gap-2 mt-auto">
-                                                    <div className="flex-1 bg-emerald-900/20 border border-emerald-900/30 p-2 rounded-lg text-center">
-                                                        <div className="text-[10px] text-emerald-500/70 font-bold uppercase tracking-wider mb-0.5">Cash</div>
-                                                        <div className="font-bold text-emerald-400">{formatCurrency(product.price)}</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                        {filteredItems.map(item => (
+                                            <div
+                                                key={item.id}
+                                                onClick={() => {
+                                                    if (!shift) {
+                                                        setShowShiftModal(true)
+                                                    } else {
+                                                        addToCart(item, item.category === 'PRODUCTS' ? 'PRODUCT' : 'SERVICE')
+                                                    }
+                                                }}
+                                                className="bg-stone-900 rounded-xl border border-stone-800 p-4 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-orange-500 transition-colors group"
+                                            >
+                                                {item.image && <img src={item.image} alt={item.name} className="h-24 w-24 object-cover rounded-full mb-2 group-hover:scale-105 transition-transform" />}
+                                                <p className="font-medium text-white text-center">{item.name}</p>
+                                                <div className="flex flex-col gap-0.5 items-center">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-xs text-stone-500">Cash:</span>
+                                                        <span className="text-sm font-semibold text-emerald-400">{formatCurrency(item.price)}</span>
                                                     </div>
-                                                    <div className="flex-1 bg-blue-900/20 border border-blue-900/30 p-2 rounded-lg text-center">
-                                                        <div className="text-[10px] text-blue-500/70 font-bold uppercase tracking-wider mb-0.5">Card</div>
-                                                        <div className="font-bold text-blue-400">{formatCurrency(product.price * 1.0399)}</div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-xs text-stone-500">Card:</span>
+                                                        <span className="text-sm font-semibold text-stone-300">{formatCurrency(item.price * 1.0399)}</span>
                                                     </div>
                                                 </div>
-                                            </button>
+                                            </div>
                                         ))}
+                                    </div>
                                 </div>
                             )}
-                        </div>
+                        </>
                     ) : (
-                        /* History View */
+                        /* Transaction History */
                         <div className="space-y-4">
-                            <h2 className="text-xl font-bold text-white mb-4">Recent Transactions</h2>
-                            <div className="grid gap-4">
-                                {transactions.map(tx => (
-                                    <div key={tx.id} className="bg-stone-900 p-4 rounded-xl border border-stone-800 flex items-center justify-between hover:border-stone-700 transition-colors cursor-pointer" onClick={() => setSelectedTx(tx)}>
-                                        <div className="flex items-center gap-4">
-                                            <div className={`h-10 w-10 rounded-full flex items-center justify-center ${tx.status === 'REFUNDED' ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                                                {tx.status === 'REFUNDED' ? <RotateCcw className="h-5 w-5" /> : <Banknote className="h-5 w-5" />}
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-white">
-                                                    {tx.client ? `${tx.client.firstName} ${tx.client.lastName}` : 'Walk-in Customer'}
-                                                </p>
-                                                <p className="text-sm text-stone-500">{new Date(tx.createdAt).toLocaleString()}</p>
-                                            </div>
+                            {transactions.map(tx => (
+                                <div key={tx.id} className="bg-stone-900 p-4 rounded-xl border border-stone-800 flex items-center justify-between hover:border-stone-700 transition-colors cursor-pointer" onClick={() => setSelectedTx(tx)}>
+                                    <div className="flex items-center gap-4">
+                                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${tx.status === 'REFUNDED' ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                                            {tx.status === 'REFUNDED' ? <RotateCcw className="h-5 w-5" /> : <Banknote className="h-5 w-5" />}
                                         </div>
-                                        <div className="text-right">
-                                            <p className={`font-bold ${tx.status === 'REFUNDED' ? 'text-red-400' : 'text-white'}`}>
-                                                {formatCurrency(tx.total)}
+                                        <div>
+                                            <p className="font-medium text-white">
+                                                {tx.client ? `${tx.client.firstName} ${tx.client.lastName}` : 'Walk-in Customer'}
                                             </p>
-                                            <p className="text-xs text-stone-500 uppercase">{tx.paymentMethod}</p>
+                                            <p className="text-sm text-stone-500">{new Date(tx.createdAt).toLocaleString()}</p>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+                                    <div className="text-right">
+                                        <p className={`font-bold ${tx.status === 'REFUNDED' ? 'text-red-400' : 'text-white'}`}>
+                                            {formatCurrency(tx.total)}
+                                        </p>
+                                        <p className="text-xs text-stone-500 uppercase">{tx.paymentMethod}</p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
@@ -756,21 +712,21 @@ export default function POSPage() {
                                 </div>
                                 <div className="flex justify-between text-sm font-medium text-stone-400">
                                     <span>Total (Card)</span>
-                                    <span>{formatCurrency(totalCard)}</span>
+                                    <span className="text-stone-300">{formatCurrency(totalCard)}</span>
                                 </div>
                             </div>
 
                             <button
                                 onClick={() => setShowCheckoutModal(true)}
                                 disabled={cart.length === 0}
-                                className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold text-xl shadow-lg shadow-orange-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-900/20"
                             >
                                 Checkout
                             </button>
                         </div>
                     </>
                 ) : (
-                    /* Transaction Details View */
+                    /* Transaction Details */
                     selectedTx ? (
                         <div className="flex flex-col h-full">
                             <div className="h-20 border-b border-stone-800 flex items-center justify-between px-6">
@@ -790,8 +746,8 @@ export default function POSPage() {
                                 <div className="space-y-4">
                                     {selectedTx.lineItems.map((item: any, idx: number) => (
                                         <div key={idx} className="flex justify-between text-sm">
-                                            <span className="text-stone-300">{item.quantity}x Item</span>
-                                            <span className="text-white">{formatCurrency(item.total)}</span>
+                                            <span className="text-stone-300">{item.quantity}x {item.name || 'Item'}</span>
+                                            <span className="text-white">{formatCurrency(item.price * item.quantity)}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -814,90 +770,90 @@ export default function POSPage() {
                         </div>
                     )
                 )}
-            </div>
 
-            {/* Checkout Modal */}
-            {showCheckoutModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
-                    <div className="w-full max-w-2xl bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
-                        <div className="p-6 border-b border-stone-800 flex items-center justify-between">
-                            <h2 className="text-2xl font-bold text-white">Payment Method</h2>
-                            <button onClick={() => setShowCheckoutModal(false)} className="text-stone-400 hover:text-white">
-                                <Trash2 className="h-6 w-6 rotate-45" />
-                            </button>
-                        </div>
-
-                        <div className="p-8 grid grid-cols-2 gap-6">
-                            <button
-                                onClick={() => handleCheckout('CASH')}
-                                className="aspect-video bg-emerald-900/20 hover:bg-emerald-900/40 border border-emerald-500/30 hover:border-emerald-500 rounded-xl flex flex-col items-center justify-center gap-4 transition-all group"
-                            >
-                                <Banknote className="h-12 w-12 text-emerald-500 group-hover:scale-110 transition-transform" />
-                                <span className="text-xl font-bold text-emerald-100">Cash</span>
-                            </button>
-
-                            <button
-                                onClick={() => handleCheckout('CREDIT_CARD')}
-                                className="aspect-video bg-blue-900/20 hover:bg-blue-900/40 border border-blue-500/30 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-4 transition-all group"
-                            >
-                                <CreditCard className="h-12 w-12 text-blue-500 group-hover:scale-110 transition-transform" />
-                                <span className="text-xl font-bold text-blue-100">Card</span>
-                                <span className="text-sm text-blue-300">Total: {formatCurrency(totalCard)}</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Discount Modal */}
-            {showDiscountModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
-                        <div className="p-6 border-b border-stone-800 flex justify-between items-center">
-                            <h3 className="text-xl font-bold text-white">Apply Discount</h3>
-                            <button onClick={() => setShowDiscountModal(false)} className="text-stone-400 hover:text-white">
-                                <LogOut className="h-5 w-5 rotate-45" />
-                            </button>
-                        </div>
-                        <div className="p-6">
-                            <label className="block text-sm font-medium text-stone-400 mb-2">Discount Percentage (%)</label>
-                            <div className="flex gap-4">
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={discountValue}
-                                    onChange={(e) => setDiscountValue(e.target.value)}
-                                    className="flex-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 outline-none text-lg"
-                                    placeholder="0"
-                                    autoFocus
-                                />
-                                <button
-                                    onClick={() => {
-                                        if (selectedCartIndex !== null) {
-                                            applyDiscount(selectedCartIndex, parseFloat(discountValue) || 0)
-                                        }
-                                    }}
-                                    className="px-6 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold transition-colors"
-                                >
-                                    Apply
+                {/* Checkout Modal */}
+                {showCheckoutModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+                        <div className="w-full max-w-2xl bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
+                            <div className="p-6 border-b border-stone-800 flex items-center justify-between">
+                                <h2 className="text-2xl font-bold text-white">Payment Method</h2>
+                                <button onClick={() => setShowCheckoutModal(false)} className="text-stone-400 hover:text-white">
+                                    <Trash2 className="h-6 w-6 rotate-45" />
                                 </button>
                             </div>
-                            <div className="grid grid-cols-4 gap-2 mt-4">
-                                {[5, 10, 15, 20, 25, 30, 50, 100].map(pct => (
-                                    <button
-                                        key={pct}
-                                        onClick={() => setDiscountValue(pct.toString())}
-                                        className="py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg text-sm font-medium transition-colors"
-                                    >
-                                        {pct}%
-                                    </button>
-                                ))}
+
+                            <div className="p-8 grid grid-cols-2 gap-6">
+                                <button
+                                    onClick={() => handleCheckout('CASH')}
+                                    className="aspect-video bg-emerald-900/20 hover:bg-emerald-900/40 border border-emerald-500/30 hover:border-emerald-500 rounded-xl flex flex-col items-center justify-center gap-4 transition-all group"
+                                >
+                                    <Banknote className="h-12 w-12 text-emerald-500 group-hover:scale-110 transition-transform" />
+                                    <span className="text-xl font-bold text-emerald-100">Cash</span>
+                                </button>
+
+                                <button
+                                    onClick={() => handleCheckout('CREDIT_CARD')}
+                                    className="aspect-video bg-blue-900/20 hover:bg-blue-900/40 border border-blue-500/30 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-4 transition-all group"
+                                >
+                                    <CreditCard className="h-12 w-12 text-blue-500 group-hover:scale-110 transition-transform" />
+                                    <span className="text-xl font-bold text-blue-100">Card</span>
+                                    <span className="text-sm text-blue-300">Total: {formatCurrency(totalCard)}</span>
+                                </button>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+
+                {/* Discount Modal */}
+                {showDiscountModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+                        <div className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
+                            <div className="p-6 border-b border-stone-800 flex justify-between items-center">
+                                <h3 className="text-xl font-bold text-white">Apply Discount</h3>
+                                <button onClick={() => setShowDiscountModal(false)} className="text-stone-400 hover:text-white">
+                                    <LogOut className="h-5 w-5 rotate-45" />
+                                </button>
+                            </div>
+                            <div className="p-6">
+                                <label className="block text-sm font-medium text-stone-400 mb-2">Discount Percentage (%)</label>
+                                <div className="flex gap-4">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={discountValue}
+                                        onChange={(e) => setDiscountValue(e.target.value)}
+                                        className="flex-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 outline-none text-lg"
+                                        placeholder="0"
+                                        autoFocus
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            if (selectedCartIndex !== null) {
+                                                applyDiscount(selectedCartIndex, parseFloat(discountValue) || 0)
+                                            }
+                                        }}
+                                        className="px-6 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold transition-colors"
+                                    >
+                                        Apply
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-4 gap-2 mt-4">
+                                    {[5, 10, 15, 20, 25, 30, 50, 100].map(pct => (
+                                        <button
+                                            key={pct}
+                                            onClick={() => setDiscountValue(pct.toString())}
+                                            className="py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg text-sm font-medium transition-colors"
+                                        >
+                                            {pct}%
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }

@@ -11,22 +11,22 @@ export async function GET(request: Request) {
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        include: { franchise: true }
+        include: { location: true }
     })
 
-    if (!user?.franchiseId) {
-        return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+    if (!user?.locationId) {
+        return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 
     try {
-        const services = await prisma.service.findMany({
-            where: { franchiseId: user.franchiseId },
+        const items = await prisma.menuItem.findMany({
+            where: { locationId: user.locationId },
             orderBy: { name: 'asc' }
         })
 
-        return NextResponse.json(services)
+        return NextResponse.json(items)
     } catch (error) {
-        console.error('Error fetching services:', error)
+        console.error('Error fetching products:', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }
@@ -39,35 +39,37 @@ export async function POST(request: Request) {
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        include: { franchise: true }
+        include: { location: true }
     })
 
-    if (!user?.franchiseId) {
-        return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+    if (!user?.locationId) {
+        return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 
     try {
         const body = await request.json()
-        const { name, description, duration, price, category } = body
+        const { name, sku, price, stock, description } = body
 
-        if (!name || !price || !duration) {
+        if (!name || !price) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
-        const service = await prisma.service.create({
+        const item = await prisma.menuItem.create({
             data: {
                 name,
-                description,
-                duration: parseInt(duration),
+                sku,
                 price: parseFloat(price),
-                category,
-                franchiseId: user.franchiseId,
+                stock: parseInt(stock) || 0,
+                description,
+                category: 'RETAIL',
+                type: 'PRODUCT',
+                locationId: user.locationId,
             }
         })
 
-        return NextResponse.json(service)
+        return NextResponse.json(item)
     } catch (error) {
-        console.error('Error creating service:', error)
+        console.error('Error creating product:', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }
@@ -80,42 +82,42 @@ export async function PUT(request: Request) {
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        include: { franchise: true }
+        include: { location: true }
     })
 
-    if (!user?.franchiseId) {
-        return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+    if (!user?.locationId) {
+        return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 
     try {
         const body = await request.json()
-        const { id, name, description, duration, price, category } = body
+        const { id, name, sku, price, stock, description } = body
 
-        if (!id || !name || !price || !duration) {
+        if (!id || !name || !price) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
-        const service = await prisma.service.updateMany({
+        const item = await prisma.menuItem.updateMany({
             where: {
                 id,
-                franchiseId: user.franchiseId // Security: can only update own franchise services
+                locationId: user.locationId
             },
             data: {
                 name,
-                description,
-                duration: parseInt(duration),
+                sku,
                 price: parseFloat(price),
-                category,
+                stock: parseInt(stock) || 0,
+                description,
             }
         })
 
-        if (service.count === 0) {
-            return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+        if (item.count === 0) {
+            return NextResponse.json({ error: 'Product not found' }, { status: 404 })
         }
 
         return NextResponse.json({ success: true })
     } catch (error) {
-        console.error('Error updating service:', error)
+        console.error('Error updating product:', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }
@@ -128,11 +130,11 @@ export async function DELETE(request: Request) {
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        include: { franchise: true }
+        include: { location: true }
     })
 
-    if (!user?.franchiseId) {
-        return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+    if (!user?.locationId) {
+        return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 
     try {
@@ -140,23 +142,23 @@ export async function DELETE(request: Request) {
         const { id } = body
 
         if (!id) {
-            return NextResponse.json({ error: 'Missing service ID' }, { status: 400 })
+            return NextResponse.json({ error: 'Missing product ID' }, { status: 400 })
         }
 
-        const service = await prisma.service.deleteMany({
+        const item = await prisma.menuItem.deleteMany({
             where: {
                 id,
-                franchiseId: user.franchiseId // Security: can only delete own franchise services
+                locationId: user.locationId
             }
         })
 
-        if (service.count === 0) {
-            return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+        if (item.count === 0) {
+            return NextResponse.json({ error: 'Product not found' }, { status: 404 })
         }
 
         return NextResponse.json({ success: true })
     } catch (error) {
-        console.error('Error deleting service:', error)
+        console.error('Error deleting product:', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }

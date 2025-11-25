@@ -207,32 +207,76 @@ async function main() {
             const services = await Promise.all([
                 prisma.service.create({
                     data: {
-                        name: 'Haircut',
-                        description: 'Professional haircut service',
+                        name: 'Eyebrow Threading',
+                        description: 'Professional eyebrow shaping with threading technique',
+                        duration: 20,
+                        price: 15.00,
+                        category: 'THREADING',
+                        franchiseId: franchise.id
+                    }
+                }),
+                prisma.service.create({
+                    data: {
+                        name: 'Upper Lip Threading',
+                        description: 'Upper lip hair removal with threading',
+                        duration: 10,
+                        price: 8.00,
+                        category: 'THREADING',
+                        franchiseId: franchise.id
+                    }
+                }),
+                prisma.service.create({
+                    data: {
+                        name: 'Full Face Threading',
+                        description: 'Complete facial hair removal',
                         duration: 30,
-                        price: 35.00,
+                        price: 25.00,
+                        category: 'THREADING',
                         franchiseId: franchise.id
                     }
                 }),
                 prisma.service.create({
                     data: {
-                        name: 'Hair Coloring',
-                        description: 'Full hair coloring service',
-                        duration: 90,
-                        price: 85.00,
+                        name: 'Eyebrow Waxing',
+                        description: 'Eyebrow shaping with wax',
+                        duration: 15,
+                        price: 18.00,
+                        category: 'WAXING',
                         franchiseId: franchise.id
                     }
                 }),
                 prisma.service.create({
                     data: {
-                        name: 'Styling',
-                        description: 'Hair styling service',
+                        name: 'Facial Waxing',
+                        description: 'Full face waxing service',
+                        duration: 25,
+                        price: 30.00,
+                        category: 'WAXING',
+                        franchiseId: franchise.id
+                    }
+                }),
+                prisma.service.create({
+                    data: {
+                        name: 'Facial Treatment',
+                        description: 'Deep cleansing facial with mask',
+                        duration: 60,
+                        price: 65.00,
+                        category: 'SPA',
+                        franchiseId: franchise.id
+                    }
+                }),
+                prisma.service.create({
+                    data: {
+                        name: 'Henna Design',
+                        description: 'Traditional henna application',
                         duration: 45,
-                        price: 45.00,
+                        price: 40.00,
+                        category: 'ADDITIONS',
                         franchiseId: franchise.id
                     }
                 })
             ])
+
 
             // Create Locations
             for (const locationInfo of franchiseeInfo.locations) {
@@ -379,14 +423,22 @@ async function main() {
     console.log('   Franchisee (Owner): john@aurasalon.com / admin123')
     console.log('   Employee (POS): sarah@aurasalon.com / admin123')
 
-    // Assign test employee to the first location so they can open shifts
-    const firstLocation = await prisma.location.findFirst()
-    if (firstLocation) {
+    // Assign test employee to Aura Downtown so they can open shifts
+    const downtownLocation = await prisma.location.findFirst({
+        where: { name: 'Aura Downtown' }
+    })
+
+    if (downtownLocation) {
         await prisma.user.update({
             where: { email: 'employee@downtown.com' },
-            data: { locationId: firstLocation.id }
+            data: {
+                locationId: downtownLocation.id,
+                franchiseId: downtownLocation.franchiseId
+            }
         })
-        console.log(`✅ Assigned test employee to location: ${firstLocation.name}`)
+        console.log(`✅ Assigned test employee to location: ${downtownLocation.name}`)
+    } else {
+        console.error('❌ Could not find Aura Downtown location to assign to employee')
     }
 }
 

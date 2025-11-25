@@ -1,5 +1,176 @@
-import ComingSoon from '@/components/ui/ComingSoon'
+﻿'use client'
 
-export default function Page() {
-    return <ComingSoon title="Service Management" />
+import { useState, useEffect } from 'react'
+import { Briefcase, Plus, Edit, Trash2, X } from 'lucide-react'
+
+const CATEGORIES = ['THREADING', 'WAXING', 'SPA', 'ADDITIONS']
+
+export default function ServicesPage() {
+    const [services, setServices] = useState([])
+    const [showModal, setShowModal] = useState(false)
+    const [editingService, setEditingService] = useState(null)
+    const [selectedCategory, setSelectedCategory] = useState('ALL')
+    const [loading, setLoading] = useState(true)
+    const [formData, setFormData] = useState({ name: '', category: 'THREADING', price: '', duration: '30', description: '' })
+
+    useEffect(() => { fetchServices() }, [])
+
+    const fetchServices = async () => {
+        try {
+            const res = await fetch('/api/franchise/services')
+            const data = await res.json()
+            setServices(data || [])
+        } catch (error) {
+            console.error('Failed to fetch services:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleSubmit = async (e) => {
+        e.preventDefault()
+        const url = '/api/franchise/services'
+        const method = editingService ? 'PUT' : 'POST'
+        const body = editingService ? { id: editingService.id, ...formData, price: parseFloat(formData.price), duration: parseInt(formData.duration) } : { ...formData, price: parseFloat(formData.price), duration: parseInt(formData.duration) }
+
+        try {
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            })
+            if (res.ok) {
+                await fetchServices()
+                setShowModal(false)
+                setEditingService(null)
+                setFormData({ name: '', category: 'THREADING', price: '', duration: '30', description: '' })
+            }
+        } catch (error) {
+            console.error('Failed to save service:', error)
+        }
+    }
+
+    const handleDelete = async (id) => {
+        if (!confirm('Delete this service?')) return
+        try {
+            const res = await fetch('/api/franchise/services', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            })
+            if (res.ok) await fetchServices()
+        } catch (error) {
+            console.error('Failed to delete service:', error)
+        }
+    }
+
+    const openEdit = (service) => {
+        setEditingService(service)
+        setFormData({ name: service.name, category: service.category, price: service.price.toString(), duration: service.duration?.toString() || '30', description: service.description || '' })
+        setShowModal(true)
+    }
+
+    const filtered = selectedCategory === 'ALL' ? services : services.filter(s => s.category === selectedCategory)
+
+    if (loading) return <div className="flex items-center justify-center h-screen bg-stone-950"><div className="text-orange-500 text-xl">Loading...</div></div>
+
+    return (
+        <div className="p-8 bg-stone-950 min-h-screen">
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <Briefcase className="h-8 w-8 text-orange-500" />
+                        Service Management
+                    </h1>
+                    <p className="text-stone-400 mt-2">Manage services and pricing</p>
+                </div>
+                <button onClick={() => setShowModal(true)} className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold flex items-center gap-2">
+                    <Plus className="h-5 w-5" />
+                    Add Service
+                </button>
+            </div>
+
+            <div className="flex gap-2 mb-6">
+                <button onClick={() => setSelectedCategory('ALL')} className={`px-4 py-2 rounded-lg ${selectedCategory === 'ALL' ? 'bg-orange-600 text-white' : 'bg-stone-900 text-stone-400'}`}>All</button>
+                {CATEGORIES.map(cat => (
+                    <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-lg ${selectedCategory === cat ? 'bg-orange-600 text-white' : 'bg-stone-900 text-stone-400'}`}>{cat}</button>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filtered.map(service => (
+                    <div key={service.id} className="glass-panel p-6 rounded-xl">
+                        <div className="flex items-start justify-between mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-white">{service.name}</h3>
+                                <p className="text-xs text-stone-500 uppercase">{service.category}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => openEdit(service)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-orange-400">
+                                    <Edit className="h-4 w-4" />
+                                </button>
+                                <button onClick={() => handleDelete(service.id)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-red-400">
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            </div>
+                        </div>
+                        {service.description && <p className="text-sm text-stone-400 mb-4">{service.description}</p>}
+                        <div className="space-y-2">
+                            <div className="flex justify-between">
+                                <span className="text-xs text-stone-500">Cash:</span>
+                                <span className="text-sm font-bold text-emerald-400">${Number(service.price).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-xs text-stone-500">Card:</span>
+                                <span className="text-sm font-bold text-stone-300">${(Number(service.price) * 1.0399).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {showModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+                    <div className="w-full max-w-2xl bg-stone-900 rounded-2xl border border-stone-800 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-2xl font-bold text-white">{editingService ? 'Edit' : 'Add'} Service</h2>
+                            <button onClick={() => { setShowModal(false); setEditingService(null); setFormData({ name: '', category: 'THREADING', price: '', duration: '30', description: '' }); }} className="text-stone-400 hover:text-white">
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-stone-300 mb-2">Name</label>
+                                <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-stone-300 mb-2">Category</label>
+                                    <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white">
+                                        {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-stone-300 mb-2">Price</label>
+                                    <input type="number" step="0.01" required value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-stone-300 mb-2">Duration (min)</label>
+                                <input type="number" value={formData.duration} onChange={(e) => setFormData({ ...formData, duration: e.target.value })} className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-stone-300 mb-2">Description</label>
+                                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white" />
+                            </div>
+                            <div className="flex gap-3">
+                                <button type="button" onClick={() => { setShowModal(false); setEditingService(null); }} className="flex-1 px-6 py-3 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg">Cancel</button>
+                                <button type="submit" className="flex-1 px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
 }
