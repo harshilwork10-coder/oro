@@ -18,6 +18,9 @@ import PredictiveAlerts from "@/components/dashboard/PredictiveAlerts"
 import RequestExpansionModal from "@/components/modals/RequestExpansionModal"
 import ConsultationRequestModal from "@/components/modals/ConsultationRequestModal"
 import MerchantApplicationModal from "@/components/modals/MerchantApplicationModal"
+import CheckInQueue from "@/components/dashboard/employee/CheckInQueue"
+import TodayAppointments from "@/components/dashboard/employee/TodayAppointments"
+import UpcomingAppointments from "@/components/dashboard/employee/UpcomingAppointments"
 import { useState } from "react"
 
 export default function DashboardPage() {
@@ -398,7 +401,33 @@ export default function DashboardPage() {
         )
     }
 
-    // Default dashboard for other roles (Franchisee / Employee)
+    // Employee Dashboard
+    if (role === 'EMPLOYEE' || role === 'USER') {
+        return (
+            <div className="p-4 md:p-8 space-y-6">
+                {/* Header */}
+                <div>
+                    <h1 className="text-3xl font-bold text-stone-100">
+                        Welcome back, {session?.user?.name || 'Employee'}! 👋
+                    </h1>
+                    <p className="text-stone-400 mt-2">
+                        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </p>
+                </div>
+
+                {/* Main Grid - Queue and Today's Appointments */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <CheckInQueue />
+                    <TodayAppointments />
+                </div>
+
+                {/* Upcoming Appointments */}
+                <UpcomingAppointments />
+            </div>
+        )
+    }
+
+    // Default dashboard for other roles (Franchisee / Manager)
     const [isExpansionModalOpen, setIsExpansionModalOpen] = useState(false)
     const [isConsultationModalOpen, setIsConsultationModalOpen] = useState(false)
     const [isMerchantApplicationModalOpen, setIsMerchantApplicationModalOpen] = useState(false)
@@ -519,10 +548,10 @@ export default function DashboardPage() {
                         <div>
                             <p className="text-sm font-medium text-stone-400">Today's Revenue</p>
                             <p className="text-3xl font-bold text-stone-100 mt-2">${todayStats.revenue.toFixed(2)}</p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
         </div>
     )
 }

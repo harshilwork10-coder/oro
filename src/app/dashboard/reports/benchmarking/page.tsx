@@ -2,8 +2,9 @@
 
 import ReportPageLayout from "@/components/reports/ReportPageLayout"
 import { BarChart3, ArrowRight } from "lucide-react"
+import { WithReportPermission } from "@/components/reports/WithReportPermission"
 
-export default function BenchmarkingReportPage() {
+function BenchmarkingReportPage() {
     // Mock data
     const benchmarkData = [
         { id: 1, location: "Aura Downtown", revenuePerSqFt: 450, salesPerLaborHour: 54.40, profitMargin: 23.6, compliance: 98 },
@@ -56,5 +57,14 @@ export default function BenchmarkingReportPage() {
                 </div>
             </div>
         </ReportPageLayout>
+    )
+}
+
+// Wrap with permission check - Benchmarking report
+export default function ProtectedBenchmarkingReport() {
+    return (
+        <WithReportPermission reportType="benchmarking">
+            <BenchmarkingReportPage />
+        </WithReportPermission>
     )
 }

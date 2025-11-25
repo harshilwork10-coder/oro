@@ -2,8 +2,9 @@
 
 import ReportPageLayout from "@/components/reports/ReportPageLayout"
 import { DollarSign, TrendingUp, AlertCircle, CheckCircle } from "lucide-react"
+import { WithReportPermission } from "@/components/reports/WithReportPermission"
 
-export default function RoyaltyRevenueReportPage() {
+function RoyaltyRevenueReportPage() {
     // Mock data
     const royalties = [
         { id: 1, location: "Aura Downtown", franchisee: "John Smith", sales: 45000, rate: 0.06, amount: 2700, status: "PAID", date: "2024-11-01" },
@@ -107,5 +108,14 @@ export default function RoyaltyRevenueReportPage() {
                 </div>
             </div>
         </ReportPageLayout>
+    )
+}
+
+// Wrap with permission check - Royalties is a financial report
+export default function ProtectedRoyaltyReport() {
+    return (
+        <WithReportPermission reportType="financial">
+            <RoyaltyRevenueReportPage />
+        </WithReportPermission>
     )
 }

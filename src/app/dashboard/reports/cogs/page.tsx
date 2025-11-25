@@ -2,8 +2,9 @@
 
 import ReportPageLayout from "@/components/reports/ReportPageLayout"
 import { Package, AlertTriangle, TrendingUp } from "lucide-react"
+import { WithReportPermission } from "@/components/reports/WithReportPermission"
 
-export default function COGSReportPage() {
+function COGSReportPage() {
     // Mock data
     const cogsData = [
         { id: 1, location: "Aura Downtown", revenue: 68000, cogs: 19500, cogsPercent: 28.6, waste: 2.1, turnover: 4.5 },
@@ -85,5 +86,14 @@ export default function COGSReportPage() {
                 </div>
             </div>
         </ReportPageLayout>
+    )
+}
+
+// Wrap with permission check - COGS is a financial report
+export default function ProtectedCOGSReport() {
+    return (
+        <WithReportPermission reportType="financial">
+            <COGSReportPage />
+        </WithReportPermission>
     )
 }

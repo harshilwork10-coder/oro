@@ -17,7 +17,11 @@ model User {
   password    String?   // Optional for passwordless/PIN users
   pin         String?   // Hashed 4-digit PIN for quick login
   image       String?
-  role        String   @default("USER") // USER, PROVIDER, FRANCHISEE, FRANCHISOR, ADMINPLOYEE
+  role        String   @default("EMPLOYEE") // Will migrate to Enum in next step, keeping string for now to avoid breaking existing data immediately, but logic will use Enum values: FRANCHISOR, FRANCHISEE, MANAGER, SHIFT_SUPERVISOR, EMPLOYEE
+  
+  // Permissions - Now role-based with overrides
+  customPermissions String? // Stored as JSON string for SQLite compatibility if needed, or use Json type if supported. Prisma SQLite supports Json.
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

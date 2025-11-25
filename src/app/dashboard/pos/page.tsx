@@ -199,6 +199,10 @@ export default function POSPage() {
                 if (action === 'CLOSE') {
                     setCart([])
                     setView('POS')
+                } else if (action === 'OPEN') {
+                    // Auto-open customer display on second screen
+                    const kioskUrl = window.location.origin + '/kiosk'
+                    window.open(kioskUrl, 'CustomerDisplay', 'width=1920,height=1080,left=1920,top=0')
                 }
             }
         } catch (error) {

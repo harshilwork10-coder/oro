@@ -30,7 +30,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import BreadLogo from '@/components/ui/BreadLogo'
-import { hasPermission, PERMISSIONS } from '@/lib/permissions'
+import { hasPermission, Role } from '@/lib/permissions'
 
 interface SidebarProps {
     isOpen: boolean
@@ -66,61 +66,73 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag }, // New Inventory
     ]
 
-    // Franchisor Navigation (Franchise Company - manages their franchisees, NOT employees)
+    // Franchisor Navigation (Brand Owner - manages franchisees and global catalog)
     const franchisorLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Franchisees', href: '/dashboard/franchisees', icon: Users },
+        { name: 'Global Catalog', href: '/dashboard/catalog', icon: Globe },
         { name: 'Success Scoring', href: '/dashboard/success-scoring', icon: BarChart3 },
-        { name: 'Alerts', href: '/dashboard/alerts', icon: Bell },
-        { name: 'Locations', href: '/dashboard/locations', icon: MapPin },
         { name: 'Benchmarking', href: '/dashboard/benchmarking', icon: BarChart3 },
-        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar, permission: null }, // Always visible
-        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar, permission: PERMISSIONS.MANAGE_SCHEDULE },
-        { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock, permission: null }, // Visible to everyone
-        { name: 'Employees', href: '/dashboard/employees', icon: Users, permission: PERMISSIONS.MANAGE_EMPLOYEES },
-        { name: 'Services', href: '/dashboard/services', icon: Briefcase, permission: PERMISSIONS.MANAGE_SERVICES },
-        { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag, permission: PERMISSIONS.MANAGE_INVENTORY },
-        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText, permission: PERMISSIONS.VIEW_REPORTS },
-        { name: 'Customers', href: '/dashboard/customers', icon: Users, permission: null },
-        { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart, permission: null }, // Visible to all
-        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift, permission: null }, // Visible to all
+        { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+        { name: 'Reports', href: '/dashboard/reports', icon: FileText },
+        { name: 'Compliance', href: '/dashboard/compliance', icon: Shield },
+        { name: 'Alerts', href: '/dashboard/alerts', icon: Bell },
     ]
 
-    // Franchise Level Navigation (Franchisees & Employees)
-    const allFranchiseLinks = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission: null }, // Always visible
-        { name: 'POS', href: '/dashboard/pos', icon: CreditCard, permission: null }, // Always visible
-        { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones, permission: null, employeeOnly: true }, // Only for employees
-        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar, permission: null }, // Always visible
-        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar, permission: PERMISSIONS.MANAGE_SCHEDULE },
-        { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock, permission: null }, // Visible to everyone
-        { name: 'Employees', href: '/dashboard/employees', icon: Users, permission: PERMISSIONS.MANAGE_EMPLOYEES },
-        { name: 'Services', href: '/dashboard/services', icon: Briefcase, permission: PERMISSIONS.MANAGE_SERVICES },
-        { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag, permission: PERMISSIONS.MANAGE_INVENTORY },
-        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText, permission: PERMISSIONS.VIEW_REPORTS },
-        { name: 'Customers', href: '/dashboard/customers', icon: Users, permission: null },
-        { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart, permission: null }, // Visible to all
-        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift, permission: null }, // Visible to all
+    // Franchisee Navigation (Location Owner - manages own locations)
+    const franchiseeLinks = [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
+        { name: 'My Locations', href: '/dashboard/locations', icon: MapPin },
+        { name: 'Employees', href: '/dashboard/employees', icon: Users },
+        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
+        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar },
+        { name: 'Services', href: '/dashboard/services', icon: Briefcase },
+        { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
+        { name: 'Customers', href: '/dashboard/customers', icon: Users },
+        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
+        { name: 'Financials', href: '/dashboard/financials', icon: DollarSign },
+        { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart },
+        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift },
     ]
 
-    // Filter links based on permissions and role
-    const franchiseLinks = allFranchiseLinks.filter(link => {
-        // Check permission first
-        if (!hasPermission(session?.user as any, link.permission as any)) {
-            return false
-        }
-        // If employeeOnly flag is set, only show for employees
-        if ((link as any).employeeOnly && session?.user?.role !== 'EMPLOYEE') {
-            return false
-        }
-        return true
-    })
+    // Manager Navigation (Operations Manager - runs daily operations)
+    const managerLinks = [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
+        { name: 'Employees', href: '/dashboard/employees', icon: Users },
+        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar },
+        { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock },
+        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
+        { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
+        { name: 'Services', href: '/dashboard/services', icon: Briefcase },
+        { name: 'Customers', href: '/dashboard/customers', icon: Users },
+        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
+        { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart },
+        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift },
+    ]
 
-    const links = session?.user?.role === 'PROVIDER'
-        ? providerLinks
-        : session?.user?.role === 'FRANCHISOR'
-            ? franchisorLinks
-            : franchiseLinks
+    // Employee Navigation (Front-line Staff - limited access)
+    const employeeLinks = [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
+        { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock },
+        { name: 'My Schedule', href: '/dashboard/schedule/me', icon: Calendar },
+        { name: 'My Performance', href: '/dashboard/employee/me', icon: UserCircle },
+        { name: 'Z Report', href: '/dashboard/reports/z-report', icon: FileText },
+        { name: 'Customers', href: '/dashboard/customers', icon: Users },
+        { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart },
+        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift },
+        { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones },
+    ]
+
+    // Select navigation based on role
+    const links =
+        session?.user?.role === Role.PROVIDER ? providerLinks :
+            session?.user?.role === Role.FRANCHISOR ? franchisorLinks :
+                session?.user?.role === Role.FRANCHISEE ? franchiseeLinks :
+                    session?.user?.role === Role.MANAGER ? managerLinks :
+                        employeeLinks  // Default to employee for EMPLOYEE or USER roles
 
     return (
         <>
@@ -209,9 +221,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 {session?.user?.name}
                             </p>
                             <p className="text-xs text-stone-500">
-                                {role === 'PROVIDER' ? 'Super Admin' :
-                                    role === 'FRANCHISOR' ? 'Franchise Owner' :
-                                        role === 'FRANCHISEE' ? 'Franchisee' : 'Employee'}
+                                {role === 'PROVIDER' ? 'Platform Owner' :
+                                    role === 'FRANCHISOR' ? 'Brand Owner' :
+                                        role === 'FRANCHISEE' ? 'Location Owner' :
+                                            role === 'MANAGER' ? 'Operations Manager' : 'Employee'}
                             </p>
                         </div>
                     </div>

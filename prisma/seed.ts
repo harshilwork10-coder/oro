@@ -7,29 +7,102 @@ async function main() {
     console.log('🌱 Starting multi-tenant database seed...')
 
     // Clear existing data
+    // Clear existing data with FKs disabled to avoid circular dependency issues
     console.log('🗑️  Clearing existing data...')
-    await prisma.transaction.deleteMany()
-    // await prisma.appointmentPayment.deleteMany()
-    await prisma.appointment.deleteMany()
-    await prisma.client.deleteMany()
-    await prisma.service.deleteMany()
-    await prisma.user.deleteMany()
-    await prisma.location.deleteMany()
-    await prisma.franchise.deleteMany()
-    await prisma.franchisor.deleteMany()
+    try {
+        await prisma.$executeRawUnsafe('PRAGMA foreign_keys = OFF;')
+        await prisma.transaction.deleteMany()
+        await prisma.appointment.deleteMany()
+        await prisma.client.deleteMany()
+        await prisma.service.deleteMany()
+        await prisma.user.deleteMany()
+        await prisma.location.deleteMany()
+        await prisma.franchise.deleteMany()
+        await prisma.franchisor.deleteMany()
+        await prisma.globalService.deleteMany()
+        await prisma.globalProduct.deleteMany()
+        await prisma.product.deleteMany()
+        await prisma.membershipPlan.deleteMany()
+        await prisma.clientMembership.deleteMany()
+        await prisma.supplier.deleteMany()
+        await prisma.purchaseOrder.deleteMany()
+        await prisma.timeEntry.deleteMany()
+        await prisma.cashDrawerSession.deleteMany()
+        await prisma.commissionRule.deleteMany()
+        await prisma.loyaltyProgram.deleteMany()
+        await prisma.giftCard.deleteMany()
+        await prisma.discount.deleteMany()
+        await prisma.magicLink.deleteMany()
+        await prisma.post.deleteMany()
+        await prisma.comment.deleteMany()
+        await prisma.vote.deleteMany()
+        await prisma.userBadge.deleteMany()
+        await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON;')
+    } catch (error) {
+        console.error('Error clearing data:', error)
+    }
 
     const hashedPassword = await hash('admin123', 10)
+    const hashedTestPassword = await hash('password123', 10)
 
     // Create Provider (Platform Admin)
     console.log('👤 Creating Provider (Platform Admin)...')
     const provider = await prisma.user.create({
         data: {
             name: 'Platform Admin',
-            email: 'admin@example.com',
-            password: hashedPassword,
+            email: 'provider@aura.com',
+            password: hashedTestPassword,
+            pin: await hash('1111', 10),
             role: 'PROVIDER'
         }
     })
+
+    // Create dedicated test users for each role
+    console.log('👥 Creating test users for each role...')
+
+    const testManager = await prisma.user.create({
+        data: {
+            name: 'Test Manager',
+            email: 'manager@downtown.com',
+            password: hashedTestPassword,
+            pin: await hash('4444', 10),
+            role: 'MANAGER',
+            canManageEmployees: true,
+            canManageShifts: true,
+            canManageInventory: true,
+            canViewReports: true,
+            canProcessRefunds: true
+        }
+    })
+
+    const testEmployee = await prisma.user.create({
+        data: {
+            name: 'Test Employee',
+            email: 'employee@downtown.com',
+            password: hashedTestPassword,
+            pin: await hash('5555', 10),
+            role: 'EMPLOYEE',
+            canClockIn: true,
+            canClockOut: true
+        }
+    })
+
+    const testFranchisor = await prisma.user.create({
+        data: {
+            name: 'Test Franchisor',
+            email: 'franchisor@downtown.com',
+            password: hashedTestPassword,
+            pin: await hash('2222', 10),
+            role: 'FRANCHISOR'
+        }
+    })
+
+    console.log('✅ Test users created:')
+    console.log('   Provider: provider@aura.com / password123')
+    console.log('   Franchisor: franchisor@downtown.com / password123')
+    console.log('   Franchisee: (use sarah@aurasalon.com / admin123)')
+    console.log('   Manager: manager@downtown.com / password123')
+    console.log('   Employee: employee@downtown.com / password123')
 
     // Create 2 Franchisors (Brand Companies)
     console.log('🏢 Creating Franchisors (Brand Companies)...')
@@ -173,12 +246,30 @@ async function main() {
 
                 const employees = []
 
+                // Create a Manager for the first location
+                if (locationInfo === franchiseeInfo.locations[0]) {
+                    const managerEmail = `manager.${franchiseeInfo.name.split(' ')[0].toLowerCase()}@${franchisor.name.toLowerCase().replace(' ', '')}.com`
+                    const manager = await prisma.user.create({
+                        data: {
+                            name: `Manager - ${franchiseeInfo.name}`,
+                            email: managerEmail,
+                            password: hashedPassword, // admin123
+                            role: 'MANAGER',
+                            franchiseId: franchise.id,
+                            locationId: location.id
+                        }
+                    })
+                    employees.push(manager)
+                    console.log(`      👤 Created Manager: ${manager.name} (${managerEmail})`)
+                }
+
                 // Create a dedicated test employee for POS with simple credentials (only for first location)
                 if (locationInfo === franchiseeInfo.locations[0]) {
+                    const testEmail = `sarah.${franchiseeInfo.name.split(' ')[0].toLowerCase()}@${franchisor.name.toLowerCase().replace(' ', '')}.com`
                     const testEmployee = await prisma.user.create({
                         data: {
                             name: 'Sarah Martinez',
-                            email: 'sarah@aurasalon.com',
+                            email: testEmail,
                             password: hashedPassword, // admin123
                             role: 'EMPLOYEE',
                             franchiseId: franchise.id,
@@ -186,6 +277,7 @@ async function main() {
                         }
                     })
                     employees.push(testEmployee)
+                    console.log(`      👤 Created Test Employee: Sarah (${testEmail})`)
                 }
 
                 // Create 3-8 additional employees per location
@@ -286,6 +378,16 @@ async function main() {
     console.log('   Beauty Co Franchisor: admin@beautyco.com / admin123')
     console.log('   Franchisee (Owner): john@aurasalon.com / admin123')
     console.log('   Employee (POS): sarah@aurasalon.com / admin123')
+
+    // Assign test employee to the first location so they can open shifts
+    const firstLocation = await prisma.location.findFirst()
+    if (firstLocation) {
+        await prisma.user.update({
+            where: { email: 'employee@downtown.com' },
+            data: { locationId: firstLocation.id }
+        })
+        console.log(`✅ Assigned test employee to location: ${firstLocation.name}`)
+    }
 }
 
 main()

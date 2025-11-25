@@ -2,8 +2,9 @@
 
 import ReportPageLayout from "@/components/reports/ReportPageLayout"
 import { ShieldCheck, AlertCircle, CheckCircle, XCircle } from "lucide-react"
+import { WithReportPermission } from "@/components/reports/WithReportPermission"
 
-export default function ComplianceReportPage() {
+function ComplianceReportPage() {
     // Mock data
     const complianceData = [
         { id: 1, location: "Aura Downtown", score: 98, healthSafety: 100, brandStandards: 95, operational: 99, status: "EXCELLENT", lastAudit: "2024-11-15" },
@@ -102,5 +103,14 @@ export default function ComplianceReportPage() {
                 </div>
             </div>
         </ReportPageLayout>
+    )
+}
+
+// Wrap with permission check - Compliance report
+export default function ProtectedComplianceReport() {
+    return (
+        <WithReportPermission reportType="compliance">
+            <ComplianceReportPage />
+        </WithReportPermission>
     )
 }

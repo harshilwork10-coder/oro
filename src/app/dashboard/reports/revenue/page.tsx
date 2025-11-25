@@ -2,8 +2,9 @@
 
 import ReportPageLayout from "@/components/reports/ReportPageLayout"
 import { TrendingUp, TrendingDown, DollarSign } from "lucide-react"
+import { WithReportPermission } from "@/components/reports/WithReportPermission"
 
-export default function RevenueReportPage() {
+function RevenueReportPage() {
     // Mock data
     const revenueData = [
         { id: 1, location: "Aura Downtown", daily: 2100, weekly: 15400, monthly: 68000, ytd: 750000, trend: "UP", percent: 18 },
@@ -58,5 +59,14 @@ export default function RevenueReportPage() {
                 </div>
             </div>
         </ReportPageLayout>
+    )
+}
+
+// Wrap with permission check - Revenue is a financial report
+export default function ProtectedRevenueReport() {
+    return (
+        <WithReportPermission reportType="financial">
+            <RevenueReportPage />
+        </WithReportPermission>
     )
 }

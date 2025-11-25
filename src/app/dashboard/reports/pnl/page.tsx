@@ -2,8 +2,9 @@
 
 import ReportPageLayout from "@/components/reports/ReportPageLayout"
 import { DollarSign, TrendingUp, TrendingDown, PieChart } from "lucide-react"
+import { WithReportPermission } from "@/components/reports/WithReportPermission"
 
-export default function PnLReportPage() {
+function PnLReportPage() {
     // Mock data
     const pnlData = [
         { id: 1, location: "Aura Downtown", revenue: 45000, cogs: 12600, labor: 13500, rent: 4500, marketing: 2250, other: 1500, netProfit: 10650, margin: 23.6 },
@@ -22,7 +23,7 @@ export default function PnLReportPage() {
             title="Profit & Loss by Location"
             description="Detailed breakdown of revenue, expenses, and net profit margins for each location."
         >
-            {/* KPI Cards */}
+            {/* K PI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="glass-panel p-4 rounded-xl border-l-4 border-emerald-500">
                     <p className="text-sm text-stone-500 mb-1">Total Network Profit</p>
@@ -92,5 +93,14 @@ export default function PnLReportPage() {
                 </div>
             </div>
         </ReportPageLayout>
+    )
+}
+
+// Wrap with permission check - P&L is a financial report
+export default function ProtectedPnLReport() {
+    return (
+        <WithReportPermission reportType="financial">
+            <PnLReportPage />
+        </WithReportPermission>
     )
 }

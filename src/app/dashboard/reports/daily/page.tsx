@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { Calendar, DollarSign, TrendingUp, Users, CreditCard, Download, Loader2, Printer } from 'lucide-react'
+import { WithReportPermission } from '@/components/reports/WithReportPermission'
 
-export default function DailyReportPage() {
+function DailyReportPageContent() {
     const [reportData, setReportData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
