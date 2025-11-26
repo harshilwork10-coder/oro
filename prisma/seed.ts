@@ -183,9 +183,13 @@ async function main() {
 
         // Create Franchisees for this Franchisor
         for (const franchiseeInfo of franchisorInfo.franchisees) {
+            const franchiseName = `${franchiseeInfo.name}'s ${franchisor.name}`
+            const franchiseSlug = franchiseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+
             const franchise = await prisma.franchise.create({
                 data: {
-                    name: `${franchiseeInfo.name}'s ${franchisor.name}`,
+                    name: franchiseName,
+                    slug: franchiseSlug,
                     franchisorId: franchisor.id
                 }
             })
@@ -280,9 +284,12 @@ async function main() {
 
             // Create Locations
             for (const locationInfo of franchiseeInfo.locations) {
+                const locationSlug = locationInfo.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+
                 const location = await prisma.location.create({
                     data: {
                         name: locationInfo.name,
+                        slug: locationSlug,
                         address: locationInfo.address,
                         franchiseId: franchise.id
                     }

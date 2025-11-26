@@ -50,7 +50,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Interventions', href: '/dashboard/interventions', icon: AlertTriangle },
         { name: 'Community', href: '/dashboard/community', icon: Users },
         { name: 'Leaderboard', href: '/dashboard/leaderboard', icon: Trophy },
-        { name: 'Success Scoring', href: '/dashboard/success-scoring', icon: BarChart3 },
+        // { name: 'Success Scoring', href: '/dashboard/success-scoring', icon: BarChart3 },
         { name: 'Alerts', href: '/dashboard/alerts', icon: Bell },
         { name: 'Franchisees', href: '/dashboard/franchisees', icon: Users },
         { name: 'Locations', href: '/dashboard/locations', icon: MapPin },
@@ -71,7 +71,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Franchisees', href: '/dashboard/franchisees', icon: Users },
         { name: 'Global Catalog', href: '/dashboard/catalog', icon: Globe },
-        { name: 'Success Scoring', href: '/dashboard/success-scoring', icon: BarChart3 },
+        // { name: 'Success Scoring', href: '/dashboard/success-scoring', icon: BarChart3 },
         { name: 'Benchmarking', href: '/dashboard/benchmarking', icon: BarChart3 },
         { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText },
@@ -161,7 +161,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                         <div className="flex items-center gap-3 group">
                             <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
                                 <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                <BreadLogo size={32} className="relative z-10 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
+                                <BreadLogo size={100} className="relative z-10 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
                             </div>
                             <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-amber-200 to-orange-400 bg-clip-text text-transparent bg-[length:200%_auto] animate-text-shimmer">
                                 Aura

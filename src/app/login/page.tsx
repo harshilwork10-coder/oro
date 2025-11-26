@@ -48,10 +48,10 @@ export default function LoginPage() {
 
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-8">
-                        <div className="h-16 w-16 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20 shadow-lg shadow-orange-900/20">
-                            <BreadLogo size={48} />
+                        <div className="h-24 w-24 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20 shadow-lg shadow-orange-900/20">
+                            <BreadLogo size={100} />
                         </div>
-                        <h1 className="text-4xl font-bold text-white drop-shadow-lg">Aura</h1>
+                        <h1 className="text-5xl font-bold text-white drop-shadow-lg">Aura</h1>
                     </div>
                     <p className="text-orange-50 text-lg max-w-md leading-relaxed">
                         The modern POS system designed for franchise networks and independent businesses.
@@ -81,8 +81,8 @@ export default function LoginPage() {
                     <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
                         <div className="relative">
                             <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full"></div>
-                            <div className="relative h-14 w-14 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center p-2 shadow-lg shadow-orange-900/20">
-                                <BreadLogo size={40} />
+                            <div className="relative h-20 w-20 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center p-2 shadow-lg shadow-orange-900/20">
+                                <BreadLogo size={100} />
                             </div>
                         </div>
                         <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">Aura</h1>

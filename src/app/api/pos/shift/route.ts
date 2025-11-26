@@ -18,22 +18,45 @@ export async function POST(req: Request) {
         const body = await req.json()
         const { action, amount, notes } = body // action: 'OPEN' | 'CLOSE' | 'DROP'
 
+        console.log('[SHIFT_API] Action:', action, 'User:', user.id, 'Location:', locationId)
+
         if (action === 'OPEN') {
-            if (!locationId) return NextResponse.json({ error: 'Location ID required to open shift' }, { status: 400 })
+            // Get locationId - either from user or from franchise's first location
+            let finalLocationId = locationId
+
+            if (!finalLocationId && user.franchiseId) {
+                console.log('[SHIFT_API] No locationId, looking up first location for franchise:', user.franchiseId)
+                // Franchise owner without location - use first location
+                const firstLocation = await prisma.location.findFirst({
+                    where: { franchiseId: user.franchiseId }
+                })
+                if (!firstLocation) {
+                    console.error('[SHIFT_API] No location found for franchise')
+                    return NextResponse.json({ error: 'No location found for this franchise' }, { status: 400 })
+                }
+                finalLocationId = firstLocation.id
+                console.log('[SHIFT_API] Found location:', finalLocationId)
+            }
+
+            if (!finalLocationId) {
+                return NextResponse.json({ error: 'Location ID required to open shift' }, { status: 400 })
+            }
 
             // Check if already open
             const existing = await prisma.cashDrawerSession.findFirst({
                 where: {
-                    locationId: locationId,
+                    locationId: finalLocationId,
                     status: 'OPEN',
                     employeeId: user.id
                 }
             })
             if (existing) return NextResponse.json({ error: 'Shift already open' }, { status: 400 })
 
+            console.log('[SHIFT_API] Creating session with:', { locationId: finalLocationId, employeeId: user.id, amount })
+
             const newSession = await prisma.cashDrawerSession.create({
                 data: {
-                    locationId: locationId,
+                    locationId: finalLocationId,
                     employeeId: user.id,
                     startingCash: amount,
                     status: 'OPEN',

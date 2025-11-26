@@ -88,6 +88,7 @@ model Franchisor {
 model Franchise {
   id          String   @id @default(cuid())
   name        String
+  slug        String     @unique // e.g. "aura-salon"
   franchisorId String
   franchisor  Franchisor @relation(fields: [franchisorId], references: [id])
   
@@ -136,6 +137,7 @@ model FranchiseSettings {
 model Location {
   id          String   @id @default(cuid())
   name        String
+  slug        String   @unique // e.g. "aura-downtown"
   address     String?
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id])

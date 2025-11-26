@@ -47,9 +47,26 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Name and Franchisor ID are required' }, { status: 400 })
         }
 
+        // Generate slug
+        let slug = name.toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^\w\-]+/g, '')
+            .replace(/\-\-+/g, '-')
+            .replace(/^-+/, '')
+            .replace(/-+$/, '')
+
+        // Ensure uniqueness
+        let uniqueSlug = slug
+        let counter = 1
+        while (await prisma.franchise.findUnique({ where: { slug: uniqueSlug } })) {
+            uniqueSlug = `${slug}-${counter}`
+            counter++
+        }
+
         const franchise = await prisma.franchise.create({
             data: {
                 name,
+                slug: uniqueSlug,
                 franchisorId
             }
         })

@@ -12,7 +12,7 @@ export default function CustomerDisplay({ cart }: CustomerDisplayProps) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
                 <div className="mb-8 animate-pulse">
-                    <BreadLogo size={64} />
+                    <BreadLogo size={100} />
                 </div>
                 <h1 className="text-4xl font-bold text-gray-900 mb-4">Welcome to Aura</h1>
                 <p className="text-xl text-gray-500">We're ready when you are.</p>
@@ -25,8 +25,8 @@ export default function CustomerDisplay({ cart }: CustomerDisplayProps) {
             {/* Header */}
             <div className="bg-white p-6 shadow-sm flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center text-white">
-                        <BreadLogo size={24} />
+                    <div className="h-24 w-24 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center text-white">
+                        <BreadLogo size={100} />
                     </div>
                     <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
                         Aura

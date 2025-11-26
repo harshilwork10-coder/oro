@@ -24,13 +24,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
-const LOCATION_NAMES: Record<string, string> = {
-    'cmieuizt9000iwk1l80537w38': 'Downtown Location'
-}
-
-const FRANCHISE_NAMES: Record<string, string> = {
-    'cmieuizro0008wk1lc1q5fvvy': 'Downtown Franchise'
-}
+// Removed hardcoded maps
 
 // Types
 interface CartItem {
@@ -93,12 +87,97 @@ export default function POSPage() {
     const [activeCategory, setActiveCategory] = useState('ALL')
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+    const [locationName, setLocationName] = useState<string>('')
+    const [franchiseName, setFranchiseName] = useState<string>('')
 
     useEffect(() => {
         fetchMenu()
         fetchTransactions()
         checkShift()
-    }, [])
+        if (session?.user) {
+            fetchDetails()
+        }
+    }, [session])
+
+    const fetchDetails = async () => {
+        try {
+            const user = session?.user as any
+            if (user?.locationId) {
+                const res = await fetch(`/api/locations/${user.locationId}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setLocationName(data.name)
+                }
+            }
+            if (user?.franchiseId) {
+                const res = await fetch(`/api/franchises/${user.franchiseId}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setFranchiseName(data.name)
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching details:', error)
+        }
+    }
+
+    const calculateTotal = () => {
+        const subtotal = cart.reduce((sum, item) => sum + getItemPrice(item), 0)
+        const tax = subtotal * 0.08
+        const totalCash = subtotal + tax
+        const totalCard = totalCash * 1.0399
+        return {
+            subtotal,
+            tax,
+            totalCash,
+            totalCard
+        }
+    }
+
+    // Sync with Customer Display
+    useEffect(() => {
+        const channel = new BroadcastChannel('pos_channel')
+        const totals = calculateTotal()
+
+        const payload = {
+            type: 'CART_UPDATE',
+            data: {
+                items: cart,
+                subtotal: totals.subtotal,
+                tax: totals.tax,
+                total: totals.totalCash,
+                totalCard: totals.totalCard,
+                status: cart.length > 0 ? 'ACTIVE' : 'IDLE',
+                customerName: 'Guest' // TODO: Add customer selection
+            }
+        }
+
+        // 1. Broadcast Channel
+        channel.postMessage(payload)
+
+        // 2. LocalStorage Fallback (for reliability and initial load)
+        localStorage.setItem('pos_cart_sync', JSON.stringify(payload))
+
+        return () => channel.close()
+    }, [cart])
+
+    // Auto-open Customer Display when shift is active
+    useEffect(() => {
+        if (shift) {
+            const kioskUrl = window.location.origin + '/kiosk'
+            // Use a specific name to target the same window/tab
+            const windowName = 'CustomerDisplay'
+            const windowFeatures = 'width=1920,height=1080,left=1920,top=0'
+
+            // Attempt to open/focus the window
+            const displayWindow = window.open(kioskUrl, windowName, windowFeatures)
+
+            // If blocked, we might want to notify the user, but for now we assume allowed popups
+            if (!displayWindow) {
+                console.warn('Customer Display popup was blocked')
+            }
+        }
+    }, [shift])
 
     const fetchMenu = async () => {
         try {
@@ -166,8 +245,7 @@ export default function POSPage() {
                     alert('Shift Closed Successfully')
                 }
                 if (action === 'OPEN') {
-                    const kioskUrl = window.location.origin + '/kiosk'
-                    window.open(kioskUrl, 'CustomerDisplay', 'width=1920,height=1080,left=1920,top=0')
+                    // Window open is now handled by the useEffect on 'shift' change
                 }
             } else {
                 const errorData = await res.json()
@@ -299,18 +377,7 @@ export default function POSPage() {
         }
     }
 
-    const calculateTotal = () => {
-        const subtotal = cart.reduce((sum, item) => sum + getItemPrice(item), 0)
-        const tax = subtotal * 0.08
-        const totalCash = subtotal + tax
-        const totalCard = totalCash * 1.0399
-        return {
-            subtotal,
-            tax,
-            totalCash,
-            totalCard
-        }
-    }
+
 
     if (isLoading) return <div className="flex items-center justify-center h-screen bg-stone-950 text-orange-500">Loading POS...</div>
 
@@ -494,16 +561,16 @@ export default function POSPage() {
                     </div>
 
                     <div className="flex flex-col items-end mr-4 text-xs text-stone-500">
-                        {(session?.user as any)?.locationId && (
+                        {locationName && (
                             <div>
                                 <span className="font-medium text-stone-400">Loc: </span>
-                                {LOCATION_NAMES[(session?.user as any).locationId] || (session?.user as any).locationId}
+                                {locationName}
                             </div>
                         )}
-                        {(session?.user as any)?.franchiseId && (
+                        {franchiseName && (
                             <div>
                                 <span className="font-medium text-stone-400">Fran: </span>
-                                {FRANCHISE_NAMES[(session?.user as any).franchiseId] || (session?.user as any).franchiseId}
+                                {franchiseName}
                             </div>
                         )}
                     </div>

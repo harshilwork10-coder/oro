@@ -40,9 +40,51 @@ export default function KioskPage() {
     }
 
     useEffect(() => {
-        fetchCart()
-        const interval = setInterval(fetchCart, 1000) // Poll every second
-        return () => clearInterval(interval)
+        // 1. Initial check from LocalStorage
+        const savedCart = localStorage.getItem('pos_cart_sync')
+        if (savedCart) {
+            try {
+                const parsed = JSON.parse(savedCart)
+                if (parsed.type === 'CART_UPDATE') {
+                    setCart(parsed.data)
+                    setLoading(false)
+                }
+            } catch (e) {
+                console.error('Error parsing saved cart', e)
+            }
+        }
+
+        // 2. Listen for direct updates from POS (BroadcastChannel)
+        const channel = new BroadcastChannel('pos_channel')
+        channel.onmessage = (event) => {
+            if (event.data.type === 'CART_UPDATE') {
+                console.log('Received cart update from POS (Broadcast):', event.data.data)
+                setCart(event.data.data)
+                setLoading(false)
+            }
+        }
+
+        // 3. Listen for LocalStorage updates (Fallback)
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === 'pos_cart_sync' && e.newValue) {
+                try {
+                    const parsed = JSON.parse(e.newValue)
+                    if (parsed.type === 'CART_UPDATE') {
+                        console.log('Received cart update from POS (Storage):', parsed.data)
+                        setCart(parsed.data)
+                        setLoading(false)
+                    }
+                } catch (err) {
+                    console.error('Error parsing storage update', err)
+                }
+            }
+        }
+        window.addEventListener('storage', handleStorage)
+
+        return () => {
+            channel.close()
+            window.removeEventListener('storage', handleStorage)
+        }
     }, [])
 
     if (loading) {

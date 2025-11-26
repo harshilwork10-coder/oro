@@ -92,8 +92,8 @@ export default function CheckIn() {
 
             <div className="p-6 flex items-center justify-center relative z-10">
                 <div className="flex items-center gap-3 glass-panel px-6 py-3 rounded-full">
-                    <div className="h-10 w-10 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
-                        <BreadLogo className="h-6 w-6 text-white" />
+                    <div className="h-24 w-24 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
+                        <BreadLogo size={100} />
                     </div>
                     <span className="text-2xl font-bold text-stone-100 tracking-tight">
                         Aura Salon
