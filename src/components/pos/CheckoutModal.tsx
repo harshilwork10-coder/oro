@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, CreditCard, DollarSign, Users, Tag, AlertCircle } from 'lucide-react'
 
 interface CheckoutModalProps {
@@ -10,14 +10,21 @@ interface CheckoutModalProps {
     subtotal: number
     taxRate: number
     customerId?: string
+    customerName?: string
     onComplete: (transaction: any) => void
+    onShowTipModal?: (show: boolean) => void
+    onShowReviewModal?: (show: boolean) => void
+    onTipSelected?: (tipAmount: number) => void
+    onReviewSubmit?: (rating: number, feedbackTag: string | null) => void
 }
 
-export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate, customerId, onComplete }: CheckoutModalProps) {
+export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate, customerId, customerName, onComplete, onShowTipModal, onShowReviewModal, onTipSelected, onReviewSubmit }: CheckoutModalProps) {
     const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'DEBIT_CARD' | 'CREDIT_CARD'>('CASH')
     const [tip, setTip] = useState(0)
     const [tipPercent, setTipPercent] = useState<number | null>(null)
     const [discount, setDiscount] = useState(0)
+    const [waitingForTip, setWaitingForTip] = useState(false)
+    const [paymentCompleted, setPaymentCompleted] = useState(false)
 
     // Mock merchant config - will be fetched from franchise settings
     const merchantConfig = {
@@ -71,7 +78,62 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
         setTip((subtotal - discount) * (percent / 100))
     }
 
-    const handleComplete = () => {
+    // Listen for tip updates from customer display
+    useEffect(() => {
+        if (onTipSelected) {
+            // This effect ensures tip state is synced when customer selects tip
+            // The parent component should call setTip via this callback
+        }
+    }, [onTipSelected])
+
+    const handleComplete = async () => {
+        // For card payments, show tip modal first
+        if ((paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') && !waitingForTip && !paymentCompleted) {
+            setWaitingForTip(true)
+            onShowTipModal?.(true)
+            return
+        }
+
+        // Simulate payment processing (PAX integration will go here)
+        setPaymentCompleted(true)
+        setWaitingForTip(false)
+
+        const transaction = {
+            items: cart,
+            subtotal,
+            discount,
+            cardFee,
+            tax,
+            tip,
+            total,
+            paymentMethod,
+            customerId: customerId || null,
+            timestamp: new Date()
+        }
+
+        // Show review modal if customer is available
+        if (customerId && onShowReviewModal) {
+            onShowReviewModal(true)
+            // Wait for review submission before completing
+            // The review submit handler will call onComplete
+        } else {
+            onComplete(transaction)
+            onClose()
+        }
+    }
+
+    const handleTipModalClose = () => {
+        onShowTipModal?.(false)
+        // Continue with payment after tip selected
+        handleComplete()
+    }
+
+    const handleReviewModalSubmit = async (rating: number, feedbackTag: string | null) => {
+        // Submit review via parent component handler
+        onReviewSubmit?.(rating, feedbackTag)
+        onShowReviewModal?.(false)
+
+        // Now complete the transaction
         const transaction = {
             items: cart,
             subtotal,
@@ -86,6 +148,34 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
         }
         onComplete(transaction)
         onClose()
+
+        // Reset state
+        setPaymentCompleted(false)
+        setWaitingForTip(false)
+    }
+
+    const handleReviewModalSkip = () => {
+        onShowReviewModal?.(false)
+
+        // Complete transaction without review
+        const transaction = {
+            items: cart,
+            subtotal,
+            discount,
+            cardFee,
+            tax,
+            tip,
+            total,
+            paymentMethod,
+            customerId: customerId || null,
+            timestamp: new Date()
+        }
+        onComplete(transaction)
+        onClose()
+
+        // Reset state
+        setPaymentCompleted(false)
+        setWaitingForTip(false)
     }
 
     if (!isOpen) return null

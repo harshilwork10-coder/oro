@@ -109,6 +109,7 @@ model Franchise {
   giftCards   GiftCard[]
   discounts   Discount[]
   clients     Client[]
+  reviews     Review[]
   
   settings    FranchiseSettings?
   
@@ -239,6 +240,9 @@ model Client {
   email       String?
   phone       String?
   
+  liabilitySigned Boolean @default(false)
+  loyaltyJoined   Boolean @default(false)
+  
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id])
   
@@ -246,6 +250,7 @@ model Client {
   memberships ClientMembership[]
   loyalty     ClientLoyalty?
   transactions Transaction[]
+  reviews     Review[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -780,4 +785,30 @@ model UserBadge {
   name      String   // e.g., "Top Seller", "Early Adopter"
   icon      String?
   awardedAt DateTime @default(now())
+}
+
+// ============ REVIEWS ============
+
+model Review {
+  id              String   @id @default(cuid())
+  franchiseId     String
+  franchise       Franchise @relation(fields: [franchiseId], references: [id])
+  
+  clientId        String
+  client          Client   @relation(fields: [clientId], references: [id])
+  
+  // Transaction reference (optional - for linking to specific purchase)
+  transactionRef  String?  // Could link to future Transaction model
+  
+  rating          Int      // 1-5 stars
+  feedbackTag     String?  // Selected feedback tag (e.g., "Amazing service! ⭐")
+  comment         String?  // Optional text comment
+  
+  // Google Business integration (future)
+  googleReviewId  String?  // Google My Business review ID when posted
+  postedToGoogle  Boolean  @default(false)
+  postedAt        DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

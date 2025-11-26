@@ -2,12 +2,28 @@
 
 import { ShoppingCart, User } from 'lucide-react'
 import BreadLogo from '@/components/ui/BreadLogo'
+import TipModal from './TipModal'
+import ReviewModal from './ReviewModal'
 
 interface CustomerDisplayProps {
     cart: any
+    showTipModal?: boolean
+    onTipSelected?: (tipAmount: number) => void
+    onTipModalClose?: () => void
+    showReviewModal?: boolean
+    onReviewSubmit?: (rating: number, feedbackTag: string | null) => void
+    onReviewSkip?: () => void
 }
 
-export default function CustomerDisplay({ cart }: CustomerDisplayProps) {
+export default function CustomerDisplay({
+    cart,
+    showTipModal = false,
+    onTipSelected,
+    onTipModalClose,
+    showReviewModal = false,
+    onReviewSubmit,
+    onReviewSkip
+}: CustomerDisplayProps) {
     if (!cart || !cart.items || cart.items.length === 0) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
@@ -147,6 +163,26 @@ export default function CustomerDisplay({ cart }: CustomerDisplayProps) {
                     </div>
                 </div>
             </div>
+
+            {/* Tip Modal */}
+            {showTipModal && onTipSelected && onTipModalClose && (
+                <TipModal
+                    isOpen={showTipModal}
+                    subtotal={cart.subtotal || 0}
+                    onTipSelected={onTipSelected}
+                    onClose={onTipModalClose}
+                />
+            )}
+
+            {/* Review Modal */}
+            {showReviewModal && onReviewSubmit && onReviewSkip && (
+                <ReviewModal
+                    isOpen={showReviewModal}
+                    clientName={cart.customerName?.split(' ')[0] || 'Customer'}
+                    onSubmit={onReviewSubmit}
+                    onSkip={onReviewSkip}
+                />
+            )}
         </div>
     )
 }

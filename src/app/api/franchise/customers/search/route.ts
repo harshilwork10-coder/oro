@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     }
 
     try {
-        const customers = await prisma.customer.findMany({
+        const customers = await prisma.client.findMany({
             where: {
                 franchiseId: user.franchiseId,
                 phone: {
@@ -36,7 +36,12 @@ export async function GET(request: Request) {
             take: 5
         })
 
-        return NextResponse.json(customers)
+        const mappedCustomers = customers.map(c => ({
+            ...c,
+            name: `${c.firstName} ${c.lastName}`
+        }))
+
+        return NextResponse.json(mappedCustomers)
     } catch (error) {
         console.error('Error searching customers:', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

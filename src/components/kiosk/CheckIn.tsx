@@ -1,18 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Check, ChevronRight } from 'lucide-react'
 import BreadLogo from '@/components/ui/BreadLogo'
 import VirtualKeyboard from './VirtualKeyboard'
 
 export default function CheckIn() {
-    const [step, setStep] = useState<'phone' | 'name' | 'welcome'>('phone')
+    const [step, setStep] = useState<'phone' | 'name' | 'liability' | 'loyalty' | 'welcome'>('phone')
     const [phone, setPhone] = useState('')
     const [firstName, setFirstName] = useState('')
     const [lastName, setLastName] = useState('')
     const [loading, setLoading] = useState(false)
     const [showPhoneKeyboard, setShowPhoneKeyboard] = useState(true)
     const [showNameKeyboard, setShowNameKeyboard] = useState<'first' | 'last' | null>(null)
+    const [liabilitySigned, setLiabilitySigned] = useState(false)
+    const [loyaltyJoined, setLoyaltyJoined] = useState(false)
 
     const handlePhoneSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -23,8 +25,18 @@ export default function CheckIn() {
             if (res.ok) {
                 const data = await res.json()
                 if (data.length > 0) {
-                    setFirstName(data[0].name.split(' ')[0])
-                    setStep('welcome')
+                    const customer = data[0]
+                    setFirstName(customer.firstName)
+                    setLastName(customer.lastName)
+
+                    // Check if they need to sign liability or join loyalty
+                    if (!customer.liabilitySigned) {
+                        setStep('liability')
+                    } else if (!customer.loyaltyJoined) {
+                        setStep('loyalty')
+                    } else {
+                        setStep('welcome')
+                    }
                 } else {
                     setStep('name')
                 }
@@ -38,6 +50,22 @@ export default function CheckIn() {
 
     const handleNameSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        setStep('liability')
+    }
+
+    const handleLiabilitySubmit = async (signed: boolean) => {
+        setLiabilitySigned(signed)
+        if (signed) {
+            setStep('loyalty')
+        } else {
+            // Can't proceed without liability? Or maybe just skip to loyalty?
+            // Assuming mandatory for now based on "checked and accept" requirement
+            alert('You must accept the liability waiver to proceed.')
+        }
+    }
+
+    const handleLoyaltySubmit = async (join: boolean) => {
+        setLoyaltyJoined(join)
         setLoading(true)
 
         try {
@@ -46,7 +74,9 @@ export default function CheckIn() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: `${firstName} ${lastName}`,
-                    phone: phone
+                    phone: phone,
+                    liabilitySigned: liabilitySigned,
+                    loyaltyJoined: join
                 })
             })
 
@@ -54,11 +84,26 @@ export default function CheckIn() {
                 setStep('welcome')
             }
         } catch (error) {
-            console.error('Error creating customer:', error)
+            console.error('Error creating/updating customer:', error)
         } finally {
             setLoading(false)
         }
     }
+
+    useEffect(() => {
+        if (step === 'welcome') {
+            const timer = setTimeout(() => {
+                setStep('phone')
+                setPhone('')
+                setFirstName('')
+                setLastName('')
+                setLiabilitySigned(false)
+                setLoyaltyJoined(false)
+            }, 30000) // 30 seconds
+
+            return () => clearTimeout(timer)
+        }
+    }, [step])
 
     if (step === 'welcome') {
         return (
@@ -75,6 +120,8 @@ export default function CheckIn() {
                             setPhone('')
                             setFirstName('')
                             setLastName('')
+                            setLiabilitySigned(false)
+                            setLoyaltyJoined(false)
                         }}
                         className="mt-12 px-8 py-3 bg-stone-800 hover:bg-stone-700 rounded-full text-sm font-medium transition-colors text-stone-300 border border-stone-700"
                     >
@@ -103,7 +150,7 @@ export default function CheckIn() {
 
             <div className="flex-1 flex items-center justify-center p-6 relative z-10">
                 <div className="max-w-2xl w-full glass-panel rounded-[2rem] shadow-2xl border-orange-500/10 p-8 md:p-12 backdrop-blur-xl">
-                    {step === 'phone' ? (
+                    {step === 'phone' && (
                         <form onSubmit={handlePhoneSubmit} className="space-y-8">
                             <div className="text-center mb-8">
                                 <h2 className="text-3xl font-bold text-stone-100 mb-2">Welcome! 👋</h2>
@@ -142,7 +189,9 @@ export default function CheckIn() {
                                 {!loading && <ChevronRight className="h-6 w-6" />}
                             </button>
                         </form>
-                    ) : (
+                    )}
+
+                    {step === 'name' && (
                         <form onSubmit={handleNameSubmit} className="space-y-8">
                             <div className="text-center mb-8">
                                 <h2 className="text-3xl font-bold text-stone-100 mb-2">Nice to meet you!</h2>
@@ -156,6 +205,7 @@ export default function CheckIn() {
                                         type="text"
                                         value={firstName}
                                         onChange={(e) => setFirstName(e.target.value)}
+                                        onClick={() => setShowNameKeyboard('first')}
                                         onFocus={() => setShowNameKeyboard('first')}
                                         readOnly
                                         className="w-full text-2xl p-5 bg-stone-900/50 border-2 border-stone-800 rounded-2xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 cursor-pointer text-stone-100 placeholder-stone-700 transition-all"
@@ -178,6 +228,7 @@ export default function CheckIn() {
                                         type="text"
                                         value={lastName}
                                         onChange={(e) => setLastName(e.target.value)}
+                                        onClick={() => setShowNameKeyboard('last')}
                                         onFocus={() => setShowNameKeyboard('last')}
                                         readOnly
                                         className="w-full text-2xl p-5 bg-stone-900/50 border-2 border-stone-800 rounded-2xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 cursor-pointer text-stone-100 placeholder-stone-700 transition-all"
@@ -201,10 +252,70 @@ export default function CheckIn() {
                                 disabled={loading || !firstName || !lastName}
                                 className="w-full py-5 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-xl hover:shadow-[0_0_30px_rgba(249,115,22,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
                             >
-                                {loading ? 'Saving...' : 'Check In'}
-                                {!loading && <Check className="h-6 w-6" />}
+                                Continue
+                                <ChevronRight className="h-6 w-6" />
                             </button>
                         </form>
+                    )}
+
+                    {step === 'liability' && (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <div className="text-center mb-8">
+                                <h2 className="text-3xl font-bold text-stone-100 mb-2">One last thing...</h2>
+                                <p className="text-stone-400 text-lg">Please review and accept our liability waiver.</p>
+                            </div>
+
+                            <div className="bg-stone-900/50 p-6 rounded-2xl border border-stone-800 h-64 overflow-y-auto text-sm text-stone-400 leading-relaxed">
+                                <p className="mb-4">
+                                    <strong>LIABILITY WAIVER AND RELEASE FORM</strong>
+                                </p>
+                                <p className="mb-4">
+                                    I hereby acknowledge that I am voluntarily participating in services provided by Aura Salon. I understand that these services may involve risks, including but not limited to allergic reactions to products, minor cuts, or other injuries.
+                                </p>
+                                <p className="mb-4">
+                                    I agree to release and hold harmless Aura Salon, its employees, and agents from any and all liability, claims, or causes of action arising out of my participation in these services.
+                                </p>
+                                <p>
+                                    By clicking "Accept", I acknowledge that I have read and understood this waiver and agree to its terms.
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={() => handleLiabilitySubmit(true)}
+                                className="w-full py-5 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-xl hover:shadow-[0_0_30px_rgba(249,115,22,0.4)] transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                            >
+                                I Accept
+                                <Check className="h-6 w-6" />
+                            </button>
+                        </div>
+                    )}
+
+                    {step === 'loyalty' && (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <div className="text-center mb-8">
+                                <div className="mx-auto w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-purple-500/20">
+                                    <span className="text-4xl">🎁</span>
+                                </div>
+                                <h2 className="text-3xl font-bold text-stone-100 mb-2">Join Aura Rewards?</h2>
+                                <p className="text-stone-400 text-lg">Earn points on every visit and get exclusive offers!</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                <button
+                                    onClick={() => handleLoyaltySubmit(true)}
+                                    className="w-full py-5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl font-bold text-xl hover:shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                                >
+                                    Yes, sign me up!
+                                    <span className="text-2xl">✨</span>
+                                </button>
+                                <button
+                                    onClick={() => handleLoyaltySubmit(false)}
+                                    className="w-full py-4 bg-transparent text-stone-500 font-medium hover:text-stone-300 transition-colors"
+                                >
+                                    No thanks, maybe later
+                                </button>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>

@@ -26,11 +26,12 @@ export async function GET(request: Request) {
     }
 
     try {
-        const customers = await prisma.customer.findMany({
+        const customers = await prisma.client.findMany({
             where: {
                 franchiseId: user.franchiseId,
                 OR: [
-                    { name: { contains: query } },
+                    { firstName: { contains: query } },
+                    { lastName: { contains: query } },
                     { email: { contains: query } },
                     { phone: { contains: query } }
                 ]
@@ -39,7 +40,13 @@ export async function GET(request: Request) {
             orderBy: { createdAt: 'desc' }
         })
 
-        return NextResponse.json(customers)
+        // Map Client to expected format if needed, or just return
+        const mappedCustomers = customers.map(c => ({
+            ...c,
+            name: `${c.firstName} ${c.lastName}`
+        }))
+
+        return NextResponse.json(mappedCustomers)
     } catch (error) {
         console.error('Error searching customers:', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -63,23 +70,31 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json()
-        const { name, email, phone, notes } = body
+        const { name, email, phone, liabilitySigned, loyaltyJoined } = body
 
         if (!name || !phone) {
             return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 })
         }
 
-        const customer = await prisma.customer.create({
+        const [firstName, ...lastNameParts] = name.split(' ')
+        const lastName = lastNameParts.join(' ') || ''
+
+        const customer = await prisma.client.create({
             data: {
-                name,
+                firstName,
+                lastName,
                 email,
                 phone,
-                notes,
+                liabilitySigned: liabilitySigned || false,
+                loyaltyJoined: loyaltyJoined || false,
                 franchiseId: user.franchiseId
             }
         })
 
-        return NextResponse.json(customer)
+        return NextResponse.json({
+            ...customer,
+            name: `${customer.firstName} ${customer.lastName}`
+        })
     } catch (error) {
         console.error('Error creating customer:', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
