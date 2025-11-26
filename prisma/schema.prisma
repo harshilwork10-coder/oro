@@ -94,6 +94,7 @@ model Franchise {
   users       User[]
   locations   Location[]
   services    Service[]
+  serviceCategories ServiceCategory[]
   products    Product[]
   transactions Transaction[]
   
@@ -194,13 +195,29 @@ model GlobalProduct {
 
 // ============ LOCAL INSTANCES ============
 
+model ServiceCategory {
+  id          String   @id @default(cuid())
+  name        String
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  
+  services    Service[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Service {
   id          String   @id @default(cuid())
   name        String
   description String?
   duration    Int      // in minutes
   price       Decimal
-  category    String?  // e.g., "Hair", "Nails", "Spa"
+  category    String?  // Deprecated - keeping for backward compatibility
+  categoryId  String?  // New: Link to ServiceCategory
+  serviceCategory ServiceCategory? @relation(fields: [categoryId], references: [id])
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id])
   

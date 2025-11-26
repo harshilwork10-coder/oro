@@ -21,6 +21,7 @@ export async function GET(request: Request) {
     try {
         const services = await prisma.service.findMany({
             where: { franchiseId: user.franchiseId },
+            include: { serviceCategory: true },
             orderBy: { name: 'asc' }
         })
 
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json()
-        const { name, description, duration, price, category } = body
+        const { name, description, duration, price, category, categoryId } = body
 
         if (!name || !price || !duration) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -61,8 +62,10 @@ export async function POST(request: Request) {
                 duration: parseInt(duration),
                 price: parseFloat(price),
                 category,
+                categoryId: categoryId || null,
                 franchiseId: user.franchiseId,
-            }
+            },
+            include: { serviceCategory: true }
         })
 
         return NextResponse.json(service)
@@ -89,7 +92,7 @@ export async function PUT(request: Request) {
 
     try {
         const body = await request.json()
-        const { id, name, description, duration, price, category } = body
+        const { id, name, description, duration, price, category, categoryId } = body
 
         if (!id || !name || !price || !duration) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -106,6 +109,7 @@ export async function PUT(request: Request) {
                 duration: parseInt(duration),
                 price: parseFloat(price),
                 category,
+                categoryId: categoryId || null,
             }
         })
 

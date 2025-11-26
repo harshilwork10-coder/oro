@@ -137,21 +137,24 @@ export default function POSPage() {
         }
     }
 
-    const handleShiftAction = async (action: 'OPEN' | 'CLOSE' | 'DROP') => {
+    const handleShiftAction = async (action: 'OPEN' | 'CLOSE' | 'DROP', amountOverride?: number) => {
         try {
+            const finalAmount = amountOverride !== undefined ? amountOverride : parseFloat(shiftAmount)
+
             const res = await fetch('/api/pos/shift', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action,
-                    amount: parseFloat(shiftAmount),
+                    amount: finalAmount,
                     denominations
                 })
             })
 
             if (res.ok) {
                 const data = await res.json()
-                setShift(data.shift)
+                // API returns the session/shift directly, not wrapped in {shift: ...}
+                setShift(data)
                 setShowShiftModal(false)
                 setDenominations({
                     hundreds: 0, fifties: 0, twenties: 0, tens: 0, fives: 0, ones: 0,
@@ -166,9 +169,13 @@ export default function POSPage() {
                     const kioskUrl = window.location.origin + '/kiosk'
                     window.open(kioskUrl, 'CustomerDisplay', 'width=1920,height=1080,left=1920,top=0')
                 }
+            } else {
+                const errorData = await res.json()
+                alert(errorData.error || 'Failed to perform shift action')
             }
         } catch (error) {
             console.error('Shift action error:', error)
+            alert('An error occurred')
         }
     }
 
@@ -410,10 +417,7 @@ export default function POSPage() {
                         </div>
 
                         <button
-                            onClick={() => {
-                                setShiftAmount(totalAmount.toFixed(2))
-                                handleShiftAction('OPEN')
-                            }}
+                            onClick={() => handleShiftAction('OPEN', totalAmount)}
                             disabled={totalAmount === 0}
                             className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
