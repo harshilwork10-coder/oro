@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Keyboard from 'react-simple-keyboard'
 import 'react-simple-keyboard/build/css/index.css'
 
@@ -9,13 +9,15 @@ interface VirtualKeyboardProps {
     value: string
     mode?: 'full' | 'numeric'
     placeholder?: string
+    onEnter?: () => void  // Callback when Enter is pressed
 }
 
 export default function VirtualKeyboard({
     onChange,
     value,
     mode = 'numeric',
-    placeholder = ''
+    placeholder = '',
+    onEnter
 }: VirtualKeyboardProps) {
     const [layoutName, setLayoutName] = useState('default')
 
@@ -49,8 +51,9 @@ export default function VirtualKeyboard({
 
     const onKeyPress = (button: string) => {
         if (button === '{shift}') handleShift()
-        if (button === '{enter}') {
-            // Could trigger submit here
+        if (button === '{enter}' && onEnter) {
+            // Call the onEnter callback if provided
+            onEnter()
         }
     }
 

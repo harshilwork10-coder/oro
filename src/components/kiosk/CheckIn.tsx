@@ -69,7 +69,7 @@ export default function CheckIn() {
         setLoading(true)
 
         try {
-            const res = await fetch('/api/franchise/customers', {
+            const res = await fetch('/api/kiosk/check-in', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -82,9 +82,14 @@ export default function CheckIn() {
 
             if (res.ok) {
                 setStep('welcome')
+            } else {
+                const error = await res.json()
+                console.error('Error during check-in:', error)
+                alert('There was an error completing your check-in. Please ask for assistance.')
             }
         } catch (error) {
             console.error('Error creating/updating customer:', error)
+            alert('There was an error completing your check-in. Please ask for assistance.')
         } finally {
             setLoading(false)
         }
@@ -175,6 +180,11 @@ export default function CheckIn() {
                                             value={phone}
                                             onChange={setPhone}
                                             mode="numeric"
+                                            onEnter={() => {
+                                                if (phone.length >= 10) {
+                                                    document.querySelector<HTMLFormElement>('form')?.requestSubmit()
+                                                }
+                                            }}
                                         />
                                     </div>
                                 )}
@@ -218,6 +228,7 @@ export default function CheckIn() {
                                                 value={firstName}
                                                 onChange={setFirstName}
                                                 mode="full"
+                                                onEnter={() => setShowNameKeyboard('last')}
                                             />
                                         </div>
                                     )}
@@ -241,6 +252,11 @@ export default function CheckIn() {
                                                 value={lastName}
                                                 onChange={setLastName}
                                                 mode="full"
+                                                onEnter={() => {
+                                                    if (firstName && lastName) {
+                                                        document.querySelector<HTMLFormElement>('form')?.requestSubmit()
+                                                    }
+                                                }}
                                             />
                                         </div>
                                     )}
