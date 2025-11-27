@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import CheckIn from '@/components/kiosk/CheckIn'
 import CustomerDisplay from '@/components/kiosk/CustomerDisplay'
@@ -11,6 +11,7 @@ export default function KioskPage() {
     const [cart, setCart] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const { enterFullscreen, isSupported } = useFullscreen()
+    const lastCartRef = useRef<string>('')
 
     // Auto-enter fullscreen on mount
     useEffect(() => {
@@ -30,7 +31,13 @@ export default function KioskPage() {
             const res = await fetch('/api/pos/cart')
             if (res.ok) {
                 const data = await res.json()
-                setCart(data.empty ? null : data)
+                const cartData = data.empty ? null : data
+                const cartString = JSON.stringify(cartData)
+
+                if (cartString !== lastCartRef.current) {
+                    lastCartRef.current = cartString
+                    setCart(cartData)
+                }
             }
         } catch (error) {
             console.error('Error fetching cart:', error)
@@ -46,7 +53,11 @@ export default function KioskPage() {
             try {
                 const parsed = JSON.parse(savedCart)
                 if (parsed.type === 'CART_UPDATE') {
-                    setCart(parsed.data)
+                    const cartString = JSON.stringify(parsed.data)
+                    if (cartString !== lastCartRef.current) {
+                        lastCartRef.current = cartString
+                        setCart(parsed.data)
+                    }
                     setLoading(false)
                 }
             } catch (e) {
@@ -58,8 +69,12 @@ export default function KioskPage() {
         const channel = new BroadcastChannel('pos_channel')
         channel.onmessage = (event) => {
             if (event.data.type === 'CART_UPDATE') {
-                console.log('Received cart update from POS (Broadcast):', event.data.data)
-                setCart(event.data.data)
+                const cartString = JSON.stringify(event.data.data)
+                if (cartString !== lastCartRef.current) {
+                    // console.log('Received NEW cart update from POS (Broadcast)')
+                    lastCartRef.current = cartString
+                    setCart(event.data.data)
+                }
                 setLoading(false)
             }
         }
@@ -70,8 +85,12 @@ export default function KioskPage() {
                 try {
                     const parsed = JSON.parse(e.newValue)
                     if (parsed.type === 'CART_UPDATE') {
-                        console.log('Received cart update from POS (Storage):', parsed.data)
-                        setCart(parsed.data)
+                        const cartString = JSON.stringify(parsed.data)
+                        if (cartString !== lastCartRef.current) {
+                            // console.log('Received NEW cart update from POS (Storage)')
+                            lastCartRef.current = cartString
+                            setCart(parsed.data)
+                        }
                         setLoading(false)
                     }
                 } catch (err) {
@@ -98,14 +117,16 @@ export default function KioskPage() {
     // State Logic
     const status = cart?.status || 'IDLE'
 
-    if (status === 'REVIEW') {
-        return <Review onComplete={fetchCart} />
-    }
+    return (
+        <>
+            {status === 'REVIEW' && <Review onComplete={fetchCart} />}
 
-    if (status === 'ACTIVE' && cart?.items?.length > 0) {
-        return <CustomerDisplay cart={cart} />
-    }
+            {status === 'ACTIVE' && cart?.items?.length > 0 && <CustomerDisplay cart={cart} />}
 
-    // Default to Check-In (IDLE)
-    return <CheckIn />
+            {/* Keep CheckIn mounted but hidden when not active to preserve state */}
+            <div style={{ display: status === 'IDLE' ? 'block' : 'none' }}>
+                <CheckIn />
+            </div>
+        </>
+    )
 }
