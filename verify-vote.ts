@@ -21,7 +21,7 @@ async function main() {
             data: {
                 title: 'Vote Test Post',
                 content: 'Please vote on this.',
-                type: 'DISCUSSION',
+                // type: 'DISCUSSION',  // Field doesn't exist in Post model
                 authorId: user.id
             }
         })
@@ -30,7 +30,7 @@ async function main() {
         console.log('Voting up...')
         const vote = await prisma.vote.create({
             data: {
-                value: 1,
+                type: 'UPVOTE',  // Use type enum instead of value
                 userId: user.id,
                 postId: post.id
             }

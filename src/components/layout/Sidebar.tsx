@@ -118,6 +118,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
         { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock },
         { name: 'My Schedule', href: '/dashboard/schedule/me', icon: Calendar },
+        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
         { name: 'Services', href: '/dashboard/services', icon: Briefcase },
         { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
         { name: 'My Performance', href: '/dashboard/employee/me', icon: UserCircle },

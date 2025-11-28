@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
             data: {
                 token,
                 userId: user.id,
+                email: sanitizedEmail,
                 expiresAt
             }
         })
@@ -114,6 +115,8 @@ export async function POST(request: NextRequest) {
         const magicLinkUrl = `${process.env.NEXTAUTH_URL}/auth/magic-link/${token}`
 
         // Log email
+        // Note: EmailLog model not yet defined in schema
+        /*
         await prisma.emailLog.create({
             data: {
                 to: sanitizedEmail,
@@ -122,6 +125,8 @@ export async function POST(request: NextRequest) {
                 status: 'pending'
             }
         })
+        */
+        console.log(`[Mock Email] To: ${sanitizedEmail}, Subject: Welcome to Aura - Setup Your Franchise Account, Magic Link: ${magicLinkUrl}`)
 
         return NextResponse.json({
             success: true,

@@ -36,8 +36,9 @@ export async function GET(request: Request) {
     if (search) {
         where.OR = [
             { id: { contains: search } },
-            { customer: { name: { contains: search } } },
-            { customer: { email: { contains: search } } },
+            { client: { firstName: { contains: search } } },
+            { client: { lastName: { contains: search } } },
+            { client: { email: { contains: search } } },
         ]
     }
 
@@ -56,7 +57,7 @@ export async function GET(request: Request) {
             prisma.transaction.findMany({
                 where,
                 include: {
-                    customer: true,
+                    client: true,
                     employee: true,
                     lineItems: {
                         include: {

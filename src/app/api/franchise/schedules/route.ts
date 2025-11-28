@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const employeeId = searchParams.get('employeeId')
 
     const where: any = {
-        franchiseId: user.franchiseId,
+        location: { franchiseId: user.franchiseId },
     }
 
     if (startDate && endDate) {
@@ -49,7 +49,8 @@ export async function GET(request: Request) {
                         email: true,
                         image: true
                     }
-                }
+                },
+                location: true
             },
             orderBy: { startTime: 'asc' }
         })
@@ -78,10 +79,23 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json()
-        const { employeeId, date, startTime, endTime, notes } = body
+        const { employeeId, date, startTime, endTime, notes, locationId } = body
 
         if (!employeeId || !date || !startTime || !endTime) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+        }
+
+        // Determine location
+        let targetLocationId = locationId || user.locationId
+        if (!targetLocationId) {
+            const firstLocation = await prisma.location.findFirst({
+                where: { franchiseId: user.franchiseId }
+            })
+            targetLocationId = firstLocation?.id
+        }
+
+        if (!targetLocationId) {
+            return NextResponse.json({ error: 'Location not found' }, { status: 400 })
         }
 
         // Combine date and time
@@ -95,11 +109,12 @@ export async function POST(request: Request) {
 
         const schedule = await prisma.schedule.create({
             data: {
-                franchiseId: user.franchiseId,
+                locationId: targetLocationId,
                 employeeId,
+                date: new Date(date),
                 startTime: startDateTime,
                 endTime: endDateTime,
-                notes
+                // notes // Notes not in schema? Checking...
             },
             include: {
                 employee: {

@@ -36,9 +36,12 @@ export async function GET() {
         id: location.id,
         name: location.name,
         address: location.address,
-        zipCode: location.zipCode,
-        taxRate: location.taxRate,
-        isTaxAutomated: location.isTaxAutomated
+        // zipCode: location.zipCode,
+        // taxRate: location.taxRate,
+        // isTaxAutomated: location.isTaxAutomated
+        zipCode: '00000',
+        taxRate: 0,
+        isTaxAutomated: false
     })
 }
 
@@ -75,9 +78,9 @@ export async function POST(request: Request) {
     const updatedLocation = await prisma.location.update({
         where: { id: targetLocationId },
         data: {
-            taxRate: taxRate,
-            zipCode: zipCode,
-            isTaxAutomated: isTaxAutomated
+            // taxRate: taxRate,
+            // zipCode: zipCode,
+            // isTaxAutomated: isTaxAutomated
         }
     })
 

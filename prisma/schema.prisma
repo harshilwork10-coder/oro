@@ -344,8 +344,12 @@ model Transaction {
   cardFee       Decimal   @default(0)  // Card processing fee if applicable
   total         Decimal
   
-  paymentMethod String   // CASH, DEBIT_CARD, CREDIT_CARD
+  paymentMethod String   // CASH, DEBIT_CARD, CREDIT_CARD, SPLIT
   processingPlan String?  // STANDARD, SURCHARGE, DUAL_PRICE (from merchant config)
+  
+  // Split Payment Fields
+  cashAmount    Decimal   @default(0)  // Amount paid in cash (for SPLIT payments)
+  cardAmount    Decimal   @default(0)  // Amount paid on card (for SPLIT payments)
   
   status        String   @default("COMPLETED") // COMPLETED, REFUNDED, VOIDED
   

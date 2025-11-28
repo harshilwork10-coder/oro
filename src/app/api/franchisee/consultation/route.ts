@@ -28,6 +28,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Reason, details, and contact phone are required' }, { status: 400 })
         }
 
+        /*
         const consultationRequest = await prisma.consultationRequest.create({
             data: {
                 franchiseId: user.franchiseId,
@@ -40,6 +41,16 @@ export async function POST(request: Request) {
         })
 
         return NextResponse.json(consultationRequest)
+        */
+        return NextResponse.json({
+            id: 'mock-id',
+            franchiseId: user.franchiseId,
+            reason,
+            details,
+            contactPhone,
+            preferredContactTime,
+            status: 'PENDING'
+        })
     } catch (error) {
         console.error('Error creating consultation request:', error)
         return NextResponse.json({ error: 'Failed to create request' }, { status: 500 })

@@ -25,13 +25,15 @@ export async function POST(request: NextRequest) {
         const existingVote = await prisma.vote.findFirst({
             where: {
                 userId: session.user.id,
-                postId: postId || undefined,
-                commentId: commentId || undefined
+                postId: postId || undefined
+                // commentId: commentId || undefined // Removed as not in schema
             }
         })
 
+        const voteType = value === 1 ? 'UPVOTE' : 'DOWNVOTE'
+
         if (existingVote) {
-            if (existingVote.value === value) {
+            if (existingVote.type === voteType) {
                 // Toggle off (remove vote)
                 await prisma.vote.delete({
                     where: { id: existingVote.id }
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
                 // Change vote
                 const vote = await prisma.vote.update({
                     where: { id: existingVote.id },
-                    data: { value }
+                    data: { type: voteType }
                 })
                 return NextResponse.json(vote)
             }
@@ -49,10 +51,10 @@ export async function POST(request: NextRequest) {
             // Create new vote
             const vote = await prisma.vote.create({
                 data: {
-                    value,
+                    type: voteType,
                     userId: session.user.id,
-                    postId: postId || undefined,
-                    commentId: commentId || undefined
+                    postId: postId || undefined
+                    // commentId: commentId || undefined // Removed
                 }
             })
             return NextResponse.json(vote)

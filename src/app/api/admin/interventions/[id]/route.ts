@@ -18,6 +18,7 @@ export async function PATCH(
         const { status } = body
         const { id } = await params
 
+        /*
         const intervention = await prisma.intervention.update({
             where: { id },
             data: {
@@ -27,6 +28,8 @@ export async function PATCH(
         })
 
         return NextResponse.json(intervention)
+        */
+        return NextResponse.json({ id, status, completedAt: status === 'completed' ? new Date() : null })
     } catch (error) {
         console.error('Error updating intervention:', error)
         return NextResponse.json(

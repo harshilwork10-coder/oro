@@ -21,8 +21,8 @@ async function main() {
             data: {
                 title: 'How to increase revenue?',
                 content: 'Looking for tips on upselling services.',
-                type: 'QUESTION',
-                tags: 'revenue,sales',
+                // type: 'QUESTION',  // Field doesn't exist in Post model
+                // tags: 'revenue,sales',  // Field doesn't exist in Post model
                 authorId: user.id
             }
         })

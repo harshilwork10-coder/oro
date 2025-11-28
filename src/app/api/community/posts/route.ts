@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
         const tag = searchParams.get('tag')
 
         const where: any = {}
-        if (type && type !== 'ALL') where.type = type
-        if (tag) where.tags = { contains: tag }
+        // if (type && type !== 'ALL') where.type = type
+        // if (tag) where.tags = { contains: tag }
 
         const posts = await prisma.post.findMany({
             where,
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { title, content, type, tags } = body
+        const { title, content } = body // Removed type, tags
 
         if (!title || !content) {
             return NextResponse.json({ error: 'Title and content are required' }, { status: 400 })
@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
             data: {
                 title,
                 content,
-                type: type || 'DISCUSSION',
-                tags,
+                // type: type || 'DISCUSSION', // Removed
+                // tags, // Removed
                 authorId: session.user.id
             }
         })

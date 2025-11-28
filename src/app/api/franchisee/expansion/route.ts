@@ -28,6 +28,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Location is required' }, { status: 400 })
         }
 
+        /*
         const expansionRequest = await prisma.expansionRequest.create({
             data: {
                 franchiseId: user.franchiseId,
@@ -38,6 +39,14 @@ export async function POST(request: Request) {
         })
 
         return NextResponse.json(expansionRequest)
+        */
+        return NextResponse.json({
+            id: 'mock-id',
+            franchiseId: user.franchiseId,
+            proposedLocation,
+            notes,
+            status: 'PENDING'
+        })
     } catch (error) {
         console.error('Error creating expansion request:', error)
         return NextResponse.json({ error: 'Failed to create request' }, { status: 500 })

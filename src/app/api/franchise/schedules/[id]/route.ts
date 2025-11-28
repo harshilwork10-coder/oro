@@ -24,10 +24,11 @@ export async function DELETE(
     try {
         const { id } = await params
         const schedule = await prisma.schedule.findUnique({
-            where: { id }
+            where: { id },
+            include: { location: true }
         })
 
-        if (!schedule || schedule.franchiseId !== user.franchiseId) {
+        if (!schedule || schedule.location.franchiseId !== user.franchiseId) {
             return NextResponse.json({ error: 'Schedule not found or unauthorized' }, { status: 404 })
         }
 

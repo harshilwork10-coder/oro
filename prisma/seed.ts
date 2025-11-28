@@ -83,7 +83,8 @@ async function main() {
             pin: await hash('5555', 10),
             role: 'EMPLOYEE',
             canClockIn: true,
-            canClockOut: true
+            canClockOut: true,
+            canManageShifts: true  // Employees need this to open/close their own shifts
         }
     })
 

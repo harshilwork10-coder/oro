@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react'
 import { Briefcase, Plus, Edit, Trash2, X, Settings } from 'lucide-react'
 
 export default function ServicesPage() {
-    const [services, setServices] = useState([])
-    const [categories, setCategories] = useState([])
+    const [services, setServices] = useState<any[]>([])
+    const [categories, setCategories] = useState<any[]>([])
     const [showModal, setShowModal] = useState(false)
     const [showCategoryModal, setShowCategoryModal] = useState(false)
-    const [editingService, setEditingService] = useState(null)
-    const [editingCategory, setEditingCategory] = useState(null)
+    const [editingService, setEditingService] = useState<any>(null)
+    const [editingCategory, setEditingCategory] = useState<any>(null)
     const [selectedCategory, setSelectedCategory] = useState('ALL')
     const [loading, setLoading] = useState(true)
     const [categoryName, setCategoryName] = useState('')
@@ -42,7 +42,7 @@ export default function ServicesPage() {
         }
     }
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         const url = '/api/franchise/services'
         const method = editingService ? 'PUT' : 'POST'
@@ -67,7 +67,7 @@ export default function ServicesPage() {
         }
     }
 
-    const handleDelete = async (id) => {
+    const handleDelete = async (id: string) => {
         if (!confirm('Delete this service?')) return
         try {
             const res = await fetch('/api/franchise/services', {
@@ -81,7 +81,7 @@ export default function ServicesPage() {
         }
     }
 
-    const handleCategorySubmit = async (e) => {
+    const handleCategorySubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         const url = '/api/service-categories'
         const method = editingCategory ? 'PUT' : 'POST'
@@ -107,7 +107,7 @@ export default function ServicesPage() {
         }
     }
 
-    const handleDeleteCategory = async (id) => {
+    const handleDeleteCategory = async (id: string) => {
         if (!confirm('Delete this category? This cannot be undone.')) return
         try {
             const res = await fetch('/api/service-categories', {
@@ -126,7 +126,7 @@ export default function ServicesPage() {
         }
     }
 
-    const openEdit = (service) => {
+    const openEdit = (service: any) => {
         setEditingService(service)
         setFormData({
             name: service.name,
@@ -138,7 +138,7 @@ export default function ServicesPage() {
         setShowModal(true)
     }
 
-    const openEditCategory = (category) => {
+    const openEditCategory = (category: any) => {
         setEditingCategory(category)
         setCategoryName(category.name)
     }

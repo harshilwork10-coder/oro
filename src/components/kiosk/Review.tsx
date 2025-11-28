@@ -15,10 +15,15 @@ export default function Review({ onComplete }: ReviewProps) {
     const [selectedTags, setSelectedTags] = useState<string[]>([])
     const [waiverAgreed, setWaiverAgreed] = useState(false)
 
-    const feedbackTags = [
-        'Great Service', 'Friendly Staff', 'Clean Facility',
-        'Professional', 'Good Value', 'Relaxing Atmosphere'
-    ]
+    const FEEDBACK_OPTIONS: Record<number, string[]> = {
+        5: ['Amazing Service', 'Extraordinary', 'Best Experience', 'Highly Recommend', 'Professional', 'Great Value'],
+        4: ['Good Service', 'Clean Facility', 'Friendly Staff', 'Nice Atmosphere', 'Good Value'],
+        3: ['Wait Time', 'Cleanliness', 'Service Quality', 'Price', 'Staff Behavior', 'Other'],
+        2: ['Wait Time', 'Cleanliness', 'Service Quality', 'Price', 'Staff Behavior', 'Other'],
+        1: ['Wait Time', 'Cleanliness', 'Service Quality', 'Price', 'Staff Behavior', 'Other']
+    }
+
+    const currentFeedbackTags = FEEDBACK_OPTIONS[rating] || FEEDBACK_OPTIONS[5]
 
     const handleRating = (stars: number) => {
         setRating(stars)
@@ -135,12 +140,14 @@ export default function Review({ onComplete }: ReviewProps) {
                         {step === 'feedback' && (
                             <div className="space-y-8 animate-in fade-in slide-in-from-right duration-300">
                                 <div className="text-center">
-                                    <h2 className="text-3xl font-bold text-gray-900 mb-2">What did you like?</h2>
+                                    <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                                        {rating === 5 ? 'What did you like?' : 'How can we improve?'}
+                                    </h2>
                                     <p className="text-gray-500">Select all that apply</p>
                                 </div>
 
                                 <div className="flex flex-wrap justify-center gap-3">
-                                    {feedbackTags.map((tag) => (
+                                    {currentFeedbackTags.map((tag) => (
                                         <button
                                             key={tag}
                                             onClick={() => toggleTag(tag)}

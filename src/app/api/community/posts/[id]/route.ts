@@ -43,7 +43,7 @@ export async function GET(
 
         return NextResponse.json({
             ...post,
-            userVote: post.votes[0]?.value || 0
+            userVote: post.votes[0]?.type === 'UPVOTE' ? 1 : post.votes[0]?.type === 'DOWNVOTE' ? -1 : 0
         })
     } catch (error) {
         return NextResponse.json({ error: 'Failed to fetch post' }, { status: 500 })

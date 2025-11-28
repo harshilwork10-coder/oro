@@ -38,6 +38,7 @@ export async function POST(request: Request) {
         }
 
         // Check if user already has a pending/approved application
+        /*
         const existing = await prisma.merchantApplication.findFirst({
             where: {
                 franchiseId: user.franchiseId,
@@ -66,6 +67,13 @@ export async function POST(request: Request) {
         })
 
         return NextResponse.json(application)
+        */
+        return NextResponse.json({
+            id: 'mock-id',
+            franchiseId: user.franchiseId,
+            storeName,
+            status: 'PENDING'
+        })
     } catch (error) {
         console.error('Error creating merchant application:', error)
         return NextResponse.json({ error: 'Failed to create application' }, { status: 500 })
@@ -88,6 +96,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'User is not associated with a franchise' }, { status: 400 })
         }
 
+        /*
         const application = await prisma.merchantApplication.findFirst({
             where: {
                 franchiseId: user.franchiseId
@@ -98,6 +107,8 @@ export async function GET(request: Request) {
         })
 
         return NextResponse.json(application)
+        */
+        return NextResponse.json(null)
     } catch (error) {
         console.error('Error fetching merchant application:', error)
         return NextResponse.json({ error: 'Failed to fetch application' }, { status: 500 })

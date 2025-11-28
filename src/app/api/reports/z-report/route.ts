@@ -73,37 +73,38 @@ export async function GET(request: NextRequest) {
         })
 
         // Calculate summary
-        const totalSales = transactions.reduce((sum, tx) => sum + tx.total, 0)
+        const totalSales = transactions.reduce((sum, tx) => sum + Number(tx.total), 0)
         const cashTransactions = transactions.filter(tx => tx.paymentMethod === 'CASH')
         const cardTransactions = transactions.filter(tx => tx.paymentMethod === 'CARD')
 
-        const cashSales = cashTransactions.reduce((sum, tx) => sum + tx.total, 0)
-        const cardSales = cardTransactions.reduce((sum, tx) => sum + tx.total, 0)
+        const cashSales = cashTransactions.reduce((sum, tx) => sum + Number(tx.total), 0)
+        const cardSales = cardTransactions.reduce((sum, tx) => sum + Number(tx.total), 0)
 
         // Get cash drawer info for the day
         const cashDrawerSessions = await prisma.cashDrawerSession.findMany({
             where: {
-                openedAt: {
+                startTime: {
                     gte: startOfDay,
                     lte: endOfDay
                 },
                 ...(user.locationId ? { locationId: user.locationId } : {})
             },
-            orderBy: { openedAt: 'desc' }
+            orderBy: { startTime: 'desc' }
         })
 
         const latestSession = cashDrawerSessions[0]
-        const openingCash = latestSession?.openingAmount || 0
-        const closingCash = latestSession?.closingAmount || null
+        const openingCash = latestSession?.startingCash ? Number(latestSession.startingCash) : 0
+        const closingCash = latestSession?.endingCash ? Number(latestSession.endingCash) : null
 
         // Top selling items
         const itemMap = new Map()
         transactions.forEach(tx => {
             tx.lineItems.forEach((lineItem: any) => {
-                const name = lineItem.service?.name || lineItem.product?.name || 'Unknown Item'
+                // Use description field first (stores name from cart), then fallback to service/product name
+                const name = lineItem.description || lineItem.service?.name || lineItem.product?.name || 'Unknown Item'
                 const existing = itemMap.get(name) || { name, quantity: 0, sales: 0 }
                 existing.quantity += lineItem.quantity
-                existing.sales += lineItem.total
+                existing.sales += Number(lineItem.total)
                 itemMap.set(name, existing)
             })
         })
@@ -113,8 +114,8 @@ export async function GET(request: NextRequest) {
             .slice(0, 10)
 
         // Tax calculation
-        const subtotal = transactions.reduce((sum, tx) => sum + tx.subtotal, 0)
-        const tax = transactions.reduce((sum, tx) => sum + tx.tax, 0)
+        const subtotal = transactions.reduce((sum, tx) => sum + Number(tx.subtotal), 0)
+        const tax = transactions.reduce((sum, tx) => sum + Number(tx.tax), 0)
 
         const reportData = {
             summary: {

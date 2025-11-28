@@ -41,9 +41,9 @@ export async function GET(request: NextRequest) {
                 },
                 users: true,
                 appointments: {
-                    include: {
-                        transaction: true
-                    }
+                    // include: {
+                    //     transaction: true
+                    // }
                 }
             }
         })

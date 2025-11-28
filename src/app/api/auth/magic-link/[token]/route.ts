@@ -15,27 +15,25 @@ export async function GET(
             include: { user: true }
         })
 
-        if (!magicLink) {
+        if (!magicLink || !magicLink.user) {
             return NextResponse.json({ error: 'Invalid magic link' }, { status: 404 })
         }
 
+        /*
         // Check if already used
         if (magicLink.used) {
             return NextResponse.json({ error: 'Magic link already used' }, { status: 400 })
         }
+        */
 
         // Check if expired
         if (new Date() > magicLink.expiresAt) {
             return NextResponse.json({ error: 'Magic link expired' }, { status: 400 })
         }
 
-        // Mark as used
-        await prisma.magicLink.update({
-            where: { id: magicLink.id },
-            data: {
-                used: true,
-                usedAt: new Date()
-            }
+        // Delete the magic link to ensure one-time use
+        await prisma.magicLink.delete({
+            where: { id: magicLink.id }
         })
 
         // Return user info (frontend will handle session creation)

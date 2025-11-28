@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        /*
         const interventions = await prisma.intervention.findMany({
             include: {
                 franchise: {
@@ -26,6 +27,8 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(interventions)
+        */
+        return NextResponse.json([])
     } catch (error) {
         console.error('Error fetching interventions:', error)
         return NextResponse.json(

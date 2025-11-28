@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react'
 import { ShoppingBag, Plus, Edit, Trash2, X, Package, AlertTriangle } from 'lucide-react'
 
 export default function ProductsPage() {
-    const [products, setProducts] = useState([])
+    const [products, setProducts] = useState<any[]>([])
     const [showModal, setShowModal] = useState(false)
-    const [editingProduct, setEditingProduct] = useState(null)
+    const [editingProduct, setEditingProduct] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [formData, setFormData] = useState({ name: '', sku: '', price: '', stock: '0', description: '' })
 
@@ -16,8 +16,8 @@ export default function ProductsPage() {
         try {
             const res = await fetch('/api/products')
             const data = await res.json()
-            const productsData = Array.isArray(data) ? data.filter(item => item.type === 'PRODUCT') : []
-            setProducts(productsData)
+            const productsData = Array.isArray(data) ? data : []
+            setProducts(productsData as any)
         } catch (error) {
             console.error('Failed to fetch products:', error)
         } finally {
@@ -25,7 +25,7 @@ export default function ProductsPage() {
         }
     }
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         const url = '/api/products'
         const method = editingProduct ? 'PUT' : 'POST'
@@ -48,7 +48,7 @@ export default function ProductsPage() {
         }
     }
 
-    const handleDelete = async (id) => {
+    const handleDelete = async (id: string) => {
         if (!confirm('Delete this product?')) return
         try {
             const res = await fetch('/api/products', {
@@ -62,7 +62,7 @@ export default function ProductsPage() {
         }
     }
 
-    const openEdit = (product) => {
+    const openEdit = (product: any) => {
         setEditingProduct(product)
         setFormData({ name: product.name, sku: product.sku || '', price: product.price.toString(), stock: (product.stock || 0).toString(), description: product.description || '' })
         setShowModal(true)

@@ -11,9 +11,9 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json()
-        const { originalTransactionId, items, reason } = body
+        const { originalTransactionId, refundType, items, reason, refundMethod } = body
 
-        // Fetch original transaction
+        // Fetch original transaction with line items
         const originalTx = await prisma.transaction.findUnique({
             where: { id: originalTransactionId },
             include: { lineItems: true }
@@ -23,10 +23,44 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
         }
 
+        if (originalTx.status !== 'COMPLETED') {
+            return NextResponse.json({
+                error: `Cannot refund transaction with status: ${originalTx.status}`
+            }, { status: 400 })
+        }
+
+        // Map requested refund items to actual line items
+        const refundLineItems = items.map((refundItem: any) => {
+            const originalLineItem = originalTx.lineItems.find(li => li.id === refundItem.lineItemId)
+            if (!originalLineItem) {
+                throw new Error(`Line item ${refundItem.lineItemId} not found`)
+            }
+            return {
+                ...originalLineItem,
+                quantityToRefund: refundItem.quantity
+            }
+        })
+
         // Calculate refund totals
         let refundSubtotal = 0
-        let refundTax = 0
-        let refundTotal = 0
+        const refundItems = refundLineItems.map((item: any) => {
+            const itemTotal = item.price * item.quantityToRefund * (1 - (item.discount || 0) / 100)
+            refundSubtotal += itemTotal
+            return {
+                type: item.type,
+                serviceId: item.serviceId,
+                productId: item.productId,
+                quantity: -item.quantityToRefund, // Negative quantity for refund
+                price: item.price,
+                discount: item.discount || 0,
+                total: -itemTotal // Negative total for refund
+            }
+        })
+
+        // Calculate proportional tax
+        const taxRate = Number(originalTx.tax) / Number(originalTx.subtotal)
+        const refundTax = refundSubtotal * (isNaN(taxRate) ? 0 : taxRate)
+        const refundTotal = refundSubtotal + refundTax
 
         // Create Refund Transaction (Negative values)
         const refundTx = await prisma.transaction.create({
@@ -36,49 +70,33 @@ export async function POST(req: Request) {
                 employeeId: session.user.id,
                 originalTransactionId: originalTx.id,
                 status: 'REFUNDED',
-                paymentMethod: originalTx.paymentMethod, // Refund to same method
-                subtotal: 0, // Calculated below
-                tax: 0,
-                total: 0,
+                paymentMethod: refundMethod || originalTx.paymentMethod,
+                subtotal: -refundSubtotal,
+                tax: -refundTax,
+                total: -refundTotal,
+                cashDrawerSessionId: originalTx.cashDrawerSessionId,
                 lineItems: {
-                    create: items.map((item: any) => {
-                        const lineTotal = item.price * item.quantity
-                        refundSubtotal += lineTotal
-                        return {
-                            type: item.type,
-                            serviceId: item.serviceId,
-                            productId: item.productId,
-                            quantity: -item.quantity, // Negative quantity
-                            price: item.price,
-                            total: -lineTotal // Negative total
-                        }
-                    })
+                    create: refundItems
                 }
             }
         })
 
-        // Calculate tax proportion (simplified)
-        // In real world, we'd recalculate tax exactly based on refunded items
-        const taxRate = Number(originalTx.tax) / Number(originalTx.subtotal)
-        refundTax = refundSubtotal * (isNaN(taxRate) ? 0 : taxRate)
-        refundTotal = refundSubtotal + refundTax
+        // Update Original Transaction Status
+        // Only mark as REFUNDED if all items were refunded
+        const allItemsRefunded = refundType === 'FULL'
+        if (allItemsRefunded) {
+            await prisma.transaction.update({
+                where: { id: originalTx.id },
+                data: { status: 'REFUNDED' }
+            })
+        }
 
-        // Update the refund transaction with calculated totals (negative)
-        await prisma.transaction.update({
-            where: { id: refundTx.id },
-            data: {
-                subtotal: -refundSubtotal,
-                tax: -refundTax,
-                total: -refundTotal
-            }
-        })
-
-        // Restock Inventory
-        for (const item of items) {
-            if (item.type === 'PRODUCT' && item.productId) {
+        // Restock Inventory for refunded items
+        for (const refundItem of refundLineItems) {
+            if (refundItem.type === 'PRODUCT' && refundItem.productId) {
                 await prisma.product.update({
-                    where: { id: item.productId },
-                    data: { stock: { increment: item.quantity } }
+                    where: { id: refundItem.productId },
+                    data: { stock: { increment: refundItem.quantityToRefund } }
                 })
             }
         }

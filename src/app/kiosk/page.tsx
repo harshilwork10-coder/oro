@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react'
 import CheckIn from '@/components/kiosk/CheckIn'
 import CustomerDisplay from '@/components/kiosk/CustomerDisplay'
 import Review from '@/components/kiosk/Review'
+import ThankYou from '@/components/kiosk/ThankYou'
 import { useFullscreen } from '@/hooks/useFullscreen'
 
 export default function KioskPage() {
@@ -120,6 +121,7 @@ export default function KioskPage() {
     return (
         <>
             {status === 'REVIEW' && <Review onComplete={fetchCart} />}
+            {status === 'COMPLETED' && <ThankYou onComplete={fetchCart} />}
 
             {status === 'ACTIVE' && cart?.items?.length > 0 && <CustomerDisplay cart={cart} />}
 

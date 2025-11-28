@@ -98,10 +98,14 @@ export async function POST(request: NextRequest) {
         const tempPassword = crypto.randomBytes(32).toString('hex')
         const hashedPassword = await hash(tempPassword, 10)
 
+        // Generate slug from name
+        const slug = sanitizedFranchiseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+
         // Create franchise with sanitized data
         const franchise = await prisma.franchise.create({
             data: {
                 name: sanitizedFranchiseName,
+                slug: slug,
                 franchisorId: franchisor.id
             }
         })
@@ -126,6 +130,7 @@ export async function POST(request: NextRequest) {
             data: {
                 token,
                 userId: user.id,
+                email: sanitizedEmail,
                 expiresAt
             }
         })
@@ -134,6 +139,8 @@ export async function POST(request: NextRequest) {
         const magicLinkUrl = `${process.env.NEXTAUTH_URL}/auth/magic-link/${token}`
 
         // Log email (actual sending will be implemented with email service)
+        // Note: EmailLog model not yet defined in schema
+        /*
         await prisma.emailLog.create({
             data: {
                 to: email,
@@ -142,6 +149,8 @@ export async function POST(request: NextRequest) {
                 status: 'pending'
             }
         })
+        */
+        console.log(`[Mock Email] To: ${email}, Subject: Welcome to ${franchisor.name} Network!, Magic Link: ${magicLinkUrl}`)
 
         return NextResponse.json({
             success: true,

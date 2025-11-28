@@ -52,6 +52,8 @@ export const authOptions: NextAuthOptions = {
                     role: user.role,
                     franchiseId: user.franchiseId,
                     locationId: user.locationId,
+                    canProcessRefunds: user.canProcessRefunds,
+                    canManageShifts: user.canManageShifts,
                 }
             }
         })
@@ -66,6 +68,8 @@ export const authOptions: NextAuthOptions = {
                     role: token.role,
                     franchiseId: token.franchiseId,
                     locationId: token.locationId,
+                    canProcessRefunds: token.canProcessRefunds,
+                    canManageShifts: token.canManageShifts,
                 }
             }
         },
@@ -77,6 +81,8 @@ export const authOptions: NextAuthOptions = {
                     role: (user as any).role,
                     franchiseId: (user as any).franchiseId,
                     locationId: (user as any).locationId,
+                    canProcessRefunds: (user as any).canProcessRefunds,
+                    canManageShifts: (user as any).canManageShifts,
                 }
             }
             return token

@@ -21,6 +21,8 @@ import MerchantApplicationModal from "@/components/modals/MerchantApplicationMod
 import CheckInQueue from "@/components/dashboard/employee/CheckInQueue"
 import TodayAppointments from "@/components/dashboard/employee/TodayAppointments"
 import UpcomingAppointments from "@/components/dashboard/employee/UpcomingAppointments"
+import EmployeePerformanceStats from "@/components/dashboard/employee/EmployeePerformanceStats"
+import NextClientSpotlight from "@/components/dashboard/employee/NextClientSpotlight"
 import { useState } from "react"
 
 export default function DashboardPage() {
@@ -404,25 +406,59 @@ export default function DashboardPage() {
     // Employee Dashboard
     if (role === 'EMPLOYEE' || role === 'USER') {
         return (
-            <div className="p-4 md:p-8 space-y-6">
-                {/* Header */}
-                <div>
-                    <h1 className="text-3xl font-bold text-stone-100">
-                        Welcome back, {session?.user?.name || 'Employee'}! 👋
-                    </h1>
-                    <p className="text-stone-400 mt-2">
-                        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                    </p>
+            <div className="p-4 md:p-8 space-y-8">
+                {/* Header with Quick Actions */}
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-stone-100">
+                            Let's crush it, {session?.user?.name?.split(' ')[0] || 'Team'}! 🚀
+                        </h1>
+                        <p className="text-stone-400 mt-2">
+                            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                        </p>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <Link href="/dashboard/pos" className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg font-medium transition-colors flex items-center gap-2 border border-stone-700">
+                            <CreditCard className="h-4 w-4" />
+                            New Sale
+                        </Link>
+                        <Link href="/dashboard/appointments" className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-orange-900/20">
+                            <Clock className="h-4 w-4" />
+                            Book Appt
+                        </Link>
+                    </div>
                 </div>
 
-                {/* Main Grid - Queue and Today's Appointments */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <CheckInQueue />
-                    <TodayAppointments />
-                </div>
+                {/* Performance Stats */}
+                <EmployeePerformanceStats />
 
-                {/* Upcoming Appointments */}
-                <UpcomingAppointments />
+                {/* Main Workflow Area */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Left Column: Next Up & Queue */}
+                    <div className="lg:col-span-2 space-y-8">
+                        <section>
+                            <h2 className="text-lg font-bold text-stone-100 mb-4 flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+                                Up Next
+                            </h2>
+                            <NextClientSpotlight />
+                        </section>
+
+                        <section>
+                            <h2 className="text-lg font-bold text-stone-100 mb-4">Waiting Room</h2>
+                            <CheckInQueue />
+                        </section>
+                    </div>
+
+                    {/* Right Column: Today's Schedule List */}
+                    <div className="space-y-8">
+                        <section>
+                            <h2 className="text-lg font-bold text-stone-100 mb-4">Rest of Today</h2>
+                            <TodayAppointments />
+                        </section>
+                    </div>
+                </div>
             </div>
         )
     }

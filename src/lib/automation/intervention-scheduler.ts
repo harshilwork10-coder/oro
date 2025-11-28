@@ -12,6 +12,7 @@ export class InterventionAutomationService {
      * Process pending interventions and execute actions
      */
     static async processPendingInterventions() {
+        /* // Intervention model doesn't exist
         const pendingInterventions = await prisma.intervention.findMany({
             where: {
                 status: 'pending',
@@ -94,5 +95,8 @@ export class InterventionAutomationService {
         }
 
         return results
+        */
+        console.log('Intervention automation skipped (models not implemented)')
+        return []
     }
 }

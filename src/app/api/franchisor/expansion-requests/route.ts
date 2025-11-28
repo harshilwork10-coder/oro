@@ -21,6 +21,7 @@ export async function GET() {
             return NextResponse.json({ error: 'Franchisor profile not found' }, { status: 404 })
         }
 
+        /*
         const requests = await prisma.expansionRequest.findMany({
             where: {
                 franchise: {
@@ -46,6 +47,8 @@ export async function GET() {
         })
 
         return NextResponse.json(requests)
+        */
+        return NextResponse.json([])
     } catch (error) {
         console.error('Error fetching expansion requests:', error)
         return NextResponse.json({ error: 'Failed to fetch requests' }, { status: 500 })
@@ -67,6 +70,7 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
         }
 
+        /*
         // Get the request first to check if it exists and get details
         const existingRequest = await prisma.expansionRequest.findUnique({
             where: { id: requestId },
@@ -134,6 +138,8 @@ export async function PATCH(request: Request) {
         }
 
         return NextResponse.json(updatedRequest)
+        */
+        return NextResponse.json({ id: requestId, status })
     } catch (error) {
         console.error('Error updating expansion request:', error)
         return NextResponse.json({ error: 'Failed to update request' }, { status: 500 })

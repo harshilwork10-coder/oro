@@ -7,12 +7,18 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
     const user = session?.user as any
 
-    // Ensure user has a location assigned for shift management
-    if (!user?.locationId && !user?.franchiseId) {
+    // Fetch fresh user data to ensure we have the latest locationId
+    // This handles cases where location was assigned after login (stale session)
+    const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { id: true, locationId: true, franchiseId: true }
+    })
+
+    if (!dbUser?.locationId && !dbUser?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized: No Location/Franchise context' }, { status: 401 })
     }
 
-    const locationId = user.locationId
+    const locationId = dbUser.locationId
 
     try {
         const body = await req.json()
@@ -69,7 +75,7 @@ export async function POST(req: Request) {
         if (action === 'CLOSE') {
             const currentSession = await prisma.cashDrawerSession.findFirst({
                 where: {
-                    locationId: locationId, // Optional if we just find by employee? But safer with location
+                    ...(locationId ? { locationId } : {}),
                     status: 'OPEN',
                     employeeId: user.id
                 }
@@ -92,7 +98,7 @@ export async function POST(req: Request) {
             // Handle cash drop: record amount in current open session
             const currentSession = await prisma.cashDrawerSession.findFirst({
                 where: {
-                    locationId: locationId,
+                    ...(locationId ? { locationId } : {}),
                     status: 'OPEN',
                     employeeId: user.id,
                 },
@@ -118,15 +124,25 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Validate user exists in DB (handle stale sessions after seed)
+    const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { id: true, locationId: true }
+    })
+
+    if (!dbUser) {
+        return NextResponse.json({ error: 'User not found' }, { status: 401 })
+    }
+
     // Get current open session for this user
     // We assume a user can only have one open session at a time across locations? 
     // Or strictly filter by current location if available.
     const whereClause: any = {
         status: 'OPEN',
-        employeeId: user.id
+        employeeId: dbUser.id
     }
-    if (user.locationId) {
-        whereClause.locationId = user.locationId
+    if (dbUser.locationId) {
+        whereClause.locationId = dbUser.locationId
     }
 
     const currentSession = await prisma.cashDrawerSession.findFirst({

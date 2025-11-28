@@ -18,11 +18,13 @@ import {
     ShoppingBag,
     Tag,
     RotateCcw,
+    Monitor,
     ChevronRight,
     UserPlus,
     DollarSign
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 
 // Removed hardcoded maps
 
@@ -89,6 +91,7 @@ export default function POSPage() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
     const [locationName, setLocationName] = useState<string>('')
     const [franchiseName, setFranchiseName] = useState<string>('')
+    const [showPaxModal, setShowPaxModal] = useState(false)
 
     useEffect(() => {
         fetchMenu()
@@ -867,8 +870,20 @@ export default function POSPage() {
                                     className="aspect-video bg-blue-900/20 hover:bg-blue-900/40 border border-blue-500/30 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-4 transition-all group"
                                 >
                                     <CreditCard className="h-12 w-12 text-blue-500 group-hover:scale-110 transition-transform" />
-                                    <span className="text-xl font-bold text-blue-100">Card</span>
+                                    <span className="text-xl font-bold text-blue-100">Card (Manual)</span>
                                     <span className="text-sm text-blue-300">Total: {formatCurrency(totalCard)}</span>
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setShowCheckoutModal(false)
+                                        setShowPaxModal(true)
+                                    }}
+                                    className="col-span-2 aspect-video bg-purple-900/20 hover:bg-purple-900/40 border border-purple-500/30 hover:border-purple-500 rounded-xl flex flex-col items-center justify-center gap-4 transition-all group"
+                                >
+                                    <Monitor className="h-12 w-12 text-purple-500 group-hover:scale-110 transition-transform" />
+                                    <span className="text-xl font-bold text-purple-100">Card (Terminal)</span>
+                                    <span className="text-sm text-purple-300">PAX Device</span>
                                 </button>
                             </div>
                         </div>
@@ -924,6 +939,19 @@ export default function POSPage() {
                         </div>
                     </div>
                 )}
+
+                {/* PAX Terminal Payment Modal */}
+                <PaxPaymentModal
+                    isOpen={showPaxModal}
+                    onClose={() => setShowPaxModal(false)}
+                    onSuccess={(response) => {
+                        // Process payment using terminal response
+                        handleCheckout('CREDIT_CARD')
+                        setShowPaxModal(false)
+                    }}
+                    amount={totalCard}
+                    invoiceNumber={`INV-${Date.now()}`}
+                />
             </div>
         </div>
     )

@@ -14,13 +14,13 @@ export async function GET(request: Request) {
         include: { location: true }
     })
 
-    if (!user?.locationId) {
-        return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+    if (!user?.franchiseId) {
+        return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
     }
 
     try {
-        const items = await prisma.menuItem.findMany({
-            where: { locationId: user.locationId },
+        const items = await prisma.product.findMany({
+            where: { franchiseId: user.franchiseId },
             orderBy: { name: 'asc' }
         })
 
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
-        const item = await prisma.menuItem.create({
+        const item = await prisma.product.create({
             data: {
                 name,
                 sku,
@@ -62,8 +62,8 @@ export async function POST(request: Request) {
                 stock: parseInt(stock) || 0,
                 description,
                 category: 'RETAIL',
-                type: 'PRODUCT',
-                locationId: user.locationId,
+                // type: 'PRODUCT', // Removed as not in schema
+                franchiseId: user.franchiseId!, // Use franchiseId
             }
         })
 
@@ -97,10 +97,10 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
-        const item = await prisma.menuItem.updateMany({
+        const item = await prisma.product.updateMany({
             where: {
                 id,
-                locationId: user.locationId
+                franchiseId: user.franchiseId!
             },
             data: {
                 name,
@@ -145,10 +145,10 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: 'Missing product ID' }, { status: 400 })
         }
 
-        const item = await prisma.menuItem.deleteMany({
+        const item = await prisma.product.deleteMany({
             where: {
                 id,
-                locationId: user.locationId
+                franchiseId: user.franchiseId!
             }
         })
 
