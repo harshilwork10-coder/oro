@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { generateInvoiceNumber } from '@/lib/invoice'
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
@@ -11,7 +12,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json()
-        const { items, subtotal, tax, total, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount } = body
+        const { items, subtotal, tax, total, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType } = body
 
         console.log('[POS_TRANSACTION_POST] Received data:', {
             itemsCount: items?.length,
@@ -23,6 +24,10 @@ export async function POST(req: Request) {
             clientId,
             cashAmount,
             cardAmount,
+            gatewayTxId,
+            authCode,
+            cardLast4,
+            cardType,
             franchiseId: session.user.franchiseId,
             employeeId: session.user.id
         })
@@ -37,8 +42,12 @@ export async function POST(req: Request) {
             }
         }
 
+        // Generate sequential invoice number
+        const invoiceNumber = await generateInvoiceNumber(session.user.franchiseId)
+
         // Ensure numeric values are converted to strings for Prisma Decimal type
         const transactionData = {
+            invoiceNumber,
             franchiseId: session.user.franchiseId,
             employeeId: session.user.id,
             clientId: clientId || null,
@@ -48,6 +57,10 @@ export async function POST(req: Request) {
             paymentMethod: paymentMethod,
             cashAmount: (paymentMethod === 'SPLIT' ? cashAmount : (paymentMethod === 'CASH' ? total : 0)).toString(),
             cardAmount: (paymentMethod === 'SPLIT' ? cardAmount : (paymentMethod !== 'CASH' ? total : 0)).toString(),
+            gatewayTxId: gatewayTxId || null,
+            authCode: authCode || null,
+            cardLast4: cardLast4 || null,
+            cardType: cardType || null,
             status: 'COMPLETED',
             cashDrawerSessionId: cashDrawerSessionId || null,
             lineItems: {

@@ -7,6 +7,10 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
     const user = session?.user as any
 
+    if (!user || !user.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     // Fetch fresh user data to ensure we have the latest locationId
     // This handles cases where location was assigned after login (stale session)
     const dbUser = await prisma.user.findUnique({

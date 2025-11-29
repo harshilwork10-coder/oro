@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function DELETE(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.franchiseId) {
@@ -13,7 +13,8 @@ export async function DELETE(
     }
 
     try {
-        const transactionId = params.id
+        const { id } = await params
+        const transactionId = id
 
         // Find the transaction
         const transaction = await prisma.transaction.findUnique({

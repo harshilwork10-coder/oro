@@ -1,0 +1,62 @@
+*{font-size: 16px;}
+::-webkit-input-placeholder{color:#c3c3c3 !important;}
+::-moz-placeholder{color:#c3c3c3 !important;}
+:-moz-placeholder{color:#c3c3c3 !important;}
+
+/*#AmountInfoinput input::-webkit-outer-spin-button,
+#AmountInfoinput input::-webkit-inner-spin-button{-webkit-appearance: none !important;margin: 0; }
+#AmountInfoinput input[type="number"]{-moz-appearance:textfield;}*/
+
+#tabs button{width:140px; height:36px; vertical-align: top;}
+#tabs input{height:30px; text-indent: 3px; }
+#tabs select{height:36px;width:200px;color:gray;}
+
+.command>div{height:auto; margin:5px 0; padding: 20px; border:1px solid #c3c3c3;}
+.command label{display: inline-block;width:200px;}
+.command .subDiv{border:1px solid #c3c3c3; padding:5px;min-height: 30px;}
+.command .subInfo{margin:5px;}
+
+.setting>div{height:auto; margin:5px 0; padding: 15px; }
+.setting .getDeviceLocalIP{ height:auto;border:1px solid #c3c3c3;margin:5px 0; padding: 20px;margin-bottom: 20px;position: relative;}
+.setting .getDeviceLocalIP:before{content:"Remote IP";position: absolute;top:-10px;left:15px;background: #fff;}
+.setting .getDeviceLocalIP div{margin: 15px 0;}
+/*.setting .getDeviceLocalIP .Retrieve{margin-left: 125px;}*/
+
+/*.setting .host{ height:auto;border:1px solid #c3c3c3;margin:5px 0; padding: 20px;margin-bottom: 20px;position: relative;}
+.setting .host:before{content:"Service Setting";position: absolute;top:-10px;left:15px;background: #fff;}*/
+.setting .timeout{border:1px solid #c3c3c3;position: relative;}
+.setting .timeout:before{content:"Communication Timeout";position: absolute;top:-10px;left:15px;background: #fff;}
+.setting .timeout>div{width:100%; height:auto; margin:5px 0; padding: 5px; }
+/*.setting .timeout .TimeoutSetting{margin-left: 130px;}*/
+.setting label{display:inline-block;width:120px;}
+.setting input{margin-right: 8px;}
+
+/***** request params ******/
+.command .requestParams{width:75%; display: inline-block; border:0px; }
+.command .ui-button{padding:0;}
+.requestParams input{margin-bottom:5px;}
+
+/**** table style ****/
+table{margin:5px 0;}
+
+/**** loading ****/
+.mask{display:none; position:absolute; left:0px;  top:0px; width:100%; height:100%; text-align:center; z-index: 1000; background-color: #333; opacity: 0.5;   /* 背景半透明 */}
+#loading{width:124px;height:124px;overflow:hidden;background:url(../images/loaderc.gif) no-repeat; position: absolute; top:50%;left:50%; margin:-62px 0 0 -62px;} 
+/*#loading{display:none;position:fixed;_position:absolute;top:50%;left:50%;width:124px;height:124px;overflow:hidden;background:url(../images/loaderc.gif) no-repeat;z-index:99999; margin:-62px 0 0 -62px;} 
+*/
+/***** Configure Tabs******/
+#ConfigureTabs{display: none;}
+/*#ConfigureTabs input{margin:5px; height:30px; text-indent: 3px; width:200px;}
+#ConfigureTabs select{margin:5px; height:36px; width:204px; color:gray;}*/
+#ConfigureTabs input{margin:5px; height:30px; text-indent: 3px; width:240px;display: inline-block;} 
+#ConfigureTabs select{margin:5px; height:36px; width:244px; color:gray;}
+#ConfigureTabs .input32{width:499px; max-width: 100%;}
+#ConfigureTabs .input64{width:757px; display: block;max-width: 100%;}
+#ConfigureTabs .input256{width:1274px; max-width: 100%;}
+
+
+/*validate*/
+.error{outline:1px solid red; border:1px solid red;background:url(../images/error.png) 92% 50% no-repeat;background-size:18px 18px;}
+.correct{outline:1px solid #3deb54; border:1px solid #3deb54;background:url(../images/correct.png) 92% 50% no-repeat;background-size:18px 18px;}
+.errorText{color:red;margin-left: 6px; display: block;}
+.block{display: block;}

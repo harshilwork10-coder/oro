@@ -19,11 +19,17 @@ export interface PaxResponse {
     responseCode: string;
     responseMessage: string;
     hostInformation?: any;
-    amountInformation?: any;
     accountInformation?: any;
     traceInformation?: any;
     rawResponse?: any;
+    // Extracted Fields
+    transactionId?: string;
+    authCode?: string;
+    cardLast4?: string;
+    cardType?: string;
 }
+
+
 
 export class PaxTerminal {
     private ip: string;
@@ -91,7 +97,6 @@ export class PaxTerminal {
         const additionalInfo = {};
 
         // 2. Build Raw Params for LRC Calculation
-        // [STX, Command, FS, Version, FS, TransType, FS, AmountInfo..., FS, AccountInfo..., ...]
         let rawParams: any[] = [this.STX.hex, command, this.FS.hex, version];
 
         rawParams.push(this.FS.hex);
@@ -137,7 +142,6 @@ export class PaxTerminal {
         const lrc = this.calculateLRC(rawParams);
 
         // 4. Build Encoded Elements
-        // [STX, EncodedCommand, FS, EncodedVersion, FS, EncodedTransType, FS, EncodedAmountInfo..., ETX, EncodedLRC]
         let elements: string[] = [this.STX.code];
 
         elements.push(this.encodeString(command));
@@ -170,16 +174,31 @@ export class PaxTerminal {
         const finalString = elements.join(" ");
         const finalBase64 = this.hexToBase64(finalString);
 
-        const url = `http://${this.ip}:${this.port}?${finalBase64}`;
+        console.log('[PAX] Sending Request via Proxy');
+        console.log('[PAX] Payload:', finalBase64);
 
-        console.log('[PAX] Sending Request to:', url);
-
-        // 6. Send Request
+        // 6. Send Request via Proxy
         try {
-            const response = await fetch(url);
-            const responseText = await response.text();
-            console.log('[PAX] Raw Response:', responseText);
-            return this.parseResponse(responseText);
+            const response = await fetch('/api/pax/proxy', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ip: this.ip,
+                    port: this.port,
+                    payload: finalBase64,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'Proxy request failed');
+            }
+
+            console.log('[PAX] Raw Response:', data.response);
+            return this.parseResponse(data.response);
         } catch (error) {
             console.error('[PAX] Error:', error);
             throw new Error('Failed to communicate with PAX terminal');
@@ -245,16 +264,9 @@ export class PaxTerminal {
             if (tmp.length === 1) tmp = "0" + tmp;
             hex.push(tmp);
         }
-        return hex.join(""); // Note: The original code joined with spaces, but let's check if that's needed for the intermediate step.
-        // Wait, the original code `base64ToHex` returns space-separated hex.
-        // `elements` array contains these space-separated hex strings.
-        // Then `elements.join(" ")` puts spaces between them.
-        // So `encodeString` should probably return the hex string directly?
-        // Let's stick to the original logic:
-        // `base64ToHex` returns "HH HH HH"
+        return hex.join(" ");
     }
 
-    // Re-implementing base64ToHex to match original exactly (space separated)
     private base64ToHexSpace(str: string): string {
         const bin = atob(str);
         const hex: string[] = [];
@@ -267,7 +279,6 @@ export class PaxTerminal {
     }
 
     private hexToBase64(str: string): string {
-        // Hex (space separated or not) -> Bytes -> Base64
         const cleanStr = str.replace(/\r|\n/g, "").replace(/([\da-fA-F]{2}) ?/g, "0x$1 ").replace(/ +$/, "");
         const hexArr = cleanStr.split(" ");
         let binString = "";
@@ -280,34 +291,20 @@ export class PaxTerminal {
     }
 
     private parseResponse(response: string): PaxResponse {
-        // Response is Base64 string
-        // Base64 -> Hex -> String
-        const hexString = this.base64ToHexSpace(response); // Get "HH HH HH"
-
-        // Convert Hex to String (handling delimiters)
-        // The original code does: StringToHex(response) -> split -> check LRC -> split by 02|1c
-        // But `response` passed to `parseResponse` is the raw Base64 string from the server?
-        // No, the server returns a Base64 string.
-
-        // Let's decode the whole thing first.
         const decodedBin = atob(response);
-        // Now we have the raw bytes string.
-
-        // Split by FS (0x1c) and STX (0x02)
-        // This is tricky because we need to handle the structure.
-
-        // Simple parsing based on known structure:
-        // [STX] [Status] [FS] [Command] [FS] [Version] [FS] [ResponseCode] [FS] [ResponseMessage] ...
-
-        // Let's convert to an array of strings
         const parts = decodedBin.split(String.fromCharCode(0x1c));
-
-        // First part contains STX + Status + Command?
-        // Actually, let's just split by 0x1c and clean up 0x02 and 0x03
-
         const cleanParts = parts.map(p => p.replace(/\x02/g, '').replace(/\x03/g, ''));
 
-        // Note: This is a simplified parser. A robust one would check LRC.
+        // Host Information (Index 5)
+        const hostInfo = cleanParts[5] ? cleanParts[5].split(String.fromCharCode(0x1f)) : [];
+        const authCode = hostInfo[2] || '';
+        const transactionId = hostInfo[3] || '';
+
+        // Account Information (Index 8)
+        const accountInfo = cleanParts[8] ? cleanParts[8].split(String.fromCharCode(0x1f)) : [];
+        const accountNumber = accountInfo[0] || '';
+        const cardLast4 = accountNumber.slice(-4);
+        const cardType = accountInfo[6] || '';
 
         return {
             status: cleanParts[0] || '',
@@ -315,6 +312,10 @@ export class PaxTerminal {
             version: cleanParts[2] || '',
             responseCode: cleanParts[3] || '',
             responseMessage: cleanParts[4] || '',
+            transactionId,
+            authCode,
+            cardLast4,
+            cardType,
             rawResponse: cleanParts
         };
     }

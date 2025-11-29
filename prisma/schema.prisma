@@ -152,6 +152,14 @@ model Location {
   appointments Appointment[]
   schedules   Schedule[]
   
+  // Payment Processor Configuration
+  processorName    String?  // e.g., "DATAWIRE", "TSYS", "VANTIV", "WORLDPAY", "FIRST_DATA"
+  processorMID     String?  // Merchant ID from processor
+  processorTID     String?  // Terminal ID from processor
+  processorVAR     String?  // VAR/Reseller ID (if applicable)
+  paxTerminalIP    String?  // PAX device IP address
+  paxTerminalPort  String   @default("10009") // PAX device port
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -328,6 +336,7 @@ model Product {
 // POS Transaction (sale/checkout)
 model Transaction {
   id            String   @id @default(cuid())
+  invoiceNumber String?  @unique // Sequential invoice number for IRS compliance
   franchiseId   String
   franchise     Franchise @relation(fields: [franchiseId], references: [id])
   
@@ -349,7 +358,13 @@ model Transaction {
   
   // Split Payment Fields
   cashAmount    Decimal   @default(0)  // Amount paid in cash (for SPLIT payments)
-  cardAmount    Decimal   @default(0)  // Amount paid on card (for SPLIT payments)
+  cardAmount    Decimal   @default(0)  // Amount paid by card (for SPLIT payments)
+
+  // PAX / Gateway Details
+  gatewayTxId   String?   // Transaction ID from PAX/Processor
+  authCode      String?   // Authorization Code
+  cardLast4     String?   // Last 4 digits of card
+  cardType      String?   // Visa, MasterCard, etc.
   
   status        String   @default("COMPLETED") // COMPLETED, REFUNDED, VOIDED
   

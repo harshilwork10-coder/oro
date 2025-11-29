@@ -13,7 +13,7 @@ interface PaxPaymentModalProps {
 export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, invoiceNumber }: PaxPaymentModalProps) {
     const [status, setStatus] = useState<'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR'>('IDLE')
     const [message, setMessage] = useState('Ready to process payment')
-    const [terminalIp, setTerminalIp] = useState('127.0.0.1')
+    const [terminalIp, setTerminalIp] = useState('10.1.10.96')
     const [terminalPort, setTerminalPort] = useState('10009')
 
     useEffect(() => {
@@ -23,6 +23,13 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
         if (savedIp) setTerminalIp(savedIp)
         if (savedPort) setTerminalPort(savedPort)
     }, [])
+
+    // Auto-start payment when modal opens
+    useEffect(() => {
+        if (isOpen && status === 'IDLE') {
+            handleProcessPayment()
+        }
+    }, [isOpen])
 
     const handleProcessPayment = async () => {
         setStatus('PROCESSING')
@@ -93,9 +100,9 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
 
                     {/* Status Display */}
                     <div className={`rounded-xl p-6 border flex flex-col items-center justify-center gap-3 text-center min-h-[160px] transition-colors ${status === 'IDLE' ? 'bg-stone-950 border-stone-800' :
-                            status === 'PROCESSING' ? 'bg-blue-900/20 border-blue-500/30' :
-                                status === 'SUCCESS' ? 'bg-emerald-900/20 border-emerald-500/30' :
-                                    'bg-red-900/20 border-red-500/30'
+                        status === 'PROCESSING' ? 'bg-blue-900/20 border-blue-500/30' :
+                            status === 'SUCCESS' ? 'bg-emerald-900/20 border-emerald-500/30' :
+                                'bg-red-900/20 border-red-500/30'
                         }`}>
                         {status === 'IDLE' && <Monitor className="h-12 w-12 text-stone-600" />}
                         {status === 'PROCESSING' && <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />}
@@ -103,9 +110,9 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
                         {status === 'ERROR' && <AlertCircle className="h-12 w-12 text-red-500" />}
 
                         <p className={`font-medium ${status === 'IDLE' ? 'text-stone-400' :
-                                status === 'PROCESSING' ? 'text-blue-200' :
-                                    status === 'SUCCESS' ? 'text-emerald-200' :
-                                        'text-red-200'
+                            status === 'PROCESSING' ? 'text-blue-200' :
+                                status === 'SUCCESS' ? 'text-emerald-200' :
+                                    'text-red-200'
                             }`}>
                             {message}
                         </p>

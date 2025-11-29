@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import {
     Search,
@@ -27,6 +27,14 @@ import { formatCurrency } from '@/lib/utils'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 
 // Removed hardcoded maps
+
+// Types
+interface PaymentDetails {
+    gatewayTxId?: string
+    authCode?: string
+    cardLast4?: string
+    cardType?: string
+}
 
 // Types
 interface CartItem {
@@ -68,6 +76,7 @@ const SERVICE_CATEGORIES: Record<string, any> = {
 }
 
 export default function POSPage() {
+    console.log('POSPage: Rendering...')
     const { data: session } = useSession()
     const [view, setView] = useState<'POS' | 'HISTORY'>('POS')
     const [cart, setCart] = useState<CartItem[]>([])
@@ -165,30 +174,49 @@ export default function POSPage() {
     }, [cart])
 
     // Auto-open Customer Display when shift is active
-    useEffect(() => {
-        if (shift) {
-            const kioskUrl = window.location.origin + '/kiosk'
-            // Use a specific name to target the same window/tab
-            const windowName = 'CustomerDisplay'
-            const windowFeatures = 'width=1920,height=1080,left=1920,top=0'
+    // Auto-open Customer Display when shift is active
+    const customerDisplayRef = useRef<Window | null>(null)
 
-            // Attempt to open/focus the window
+    useEffect(() => {
+        if (shift?.id && !customerDisplayRef.current) {
+            const kioskUrl = window.location.origin + '/kiosk'
+            const windowName = 'CustomerDisplay'
+            // Target second screen (assuming 1920x1080 primary)
+            const windowFeatures = 'width=1920,height=1080,left=1920,top=0,menubar=no,toolbar=no,location=no,status=no'
+
+            // Check if window is already open
+            const existingWindow = window.open('', windowName)
+
+            if (existingWindow && existingWindow.location.href !== 'about:blank' && !existingWindow.closed) {
+                customerDisplayRef.current = existingWindow
+                return
+            }
+
+            // Open new window
             const displayWindow = window.open(kioskUrl, windowName, windowFeatures)
 
-            // If blocked, we might want to notify the user, but for now we assume allowed popups
-            if (!displayWindow) {
+            if (displayWindow) {
+                customerDisplayRef.current = displayWindow
+            } else {
                 console.warn('Customer Display popup was blocked')
             }
         }
-    }, [shift])
+    }, [shift?.id])
 
     const fetchMenu = async () => {
         try {
             const res = await fetch('/api/pos/menu')
+            if (!res.ok) throw new Error('Failed to fetch menu')
             const data = await res.json()
-            setMenu(data)
+            setMenu({
+                services: data.services || [],
+                products: data.products || [],
+                discounts: data.discounts || []
+            })
         } catch (error) {
             console.error('Failed to fetch menu:', error)
+            // Ensure menu is reset to safe state on error
+            setMenu({ services: [], products: [], discounts: [] })
         } finally {
             setIsLoading(false)
         }
@@ -235,7 +263,6 @@ export default function POSPage() {
 
             if (res.ok) {
                 const data = await res.json()
-                // API returns the session/shift directly, not wrapped in {shift: ...}
                 setShift(data)
                 setShowShiftModal(false)
                 setDenominations({
@@ -246,9 +273,6 @@ export default function POSPage() {
                 if (action === 'CLOSE') {
                     setCart([])
                     alert('Shift Closed Successfully')
-                }
-                if (action === 'OPEN') {
-                    // Window open is now handled by the useEffect on 'shift' change
                 }
             } else {
                 const errorData = await res.json()
@@ -321,31 +345,109 @@ export default function POSPage() {
         return basePrice
     }
 
-    const handleCheckout = async (paymentMethod: string) => {
-        const totals = calculateTotal()
-        const finalAmount = paymentMethod === 'CASH' ? totals.totalCash : totals.totalCard
+    const printReceipt = (transaction: Transaction) => {
+        const receiptWindow = window.open('', '_blank', 'width=400,height=600')
+        if (receiptWindow) {
+            receiptWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Receipt</title>
+                        <style>
+                            body { font-family: 'Courier New', monospace; padding: 20px; font-size: 12px; }
+                            .header { text-align: center; margin-bottom: 20px; }
+                            .item { display: flex; justify-content: space-between; margin-bottom: 5px; }
+                            .total { border-top: 1px dashed black; margin-top: 10px; padding-top: 10px; font-weight: bold; }
+                            .footer { text-align: center; margin-top: 20px; font-size: 10px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <h2>AURA SALON</h2>
+                            <p>${new Date(transaction.createdAt).toLocaleString()}</p>
+                            <p>Tx: ${transaction.id}</p>
+                        </div>
+                        <div class="items">
+                            ${transaction.lineItems.map((item: any) => `
+                                <div class="item">
+                                    <span>${item.quantity}x ${item.name || 'Item'}</span>
+                                    <span>$${(item.price * item.quantity).toFixed(2)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="total">
+                            <div class="item">
+                                <span>TOTAL</span>
+                                <span>$${transaction.total.toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <div class="footer">
+                            <p>Thank you for your business!</p>
+                        </div>
+                        <script>
+                            window.onload = () => { window.print(); window.close(); }
+                        </script>
+                    </body>
+                </html>
+            `)
+            receiptWindow.document.close()
+        }
+    }
 
+    const handleCheckout = async (paymentMethod: 'CASH' | 'CREDIT_CARD' | 'SPLIT', cashAmount?: number, cardAmount?: number, paymentDetails?: PaymentDetails) => {
+        if (cart.length === 0) return
+
+        setIsLoading(true)
         try {
+            const { subtotal, tax, totalCash, totalCard } = calculateTotal()
+            const total = paymentMethod === 'CASH' ? totalCash : totalCard
+
+            // For split payments, validate totals match
+            if (paymentMethod === 'SPLIT') {
+                const splitTotal = (cashAmount || 0) + (cardAmount || 0)
+                if (Math.abs(splitTotal - totalCard) > 0.01) {
+                    alert(`Split amounts must equal total (${formatCurrency(totalCard)})`)
+                    setIsLoading(false)
+                    return
+                }
+            }
+
+            console.log('Processing Checkout:', { paymentMethod, cashAmount, cardAmount, paymentDetails })
+
             const res = await fetch('/api/pos/transaction', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     items: cart,
-                    subtotal: totals.subtotal,
-                    tax: totals.tax,
-                    total: finalAmount,
+                    subtotal,
+                    tax,
+                    total,
                     paymentMethod,
-                    cashDrawerSessionId: shift?.id
+                    cashDrawerSessionId: shift?.id,
+                    cashAmount: cashAmount || 0,
+                    cardAmount: cardAmount || 0,
+                    ...paymentDetails // Spread optional payment details
                 })
             })
 
             if (res.ok) {
+                const transaction = await res.json()
                 setCart([])
                 setShowCheckoutModal(false)
-                alert('Transaction Completed!')
+                fetchTransactions()
+
+                // Prompt for receipt
+                if (confirm('Transaction Successful! Print Receipt?')) {
+                    printReceipt(transaction)
+                }
+            } else {
+                const error = await res.json()
+                alert(error.error || 'Transaction failed')
             }
         } catch (error) {
             console.error('Checkout error:', error)
+            alert('An error occurred during checkout')
+        } finally {
+            setIsLoading(false)
         }
     }
 
@@ -503,13 +605,14 @@ export default function POSPage() {
 
     const getFilteredItems = () => {
         if (searchQuery) {
-            return [...menu.services, ...menu.products].filter(item =>
+            const allItems = [...(menu.services || []), ...(menu.products || [])]
+            return allItems.filter(item =>
                 item.name.toLowerCase().includes(searchQuery.toLowerCase())
             )
         }
         if (!selectedCategory) return []
-        if (selectedCategory === 'PRODUCTS') return menu.products
-        return menu.services.filter(s => s.category === selectedCategory)
+        if (selectedCategory === 'PRODUCTS') return menu.products || []
+        return (menu.services || []).filter(s => s.category === selectedCategory)
     }
 
     const filteredItems = getFilteredItems()
@@ -857,33 +960,74 @@ export default function POSPage() {
                             </div>
 
                             <div className="p-8 grid grid-cols-2 gap-6">
+                                {/* Cash Payment */}
                                 <button
-                                    onClick={() => handleCheckout('CASH')}
+                                    onClick={() => {
+                                        const totals = calculateTotal()
+                                        fetch('/api/pos/transaction', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                items: cart,
+                                                subtotal: totals.subtotal,
+                                                tax: totals.tax,
+                                                total: totals.totalCash,
+                                                paymentMethod: 'CASH',
+                                                cashDrawerSessionId: shift?.id
+                                            })
+                                        }).then(res => {
+                                            if (res.ok) {
+                                                setCart([])
+                                                setShowCheckoutModal(false)
+                                                alert('Cash Transaction Completed!')
+                                                fetchTransactions()
+                                            }
+                                        })
+                                    }}
                                     className="aspect-video bg-emerald-900/20 hover:bg-emerald-900/40 border border-emerald-500/30 hover:border-emerald-500 rounded-xl flex flex-col items-center justify-center gap-4 transition-all group"
                                 >
                                     <Banknote className="h-12 w-12 text-emerald-500 group-hover:scale-110 transition-transform" />
                                     <span className="text-xl font-bold text-emerald-100">Cash</span>
+                                    <span className="text-sm text-emerald-300">{formatCurrency(totalCash)}</span>
                                 </button>
 
-                                <button
-                                    onClick={() => handleCheckout('CREDIT_CARD')}
-                                    className="aspect-video bg-blue-900/20 hover:bg-blue-900/40 border border-blue-500/30 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-4 transition-all group"
-                                >
-                                    <CreditCard className="h-12 w-12 text-blue-500 group-hover:scale-110 transition-transform" />
-                                    <span className="text-xl font-bold text-blue-100">Card (Manual)</span>
-                                    <span className="text-sm text-blue-300">Total: {formatCurrency(totalCard)}</span>
-                                </button>
-
+                                {/* Card Payment (PAX Terminal) */}
                                 <button
                                     onClick={() => {
                                         setShowCheckoutModal(false)
                                         setShowPaxModal(true)
                                     }}
+                                    className="aspect-video bg-blue-900/20 hover:bg-blue-900/40 border border-blue-500/30 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-4 transition-all group"
+                                >
+                                    <CreditCard className="h-12 w-12 text-blue-500 group-hover:scale-110 transition-transform" />
+                                    <span className="text-xl font-bold text-blue-100">Card</span>
+                                    <span className="text-sm text-blue-300">{formatCurrency(totalCard)}</span>
+                                </button>
+
+                                {/* Split Payment */}
+                                <button
+                                    onClick={() => {
+                                        const cash = prompt(`Total: ${formatCurrency(totalCard)}\n\nEnter cash amount:`)
+                                        if (!cash) return
+
+                                        const cashAmt = parseFloat(cash)
+                                        if (isNaN(cashAmt) || cashAmt <= 0 || cashAmt >= totalCard) {
+                                            alert('Invalid cash amount. Must be between $0 and total.')
+                                            return
+                                        }
+
+                                        const cardAmt = totalCard - cashAmt;
+                                        // For now, store these in window for PAX to use
+                                        (window as any).splitPaymentCash = cashAmt;
+                                        (window as any).splitPaymentCard = cardAmt;
+                                        setShowCheckoutModal(false);
+                                        setShowPaxModal(true);
+                                    }}
                                     className="col-span-2 aspect-video bg-purple-900/20 hover:bg-purple-900/40 border border-purple-500/30 hover:border-purple-500 rounded-xl flex flex-col items-center justify-center gap-4 transition-all group"
                                 >
                                     <Monitor className="h-12 w-12 text-purple-500 group-hover:scale-110 transition-transform" />
-                                    <span className="text-xl font-bold text-purple-100">Card (Terminal)</span>
-                                    <span className="text-sm text-purple-300">PAX Device</span>
+                                    <span className="text-xl font-bold text-purple-100">Split Payment</span>
+                                    <span className="text-sm text-purple-300">Cash + Card</span>
                                 </button>
                             </div>
                         </div>
@@ -945,14 +1089,28 @@ export default function POSPage() {
                     isOpen={showPaxModal}
                     onClose={() => setShowPaxModal(false)}
                     onSuccess={(response) => {
-                        // Process payment using terminal response
-                        handleCheckout('CREDIT_CARD')
+                        const splitCash = (window as any).splitPaymentCash
+                        const splitCard = (window as any).splitPaymentCard
+
+                        // Extract PAX details
+                        const paymentDetails: PaymentDetails = {
+                            gatewayTxId: response.transactionId,
+                            authCode: response.authCode,
+                            cardLast4: response.cardLast4,
+                            cardType: response.cardType
+                        }
+
+                        if (splitCash && splitCard) {
+                            handleCheckout('SPLIT', splitCash, splitCard, paymentDetails)
+                        } else {
+                            handleCheckout('CREDIT_CARD', undefined, undefined, paymentDetails)
+                        }
                         setShowPaxModal(false)
                     }}
                     amount={totalCard}
-                    invoiceNumber={`INV-${Date.now()}`}
+                    invoiceNumber={Date.now().toString().slice(-6)}
                 />
             </div>
-        </div>
+        </div >
     )
 }
