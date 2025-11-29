@@ -63,8 +63,29 @@ function sendTcpRequest(ip: string, port: string, data: Buffer): Promise<Buffer>
             // Check if we have a complete response (ends with ETX + LRC)
             // ETX is 0x03
             if (chunk.includes(0x03)) {
-                console.log('[PAX Proxy TCP] Complete response received, closing connection')
-                client.destroy()
+                // Check if this is the FINAL response (T01) or just a status message
+                // A response starts with STX (0x02) + Command + FS
+                // We need to parse the command from the accumulated buffer
+
+                // Find STX
+                const stxIndex = responseData.indexOf(0x02);
+                if (stxIndex !== -1) {
+                    const fsIndex = responseData.indexOf(0x1C, stxIndex);
+                    if (fsIndex !== -1) {
+                        const command = responseData.subarray(stxIndex + 1, fsIndex).toString('ascii');
+                        console.log('[PAX Proxy TCP] Command Received:', command);
+
+                        if (command === 'T01' || command === 'A00') { // T01 = Sale Response, A00 = Init Response
+                            console.log('[PAX Proxy TCP] Final response received, closing connection');
+                            client.destroy();
+                        } else {
+                            console.log('[PAX Proxy TCP] Status message received (keeping connection open)...');
+                            // Optional: Clear buffer if we want to only return the final response?
+                            // But the client might want to see the status messages too.
+                            // For now, let's keep accumulating.
+                        }
+                    }
+                }
             }
         })
 

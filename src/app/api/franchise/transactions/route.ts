@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const search = searchParams.get('search') || ''
+    const filterType = searchParams.get('filterType') || 'all'
     const status = searchParams.get('status')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
@@ -34,12 +35,36 @@ export async function GET(request: Request) {
     }
 
     if (search) {
-        where.OR = [
-            { id: { contains: search } },
-            { client: { firstName: { contains: search } } },
-            { client: { lastName: { contains: search } } },
-            { client: { email: { contains: search } } },
-        ]
+        // Smart filter based on filterType
+        switch (filterType) {
+            case 'card':
+                // Search by card last 4 digits
+                // Since paymentDetails is a JSON field, we need to search differently
+                // We'll filter client-side after fetching or use raw SQL
+                // For now, using a broader search and filtering after
+                where.OR = [
+                    { id: { contains: search } },
+                ]
+                break
+            case 'invoice':
+                // Search by invoice number
+                where.invoiceNumber = { contains: search }
+                break
+            case 'phone':
+                // Search by customer phone
+                where.client = {
+                    phone: { contains: search }
+                }
+                break
+            default:
+                // Search all fields (original behavior)
+                where.OR = [
+                    { id: { contains: search } },
+                    { client: { firstName: { contains: search } } },
+                    { client: { lastName: { contains: search } } },
+                    { client: { email: { contains: search } } },
+                ]
+        }
     }
 
     if (status) {

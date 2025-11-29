@@ -12,11 +12,12 @@ export default function TransactionHistoryPage() {
     const [totalPages, setTotalPages] = useState(1)
     const [selectedTransaction, setSelectedTransaction] = useState<any>(null)
     const [dateRange, setDateRange] = useState('all') // all, today, 7days, 30days
+    const [filterType, setFilterType] = useState('all') // all, card, invoice, phone
 
     const fetchTransactions = async () => {
         setLoading(true)
         try {
-            let url = `/api/franchise/transactions?page=${page}&limit=10&search=${encodeURIComponent(search)}`
+            let url = `/api/franchise/transactions?page=${page}&limit=10&search=${encodeURIComponent(search)}&filterType=${filterType}`
 
             // Date filtering logic
             const now = new Date()
@@ -56,7 +57,16 @@ export default function TransactionHistoryPage() {
             fetchTransactions()
         }, 300)
         return () => clearTimeout(timer)
-    }, [page, search, dateRange])
+    }, [page, search, dateRange, filterType])
+
+    const getSearchPlaceholder = () => {
+        switch (filterType) {
+            case 'card': return 'Search by card last 4 digits...'
+            case 'invoice': return 'Search by invoice number...'
+            case 'phone': return 'Search by phone number...'
+            default: return 'Search by customer, email, or transaction ID...'
+        }
+    }
 
     return (
         <div className="min-h-screen bg-gray-50/50 p-8">
@@ -64,6 +74,7 @@ export default function TransactionHistoryPage() {
                 isOpen={!!selectedTransaction}
                 onClose={() => setSelectedTransaction(null)}
                 transaction={selectedTransaction}
+                onUpdate={fetchTransactions}
             />
 
             <div className="max-w-7xl mx-auto space-y-6">
@@ -82,15 +93,27 @@ export default function TransactionHistoryPage() {
                 {/* Filters */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
                     <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                            <input
-                                type="text"
-                                placeholder="Search by customer, email, or transaction ID..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                            />
+                        <div className="flex-1 flex gap-2">
+                            <select
+                                value={filterType}
+                                onChange={(e) => setFilterType(e.target.value)}
+                                className="px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm font-medium text-gray-700"
+                            >
+                                <option value="all">All Fields</option>
+                                <option value="card">💳 Card Last 4</option>
+                                <option value="invoice">📄 Invoice #</option>
+                                <option value="phone">📱 Phone</option>
+                            </select>
+                            <div className="flex-1 relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                                <input
+                                    type="text"
+                                    placeholder={getSearchPlaceholder()}
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                />
+                            </div>
                         </div>
                         <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
                             {[
@@ -103,8 +126,8 @@ export default function TransactionHistoryPage() {
                                     key={range.id}
                                     onClick={() => setDateRange(range.id)}
                                     className={`px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${dateRange === range.id
-                                            ? 'bg-gray-900 text-white shadow-md'
-                                            : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                                        ? 'bg-gray-900 text-white shadow-md'
+                                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                                         }`}
                                 >
                                     {range.label}
@@ -176,8 +199,8 @@ export default function TransactionHistoryPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${tx.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                                                        tx.status === 'REFUNDED' ? 'bg-red-100 text-red-800' :
-                                                            'bg-gray-100 text-gray-800'
+                                                    tx.status === 'REFUNDED' ? 'bg-red-100 text-red-800' :
+                                                        'bg-gray-100 text-gray-800'
                                                     }`}>
                                                     {tx.status}
                                                 </span>

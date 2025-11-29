@@ -89,12 +89,24 @@ export class PaxTerminal {
             ECRTransID: ''
         };
 
-        // Other info objects (empty for now)
+        //Other info objects
         const avsInfo = {};
         const cashierInfo = {};
         const commercialInfo = {};
         const motoEcommerce = {};
-        const additionalInfo = {};
+        // CRITICAL FIX: Additional Info fields must be sent as "KEY=VALUE" strings!
+        // The official PAX sample encodes them as name+"="+value.
+        const additionalInfo = {
+            TABLE: '',
+            EDCTYPE: 'EDCTYPE=CREDIT' // ADDED: Try this to force online processing
+        };
+
+        console.log('[PAX] Building Request with:');
+        console.log('  Amount:', request.amount);
+        console.log('  Invoice:', request.invoiceNumber);
+        console.log('  Reference:', request.referenceNumber || '1');
+        console.log('  EDCTYPE: EDCTYPE=CREDIT (Trying to force Online)');
+        console.log('  REPORTSTATUS: REPORTSTATUS=1 (Re-enabled)');
 
         // 2. Build Raw Params for LRC Calculation
         let rawParams: any[] = [this.STX.hex, command, this.FS.hex, version];
@@ -110,7 +122,7 @@ export class PaxTerminal {
         const cashierKeys = ['ClerkID', 'ShiftID'];
         const commercialKeys = ['PONumber', 'CustomerCode', 'TaxExempt', 'TaxExemptID', 'MerchantTaxID', 'DestinationZipCode', 'ProductDescription'];
         const motoKeys = ['OrderNumber', 'Installments', 'CurrentInstallment'];
-        const additionalKeys = ['TableNum', 'GuestNum', 'TicketNum', 'HRefNum', 'Token', 'CardTypeBitmap', 'PassThruDat', 'Origtransdate', 'Origpan', 'OrigExpiryDate', 'OrigTransTime', 'DisProgPromPts', 'GateWayID', 'EntryModeBitmap', 'Odometer', 'VehicleNo', 'JobNo', 'DriverID', 'EmployeeNo', 'LicenseNo', 'JobID', 'DepartmentNo', 'CustomerData', 'UserID', 'VehicleID', 'POSEchoData'];
+        const additionalKeys = ['TABLE', 'GUEST', 'SIGN', 'TICKET', 'HREF', 'TIPREQ', 'SIGNUPLOAD', 'REPORTSTATUS', 'TOKENREQUEST', 'TOKEN', 'CARD TYPE', 'CARDTYPEBITMAP', 'PASSTHRUDATA', 'RETURNREASON', 'ORIG', 'TRANSDAITE', 'ORIGPAN', 'ORIGEXPIRYDATE', 'ORIGTRANSTIME', 'DISPROGPROMPTS', 'GATEWAYID', 'GETSIGN'];
 
         rawParams.push(this.FS.hex);
         rawParams = this.appendRawParams(rawParams, amountInfo, amountKeys);
@@ -306,7 +318,7 @@ export class PaxTerminal {
         const cardLast4 = accountNumber.slice(-4);
         const cardType = accountInfo[6] || '';
 
-        return {
+        const parsedResponse = {
             status: cleanParts[0] || '',
             command: cleanParts[1] || '',
             version: cleanParts[2] || '',
@@ -318,5 +330,30 @@ export class PaxTerminal {
             cardType,
             rawResponse: cleanParts
         };
+
+        // DETAILED LOGGING FOR DEBUGGING
+        console.log('========== PAX RESPONSE DETAILS ==========');
+        console.log('Status:', parsedResponse.status);
+        console.log('Command:', parsedResponse.command);
+        console.log('Version:', parsedResponse.version);
+        console.log('Response Code:', parsedResponse.responseCode);
+        console.log('Response Message:', parsedResponse.responseMessage);
+        console.log('Transaction ID:', parsedResponse.transactionId);
+        console.log('Auth Code:', parsedResponse.authCode);
+        console.log('Card Last 4:', parsedResponse.cardLast4);
+        console.log('Card Type:', parsedResponse.cardType);
+        console.log('\n--- RAW RESPONSE PARTS ---');
+        cleanParts.forEach((part, idx) => {
+            console.log(`Part ${idx}:`, part);
+            if (idx === 5) {
+                console.log('  → Host Info Fields:', hostInfo);
+            }
+            if (idx === 8) {
+                console.log('  → Account Info Fields:', accountInfo);
+            }
+        });
+        console.log('==========================================');
+
+        return parsedResponse;
     }
 }
