@@ -10,6 +10,9 @@ import {
     Plus, X
 } from 'lucide-react'
 import Link from 'next/link'
+import ActivityModal from '@/components/crm/ActivityModal'
+import NoteModal from '@/components/crm/NoteModal'
+import TaskModal from '@/components/crm/TaskModal'
 
 interface Lead {
     id: string
@@ -65,6 +68,35 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             console.error('Error fetching lead:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleActivitySave = (activity: any) => {
+        if (lead) {
+            setLead({
+                ...lead,
+                activities: [activity, ...lead.activities],
+                callCount: activity.type === 'CALL' ? lead.callCount + 1 : lead.callCount,
+                meetingCount: activity.type === 'MEETING' ? lead.meetingCount + 1 : lead.meetingCount
+            })
+        }
+    }
+
+    const handleNoteSave = (note: any) => {
+        if (lead) {
+            setLead({
+                ...lead,
+                notes: [note, ...lead.notes]
+            })
+        }
+    }
+
+    const handleTaskSave = (task: any) => {
+        if (lead) {
+            setLead({
+                ...lead,
+                tasks: [...(lead.tasks || []), task]
+            })
         }
     }
 
@@ -196,8 +228,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                             <button
                                 onClick={() => setActiveTab('timeline')}
                                 className={`flex-1 px-6 py-4 font-medium transition-colors ${activeTab === 'timeline'
-                                        ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50'
-                                        : 'text-stone-600 hover:bg-stone-50'
+                                    ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50'
+                                    : 'text-stone-600 hover:bg-stone-50'
                                     }`}
                             >
                                 Activity Timeline
@@ -205,8 +237,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                             <button
                                 onClick={() => setActiveTab('notes')}
                                 className={`flex-1 px-6 py-4 font-medium transition-colors ${activeTab === 'notes'
-                                        ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50'
-                                        : 'text-stone-600 hover:bg-stone-50'
+                                    ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50'
+                                    : 'text-stone-600 hover:bg-stone-50'
                                     }`}
                             >
                                 Notes ({lead.notes.length})
@@ -214,8 +246,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                             <button
                                 onClick={() => setActiveTab('tasks')}
                                 className={`flex-1 px-6 py-4 font-medium transition-colors ${activeTab === 'tasks'
-                                        ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50'
-                                        : 'text-stone-600 hover:bg-stone-50'
+                                    ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50'
+                                    : 'text-stone-600 hover:bg-stone-50'
                                     }`}
                             >
                                 Tasks ({lead.tasks?.length || 0})
@@ -378,6 +410,26 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     </div>
                 </div>
             </div>
+
+            {/* Modals */}
+            <ActivityModal
+                isOpen={showActivityModal}
+                onClose={() => setShowActivityModal(false)}
+                onSave={handleActivitySave}
+                leadId={lead.id}
+            />
+            <NoteModal
+                isOpen={showNoteModal}
+                onClose={() => setShowNoteModal(false)}
+                onSave={handleNoteSave}
+                leadId={lead.id}
+            />
+            <TaskModal
+                isOpen={showTaskModal}
+                onClose={() => setShowTaskModal(false)}
+                onSave={handleTaskSave}
+                leadId={lead.id}
+            />
         </div>
     )
 }
