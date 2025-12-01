@@ -872,11 +872,28 @@ model Lead {
   estimatedValue Float?
   proposedFee    Float?
 
+  // Lead Scoring & Intelligence (NEW)
+  score           Int?      // 0-100 lead score
+  rating          String?   // HOT, WARM, COLD
+  probability     Float?    // 0-100% chance to close
+  expectedClose   DateTime? // Expected close date
+  competitors     String?   // JSON array of competitor names
+  painPoints      String?   // JSON array of pain points
+  decisionMakers  String?   // JSON array of key stakeholders
+
+  // Activity Tracking (NEW)
+  lastActivityAt  DateTime? // Last interaction timestamp
+  emailOpens      Int       @default(0) // Email open count
+  emailClicks     Int       @default(0) // Email click count
+  callCount       Int       @default(0) // Total calls made
+  meetingCount    Int       @default(0) // Total meetings
+
   // Tracking
   lastContact  DateTime?
   nextFollowUp DateTime?
   notes        Note[]
   activities   Activity[]
+  tasks        Task[] // NEW relation
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -885,21 +902,27 @@ model Lead {
 model Note {
   id        String   @id @default(cuid())
   leadId    String
-  lead      Lead     @relation(fields: [leadId], references: [id])
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   content   String
+  category  String?  @default("GENERAL") // GENERAL, FOLLOW_UP, DECISION, RED_FLAG
+  isPinned  Boolean  @default(false)
   createdBy String
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Activity {
   id        String   @id @default(cuid())
   leadId    String
-  lead      Lead     @relation(fields: [leadId], references: [id])
-  type      String // CALL, EMAIL, MEETING, PROPOSAL_SENT
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type      String   // CALL, EMAIL, MEETING, NOTE, PROPOSAL_SENT, TASK
   subject   String
   notes     String?
+  duration  Int?     // Duration in minutes (for calls/meetings)
+  outcome   String?  // POSITIVE, NEUTRAL, NEGATIVE, NO_ANSWER
   createdBy String
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Territory {
@@ -913,4 +936,44 @@ model Territory {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueDate     DateTime
+  priority    String   @default("MEDIUM") // HIGH, MEDIUM, LOW
+  status      String   @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  assignedTo  String
+  completedAt DateTime?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  subject   String
+  body      String   // HTML content
+  variables String?  // JSON array of available variables
+  category  String?  // WELCOME, FOLLOW_UP, PROPOSAL, etc.
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String   // Lead, Note, Activity, Task
+  entityId   String
+  action     String   // CREATED, UPDATED, DELETED, VIEWED
+  userId     String
+  changes    String?  // JSON before/after
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 }
