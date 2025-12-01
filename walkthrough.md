@@ -1,4 +1,4 @@
-# Verification Walkthrough: Global Catalog & Financial Engine
+think like h# Verification Walkthrough: Global Catalog & Financial Engine
 
 This walkthrough guides you through verifying the newly implemented "World-Class" features: **Global Catalog**, **Split Payouts**, and **Commission Rules**.
 

@@ -45,6 +45,19 @@ export const authOptions: NextAuthOptions = {
                 }
 
                 console.log('Authentication successful')
+
+                // Fetch franchisor status and businessType if applicable
+                let franchisorStatus = null
+                let businessType = null
+                if (user.role === 'FRANCHISOR') {
+                    const franchisor = await prisma.franchisor.findUnique({
+                        where: { ownerId: user.id },
+                        select: { status: true, businessType: true }
+                    })
+                    franchisorStatus = franchisor?.status || null
+                    businessType = franchisor?.businessType || null
+                }
+
                 return {
                     id: user.id,
                     email: user.email,
@@ -54,6 +67,8 @@ export const authOptions: NextAuthOptions = {
                     locationId: user.locationId,
                     canProcessRefunds: user.canProcessRefunds,
                     canManageShifts: user.canManageShifts,
+                    franchisorStatus,
+                    businessType,
                 }
             }
         })
@@ -70,6 +85,8 @@ export const authOptions: NextAuthOptions = {
                     locationId: token.locationId,
                     canProcessRefunds: token.canProcessRefunds,
                     canManageShifts: token.canManageShifts,
+                    franchisorStatus: token.franchisorStatus,
+                    businessType: token.businessType,
                 }
             }
         },
@@ -83,6 +100,8 @@ export const authOptions: NextAuthOptions = {
                     locationId: (user as any).locationId,
                     canProcessRefunds: (user as any).canProcessRefunds,
                     canManageShifts: (user as any).canManageShifts,
+                    franchisorStatus: (user as any).franchisorStatus,
+                    businessType: (user as any).businessType,
                 }
             }
             return token

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { hash } from 'bcrypt'
 
 export async function GET(
     request: NextRequest,
@@ -9,34 +8,46 @@ export async function GET(
     try {
         const { token } = await params
 
-        // Find magic link
+        // Find magic link with user and their franchisor details
         const magicLink = await prisma.magicLink.findUnique({
             where: { token },
-            include: { user: true }
+            include: {
+                user: {
+                    include: {
+                        franchisor: true
+                    }
+                }
+            }
         })
 
         if (!magicLink || !magicLink.user) {
             return NextResponse.json({ error: 'Invalid magic link' }, { status: 404 })
         }
 
-        /*
-        // Check if already used
-        if (magicLink.used) {
-            return NextResponse.json({ error: 'Magic link already used' }, { status: 400 })
-        }
-        */
-
-        // Check if expired
+        // Check if expired (48 hours)
         if (new Date() > magicLink.expiresAt) {
-            return NextResponse.json({ error: 'Magic link expired' }, { status: 400 })
+            return NextResponse.json({ error: 'Magic link has expired' }, { status: 400 })
         }
 
-        // Delete the magic link to ensure one-time use
-        await prisma.magicLink.delete({
-            where: { id: magicLink.id }
-        })
+        // Check if already completed
+        if (magicLink.completedAt) {
+            return NextResponse.json({
+                error: 'This invite has already been completed',
+                completed: true
+            }, { status: 400 })
+        }
+
+        // Get support fee if user is a franchisor owner
+        let supportFee = '99.00' // Default fallback
+        if (magicLink.user.franchisor) {
+            const fee = magicLink.user.franchisor.supportFee
+            if (fee) {
+                supportFee = fee.toString()
+            }
+        }
 
         // Return user info (frontend will handle session creation)
+        // We do NOT delete the token here anymore, as it's reusable until completion
         return NextResponse.json({
             success: true,
             user: {
@@ -45,6 +56,11 @@ export async function GET(
                 name: magicLink.user.name,
                 role: magicLink.user.role
             },
+            franchisor: magicLink.user.franchisor ? {
+                name: magicLink.user.franchisor.name,
+                supportFee,
+                type: magicLink.user.franchisor.type // 'INDIVIDUAL' or 'BRAND'
+            } : null,
             requiresPasswordSetup: true
         })
     } catch (error) {

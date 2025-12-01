@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcrypt'
 import crypto from 'crypto'
+import { sendEmail } from '@/lib/email'
 
 // Rate limiting
 const creationAttempts = new Map<string, { count: number; resetAt: number }>()
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { name, email, companyName } = body
+        const { name, email, companyName, supportFee, type, billingMethod, enableCommission } = body
 
         if (!name || !email || !companyName) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -90,13 +91,27 @@ export async function POST(request: NextRequest) {
             }
         })
 
+        // Track sales agent if current user is SALES role
+        const salesAgentId = session?.user?.providerRole === 'SALES' ? session.user.id : null
+
+        // Determine base rate based on account type
+        const baseRate = type === 'BRAND' ? 499.00 : 99.00
+
         // Create franchisor company
         const franchisor = await prisma.franchisor.create({
             data: {
                 name: sanitizedCompanyName,
-                ownerId: user.id
+                ownerId: user.id,
+                supportFee: body.supportFee || baseRate,
+                type: type || 'BRAND',
+                billingMethod: billingMethod || 'DIRECT',
+                salesAgentId: salesAgentId,
+                enableCommission: enableCommission !== undefined ? enableCommission : true,
+                baseRate: baseRate
             }
         })
+
+        // Auto-license generation removed - stations are added by franchisor post-signup
 
         // Generate magic link
         const token = crypto.randomBytes(32).toString('hex')
@@ -114,25 +129,29 @@ export async function POST(request: NextRequest) {
 
         const magicLinkUrl = `${process.env.NEXTAUTH_URL}/auth/magic-link/${token}`
 
-        // Log email
-        // Note: EmailLog model not yet defined in schema
-        /*
-        await prisma.emailLog.create({
-            data: {
-                to: sanitizedEmail,
-                subject: 'Welcome to Aura - Setup Your Franchise Account',
-                template: 'franchisor_welcome',
-                status: 'pending'
-            }
+        // Send Email
+        await sendEmail({
+            to: sanitizedEmail,
+            subject: 'Welcome to Aura - Setup Your Franchise Account',
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h1>Welcome to Aura!</h1>
+                    <p>You have been invited to join Aura as a ${type === 'INDIVIDUAL' ? 'Store Owner' : 'Franchise Owner'}.</p>
+                    <p><strong>Company:</strong> ${sanitizedCompanyName}</p>
+                    <p><strong>Monthly Support Fee:</strong> $${body.supportFee || 99.00}</p>
+                    <br/>
+                    <p>Click the link below to accept the terms and set up your account:</p>
+                    <a href="${magicLinkUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Setup Account</a>
+                    <p style="margin-top: 20px; font-size: 12px; color: #666;">This link expires in 24 hours.</p>
+                </div>
+            `
         })
-        */
-        console.log(`[Mock Email] To: ${sanitizedEmail}, Subject: Welcome to Aura - Setup Your Franchise Account, Magic Link: ${magicLinkUrl}`)
 
         return NextResponse.json({
             success: true,
             user: { id: user.id, name: user.name, email: user.email },
             franchisor: { id: franchisor.id, name: franchisor.name },
-            magicLink: magicLinkUrl,
+            magicLink: magicLinkUrl, // Keep returning for dev/testing convenience
             message: 'Franchisor created successfully'
         })
 

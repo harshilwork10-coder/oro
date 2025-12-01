@@ -18,10 +18,14 @@ export async function POST(request: NextRequest) {
         // Hash new password
         const hashedPassword = await hash(password, 10)
 
-        // Update user password
+        // Update user password and terms acceptance
         await prisma.user.update({
             where: { id: userId },
-            data: { password: hashedPassword }
+            data: {
+                password: hashedPassword,
+                acceptedTermsAt: new Date(),
+                acceptedTermsVersion: '1.0'
+            }
         })
 
         return NextResponse.json({

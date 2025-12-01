@@ -21,7 +21,21 @@ export async function GET(request: NextRequest) {
                 owner: {
                     select: {
                         name: true,
-                        email: true
+                        email: true,
+                        magicLinks: {
+                            where: {
+                                expiresAt: {
+                                    gt: new Date()
+                                }
+                            },
+                            orderBy: {
+                                createdAt: 'desc'
+                            },
+                            take: 1,
+                            select: {
+                                token: true
+                            }
+                        }
                     }
                 },
                 _count: {

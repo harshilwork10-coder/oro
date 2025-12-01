@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { Plus, Search, Edit2, Trash2, MapPin, Building2 } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, MapPin, Building2, Monitor } from 'lucide-react'
 import Modal from '@/components/ui/Modal'
 import Toast from '@/components/ui/Toast'
+import RequestStationsModal from '@/components/modals/RequestStationsModal'
 
 interface Location {
     id: string
@@ -42,6 +43,7 @@ export default function LocationsPage() {
     const [filterFranchise, setFilterFranchise] = useState<string>('all')
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingLocation, setEditingLocation] = useState<Location | null>(null)
+    const [requestingLocation, setRequestingLocation] = useState<Location | null>(null)
     const [formData, setFormData] = useState({
         name: '',
         address: '',
@@ -231,6 +233,13 @@ export default function LocationsPage() {
                             </div>
                             <div className="flex gap-2">
                                 <button
+                                    onClick={() => setRequestingLocation(location)}
+                                    className="p-2 hover:bg-purple-500/10 rounded-lg transition-colors group/btn"
+                                    title="Request Stations"
+                                >
+                                    <Monitor className="h-4 w-4 text-stone-400 group-hover/btn:text-purple-400" />
+                                </button>
+                                <button
                                     onClick={() => openModal(location)}
                                     className="p-2 hover:bg-stone-800 rounded-lg transition-colors"
                                 >
@@ -345,6 +354,14 @@ export default function LocationsPage() {
                     </div>
                 </form>
             </Modal>
+
+            <RequestStationsModal
+                isOpen={!!requestingLocation}
+                onClose={() => setRequestingLocation(null)}
+                locationId={requestingLocation?.id || ''}
+                locationName={requestingLocation?.name || ''}
+                onSuccess={() => setToast({ message: 'Request submitted successfully!', type: 'success' })}
+            />
 
             {/* Toast */}
             {toast && (

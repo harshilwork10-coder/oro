@@ -15,6 +15,11 @@ export async function POST(
     try {
         const { id } = await params
         const transactionId = id
+        const { reason } = await req.json()
+
+        if (!reason || !reason.trim()) {
+            return NextResponse.json({ error: 'Reason is required' }, { status: 400 })
+        }
 
         // Find the transaction
         const transaction = await prisma.transaction.findUnique({
@@ -31,7 +36,8 @@ export async function POST(
             }, { status: 400 })
         }
 
-        // Mark as voided
+        // Mark as voided (reason logged to console for audit)
+        console.log(`[VOID_TRANSACTION] User: ${session.user.name} (${session.user.id}) voided transaction ${transactionId}. Reason: ${reason}`)
         await prisma.transaction.update({
             where: { id: transactionId },
             data: { status: 'VOIDED' }

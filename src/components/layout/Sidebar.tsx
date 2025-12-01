@@ -27,7 +27,9 @@ import {
     Clock,
     Heart,
     Gift,
-    Globe
+    Globe,
+    Package,
+    Truck
 } from 'lucide-react'
 import clsx from 'clsx'
 import BreadLogo from '@/components/ui/BreadLogo'
@@ -43,51 +45,41 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     const { data: session } = useSession()
     const role = session?.user?.role
 
-    // Provider Navigation (Super Admin - sees everything)
+    const businessType = session?.user?.businessType
+
+    // PROVIDER: Platform owner - manages clients & agents ONLY
     const providerLinks = [
+        { name: 'Dashboard', href: '/dashboard/provider', icon: LayoutDashboard },
+        { name: 'My Clients', href: '/dashboard/franchisors', icon: Building2 },
+        { name: 'My Agents', href: '/dashboard/team', icon: Users },
+        { name: 'Terminals & Licenses', href: '/dashboard/terminals', icon: Shield },
+        { name: 'Shipping', href: '/dashboard/shipping', icon: Truck },
+        { name: 'Documents', href: '/dashboard/documents', icon: FileText },
+        { name: 'Merchant Applications', href: '/dashboard/merchant-applications', icon: FileText },
+    ]
+
+    // BRAND FRANCHISOR: Sells franchises
+    const brandFranchisorLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Executive Summary', href: '/dashboard/executive', icon: BarChart3 },
-        { name: 'Franchisors', href: '/dashboard/franchisors', icon: Building2 },
-        { name: 'Interventions', href: '/dashboard/interventions', icon: AlertTriangle },
-        { name: 'Community', href: '/dashboard/community', icon: Users },
-        { name: 'Leaderboard', href: '/dashboard/leaderboard', icon: Trophy },
-        // { name: 'Success Scoring', href: '/dashboard/success-scoring', icon: BarChart3 },
-        { name: 'Alerts', href: '/dashboard/alerts', icon: Bell },
-        { name: 'Franchisees', href: '/dashboard/franchisees', icon: Users },
-        { name: 'Locations', href: '/dashboard/locations', icon: MapPin },
-        { name: 'Benchmarking', href: '/dashboard/benchmarking', icon: BarChart3 },
-        { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+        { name: 'CRM', href: '/dashboard/crm', icon: Users },
+        { name: 'Leads', href: '/dashboard/crm/leads', icon: Users },
+        { name: 'Pipeline', href: '/dashboard/crm/pipeline', icon: BarChart3 },
+        { name: 'Franchisees', href: '/dashboard/franchisees', icon: Building2 },
+        { name: 'Territories', href: '/dashboard/territories', icon: MapPin },
+        { name: 'Services Catalog', href: '/dashboard/services/catalog', icon: Briefcase },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText },
-        { name: 'Financials', href: '/dashboard/financials', icon: DollarSign },
         { name: 'Compliance', href: '/dashboard/compliance', icon: Shield },
         { name: 'Documents', href: '/dashboard/documents', icon: FileText },
-        { name: 'Expansion Requests', href: '/dashboard/expansion-requests', icon: MapPin },
-        { name: 'Merchant Apps', href: '/dashboard/merchant-applications', icon: FileText },
-        { name: 'Terminals', href: '/dashboard/terminals', icon: CreditCard },
-        { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag }, // New Inventory
     ]
 
-    // Franchisor Navigation (Brand Owner - manages franchisees and global catalog)
-    const franchisorLinks = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Franchisees', href: '/dashboard/franchisees', icon: Users },
-        { name: 'Global Catalog', href: '/dashboard/catalog', icon: Globe },
-        // { name: 'Success Scoring', href: '/dashboard/success-scoring', icon: BarChart3 },
-        { name: 'Benchmarking', href: '/dashboard/benchmarking', icon: BarChart3 },
-        { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-        { name: 'Reports', href: '/dashboard/reports', icon: FileText },
-        { name: 'Compliance', href: '/dashboard/compliance', icon: Shield },
-        { name: 'Alerts', href: '/dashboard/alerts', icon: Bell },
-    ]
-
-    // Franchisee Navigation (Location Owner - manages own locations)
-    const franchiseeLinks = [
+    // MULTI-LOCATION OWNER: Operates salons
+    const multiLocationLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
-        { name: 'My Locations', href: '/dashboard/locations', icon: MapPin },
+        { name: 'Locations', href: '/dashboard/locations', icon: MapPin },
         { name: 'Employees', href: '/dashboard/employees', icon: Users },
-        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
         { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar },
+        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
         { name: 'Services', href: '/dashboard/services', icon: Briefcase },
         { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
         { name: 'Customers', href: '/dashboard/customers', icon: Users },
@@ -98,7 +90,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift },
     ]
 
-    // Manager Navigation (Operations Manager - runs daily operations)
+    // FRANCHISEE: Location manager
+    const franchiseeLinks = [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
+        { name: 'Employees', href: '/dashboard/employees', icon: Users },
+        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
+        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar },
+        { name: 'Services', href: '/dashboard/services', icon: Briefcase },
+        { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
+        { name: 'Customers', href: '/dashboard/customers', icon: Users },
+        { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
+        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
+        { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart },
+        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift },
+    ]
+
+    // MANAGER: Operations manager
     const managerLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
@@ -106,16 +114,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar },
         { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock },
         { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
-        { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
         { name: 'Services', href: '/dashboard/services', icon: Briefcase },
         { name: 'Customers', href: '/dashboard/customers', icon: Users },
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
         { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
-        { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart },
-        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift },
     ]
 
-    // Employee Navigation (Front-line Staff - limited access)
+    // EMPLOYEE: Front-line staff
     const employeeLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
@@ -123,23 +128,20 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'My Schedule', href: '/dashboard/schedule/me', icon: Calendar },
         { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
         { name: 'Services', href: '/dashboard/services', icon: Briefcase },
-        { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
         { name: 'My Performance', href: '/dashboard/employee/me', icon: UserCircle },
-        { name: 'Z Report', href: '/dashboard/reports/z-report', icon: FileText },
         { name: 'Customers', href: '/dashboard/customers', icon: Users },
-        { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
-        { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart },
-        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift },
         { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones },
     ]
 
     // Select navigation based on role
     const links =
         session?.user?.role === Role.PROVIDER ? providerLinks :
-            session?.user?.role === Role.FRANCHISOR ? franchisorLinks :
+            session?.user?.role === Role.FRANCHISOR ? (
+                businessType === 'BRAND_FRANCHISOR' ? brandFranchisorLinks : multiLocationLinks
+            ) :
                 session?.user?.role === Role.FRANCHISEE ? franchiseeLinks :
                     session?.user?.role === Role.MANAGER ? managerLinks :
-                        employeeLinks  // Default to employee for EMPLOYEE or USER roles
+                        employeeLinks
 
     return (
         <>
@@ -193,7 +195,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                             <Link
                                 key={link.name}
                                 href={link.href}
-                                onClick={() => onClose()} // Close sidebar on mobile when link clicked
+                                onClick={() => onClose()}
                                 className={clsx(
                                     isActive
                                         ? 'bg-gradient-to-r from-orange-500/10 to-amber-500/5 text-orange-100 border-l-2 border-orange-500 shadow-[0_0_15px_rgba(234,88,12,0.1)]'
@@ -229,8 +231,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                             </p>
                             <p className="text-xs text-stone-500">
                                 {role === 'PROVIDER' ? 'Platform Owner' :
-                                    role === 'FRANCHISOR' ? 'Brand Owner' :
-                                        role === 'FRANCHISEE' ? 'Location Owner' :
+                                    role === 'FRANCHISOR' ? 'Salon Owner' :
+                                        role === 'FRANCHISEE' ? 'Location Manager' :
                                             role === 'MANAGER' ? 'Operations Manager' : 'Employee'}
                             </p>
                         </div>

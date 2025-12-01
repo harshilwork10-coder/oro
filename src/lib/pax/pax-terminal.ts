@@ -4,6 +4,7 @@ export interface PaxConfig {
     ip: string;
     port: string;
     timeout?: number;
+    licenseKey?: string;
 }
 
 export interface PaxSaleRequest {
@@ -35,6 +36,7 @@ export class PaxTerminal {
     private ip: string;
     private port: string;
     private timeout: number;
+    private licenseKey?: string;
 
     private STX = { hex: 0x02, code: "02" };
     private FS = { hex: 0x1c, code: "1c" };
@@ -45,12 +47,49 @@ export class PaxTerminal {
         this.ip = config.ip;
         this.port = config.port;
         this.timeout = config.timeout || 120000;
+        this.licenseKey = config.licenseKey;
+    }
+
+    /**
+     * Validate License with Backend
+     */
+    private async validateLicense(): Promise<void> {
+        if (!this.licenseKey) {
+            console.warn('[PAX] No license key provided, skipping validation (Development Mode)');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/license/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    licenseKey: this.licenseKey,
+                    terminalIp: this.ip
+                    // TODO: Add terminalSerialNumber when we can fetch it from device
+                })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok || !data.valid) {
+                throw new Error(data.error || 'License validation failed');
+            }
+
+            console.log('[PAX] License validated successfully');
+        } catch (error: any) {
+            console.error('[PAX] License validation error:', error);
+            throw new Error(`License Error: ${error.message}`);
+        }
     }
 
     /**
      * Main method to process a Credit Sale (T00)
      */
     public async processSale(request: PaxSaleRequest): Promise<PaxResponse> {
+        // 1. Validate License
+        await this.validateLicense();
+
         const command = 'T00';
         const version = '1.28';
         const transactionType = '01'; // 01 = Sale

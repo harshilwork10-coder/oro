@@ -1,65 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { writeFile } from 'fs/promises'
-import { join } from 'path'
-import {
-    ensureUploadDir,
-    validateFileType,
-    sanitizeFilename,
-    generateUniqueFilename,
-    MAX_FILE_SIZE,
-    UPLOAD_DIR
-} from '@/lib/fileUpload'
+import { uploadToS3 } from '@/lib/s3'
+
+// File upload limits
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']
 
 export async function POST(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user?.email) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         const formData = await request.formData()
         const file = formData.get('file') as File
+        const franchisorId = formData.get('franchisorId') as string
+        const documentType = formData.get('documentType') as string // 'dl', 'voidedCheck', etc.
 
+        // Validation
         if (!file) {
             return NextResponse.json({ error: 'No file provided' }, { status: 400 })
         }
 
-        // Validate file size
+        if (!franchisorId) {
+            return NextResponse.json({ error: 'Franchisor ID required' }, { status: 400 })
+        }
+
         if (file.size > MAX_FILE_SIZE) {
-            return NextResponse.json({ error: 'File too large. Maximum size is 5MB' }, { status: 400 })
+            return NextResponse.json({ error: 'File too large (max 5MB)' }, { status: 400 })
         }
 
-        // Validate file type
-        if (!validateFileType(file.name)) {
-            return NextResponse.json({ error: 'Invalid file type. Only PDF, JPG, JPEG, PNG allowed' }, { status: 400 })
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            return NextResponse.json({ error: 'Invalid file type. Allowed: PDF, JPG, PNG' }, { status: 400 })
         }
 
-        // Ensure upload directory exists
-        await ensureUploadDir()
-
-        // Generate unique filename
-        const sanitized = sanitizeFilename(file.name)
-        const uniqueFilename = generateUniqueFilename(sanitized)
-        const filepath = join(UPLOAD_DIR, uniqueFilename)
-
-        // Save file
+        // Convert file to buffer
         const bytes = await file.arrayBuffer()
         const buffer = Buffer.from(bytes)
-        await writeFile(filepath, buffer)
 
-        // Return relative path for database storage
-        const relativePath = join('merchant-docs', uniqueFilename)
+        // Upload to S3
+        const s3Key = await uploadToS3(
+            buffer,
+            file.name,
+            franchisorId,
+            file.type
+        )
+
+        console.log(`✅ File uploaded successfully to S3: ${s3Key}`)
 
         return NextResponse.json({
             success: true,
-            path: relativePath,
-            filename: uniqueFilename
+            s3Key,
+            fileName: file.name,
+            documentType
         })
-    } catch (error) {
-        console.error('File upload error:', error)
-        return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 })
+
+    } catch (error: any) {
+        console.error('❌ Error uploading file to S3:')
+        console.error('Error name:', error?.name)
+        console.error('Error message:', error?.message)
+        console.error('Error code:', error?.Code || error?.code)
+        console.error('AWS fault:', error?.$fault)
+        console.error('Full error:', error)
+
+        return NextResponse.json(
+            {
+                error: 'Failed to upload file to S3',
+                details: error?.message || 'Unknown AWS error',
+                code: error?.Code || error?.code || 'UNKNOWN'
+            },
+            { status: 500 }
+        )
     }
 }

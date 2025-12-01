@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { X, RotateCcw, Ban, Trash2, CheckSquare, Square, Printer, CreditCard, Banknote } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { generateReceipt } from '@/lib/receipt-generator'
+import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 
 interface TransactionLine {
     id: string
@@ -27,12 +28,14 @@ interface Transaction {
         firstName: string
         lastName: string
     }
+    cardLast4?: string
+    invoiceNumber?: string
 }
 
-interface Props {
-    transaction: Transaction
-    onClose: () => void
-    onSuccess: () => void
+interface Transaction {
+    // ... existing fields
+    cardLast4?: string        // ADD THIS
+    invoiceNumber?: string    // ADD THIS  
 }
 
 type ActionType = 'none' | 'refund' | 'void' | 'delete'
@@ -43,6 +46,8 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
     const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({})
     const [isProcessing, setIsProcessing] = useState(false)
     const [refundMethod, setRefundMethod] = useState<string>('CASH')
+    const [showPaxModal, setShowPaxModal] = useState(false)
+    const [paxVerificationPending, setPaxVerificationPending] = useState(false)
 
     useEffect(() => {
         if (transaction.paymentMethod === 'CARD') {
@@ -98,7 +103,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
             tax: transaction.tax,
             paymentMethod: transaction.paymentMethod,
             createdAt: transaction.createdAt,
-            lineItems: transaction.lineItems.map(item => ({
+            lineItems: transaction.lineItems.map((item: TransactionLine) => ({
                 name: item.service?.name || item.product?.name || 'Item',
                 quantity: item.quantity,
                 price: item.price,
@@ -115,6 +120,18 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
             return
         }
 
+        // If CARD refund and original was card payment, verify card matches
+        if (refundMethod === 'CARD' && (transaction.paymentMethod === 'CREDIT_CARD' || transaction.paymentMethod === 'DEBIT_CARD')) {
+            setPaxVerificationPending(true)
+            setShowPaxModal(true)
+            return
+        }
+
+        // Process cash refund or card-to-cash refund immediately
+        await processRefund()
+    }
+
+    const processRefund = async (paxResponse?: any) => {
         setIsProcessing(true)
         try {
             const refundItems = Array.from(selectedItems).map(itemId => ({
@@ -130,7 +147,8 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                     refundType: selectedItems.size === transaction.lineItems.length ? 'FULL' : 'PARTIAL',
                     items: refundItems,
                     reason: 'Customer request',
-                    refundMethod
+                    refundMethod,
+                    cardLast4: paxResponse?.cardLast4
                 })
             })
 
@@ -147,6 +165,27 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
             alert('Failed to process refund')
         } finally {
             setIsProcessing(false)
+        }
+    }
+
+    const handlePaxSuccess = (response: any) => {
+        setShowPaxModal(false)
+
+        if (paxVerificationPending) {
+            // Verify card matches original transaction
+            const originalCardLast4 = transaction.cardLast4
+            const currentCardLast4 = response.cardLast4
+
+            if (originalCardLast4 && currentCardLast4 !== originalCardLast4) {
+                alert(`❌ Different card detected!\n\nPlease use the original card ending in ${originalCardLast4}.\n\nTransaction cancelled.`)
+                setPaxVerificationPending(false)
+                setAction('none')
+                return
+            }
+
+            // Card matches - process refund
+            setPaxVerificationPending(false)
+            processRefund(response)
         }
     }
 
@@ -479,6 +518,20 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                     </div>
                 </div>
             </div>
+
+            {/* PAX Card Verification Modal */}
+            {showPaxModal && (
+                <PaxPaymentModal
+                    isOpen={showPaxModal}
+                    onClose={() => {
+                        setShowPaxModal(false)
+                        setPaxVerificationPending(false)
+                    }}
+                    onSuccess={handlePaxSuccess}
+                    amount={calculateRefundAmount()}
+                    invoiceNumber={transaction.invoiceNumber || Date.now().toString().slice(-6)}
+                />
+            )}
         </div>
     )
 }

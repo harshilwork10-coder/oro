@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
+import TransactionActionsModal from '@/components/pos/TransactionActionsModal'
 
 // Removed hardcoded maps
 
@@ -57,6 +58,8 @@ interface MenuData {
 interface Transaction {
     id: string
     total: number
+    subtotal: number
+    tax: number
     status: string
     paymentMethod: string
     createdAt: string
@@ -65,6 +68,7 @@ interface Transaction {
         lastName: string
     }
     lineItems: any[]
+    invoiceNumber?: string
 }
 
 const SERVICE_CATEGORIES: Record<string, any> = {
@@ -78,6 +82,7 @@ const SERVICE_CATEGORIES: Record<string, any> = {
 export default function POSPage() {
     console.log('POSPage: Rendering...')
     const { data: session } = useSession()
+    const user = session?.user as any
     const [view, setView] = useState<'POS' | 'HISTORY'>('POS')
     const [cart, setCart] = useState<CartItem[]>([])
     const [menu, setMenu] = useState<MenuData>({ services: [], products: [], discounts: [] })
@@ -101,6 +106,8 @@ export default function POSPage() {
     const [locationName, setLocationName] = useState<string>('')
     const [franchiseName, setFranchiseName] = useState<string>('')
     const [showPaxModal, setShowPaxModal] = useState(false)
+    const [showTransactionModal, setShowTransactionModal] = useState(false)
+    const [selectedTxForActions, setSelectedTxForActions] = useState<Transaction | null>(null)
 
     useEffect(() => {
         fetchMenu()
@@ -635,7 +642,7 @@ export default function POSPage() {
                                 onClick={() => setView('HISTORY')}
                                 className={`px-8 py-3 rounded-lg text-base font-semibold transition-all ${view === 'HISTORY' ? 'bg-orange-600 text-white shadow-lg' : 'text-stone-400 hover:text-white'}`}
                             >
-                                Orders
+                                Transactions
                             </button>
                         </div>
 
@@ -773,7 +780,14 @@ export default function POSPage() {
                         /* Transaction History */
                         <div className="space-y-4">
                             {transactions.map(tx => (
-                                <div key={tx.id} className="bg-stone-900 p-4 rounded-xl border border-stone-800 flex items-center justify-between hover:border-stone-700 transition-colors cursor-pointer" onClick={() => setSelectedTx(tx)}>
+                                <div
+                                    key={tx.id}
+                                    className="bg-stone-900 p-4 rounded-xl border border-stone-800 flex items-center justify-between hover:border-stone-700 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        setSelectedTxForActions(tx)
+                                        setShowTransactionModal(true)
+                                    }}
+                                >
                                     <div className="flex items-center gap-4">
                                         <div className={`h-10 w-10 rounded-full flex items-center justify-center ${tx.status === 'REFUNDED' ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
                                             {tx.status === 'REFUNDED' ? <RotateCcw className="h-5 w-5" /> : <Banknote className="h-5 w-5" />}
@@ -1110,6 +1124,25 @@ export default function POSPage() {
                     amount={totalCard}
                     invoiceNumber={Date.now().toString().slice(-6)}
                 />
+
+                {/* Transaction Actions Modal */}
+                {showTransactionModal && selectedTxForActions && (
+                    <TransactionActionsModal
+                        transaction={selectedTxForActions}
+                        onClose={() => {
+                            setShowTransactionModal(false)
+                            setSelectedTxForActions(null)
+                        }}
+                        onSuccess={() => {
+                            fetchTransactions()
+                            setShowTransactionModal(false)
+                            setSelectedTxForActions(null)
+                        }}
+                        canProcessRefunds={true}
+                        canVoid={true}
+                        canDelete={true}
+                    />
+                )}
             </div>
         </div >
     )
