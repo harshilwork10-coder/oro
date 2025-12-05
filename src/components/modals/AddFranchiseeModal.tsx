@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, UserPlus, Mail, Building2, Loader2 } from 'lucide-react'
+import { X, UserPlus, Mail, Building2, Loader2, MapPin } from 'lucide-react'
 
 interface AddFranchiseeModalProps {
     isOpen: boolean
@@ -13,11 +13,13 @@ export default function AddFranchiseeModal({ isOpen, onClose, onSuccess }: AddFr
     const [formData, setFormData] = useState({
         name: '',
         email: '',
-        franchiseName: ''
+        locationName: '',
+        locationAddress: ''
     })
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
-    const [magicLink, setMagicLink] = useState('')
+    const [success, setSuccess] = useState(false)
+    const [tempPassword, setTempPassword] = useState('')
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -26,8 +28,8 @@ export default function AddFranchiseeModal({ isOpen, onClose, onSuccess }: AddFr
 
         try {
             // Input validation on client side
-            if (!formData.name || !formData.email || !formData.franchiseName) {
-                setError('All fields are required')
+            if (!formData.name || !formData.email) {
+                setError('Name and email are required')
                 setLoading(false)
                 return
             }
@@ -40,14 +42,7 @@ export default function AddFranchiseeModal({ isOpen, onClose, onSuccess }: AddFr
                 return
             }
 
-            // Length validation
-            if (formData.name.length > 100 || formData.franchiseName.length > 100) {
-                setError('Name fields must be less than 100 characters')
-                setLoading(false)
-                return
-            }
-
-            const response = await fetch('/api/admin/franchisees/create', {
+            const response = await fetch('/api/franchisee/invite', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -58,20 +53,22 @@ export default function AddFranchiseeModal({ isOpen, onClose, onSuccess }: AddFr
             const data = await response.json()
 
             if (!response.ok) {
-                throw new Error(data.error || 'Failed to create franchisee')
+                throw new Error(data.error || 'Failed to invite franchisee')
             }
 
-            setMagicLink(data.magicLink)
+            setSuccess(true)
+            if (data.tempPassword) {
+                setTempPassword(data.tempPassword)
+            }
 
-            // Reset form
-            setFormData({ name: '', email: '', franchiseName: '' })
-
-            // Show success and close after delay
+            // Reset form after delay
             setTimeout(() => {
+                setFormData({ name: '', email: '', locationName: '', locationAddress: '' })
                 onSuccess()
                 onClose()
-                setMagicLink('')
-            }, 3000)
+                setSuccess(false)
+                setTempPassword('')
+            }, 5000)
         } catch (err: any) {
             setError(err.message || 'An error occurred')
         } finally {
@@ -83,7 +80,7 @@ export default function AddFranchiseeModal({ isOpen, onClose, onSuccess }: AddFr
 
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50">
-            <div className="glass-panel rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
+            <div className="glass-panel rounded-2xl shadow-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
                 {/* Close button */}
                 <button
                     onClick={onClose}
@@ -95,20 +92,26 @@ export default function AddFranchiseeModal({ isOpen, onClose, onSuccess }: AddFr
 
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-6">
-                    <div className="h-12 w-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20">
+                    <div className="h-12 w-12 bg-gradient-to-br from-orange-600 to-amber-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-900/20">
                         <UserPlus className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                        <h2 className="text-2xl font-bold text-stone-100">Add Franchisee</h2>
-                        <p className="text-sm text-stone-400">Create a new franchisee account</p>
+                        <h2 className="text-2xl font-bold text-stone-100">Invite Franchisee</h2>
+                        <p className="text-sm text-stone-400">Add a new franchisee to your network</p>
                     </div>
                 </div>
 
                 {/* Success message */}
-                {magicLink && (
+                {success && (
                     <div className="mb-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                        <p className="text-sm text-emerald-400 font-semibold mb-2">✅ Franchisee created successfully!</p>
-                        <p className="text-xs text-emerald-300">Welcome email sent with magic link.</p>
+                        <p className="text-sm text-emerald-400 font-semibold mb-2">✅ Franchisee invited!</p>
+                        {tempPassword && (
+                            <div className="mt-2 p-2 bg-stone-900 rounded-lg">
+                                <p className="text-xs text-stone-400">Temporary Password:</p>
+                                <p className="text-sm font-mono text-orange-400 mt-1">{tempPassword}</p>
+                                <p className="text-xs text-stone-500 mt-2">Share this securely with the franchisee.</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -132,9 +135,8 @@ export default function AddFranchiseeModal({ isOpen, onClose, onSuccess }: AddFr
                                 type="text"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full pl-10 pr-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                className="w-full pl-10 pr-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                                 placeholder="John Smith"
-                                maxLength={100}
                                 required
                             />
                         </div>
@@ -151,37 +153,63 @@ export default function AddFranchiseeModal({ isOpen, onClose, onSuccess }: AddFr
                                 type="email"
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                className="w-full pl-10 pr-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                className="w-full pl-10 pr-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                                 placeholder="john@example.com"
-                                maxLength={255}
                                 required
                             />
                         </div>
                     </div>
 
-                    {/* Franchise name field */}
+                    {/* Divider */}
+                    <div className="relative py-2">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-stone-700"></div>
+                        </div>
+                        <div className="relative flex justify-center">
+                            <span className="bg-stone-800 px-3 text-xs text-stone-500 uppercase tracking-wider">
+                                First Location (Optional)
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Location name field */}
                     <div>
                         <label className="block text-sm font-medium text-stone-300 mb-2">
-                            Franchise Name *
+                            Location Name
                         </label>
                         <div className="relative">
                             <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-500" />
                             <input
                                 type="text"
-                                value={formData.franchiseName}
-                                onChange={(e) => setFormData({ ...formData, franchiseName: e.target.value })}
-                                className="w-full pl-10 pr-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                placeholder="John's Downtown Franchise"
-                                maxLength={100}
-                                required
+                                value={formData.locationName}
+                                onChange={(e) => setFormData({ ...formData, locationName: e.target.value })}
+                                className="w-full pl-10 pr-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                                placeholder="McDonald's Dallas"
                             />
                         </div>
                     </div>
 
-                    {/* Security notice */}
-                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                        <p className="text-xs text-blue-400">
-                            🔒 A secure magic link will be sent to the franchisee's email. The link expires in 24 hours.
+                    {/* Location address field */}
+                    <div>
+                        <label className="block text-sm font-medium text-stone-300 mb-2">
+                            Location Address
+                        </label>
+                        <div className="relative">
+                            <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-500" />
+                            <input
+                                type="text"
+                                value={formData.locationAddress}
+                                onChange={(e) => setFormData({ ...formData, locationAddress: e.target.value })}
+                                className="w-full pl-10 pr-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                                placeholder="123 Main St, Dallas, TX 75201"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Info notice */}
+                    <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+                        <p className="text-xs text-orange-400">
+                            🔐 A temporary password will be created. The franchisee can change it after their first login.
                         </p>
                     </div>
 
@@ -197,17 +225,17 @@ export default function AddFranchiseeModal({ isOpen, onClose, onSuccess }: AddFr
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-900/20 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-xl hover:shadow-lg hover:shadow-orange-900/20 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {loading ? (
                                 <>
                                     <Loader2 className="h-5 w-5 animate-spin" />
-                                    Creating...
+                                    Inviting...
                                 </>
                             ) : (
                                 <>
                                     <UserPlus className="h-5 w-5" />
-                                    Create Franchisee
+                                    Invite Franchisee
                                 </>
                             )}
                         </button>
@@ -217,3 +245,4 @@ export default function AddFranchiseeModal({ isOpen, onClose, onSuccess }: AddFr
         </div>
     )
 }
+

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Shield, Check, User, Mail, Lock } from 'lucide-react'
+import { X, Shield, Check, User, Mail, Lock, MapPin } from 'lucide-react'
 
 interface EmployeeModalProps {
     isOpen: boolean
@@ -16,6 +16,7 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
         email: '',
         password: '',
         pin: '',
+        locationId: '',
         permissions: {
             canAddServices: false,
             canAddProducts: false,
@@ -27,6 +28,18 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
         }
     })
     const [loading, setLoading] = useState(false)
+    const [locations, setLocations] = useState<any[]>([])
+
+    useEffect(() => {
+        if (isOpen) {
+            fetch('/api/locations')
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data)) setLocations(data)
+                })
+                .catch(err => console.error('Error fetching locations:', err))
+        }
+    }, [isOpen])
 
     useEffect(() => {
         if (employee) {
@@ -52,6 +65,7 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
                 email: '',
                 password: '',
                 pin: '',
+                locationId: '',
                 permissions: {
                     canAddServices: false,
                     canAddProducts: false,
@@ -119,7 +133,7 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
                                         required
                                         value={formData.name}
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                                         placeholder="John Doe"
                                     />
                                 </div>
@@ -133,9 +147,26 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
                                         required
                                         value={formData.email}
                                         onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                                         placeholder="john@example.com"
                                     />
+                                </div>
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Location</label>
+                                <div className="relative">
+                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                    <select
+                                        required
+                                        value={formData.locationId}
+                                        onChange={e => setFormData({ ...formData, locationId: e.target.value })}
+                                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white text-gray-900"
+                                    >
+                                        <option value="">Select a location...</option>
+                                        {locations.map(loc => (
+                                            <option key={loc.id} value={loc.id}>{loc.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                             {!employee && (
@@ -148,7 +179,7 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
                                             required
                                             value={formData.password}
                                             onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                                             placeholder="••••••••"
                                         />
                                     </div>
@@ -167,7 +198,7 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
                                             const val = e.target.value.replace(/\D/g, '').slice(0, 4)
                                             setFormData({ ...formData, pin: val })
                                         }}
-                                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent tracking-widest font-mono"
+                                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent tracking-widest font-mono text-gray-900"
                                         placeholder="0000"
                                     />
                                 </div>
@@ -177,45 +208,36 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
                     </div>
 
                     {/* Permissions */}
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                            <Shield className="h-5 w-5 text-purple-600" />
+                    <div className="space-y-3">
+                        <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                            <Shield className="h-4 w-4 text-purple-600" />
                             Permissions & Access
                         </h3>
-                        <div className="grid grid-cols-1 gap-3">
+                        <div className="grid grid-cols-2 gap-2">
                             {[
-                                { key: 'canAddServices', label: 'Manage Services', desc: 'Create and edit service menu items' },
-                                { key: 'canAddProducts', label: 'Manage Products', desc: 'Create and edit retail products' },
-                                { key: 'canManageInventory', label: 'Manage Inventory', desc: 'Update stock levels and track inventory' },
-                                { key: 'canViewReports', label: 'View Reports', desc: 'Access financial and performance reports' },
-                                { key: 'canProcessRefunds', label: 'Process Refunds', desc: 'Issue refunds to customers' },
-                                { key: 'canManageSchedule', label: 'Manage Schedule', desc: 'Create and edit staff schedules' },
-                                { key: 'canManageEmployees', label: 'Manage Employees', desc: 'Add/edit other employees (Manager Access)' },
+                                { key: 'canAddServices', label: 'Manage Services' },
+                                { key: 'canAddProducts', label: 'Manage Products' },
+                                { key: 'canManageInventory', label: 'Manage Inventory' },
+                                { key: 'canViewReports', label: 'View Reports' },
+                                { key: 'canProcessRefunds', label: 'Process Refunds' },
+                                { key: 'canManageSchedule', label: 'Manage Schedule' },
+                                { key: 'canManageEmployees', label: 'Manage Employees' },
                             ].map((perm) => (
-                                <div
+                                <label
                                     key={perm.key}
-                                    onClick={() => togglePermission(perm.key)}
-                                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${formData.permissions[perm.key as keyof typeof formData.permissions]
-                                        ? 'border-blue-500 bg-blue-50'
-                                        : 'border-gray-200 hover:border-blue-200'
+                                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${formData.permissions[perm.key as keyof typeof formData.permissions]
+                                            ? 'bg-blue-50 text-blue-700'
+                                            : 'hover:bg-gray-50 text-gray-700'
                                         }`}
                                 >
-                                    <div>
-                                        <p className={`font-medium ${formData.permissions[perm.key as keyof typeof formData.permissions]
-                                            ? 'text-blue-900'
-                                            : 'text-gray-900'
-                                            }`}>{perm.label}</p>
-                                        <p className="text-sm text-gray-500">{perm.desc}</p>
-                                    </div>
-                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${formData.permissions[perm.key as keyof typeof formData.permissions]
-                                        ? 'bg-blue-500 border-blue-500'
-                                        : 'border-gray-300'
-                                        }`}>
-                                        {formData.permissions[perm.key as keyof typeof formData.permissions] && (
-                                            <Check className="h-4 w-4 text-white" />
-                                        )}
-                                    </div>
-                                </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.permissions[perm.key as keyof typeof formData.permissions]}
+                                        onChange={() => togglePermission(perm.key)}
+                                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span className="text-sm font-medium">{perm.label}</span>
+                                </label>
                             ))}
                         </div>
                     </div>

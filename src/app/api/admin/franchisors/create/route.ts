@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { name, email, companyName, supportFee, type, billingMethod, enableCommission } = body
+        const { name, email, phone, companyName, supportFee, type, businessType, billingMethod, enableCommission } = body
 
         if (!name || !email || !companyName) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -64,9 +64,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
         }
 
+        // Validate businessType
+        if (businessType && !['BRAND_FRANCHISOR', 'MULTI_LOCATION_OWNER'].includes(businessType)) {
+            return NextResponse.json({ error: 'Invalid business type' }, { status: 400 })
+        }
+
         const sanitizedName = sanitizeInput(name)
         const sanitizedCompanyName = sanitizeInput(companyName)
         const sanitizedEmail = email.toLowerCase().trim()
+        const sanitizedPhone = phone ? sanitizeInput(phone) : null
 
         // Check if user exists
         const existingUser = await prisma.user.findUnique({
@@ -91,23 +97,16 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        // Track sales agent if current user is SALES role
-        const salesAgentId = session?.user?.providerRole === 'SALES' ? session.user.id : null
-
-        // Determine base rate based on account type
-        const baseRate = type === 'BRAND' ? 499.00 : 99.00
+        // Use businessType from request, fall back to deriving from type if not provided
+        const finalBusinessType = businessType || (type === 'BRAND' ? 'BRAND_FRANCHISOR' : 'MULTI_LOCATION_OWNER')
 
         // Create franchisor company
         const franchisor = await prisma.franchisor.create({
             data: {
                 name: sanitizedCompanyName,
                 ownerId: user.id,
-                supportFee: body.supportFee || baseRate,
-                type: type || 'BRAND',
-                billingMethod: billingMethod || 'DIRECT',
-                salesAgentId: salesAgentId,
-                enableCommission: enableCommission !== undefined ? enableCommission : true,
-                baseRate: baseRate
+                businessType: finalBusinessType,
+                phone: sanitizedPhone,
             }
         })
 
@@ -136,9 +135,8 @@ export async function POST(request: NextRequest) {
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                     <h1>Welcome to Aura!</h1>
-                    <p>You have been invited to join Aura as a ${type === 'INDIVIDUAL' ? 'Store Owner' : 'Franchise Owner'}.</p>
+                    <p>You have been invited to join Aura as a ${finalBusinessType === 'BRAND_FRANCHISOR' ? 'Franchise Brand Owner' : 'Multi-Location Owner'}.</p>
                     <p><strong>Company:</strong> ${sanitizedCompanyName}</p>
-                    <p><strong>Monthly Support Fee:</strong> $${body.supportFee || 99.00}</p>
                     <br/>
                     <p>Click the link below to accept the terms and set up your account:</p>
                     <a href="${magicLinkUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Setup Account</a>

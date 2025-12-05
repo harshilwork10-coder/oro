@@ -1,0 +1,249 @@
+/* POS Touch-Optimized Styles */
+/* Applied to 15" terminals and similar touch devices */
+
+/* Base touch targets - minimum 44px for accessibility */
+.pos-touch-target {
+    min-height: 48px;
+    min-width: 48px;
+}
+
+/* Large touch buttons for POS */
+.pos-btn {
+    min-height: 56px;
+    min-width: 56px;
+    font-size: 1.125rem;
+    font-weight: 600;
+    border-radius: 0.75rem;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.15s ease;
+}
+
+.pos-btn:active {
+    transform: scale(0.98);
+}
+
+.pos-btn-primary {
+    background: linear-gradient(to right, #9333ea, #db2777);
+    color: white;
+}
+
+.pos-btn-primary:hover {
+    box-shadow: 0 10px 25px -5px rgba(147, 51, 234, 0.3);
+}
+
+.pos-btn-secondary {
+    background-color: #44403c;
+    color: white;
+}
+
+.pos-btn-secondary:hover {
+    background-color: #57534e;
+}
+
+/* Large product/service cards for touch */
+.pos-card {
+    min-height: 80px;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    border-width: 2px;
+    transition: all 0.15s ease;
+    touch-action: manipulation;
+}
+
+.pos-card:active {
+    transform: scale(0.98);
+}
+
+.pos-card-selected {
+    border-color: #a855f7;
+    background-color: rgba(147, 51, 234, 0.2);
+}
+
+/* Large input fields for touch keyboards */
+.pos-input {
+    min-height: 56px;
+    font-size: 1.125rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    border-radius: 0.75rem;
+    background-color: #292524;
+    border: 2px solid #44403c;
+    color: white;
+}
+
+.pos-input:focus {
+    border-color: #a855f7;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.3);
+}
+
+/* Number pad styling */
+.pos-numpad-btn {
+    height: 4rem;
+    width: 4rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    border-radius: 0.75rem;
+    background-color: #292524;
+    color: white;
+    border: 1px solid #44403c;
+    touch-action: manipulation;
+    transition: all 0.1s ease;
+}
+
+.pos-numpad-btn:hover {
+    background-color: #44403c;
+}
+
+.pos-numpad-btn:active {
+    background-color: #57534e;
+    transform: scale(0.95);
+}
+
+/* Grid layouts for POS screens */
+.pos-grid-products {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+/* Category tabs */
+.pos-category-tab {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    border-radius: 0.75rem;
+    white-space: nowrap;
+    background-color: #292524;
+    color: #a8a29e;
+    border: 1px solid #44403c;
+    touch-action: manipulation;
+    transition: all 0.15s ease;
+}
+
+.pos-category-tab:hover {
+    background-color: #44403c;
+}
+
+.pos-category-tab:active {
+    transform: scale(0.95);
+}
+
+.pos-category-tab-active {
+    background-color: #9333ea;
+    color: white;
+    border-color: #a855f7;
+}
+
+/* Time slots for appointments */
+.pos-time-slot {
+    height: 3.5rem;
+    min-width: 70px;
+    font-size: 1rem;
+    font-weight: 500;
+    border-radius: 0.75rem;
+    background-color: #292524;
+    color: #a8a29e;
+    border: 1px solid #44403c;
+    touch-action: manipulation;
+    transition: all 0.15s ease;
+}
+
+.pos-time-slot:hover {
+    background-color: #44403c;
+}
+
+.pos-time-slot:active {
+    transform: scale(0.95);
+}
+
+.pos-time-slot-selected {
+    background-color: #9333ea;
+    color: white;
+    border-color: #a855f7;
+}
+
+/* Cart/Order summary */
+.pos-cart-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    min-height: 64px;
+    border-bottom: 1px solid #44403c;
+}
+
+.pos-cart-item:last-child {
+    border-bottom: none;
+}
+
+/* Disable text selection on touch interfaces */
+.pos-no-select {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Smooth scrolling for touch */
+.pos-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+/* Media query for POS terminals (typically 1024-1366px width with touch) */
+@media (min-width: 1024px) and (max-width: 1400px) and (pointer: coarse) {
+
+    /* Increase base font size for readability */
+    html {
+        font-size: 18px;
+    }
+
+    /* Make all buttons larger */
+    button,
+    .btn {
+        min-height: 48px;
+        font-size: 1rem;
+    }
+}
+
+/* iPad and tablet optimizations */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .pos-grid-products {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Detect touch devices and increase sizes */
+@media (pointer: coarse) {
+
+    /* For touch devices, increase minimum touch target */
+    button,
+    a,
+    input,
+    select,
+    textarea {
+        min-height: 44px;
+    }
+
+    /* Increase spacing between interactive elements */
+    .grid {
+        gap: 0.5rem;
+    }
+}
+
+/* Safe area for notched devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .safe-area-inset-bottom {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}

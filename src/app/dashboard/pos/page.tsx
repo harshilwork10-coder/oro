@@ -240,6 +240,23 @@ export default function POSPage() {
     }
 
     const checkShift = async () => {
+        // FRANCHISOR/Owner doesn't require a shift to use POS
+        const user = session?.user as any
+        if (user?.role === 'FRANCHISOR') {
+            // Owner mode - no shift required, but still fetch if one exists
+            try {
+                const res = await fetch('/api/pos/shift')
+                const data = await res.json()
+                if (data.shift) {
+                    setShift(data.shift)
+                }
+            } catch (error) {
+                console.error('Failed to check shift:', error)
+            }
+            return // No shift modal for owners
+        }
+
+        // Employee mode - requires shift
         try {
             const res = await fetch('/api/pos/shift')
             const data = await res.json()
@@ -292,7 +309,11 @@ export default function POSPage() {
     }
 
     const addToCart = (item: any, type: 'SERVICE' | 'PRODUCT') => {
-        if (!shift) {
+        // FRANCHISOR can add to cart without a shift
+        const user = session?.user as any
+        const isOwner = user?.role === 'FRANCHISOR'
+
+        if (!shift && !isOwner) {
             alert('Please open a shift first')
             setShowShiftModal(true)
             return
@@ -369,7 +390,7 @@ export default function POSPage() {
                     </head>
                     <body>
                         <div class="header">
-                            <h2>AURA SALON</h2>
+                            <h2>AURA</h2>
                             <p>${new Date(transaction.createdAt).toLocaleString()}</p>
                             <p>Tx: ${transaction.id}</p>
                         </div>
@@ -493,8 +514,9 @@ export default function POSPage() {
 
     if (isLoading) return <div className="flex items-center justify-center h-screen bg-stone-950 text-orange-500">Loading POS...</div>
 
-    // Shift Modal
-    if (showShiftModal && !shift) {
+    // Shift Modal - Only show for non-owner roles
+    const isOwner = (session?.user as any)?.role === 'FRANCHISOR'
+    if (showShiftModal && !shift && !isOwner) {
         const calculateDenomTotal = () => {
             return (
                 denominations.hundreds * 100 +
@@ -750,7 +772,8 @@ export default function POSPage() {
                                             <div
                                                 key={item.id}
                                                 onClick={() => {
-                                                    if (!shift) {
+                                                    const isOwnerClick = (session?.user as any)?.role === 'FRANCHISOR'
+                                                    if (!shift && !isOwnerClick) {
                                                         setShowShiftModal(true)
                                                     } else {
                                                         addToCart(item, item.category === 'PRODUCTS' ? 'PRODUCT' : 'SERVICE')

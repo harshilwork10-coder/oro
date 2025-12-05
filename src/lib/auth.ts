@@ -1,7 +1,7 @@
 import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
-import { compare } from "bcryptjs"
+import { compareSync } from "bcryptjs"
 
 export const authOptions: NextAuthOptions = {
     session: {
@@ -18,10 +18,7 @@ export const authOptions: NextAuthOptions = {
                 password: { label: "Password", type: "password" }
             },
             async authorize(credentials) {
-                console.log('Authorize called with:', { email: credentials?.email })
-
                 if (!credentials?.email || !credentials?.password) {
-                    console.log('Missing credentials')
                     return null
                 }
 
@@ -32,30 +29,41 @@ export const authOptions: NextAuthOptions = {
                 })
 
                 if (!user || !user.password) {
-                    console.log('User not found or no password set')
                     return null
                 }
 
-                console.log('User found, verifying password...')
-                const isPasswordValid = await compare(credentials.password, user.password)
+                const isPasswordValid = compareSync(credentials.password, user.password)
 
                 if (!isPasswordValid) {
-                    console.log('Invalid password')
                     return null
                 }
 
-                console.log('Authentication successful')
-
-                // Fetch franchisor status and businessType if applicable
-                let franchisorStatus = null
+                let approvalStatus = 'PENDING'
                 let businessType = null
+
                 if (user.role === 'FRANCHISOR') {
                     const franchisor = await prisma.franchisor.findUnique({
                         where: { ownerId: user.id },
-                        select: { status: true, businessType: true }
+                        select: { businessType: true, approvalStatus: true }
                     })
-                    franchisorStatus = franchisor?.status || null
                     businessType = franchisor?.businessType || null
+                    approvalStatus = franchisor?.approvalStatus || 'PENDING'
+                } else if (user.role === 'ADMIN' || user.role === 'PROVIDER') {
+                    approvalStatus = 'APPROVED'
+                } else if (user.locationId) {
+                    // For Franchisees/Employees linked to a location
+                    const location = await prisma.franchise.findUnique({
+                        where: { id: user.locationId },
+                        select: { approvalStatus: true }
+                    })
+                    approvalStatus = location?.approvalStatus || 'PENDING'
+                } else if (user.role === 'FRANCHISEE' && user.franchiseId) {
+                    // For Franchisee Owners linked to a franchise
+                    const franchise = await prisma.franchise.findUnique({
+                        where: { id: user.franchiseId },
+                        select: { approvalStatus: true }
+                    })
+                    approvalStatus = franchise?.approvalStatus || 'PENDING'
                 }
 
                 return {
@@ -67,8 +75,8 @@ export const authOptions: NextAuthOptions = {
                     locationId: user.locationId,
                     canProcessRefunds: user.canProcessRefunds,
                     canManageShifts: user.canManageShifts,
-                    franchisorStatus,
                     businessType,
+                    approvalStatus,
                 }
             }
         })
@@ -85,8 +93,8 @@ export const authOptions: NextAuthOptions = {
                     locationId: token.locationId,
                     canProcessRefunds: token.canProcessRefunds,
                     canManageShifts: token.canManageShifts,
-                    franchisorStatus: token.franchisorStatus,
                     businessType: token.businessType,
+                    approvalStatus: token.approvalStatus,
                 }
             }
         },
@@ -100,8 +108,8 @@ export const authOptions: NextAuthOptions = {
                     locationId: (user as any).locationId,
                     canProcessRefunds: (user as any).canProcessRefunds,
                     canManageShifts: (user as any).canManageShifts,
-                    franchisorStatus: (user as any).franchisorStatus,
                     businessType: (user as any).businessType,
+                    approvalStatus: (user as any).approvalStatus,
                 }
             }
             return token

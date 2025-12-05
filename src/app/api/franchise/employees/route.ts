@@ -13,18 +13,39 @@ export async function GET() {
         include: { franchise: true }
     })
 
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+    let whereClause: any = { role: 'EMPLOYEE' }
+
+    if (user.role === 'FRANCHISOR') {
+        const franchisor = await prisma.franchisor.findUnique({
+            where: { ownerId: user.id }
+        })
+        if (!franchisor) return NextResponse.json([])
+
+        // Get all employees in franchises owned by this franchisor
+        whereClause.franchise = {
+            franchisorId: franchisor.id
+        }
+    } else if (user.franchiseId) {
+        whereClause.franchiseId = user.franchiseId
+    } else {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
 
     const employees = await prisma.user.findMany({
-        where: {
-            franchiseId: user.franchiseId,
-            role: 'EMPLOYEE'
-        },
+        where: whereClause,
         select: {
             id: true,
             name: true,
             email: true,
             role: true,
+            location: {
+                select: {
+                    id: true,
+                    name: true
+                }
+            },
             canAddServices: true,
             canAddProducts: true,
             canManageInventory: true,
@@ -49,18 +70,46 @@ export async function POST(request: Request) {
         include: { franchise: true }
     })
 
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
     // Only owners/managers can add employees
-    if (user.role !== 'FRANCHISEE' && !user.canManageEmployees) {
+    if (user.role !== 'FRANCHISOR' && user.role !== 'FRANCHISEE' && !user.canManageEmployees) {
         return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
     }
 
     const body = await request.json()
-    const { name, email, password, permissions } = body
+    const { name, email, password, permissions, locationId } = body
 
     if (!name || !email || !password) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Validate Location if provided (Optional for now to support legacy, but recommended)
+    let finalFranchiseId = user.franchiseId
+
+    if (locationId) {
+        const location = await prisma.location.findUnique({
+            where: { id: locationId },
+            include: { franchise: true }
+        })
+
+        if (!location) {
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+        }
+
+        // Verify Access to this Location
+        if (user.role === 'FRANCHISOR') {
+            const franchisor = await prisma.franchisor.findUnique({ where: { ownerId: user.id } })
+            if (!franchisor || location.franchise?.franchisorId !== franchisor.id) {
+                return NextResponse.json({ error: 'You do not own this location' }, { status: 403 })
+            }
+        } else if (user.franchiseId && location.franchiseId !== user.franchiseId) {
+            return NextResponse.json({ error: 'Location does not belong to your franchise' }, { status: 403 })
+        }
+
+        finalFranchiseId = location.franchiseId
+    } else if (user.role === 'FRANCHISOR') {
+        return NextResponse.json({ error: 'Location is required for Franchisors' }, { status: 400 })
     }
 
     // Check if user exists
@@ -79,7 +128,8 @@ export async function POST(request: Request) {
             password: hashedPassword,
             pin: hashedPin,
             role: 'EMPLOYEE',
-            franchiseId: user.franchiseId,
+            franchiseId: finalFranchiseId,
+            locationId: locationId || null,
             // Permissions
             canAddServices: permissions?.canAddServices || false,
             canAddProducts: permissions?.canAddProducts || false,

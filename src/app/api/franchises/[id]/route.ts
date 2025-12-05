@@ -83,3 +83,43 @@ export async function DELETE(
         return NextResponse.json({ error: 'Failed to delete franchise' }, { status: 500 })
     }
 }
+
+export async function PATCH(
+    request: Request,
+    context: { params: Promise<{ id: string }> }
+) {
+    try {
+        const session = await getServerSession(authOptions)
+
+        if (!session || (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR')) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const { id } = await context.params
+        const body = await request.json()
+
+        // Update allowed fields
+        const updatedFranchise = await prisma.franchise.update({
+            where: { id },
+            data: {
+                name: body.name,
+                // businessType doesn't exist on Franchise, it's inferred or not used
+                // address is on Location usually, but Franchise has processing details
+                ssn: body.ssn,
+                fein: body.fein,
+                routingNumber: body.routingNumber,
+                accountNumber: body.accountNumber,
+                voidCheckUrl: body.voidCheckUrl,
+                driverLicenseUrl: body.driverLicenseUrl,
+                feinLetterUrl: body.feinLetterUrl,
+                needToDiscussProcessing: body.needToDiscussProcessing
+            }
+        })
+
+        return NextResponse.json(updatedFranchise)
+
+    } catch (error) {
+        console.error('Error updating franchise:', error)
+        return NextResponse.json({ error: 'Failed to update franchise' }, { status: 500 })
+    }
+}

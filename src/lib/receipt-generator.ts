@@ -18,9 +18,13 @@ interface ReceiptData {
         discount: number
         total: number
     }>
+    branding?: {
+        logoUrl?: string
+        primaryColor?: string
+    }
 }
 
-export function generateReceipt(data: ReceiptData) {
+export async function generateReceipt(data: ReceiptData) {
     const doc = new jsPDF({
         unit: 'mm',
         format: [80, 200] // Thermal receipt size (80mm width)
@@ -28,10 +32,38 @@ export function generateReceipt(data: ReceiptData) {
 
     let yPos = 10
 
+    // Add Logo if available
+    if (data.branding?.logoUrl) {
+        try {
+            // Create an image element to load the logo
+            const img = new Image()
+            img.src = data.branding.logoUrl
+            await new Promise((resolve, reject) => {
+                img.onload = resolve
+                img.onerror = reject
+            })
+
+            // Calculate aspect ratio to fit width 40mm
+            const aspectRatio = img.width / img.height
+            const width = 40
+            const height = width / aspectRatio
+
+            doc.addImage(img, 'PNG', 20, yPos, width, height)
+            yPos += height + 5
+        } catch (error) {
+            console.error('Error loading logo for receipt:', error)
+            // Fallback to text if logo fails
+        }
+    }
+
     // Header
     doc.setFontSize(16)
     doc.setFont('helvetica', 'bold')
+    if (data.branding?.primaryColor) {
+        doc.setTextColor(data.branding.primaryColor)
+    }
     doc.text(data.franchiseName || 'Aura Business', 40, yPos, { align: 'center' })
+    doc.setTextColor(0, 0, 0) // Reset color
     yPos += 6
 
     doc.setFontSize(10)
@@ -40,6 +72,7 @@ export function generateReceipt(data: ReceiptData) {
     yPos += 8
 
     // Divider
+    doc.setDrawColor(200, 200, 200)
     doc.line(5, yPos, 75, yPos)
     yPos += 6
 

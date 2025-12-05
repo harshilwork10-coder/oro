@@ -11,7 +11,22 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        let whereClause = {}
+
+        if (session.user.role === 'FRANCHISOR') {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: session.user.id }
+            })
+
+            if (!franchisor) {
+                return NextResponse.json([])
+            }
+
+            whereClause = { franchisorId: franchisor.id }
+        }
+
         const franchises = await prisma.franchise.findMany({
+            where: whereClause,
             include: {
                 _count: {
                     select: {
@@ -36,12 +51,21 @@ export async function POST(request: Request) {
     try {
         const session = await getServerSession(authOptions)
 
-        if (!session || session.user.role !== 'PROVIDER') {
+        if (!session || (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const body = await request.json()
-        const { name, franchisorId } = body
+        let { name, franchisorId } = body
+
+        // If Franchisor, force their own ID
+        if (session.user.role === 'FRANCHISOR') {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: session.user.id }
+            })
+            if (!franchisor) return NextResponse.json({ error: 'Franchisor profile not found' }, { status: 404 })
+            franchisorId = franchisor.id
+        }
 
         if (!name || !franchisorId) {
             return NextResponse.json({ error: 'Name and Franchisor ID are required' }, { status: 400 })

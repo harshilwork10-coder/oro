@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
-import { Briefcase, Plus, Edit, Trash2, X, Settings } from 'lucide-react'
+import { Briefcase, Plus, Edit, Trash2, X, Settings, Lock, Building2 } from 'lucide-react'
 
 export default function ServicesPage() {
     const [services, setServices] = useState<any[]>([])
@@ -15,10 +15,29 @@ export default function ServicesPage() {
     const [categoryName, setCategoryName] = useState('')
     const [formData, setFormData] = useState({ name: '', categoryId: '', price: '', duration: '30', description: '' })
 
+    // Franchise detection - if user belongs to a franchisee, they can only view
+    const [isFranchise, setIsFranchise] = useState(false)
+    const [franchiseName, setFranchiseName] = useState('')
+
     useEffect(() => {
         fetchServices()
         fetchCategories()
+        checkUserType()
     }, [])
+
+    const checkUserType = async () => {
+        try {
+            const res = await fetch('/api/auth/me')
+            if (res.ok) {
+                const user = await res.json()
+                // If user has franchiseeId, they're a franchise location (read-only)
+                setIsFranchise(!!user.franchiseeId)
+                setFranchiseName(user.franchise?.name || user.franchisee?.franchise?.name || '')
+            }
+        } catch (error) {
+            console.error('Failed to check user type:', error)
+        }
+    }
 
     const fetchServices = async () => {
         try {
@@ -36,9 +55,11 @@ export default function ServicesPage() {
         try {
             const res = await fetch('/api/service-categories')
             const data = await res.json()
-            setCategories(data || [])
+            // Only set if it's an array, otherwise keep empty array
+            setCategories(Array.isArray(data) ? data : [])
         } catch (error) {
             console.error('Failed to fetch categories:', error)
+            setCategories([])
         }
     }
 
@@ -151,24 +172,47 @@ export default function ServicesPage() {
 
     return (
         <div className="p-8 bg-stone-950 min-h-screen">
+            {/* Franchise vs Multi-Store Badge */}
+            {isFranchise ? (
+                <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3">
+                    <Lock className="h-5 w-5 text-amber-400" />
+                    <div>
+                        <p className="text-amber-200 font-semibold">Managed by {franchiseName || 'Franchisor'}</p>
+                        <p className="text-amber-400/70 text-sm">Menu is controlled by headquarters. Contact your franchisor for changes.</p>
+                    </div>
+                </div>
+            ) : (
+                <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-3">
+                    <Building2 className="h-5 w-5 text-emerald-400" />
+                    <div>
+                        <p className="text-emerald-200 font-semibold">Your Custom Menu</p>
+                        <p className="text-emerald-400/70 text-sm">You have full control over your services and pricing.</p>
+                    </div>
+                </div>
+            )}
+
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                         <Briefcase className="h-8 w-8 text-orange-500" />
                         Service Management
                     </h1>
-                    <p className="text-stone-400 mt-2">Manage services and pricing</p>
+                    <p className="text-stone-400 mt-2">
+                        {isFranchise ? 'View services and pricing' : 'Manage services and pricing'}
+                    </p>
                 </div>
-                <div className="flex gap-3">
-                    <button onClick={() => setShowCategoryModal(true)} className="px-6 py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-lg font-semibold flex items-center gap-2">
-                        <Settings className="h-5 w-5" />
-                        Manage Categories
-                    </button>
-                    <button onClick={() => setShowModal(true)} className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold flex items-center gap-2">
-                        <Plus className="h-5 w-5" />
-                        Add Service
-                    </button>
-                </div>
+                {!isFranchise && (
+                    <div className="flex gap-3">
+                        <button onClick={() => setShowCategoryModal(true)} className="px-6 py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-lg font-semibold flex items-center gap-2">
+                            <Settings className="h-5 w-5" />
+                            Manage Categories
+                        </button>
+                        <button onClick={() => setShowModal(true)} className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold flex items-center gap-2">
+                            <Plus className="h-5 w-5" />
+                            Add Service
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="flex gap-2 mb-6 flex-wrap">
@@ -179,6 +223,26 @@ export default function ServicesPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {/* Open Item - Always available for custom pricing */}
+                <div className="glass-panel p-6 rounded-xl border-2 border-dashed border-purple-500/50 bg-purple-500/5">
+                    <div className="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 className="text-lg font-bold text-purple-300 flex items-center gap-2">
+                                💰 Open Item
+                            </h3>
+                            <p className="text-xs text-purple-400/70 uppercase">CUSTOM PRICE</p>
+                        </div>
+                        <div className="px-2 py-1 bg-purple-600/30 rounded-lg text-purple-300 text-xs font-medium">
+                            Flexible
+                        </div>
+                    </div>
+                    <p className="text-sm text-stone-400 mb-4">Enter any custom amount for miscellaneous services</p>
+                    <div className="text-center py-3 bg-purple-600/20 rounded-lg">
+                        <span className="text-purple-300 font-semibold">$?.??</span>
+                        <p className="text-xs text-purple-400/70 mt-1">Price entered at checkout</p>
+                    </div>
+                </div>
+
                 {filtered.map(service => (
                     <div key={service.id} className="glass-panel p-6 rounded-xl">
                         <div className="flex items-start justify-between mb-4">
@@ -188,14 +252,16 @@ export default function ServicesPage() {
                                     {service.serviceCategory?.name || service.category || 'UNCATEGORIZED'}
                                 </p>
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => openEdit(service)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-orange-400">
-                                    <Edit className="h-4 w-4" />
-                                </button>
-                                <button onClick={() => handleDelete(service.id)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-red-400">
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            </div>
+                            {!isFranchise && (
+                                <div className="flex gap-2">
+                                    <button onClick={() => openEdit(service)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-orange-400">
+                                        <Edit className="h-4 w-4" />
+                                    </button>
+                                    <button onClick={() => handleDelete(service.id)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-red-400">
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         {service.description && <p className="text-sm text-stone-400 mb-4">{service.description}</p>}
                         <div className="space-y-2">

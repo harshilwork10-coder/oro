@@ -3,6 +3,7 @@ import { X, RotateCcw, Ban, Trash2, CheckSquare, Square, Printer, CreditCard, Ba
 import { formatCurrency } from '@/lib/utils'
 import { generateReceipt } from '@/lib/receipt-generator'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
+import { useBranding } from '@/components/providers/BrandProvider'
 
 interface TransactionLine {
     id: string
@@ -48,6 +49,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
     const [refundMethod, setRefundMethod] = useState<string>('CASH')
     const [showPaxModal, setShowPaxModal] = useState(false)
     const [paxVerificationPending, setPaxVerificationPending] = useState(false)
+    const { logoUrl, primaryColor } = useBranding()
 
     useEffect(() => {
         if (transaction.paymentMethod === 'CARD') {
@@ -57,43 +59,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
         }
     }, [transaction.paymentMethod])
 
-    const toggleItemSelection = (itemId: string, maxQty: number) => {
-        const newSelected = new Set(selectedItems)
-        if (newSelected.has(itemId)) {
-            newSelected.delete(itemId)
-            const newQty = { ...itemQuantities }
-            delete newQty[itemId]
-            setItemQuantities(newQty)
-        } else {
-            newSelected.add(itemId)
-            setItemQuantities({ ...itemQuantities, [itemId]: maxQty })
-        }
-        setSelectedItems(newSelected)
-    }
-
-    const selectAllItems = () => {
-        const allItems = new Set(transaction.lineItems.map(item => item.id))
-        const allQty: Record<string, number> = {}
-        transaction.lineItems.forEach(item => {
-            allQty[item.id] = item.quantity
-        })
-        setSelectedItems(allItems)
-        setItemQuantities(allQty)
-    }
-
-    const calculateRefundAmount = () => {
-        let refundTotal = 0
-        transaction.lineItems.forEach(item => {
-            if (selectedItems.has(item.id)) {
-                const qty = itemQuantities[item.id] || item.quantity
-                const itemPrice = item.price * qty * (1 - item.discount / 100)
-                refundTotal += itemPrice
-            }
-        })
-        // Add proportional tax
-        const taxRate = transaction.tax / transaction.subtotal
-        return refundTotal * (1 + taxRate)
-    }
+    // ... (existing code)
 
     const handlePrint = () => {
         const receiptData = {
@@ -109,7 +75,11 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                 price: item.price,
                 discount: item.discount,
                 total: item.total
-            }))
+            })),
+            branding: {
+                logoUrl,
+                primaryColor
+            }
         }
         generateReceipt(receiptData)
     }

@@ -34,8 +34,8 @@ export default function DailyReportPageContent() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
-                <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+            <div className="min-h-screen bg-stone-950 flex items-center justify-center">
+                <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
             </div>
         )
     }
@@ -43,7 +43,7 @@ export default function DailyReportPageContent() {
     if (!reportData) return null
 
     return (
-        <div className="min-h-screen bg-gray-50/50 p-8 print:p-0 print:bg-white">
+        <div className="min-h-screen bg-stone-950 p-8 print:p-0 print:bg-white">
             {/* Print Styles */}
             <style jsx global>{`
                 @media print {
@@ -62,22 +62,22 @@ export default function DailyReportPageContent() {
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">End-of-Day Report</h1>
-                        <p className="text-gray-500 mt-1">Daily financial summary and performance metrics</p>
+                        <h1 className="text-3xl font-bold text-white tracking-tight">End-of-Day Report</h1>
+                        <p className="text-stone-400 mt-1">Daily financial summary and performance metrics</p>
                     </div>
                     <div className="flex items-center gap-3">
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-stone-400 h-5 w-5" />
                             <input
                                 type="date"
                                 value={selectedDate}
                                 onChange={(e) => setSelectedDate(e.target.value)}
-                                className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="pl-10 pr-4 py-2 bg-stone-800 border border-stone-700 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-white"
                             />
                         </div>
                         <button
                             onClick={handlePrint}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm font-medium"
+                            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 transition-colors shadow-sm font-medium"
                         >
                             <Printer className="h-4 w-4" />
                             Print Receipt
@@ -116,8 +116,8 @@ export default function DailyReportPageContent() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Hourly Sales Chart */}
-                    <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <h3 className="font-bold text-gray-900 mb-6">Hourly Sales Performance</h3>
+                    <div className="lg:col-span-2 glass-panel rounded-2xl p-6">
+                        <h3 className="font-bold text-white mb-6">Hourly Sales Performance</h3>
                         <div className="h-64 flex items-end gap-2">
                             {reportData.hourlySales.map((item: any) => {
                                 const maxSales = Math.max(...reportData.hourlySales.map((i: any) => i.sales)) || 1
@@ -125,14 +125,14 @@ export default function DailyReportPageContent() {
                                 return (
                                     <div key={item.hour} className="flex-1 flex flex-col items-center gap-2 group">
                                         <div
-                                            className="w-full bg-blue-100 rounded-t-sm hover:bg-blue-200 transition-colors relative group-hover:shadow-sm"
+                                            className="w-full bg-orange-500/50 rounded-t-sm hover:bg-orange-500/70 transition-colors relative group-hover:shadow-sm"
                                             style={{ height: `${height}%` }}
                                         >
-                                            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                                            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-stone-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                                                 ${item.sales.toFixed(0)}
                                             </div>
                                         </div>
-                                        <span className="text-[10px] text-gray-400 rotate-0 md:rotate-0">{item.hour}</span>
+                                        <span className="text-[10px] text-stone-400 rotate-0 md:rotate-0">{item.hour}</span>
                                     </div>
                                 )
                             })}
@@ -140,20 +140,20 @@ export default function DailyReportPageContent() {
                     </div>
 
                     {/* Payment Methods */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <h3 className="font-bold text-gray-900 mb-6">Payment Breakdown</h3>
+                    <div className="glass-panel rounded-2xl p-6">
+                        <h3 className="font-bold text-white mb-6">Payment Breakdown</h3>
                         <div className="space-y-4">
                             {Object.entries(reportData.paymentMethods).map(([method, amount]: [string, any]) => (
                                 <div key={method} className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 bg-gray-50 rounded-lg flex items-center justify-center text-gray-500">
+                                        <div className="h-8 w-8 bg-stone-700 rounded-lg flex items-center justify-center text-stone-300">
                                             <CreditCard className="h-4 w-4" />
                                         </div>
-                                        <span className="text-sm font-medium text-gray-700 capitalize">
+                                        <span className="text-sm font-medium text-stone-300 capitalize">
                                             {method.replace('_', ' ').toLowerCase()}
                                         </span>
                                     </div>
-                                    <span className="font-bold text-gray-900">${Number(amount).toFixed(2)}</span>
+                                    <span className="font-bold text-white">${Number(amount).toFixed(2)}</span>
                                 </div>
                             ))}
                         </div>
@@ -162,23 +162,23 @@ export default function DailyReportPageContent() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Top Items */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <h3 className="font-bold text-gray-900 mb-4">Top Selling Items</h3>
+                    <div className="glass-panel rounded-2xl p-6">
+                        <h3 className="font-bold text-white mb-4">Top Selling Items</h3>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
-                                <thead className="text-gray-500 border-b border-gray-100">
+                                <thead className="text-stone-400 border-b border-stone-700">
                                     <tr>
                                         <th className="pb-3 font-medium">Item</th>
                                         <th className="pb-3 font-medium text-right">Qty</th>
                                         <th className="pb-3 font-medium text-right">Revenue</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-50">
+                                <tbody className="divide-y divide-stone-800">
                                     {reportData.topItems.map((item: any, i: number) => (
                                         <tr key={i}>
-                                            <td className="py-3 font-medium text-gray-900">{item.name}</td>
-                                            <td className="py-3 text-gray-600 text-right">{item.quantity}</td>
-                                            <td className="py-3 text-gray-900 text-right font-medium">${item.revenue.toFixed(2)}</td>
+                                            <td className="py-3 font-medium text-white">{item.name}</td>
+                                            <td className="py-3 text-stone-400 text-right">{item.quantity}</td>
+                                            <td className="py-3 text-emerald-400 text-right font-medium">${item.revenue.toFixed(2)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -187,21 +187,21 @@ export default function DailyReportPageContent() {
                     </div>
 
                     {/* Staff Performance */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <h3 className="font-bold text-gray-900 mb-4">Staff Performance</h3>
+                    <div className="glass-panel rounded-2xl p-6">
+                        <h3 className="font-bold text-white mb-4">Staff Performance</h3>
                         <div className="space-y-4">
                             {reportData.staffStats.map((staff: any, i: number) => (
-                                <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                <div key={i} className="flex items-center justify-between p-3 bg-stone-800 rounded-xl border border-stone-700">
                                     <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-xs font-bold">
+                                        <div className="h-8 w-8 bg-orange-500/20 rounded-full flex items-center justify-center text-orange-400 text-xs font-bold">
                                             {staff.name[0]}
                                         </div>
                                         <div>
-                                            <p className="text-sm font-bold text-gray-900">{staff.name}</p>
-                                            <p className="text-xs text-gray-500">{staff.count} Transactions</p>
+                                            <p className="text-sm font-bold text-white">{staff.name}</p>
+                                            <p className="text-xs text-stone-400">{staff.count} Transactions</p>
                                         </div>
                                     </div>
-                                    <span className="font-bold text-gray-900">${staff.sales.toFixed(2)}</span>
+                                    <span className="font-bold text-emerald-400">${staff.sales.toFixed(2)}</span>
                                 </div>
                             ))}
                         </div>
@@ -297,25 +297,25 @@ export default function DailyReportPageContent() {
 
 function SummaryCard({ title, value, subtext, icon: Icon, color }: any) {
     const colors: any = {
-        blue: 'bg-blue-50 text-blue-600',
-        green: 'bg-green-50 text-green-600',
-        purple: 'bg-purple-50 text-purple-600',
-        orange: 'bg-orange-50 text-orange-600',
+        blue: 'bg-blue-500/20 text-blue-400',
+        green: 'bg-emerald-500/20 text-emerald-400',
+        purple: 'bg-purple-500/20 text-purple-400',
+        orange: 'bg-orange-500/20 text-orange-400',
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 print:shadow-none print:border-gray-300">
+        <div className="glass-panel rounded-2xl p-6 print:shadow-none print:border-stone-600 print:bg-white">
             <div className="flex items-start justify-between mb-4">
                 <div>
-                    <p className="text-sm font-medium text-gray-500">{title}</p>
-                    <h3 className="text-2xl font-bold text-gray-900 mt-1">{value}</h3>
+                    <p className="text-sm font-medium text-stone-400">{title}</p>
+                    <h3 className="text-2xl font-bold text-white mt-1">{value}</h3>
                 </div>
                 <div className={`p-3 rounded-xl ${colors[color]}`}>
                     <Icon className="h-5 w-5" />
                 </div>
             </div>
             {subtext && (
-                <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-50">{subtext}</p>
+                <p className="text-xs text-stone-500 mt-2 pt-2 border-t border-stone-700">{subtext}</p>
             )}
         </div>
     )

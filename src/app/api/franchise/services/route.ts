@@ -14,13 +14,31 @@ export async function GET(request: Request) {
         include: { franchise: true }
     })
 
-    if (!user?.franchiseId) {
-        return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+    if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     try {
+        let whereClause: any = {}
+
+        if (user.role === 'FRANCHISOR') {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: user.id }
+            })
+            if (!franchisor) return NextResponse.json([])
+
+            // Get all services in franchises owned by this franchisor
+            whereClause.franchise = {
+                franchisorId: franchisor.id
+            }
+        } else if (user.franchiseId) {
+            whereClause.franchiseId = user.franchiseId
+        } else {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+        }
+
         const services = await prisma.service.findMany({
-            where: { franchiseId: user.franchiseId },
+            where: whereClause,
             include: { serviceCategory: true },
             orderBy: { name: 'asc' }
         })
@@ -43,16 +61,49 @@ export async function POST(request: Request) {
         include: { franchise: true }
     })
 
-    if (!user?.franchiseId) {
-        return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+    if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     try {
         const body = await request.json()
-        const { name, description, duration, price, category, categoryId } = body
+        const { name, description, duration, price, category, categoryId, franchiseId } = body
 
         if (!name || !price || !duration) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+        }
+
+        let finalFranchiseId = franchiseId || user.franchiseId
+
+        // For Franchisors, validate franchise ownership or auto-assign
+        if (user.role === 'FRANCHISOR') {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: user.id },
+                include: { franchises: true }
+            })
+
+            if (!franchisor) {
+                return NextResponse.json({ error: 'Franchisor profile not found' }, { status: 403 })
+            }
+
+            if (franchiseId) {
+                // Verify they own this franchise
+                const ownsFranchise = franchisor.franchises.some(f => f.id === franchiseId)
+                if (!ownsFranchise) {
+                    return NextResponse.json({ error: 'You do not own this franchise' }, { status: 403 })
+                }
+            } else {
+                // Auto-assign if they only have one franchise
+                if (franchisor.franchises.length === 1) {
+                    finalFranchiseId = franchisor.franchises[0].id
+                } else if (franchisor.franchises.length > 1) {
+                    return NextResponse.json({ error: 'Please select a franchise' }, { status: 400 })
+                } else {
+                    return NextResponse.json({ error: 'You do not have any franchises created yet' }, { status: 400 })
+                }
+            }
+        } else if (!finalFranchiseId) {
+            return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
         }
 
         const service = await prisma.service.create({
@@ -63,7 +114,7 @@ export async function POST(request: Request) {
                 price: parseFloat(price),
                 category,
                 categoryId: categoryId || null,
-                franchiseId: user.franchiseId,
+                franchiseId: finalFranchiseId,
             },
             include: { serviceCategory: true }
         })

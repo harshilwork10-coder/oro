@@ -63,48 +63,99 @@ export async function POST(request: NextRequest) {
         })
         console.log('User updated successfully')
 
-        // 4. Update Franchisor (Business Info)
-        console.log('Step 4: Finding franchisor...')
-        const franchisor = await prisma.franchisor.findUnique({
-            where: { ownerId: userId }
+        // 4. Update Business Info (Franchisor or Franchise)
+        console.log('Step 4: Updating business info based on role...')
+
+        // Fetch the updated user to check role and relations
+        const updatedUser = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { franchisor: true, franchise: true }
         })
 
-        if (franchisor) {
-            console.log('Franchisor found, updating with formData...')
-            await prisma.franchisor.update({
-                where: { id: franchisor.id },
-                data: {
-                    // Business Info
-                    name: formData.storeName || franchisor.name,
-                    businessType: formData.businessType || 'MULTI_LOCATION_OWNER',
-                    address: formData.storeAddress,
-                    phone: formData.storePhone,
-                    corpName: formData.corpName,
-                    corpAddress: formData.corpAddress,
+        if (!updatedUser) {
+            throw new Error('User not found after update')
+        }
 
-                    // Tax Info
-                    ssn: formData.ssn,
-                    fein: formData.fein,
-                    ss4: formData.ss4,
-                    ebt: formData.ebt,
+        if (updatedUser.role === 'FRANCHISEE') {
+            console.log('User is FRANCHISEE, updating Franchise...')
+            if (updatedUser.franchise) {
+                await prisma.franchise.update({
+                    where: { id: updatedUser.franchise.id },
+                    data: {
+                        name: formData.storeName || updatedUser.franchise.name,
+                        // Franchise doesn't have businessType/corp info usually, but we save processing
 
-                    // Processing
-                    processingType: formData.processingType,
-                    needToDiscussProcessing: formData.needToDiscussProcessing,
+                        // Processing
+                        ssn: formData.ssn,
+                        fein: formData.fein,
+                        routingNumber: formData.routingNumber,
+                        accountNumber: formData.accountNumber,
+                        needToDiscussProcessing: formData.needToDiscussProcessing,
 
-                    // Documents
-                    documentsLater: formData.documentsLater,
-                    documents: JSON.stringify({
-                        dl: formData.dl,
-                        voidedCheck: formData.voidedCheck,
-                        feinLetter: formData.feinLetter,
-                        businessLicense: formData.businessLicense
-                    })
-                }
-            })
-            console.log('Franchisor updated successfully')
+                        // Documents
+                        voidCheckUrl: formData.voidedCheck,
+                        driverLicenseUrl: formData.dl,
+                        feinLetterUrl: formData.feinLetter,
+
+                        // Branding (optional, if Franchise has it, otherwise skip)
+                        // Franchise model doesn't have branding yet, skipping
+                    }
+                })
+                console.log('Franchise updated successfully')
+            } else {
+                console.error('Franchisee user has no linked Franchise')
+            }
         } else {
-            console.log('No franchisor found for user, skipping franchisor update')
+            // Default to Franchisor logic
+            console.log('User is FRANCHISOR, updating Franchisor...')
+            const franchisor = updatedUser.franchisor
+
+            if (franchisor) {
+                await prisma.franchisor.update({
+                    where: { id: franchisor.id },
+                    data: {
+                        // Business Info
+                        name: formData.storeName || franchisor.name,
+                        businessType: formData.businessType || 'MULTI_LOCATION_OWNER',
+                        address: formData.storeAddress,
+                        phone: formData.storePhone,
+                        corpName: formData.corpName,
+                        corpAddress: formData.corpAddress,
+
+                        // Tax Info
+                        ssn: formData.ssn,
+                        fein: formData.fein,
+                        ss4: formData.ss4,
+                        ebt: formData.ebt,
+
+                        // Processing
+                        processingType: formData.processingType,
+                        needToDiscussProcessing: formData.needToDiscussProcessing,
+                        routingNumber: formData.routingNumber,
+                        accountNumber: formData.accountNumber,
+
+                        // Documents (New Columns)
+                        voidCheckUrl: formData.voidedCheck,
+                        driverLicenseUrl: formData.dl,
+                        feinLetterUrl: formData.feinLetter,
+
+                        // Legacy Documents field
+                        documentsLater: formData.documentsLater,
+                        documents: JSON.stringify({
+                            dl: formData.dl,
+                            voidedCheck: formData.voidedCheck,
+                            feinLetter: formData.feinLetter,
+                            businessLicense: formData.businessLicense
+                        }),
+
+                        // Branding
+                        brandColorPrimary: formData.brandColorPrimary
+                    }
+                })
+                console.log('Franchisor updated successfully')
+            } else {
+                console.log('No franchisor found for user, skipping franchisor update')
+            }
         }
 
         // 5. Mark Magic Link as Completed
@@ -122,6 +173,18 @@ export async function POST(request: NextRequest) {
 
     } catch (error) {
         console.error('Error completing onboarding:', error)
+
+        // Log to file for debugging
+        try {
+            const fs = require('fs')
+            const path = require('path')
+            const logPath = path.join(process.cwd(), 'server-error.log')
+            const errorLog = `\n[${new Date().toISOString()}] Error: ${error instanceof Error ? error.message : 'Unknown'}\nStack: ${error instanceof Error ? error.stack : 'No stack'}\n`
+            fs.appendFileSync(logPath, errorLog)
+        } catch (e) {
+            console.error('Failed to write to log file:', e)
+        }
+
         console.error('Error details:', {
             name: error instanceof Error ? error.name : 'Unknown',
             message: error instanceof Error ? error.message : 'Unknown error',

@@ -35,6 +35,7 @@
     "react-dom": "19.2.0",
     "react-simple-keyboard": "^3.8.137",
     "resend": "^6.5.2",
+    "swr": "^2.3.7",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

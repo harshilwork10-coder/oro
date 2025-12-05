@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
-import BreadLogo from '@/components/ui/BreadLogo'
+import { Loader2, TrendingUp, Shield, Zap, BarChart3 } from 'lucide-react'
 
 export default function LoginPage() {
     const router = useRouter()
@@ -31,7 +30,7 @@ export default function LoginPage() {
                 router.push('/dashboard')
                 router.refresh()
             }
-        } catch (error) {
+        } catch (err) {
             setError('An error occurred')
         } finally {
             setLoading(false)
@@ -40,62 +39,88 @@ export default function LoginPage() {
 
     return (
         <div className="flex min-h-screen bg-stone-950">
-            {/* Left Side - Branding (Golden Ember Gradient) */}
+            {/* Left Side - Branding */}
             <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-orange-600 via-orange-500 to-amber-600 p-12 flex-col justify-between relative overflow-hidden">
-                {/* Ambient Glow Effect */}
+                {/* Ambient Glow */}
                 <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/30 rounded-full blur-[120px] animate-pulse"></div>
                 <div className="absolute bottom-0 left-0 w-96 h-96 bg-orange-500/20 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
 
+                {/* Logo + Slogan */}
                 <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-8">
-                        <div className="h-24 w-24 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20 shadow-lg shadow-orange-900/20">
-                            <BreadLogo size={100} />
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="h-20 w-20 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20 shadow-lg overflow-hidden">
+                            <img src="/aura-logo-v2.png" alt="Aura" className="w-16 h-16 object-contain" />
                         </div>
-                        <h1 className="text-5xl font-bold text-white drop-shadow-lg">Aura</h1>
+                        <div>
+                            <h1 className="text-5xl font-bold text-white drop-shadow-lg">Aura</h1>
+                            <p className="text-orange-100 text-lg font-medium">Ultimate Business Solution</p>
+                        </div>
                     </div>
-                    <p className="text-orange-50 text-lg max-w-md leading-relaxed">
-                        The modern POS system designed for franchise networks and independent businesses.
-                    </p>
                 </div>
 
-                <div className="space-y-6 relative z-10">
-                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all">
-                        <h3 className="text-white font-semibold mb-2">✨ Beautiful Interface</h3>
-                        <p className="text-orange-50 text-sm">Warm, energetic design that your team will love</p>
+                {/* Selling Features */}
+                <div className="space-y-4 relative z-10">
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20 hover:bg-white/15 transition-all">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-green-500/20 rounded-lg">
+                                <TrendingUp className="h-5 w-5 text-green-300" />
+                            </div>
+                            <h3 className="text-white font-bold text-lg">Boost Revenue 35%</h3>
+                        </div>
+                        <p className="text-orange-50 text-sm">Smart upselling, loyalty programs & retention tools</p>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all">
-                        <h3 className="text-white font-semibold mb-2">🚀 Powerful Features</h3>
-                        <p className="text-orange-50 text-sm">Manage franchises, locations, and employees effortlessly</p>
+
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20 hover:bg-white/15 transition-all">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-blue-500/20 rounded-lg">
+                                <BarChart3 className="h-5 w-5 text-blue-300" />
+                            </div>
+                            <h3 className="text-white font-bold text-lg">Real-Time Analytics</h3>
+                        </div>
+                        <p className="text-orange-50 text-sm">Track sales, inventory & staff across all locations</p>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all">
-                        <h3 className="text-white font-semibold mb-2">💰 SaaS + Processing</h3>
-                        <p className="text-orange-50 text-sm">Subscription software with integrated payment processing</p>
+
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20 hover:bg-white/15 transition-all">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-purple-500/20 rounded-lg">
+                                <Shield className="h-5 w-5 text-purple-300" />
+                            </div>
+                            <h3 className="text-white font-bold text-lg">Fraud Prevention</h3>
+                        </div>
+                        <p className="text-orange-50 text-sm">Cash drawer monitoring & complete audit trails</p>
+                    </div>
+
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20 hover:bg-white/15 transition-all">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-amber-500/20 rounded-lg">
+                                <Zap className="h-5 w-5 text-amber-300" />
+                            </div>
+                            <h3 className="text-white font-bold text-lg">Multi-Location Control</h3>
+                        </div>
+                        <p className="text-orange-50 text-sm">Manage unlimited franchises from one dashboard</p>
                     </div>
                 </div>
             </div>
 
-            {/* Right Side - Login Form (Dark Theme) */}
+            {/* Right Side - Login Form */}
             <div className="flex-1 flex items-center justify-center p-8 bg-stone-950 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-orange-900/10 via-stone-950 to-stone-950">
                 <div className="w-full max-w-md">
                     {/* Mobile Logo */}
-                    <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
+                    <div className="lg:hidden flex flex-col items-center gap-2 mb-8">
                         <div className="relative">
                             <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full"></div>
-                            <div className="relative h-20 w-20 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center p-2 shadow-lg shadow-orange-900/20">
-                                <BreadLogo size={100} />
+                            <div className="relative h-16 w-16 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+                                <img src="/aura-logo-v2.png" alt="Aura" className="w-16 h-16 object-contain" />
                             </div>
                         </div>
                         <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">Aura</h1>
+                        <p className="text-stone-400 text-sm">Ultimate Business Solution</p>
                     </div>
 
                     <div className="glass-panel rounded-2xl p-8 border border-stone-800">
                         <div className="text-center mb-8">
-                            <h2 className="text-2xl font-bold text-stone-100">
-                                Welcome back! 👋
-                            </h2>
-                            <p className="mt-2 text-stone-400">
-                                Sign in to your Aura account
-                            </p>
+                            <h2 className="text-2xl font-bold text-stone-100">Welcome back! 👋</h2>
+                            <p className="mt-2 text-stone-400">Sign in to your Aura account</p>
                         </div>
 
                         <form className="space-y-5" onSubmit={handleSubmit}>
@@ -142,7 +167,7 @@ export default function LoginPage() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-semibold py-3 px-4 rounded-lg transition-all shadow-lg shadow-orange-900/30 hover:shadow-xl hover:shadow-orange-900/40 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="w-full bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-semibold py-3 px-4 rounded-lg transition-all shadow-lg shadow-orange-900/30 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {loading ? (
                                     <>

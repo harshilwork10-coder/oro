@@ -29,11 +29,18 @@ import {
     Gift,
     Globe,
     Package,
-    Truck
+    Truck,
+    Monitor,
+    MessageSquare,
+    Percent,
+    Crown,
+    Mail,
+    Plus
 } from 'lucide-react'
 import clsx from 'clsx'
 import BreadLogo from '@/components/ui/BreadLogo'
 import { hasPermission, Role } from '@/lib/permissions'
+import { useBusinessConfig } from '@/hooks/useBusinessConfig'
 
 interface SidebarProps {
     isOpen: boolean
@@ -49,9 +56,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     // PROVIDER: Platform owner - manages clients & agents ONLY
     const providerLinks = [
-        { name: 'Dashboard', href: '/dashboard/provider', icon: LayoutDashboard },
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'My Clients', href: '/dashboard/franchisors', icon: Building2 },
+        { name: 'Feature Requests', href: '/dashboard/feature-requests', icon: Package },
         { name: 'My Agents', href: '/dashboard/team', icon: Users },
+        { name: 'Terminal Management', href: '/dashboard/terminals/manage', icon: Monitor },
         { name: 'Terminals & Licenses', href: '/dashboard/terminals', icon: Shield },
         { name: 'Shipping', href: '/dashboard/shipping', icon: Truck },
         { name: 'Documents', href: '/dashboard/documents', icon: FileText },
@@ -72,14 +81,49 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Documents', href: '/dashboard/documents', icon: FileText },
     ]
 
-    // MULTI-LOCATION OWNER: Operates salons
-    const multiLocationLinks = [
+
+    // MULTI-LOCATION OWNER: Manages business remotely (no POS - they don't serve customers)
+    const { data: config } = useBusinessConfig()
+
+    const multiLocationLinksBase = [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, always: true },
+        { name: 'My Stores', href: '/dashboard/locations', icon: MapPin, always: true },
+        { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
+        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar, feature: 'usesScheduling' as const },
+        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar, feature: 'usesAppointments' as const },
+        { name: 'Services', href: '/dashboard/services', icon: Briefcase, feature: 'usesServices' as const },
+        { name: 'Inventory', href: '/dashboard/inventory/products', icon: ShoppingBag, feature: 'usesInventory' as const },
+        { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
+        { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
+        { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },
+        { name: 'Financials', href: '/dashboard/financials', icon: DollarSign, always: true },
+        { name: 'Retention', href: '/dashboard/retention', icon: Heart, feature: 'usesLoyalty' as const },
+        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift, feature: 'usesGiftCards' as const },
+        { name: 'Memberships', href: '/dashboard/memberships', icon: Crown, feature: 'usesMemberships' as const },
+        { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },
+        { name: 'Reviews', href: '/dashboard/reviews', icon: MessageSquare, feature: 'usesReviewManagement' as const },
+        { name: 'Commissions', href: '/dashboard/commissions', icon: Percent, feature: 'usesCommissions' as const },
+        { name: 'Compliance', href: '/dashboard/compliance', icon: Shield, always: true },
+        { name: 'Documents', href: '/dashboard/documents', icon: FileText, always: true },
+        { name: 'Features & Add-ons', href: '/dashboard/settings/features', icon: Package, always: true }, // Clients can view/request features
+    ]
+
+    // Filter based on config
+    const multiLocationLinks = multiLocationLinksBase.filter(link => {
+        if (link.always) return true
+        if (!link.feature) return true
+        return config?.[link.feature] ?? true // Show by default if config not loaded
+    }).map(({ always, feature, ...link }) => link) // Remove filter props
+
+
+    // FRANCHISEE: Owner who views reports for their locations (no POS - they don't serve customers)
+    const franchiseeLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
-        { name: 'Locations', href: '/dashboard/locations', icon: MapPin },
+        { name: 'My Locations', href: '/dashboard/my-locations', icon: MapPin },
+        { name: 'Request Expansion', href: '/dashboard/expansion-requests', icon: Plus },
         { name: 'Employees', href: '/dashboard/employees', icon: Users },
-        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar },
         { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
+        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar },
         { name: 'Services', href: '/dashboard/services', icon: Briefcase },
         { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
         { name: 'Customers', href: '/dashboard/customers', icon: Users },
@@ -88,22 +132,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Financials', href: '/dashboard/financials', icon: DollarSign },
         { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart },
         { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift },
-    ]
-
-    // FRANCHISEE: Location manager
-    const franchiseeLinks = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
-        { name: 'Employees', href: '/dashboard/employees', icon: Users },
-        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
-        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar },
-        { name: 'Services', href: '/dashboard/services', icon: Briefcase },
-        { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
-        { name: 'Customers', href: '/dashboard/customers', icon: Users },
-        { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
-        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
-        { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart },
-        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift },
+        { name: 'Documents', href: '/dashboard/documents', icon: FileText },
     ]
 
     // MANAGER: Operations manager
@@ -204,13 +233,17 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 )}
                             >
                                 {isActive && (
-                                    <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-transparent opacity-50" />
+                                    <div
+                                        className="absolute inset-0 opacity-10"
+                                        style={{ background: 'var(--brand-primary)' }}
+                                    />
                                 )}
                                 <LinkIcon
                                     className={clsx(
-                                        isActive ? 'text-orange-400 drop-shadow-[0_0_5px_rgba(249,115,22,0.5)]' : 'text-stone-500 group-hover:text-orange-300',
-                                        'mr-3 h-5 w-5 flex-shrink-0 transition-all duration-300 relative z-10'
+                                        'mr-3 h-5 w-5 flex-shrink-0 transition-all duration-300 relative z-10',
+                                        isActive ? '' : 'text-stone-500 group-hover:text-white'
                                     )}
+                                    style={isActive ? { color: 'var(--brand-primary)' } : {}}
                                     aria-hidden="true"
                                 />
                                 <span className="relative z-10">{link.name}</span>
@@ -231,7 +264,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                             </p>
                             <p className="text-xs text-stone-500">
                                 {role === 'PROVIDER' ? 'Platform Owner' :
-                                    role === 'FRANCHISOR' ? 'Salon Owner' :
+                                    role === 'FRANCHISOR' ? 'Business Owner' :
                                         role === 'FRANCHISEE' ? 'Location Manager' :
                                             role === 'MANAGER' ? 'Operations Manager' : 'Employee'}
                             </p>

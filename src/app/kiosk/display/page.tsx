@@ -46,7 +46,7 @@ export default function CustomerDisplayPage() {
                 <div className="mb-8 animate-pulse">
                     <AuraLogo size={64} />
                 </div>
-                <h1 className="text-4xl font-bold text-gray-900 mb-4">Welcome to Aura Salon</h1>
+                <h1 className="text-4xl font-bold text-gray-900 mb-4">Welcome to Aura</h1>
                 <p className="text-xl text-gray-500">We're ready when you are.</p>
             </div>
         )
@@ -61,7 +61,7 @@ export default function CustomerDisplayPage() {
                         <AuraLogo size={24} />
                     </div>
                     <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        Aura Salon
+                        Aura
                     </span>
                 </div>
                 {cart.customerName && (

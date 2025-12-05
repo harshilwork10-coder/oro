@@ -25,6 +25,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Terms Acceptance
+  acceptedTermsAt      DateTime?
+  acceptedTermsVersion String?
+
   // Employee Permissions (configurable by franchise owner)
   canAddServices     Boolean @default(false) // Can create/edit services
   canAddProducts     Boolean @default(false) // Can create/edit products
@@ -50,6 +54,10 @@ model User {
   appointments Appointment[] // As employee
   schedules    Schedule[]
 
+  // Franchisee Ownership - locations this user owns/operates as a franchisee
+  ownedLocations     Location[]         @relation("LocationOwner")
+  expansionRequests  ExpansionRequest[] @relation("FranchiseeRequests")
+
   // Community
   posts                 Post[]
   comments              Comment[]
@@ -64,17 +72,40 @@ model User {
   commissionRuleId   String?
   commissionRule     CommissionRule?     @relation(fields: [commissionRuleId], references: [id])
   cashDrawerSessions CashDrawerSession[]
+  drawerActivities   DrawerActivity[]    // Fraud prevention - all drawer opens logged
   // Global Catalog (Centralized Management)
   globalServices     GlobalService[]
   globalProducts     GlobalProduct[]
+  
+  // Advanced Commission System Relations (Optional - backward compatible)
+  paymentConfig      EmployeePaymentConfig? @relation("EmployeePaymentConfig")
+  commissionTiers    CommissionTier[]       @relation("EmployeeCommissionTiers")
+  serviceOverrides   ServiceCommissionOverride[] @relation("EmployeeServiceOverrides")
+  payrollEntries     PayrollEntry[]         @relation("EmployeePayrollEntries")
 }
 
 model Franchise {
   id           String     @id @default(cuid())
   name         String
   slug         String     @unique // e.g. "aura-salon"
+  
+  approvalStatus String @default("PENDING") // PENDING, APPROVED, REJECTED
+
+  // Processing Details
+  ssn           String?
+  fein          String?
+  routingNumber String?
+  accountNumber String?
+  
+  // Documents
+  voidCheckUrl     String?
+  driverLicenseUrl String?
+  feinLetterUrl    String?
+
+  needToDiscussProcessing Boolean @default(false)
+
   franchisorId String
-  franchisor   Franchisor @relation(fields: [franchisorId], references: [id])
+  franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
 
   users             User[]
   locations         Location[]
@@ -94,6 +125,7 @@ model Franchise {
   discounts         Discount[]
   clients           Client[]
   reviews           Review[]
+  expansionRequests ExpansionRequest[] // Expansion requests from franchisees
 
   settings FranchiseSettings?
 
@@ -125,7 +157,11 @@ model Location {
   slug        String    @unique // e.g. "aura-downtown"
   address     String?
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+
+  // Franchisee who owns/operates this location (for BRAND_FRANCHISOR model)
+  ownerId     String?
+  owner       User?     @relation("LocationOwner", fields: [ownerId], references: [id])
 
   users              User[]
   terminals          Terminal[]
@@ -135,6 +171,7 @@ model Location {
   cashDrawerSessions CashDrawerSession[]
   appointments       Appointment[]
   schedules          Schedule[]
+  drawerActivities   DrawerActivity[]    // Fraud prevention audit trail
 
   // Payment Processor Configuration
   processorName   String? // e.g., "DATAWIRE", "TSYS", "VANTIV", "WORLDPAY", "FIRST_DATA"
@@ -148,12 +185,37 @@ model Location {
   updatedAt DateTime @updatedAt
 }
 
+// Expansion Request - Franchisee requesting new location from Brand Franchisor
+model ExpansionRequest {
+  id            String   @id @default(cuid())
+  
+  // The franchisee making the request
+  franchiseeId  String
+  franchisee    User     @relation("FranchiseeRequests", fields: [franchiseeId], references: [id])
+  
+  // The franchise brand they want to expand (which Brand Franchisor owns)
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  
+  // Request details
+  proposedName     String   // e.g., "McDonald's Austin"
+  proposedAddress  String
+  notes            String?  // Additional info from franchisee
+  
+  // Status
+  status           String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  responseNotes    String?  // Franchisor's response
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // ============ GLOBAL CATALOG (FRANCHISOR MANAGED) ============
 
 model GlobalService {
   id           String     @id @default(cuid())
   franchisorId String
-  franchisor   Franchisor @relation(fields: [franchisorId], references: [id])
+  franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
 
   name         String
   description  String?
@@ -174,7 +236,7 @@ model GlobalService {
 model GlobalProduct {
   id           String     @id @default(cuid())
   franchisorId String
-  franchisor   Franchisor @relation(fields: [franchisorId], references: [id])
+  franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
 
   name         String
   description  String?
@@ -198,7 +260,7 @@ model ServiceCategory {
   id          String    @id @default(cuid())
   name        String
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
   sortOrder   Int       @default(0)
   isActive    Boolean   @default(true)
 
@@ -218,7 +280,7 @@ model Service {
   categoryId      String? // New: Link to ServiceCategory
   serviceCategory ServiceCategory? @relation(fields: [categoryId], references: [id])
   franchiseId     String
-  franchise       Franchise        @relation(fields: [franchiseId], references: [id])
+  franchise       Franchise        @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   // Link to Global Catalog (Optional - allows for local-only services too)
   globalServiceId String?
@@ -239,7 +301,7 @@ model Client {
   loyaltyJoined   Boolean @default(false)
 
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   appointments Appointment[]
   memberships  ClientMembership[]
@@ -363,7 +425,8 @@ model Transaction {
   originalTransaction   Transaction?  @relation("RefundRelation", fields: [originalTransactionId], references: [id])
   refunds               Transaction[] @relation("RefundRelation")
 
-  lineItems TransactionLineItem[]
+  lineItems        TransactionLineItem[]
+  drawerActivities DrawerActivity[]      // Drawer opens related to this transaction
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -399,7 +462,7 @@ model TransactionLineItem {
 model RoyaltyConfig {
   id           String     @id @default(cuid())
   franchisorId String     @unique
-  franchisor   Franchisor @relation(fields: [franchisorId], references: [id])
+  franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
 
   percentage        Decimal // e.g., 6.0 for 6%
   minimumMonthlyFee Decimal? // Optional minimum fee
@@ -692,8 +755,9 @@ model CashDrawerSession {
   status String  @default("OPEN") // OPEN, CLOSED
   notes  String?
 
-  cashDrops    CashDrop[]
-  transactions Transaction[]
+  cashDrops        CashDrop[]
+  transactions     Transaction[]
+  drawerActivities DrawerActivity[]  // All drawer opens during this shift
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -744,6 +808,7 @@ model MagicLink {
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
+  completedAt DateTime?
 }
 
 model Post {
@@ -822,11 +887,14 @@ model Review {
 // ============ CRM & FRANCHISOR MANAGEMENT ============
 
 model Franchisor {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation("FranchisorOwner", fields: [userId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  ownerId String @unique
+  owner   User   @relation("FranchisorOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   name String?
+
+  // Approval Status
+  approvalStatus String @default("PENDING") // PENDING, APPROVED, REJECTED
 
   // Business Type
   businessType String @default("MULTI_LOCATION_OWNER") // "BRAND_FRANCHISOR" | "MULTI_LOCATION_OWNER"
@@ -842,18 +910,154 @@ model Franchisor {
   royaltyConfig  RoyaltyConfig?
 
   // Onboarding Fields
+  address                 String?
+  phone                   String?
+  corpName                String?
+  corpAddress             String?
+  ssn                     String?
+  fein                    String?
+  ss4                     String?
+  ebt                     String?
+  documents               String? // JSON string
   documentsLater          Boolean?
   processingType          String?
-  needToDiscussProcessing Boolean?
+  needToDiscussProcessing Boolean @default(false)
+
+  // Processing Details
+  routingNumber String?
+  accountNumber String?
+
+  // Documents
+  voidCheckUrl     String?
+  driverLicenseUrl String?
+  feinLetterUrl    String?
+
+  // White Label Branding
+  brandColorPrimary   String? // e.g. "#9D7DD9"
+  brandColorSecondary String? // e.g. "#5B9FE3"
+  logoUrl             String? // URL to logo image
+  faviconUrl          String? // URL to favicon
+  domain              String? // Custom domain e.g. "app.mysalon.com"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Business Configuration (PROVIDER sets this for each franchisor)
+  config BusinessConfig?
+  
+  // Feature Requests
+  featureRequests FeatureRequest[]
+}
+
+// BUSINESS CONFIGURATION (PROVIDER-CONTROLLED)
+// One config per franchisor, but PROVIDER decides what's in it
+// Franchisors can READ but NOT EDIT
+model BusinessConfig {
+  id            String     @id @default(cuid())
+  franchisorId  String     @unique
+  franchisor    Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
+
+  // Core Features
+  usesCommissions  Boolean @default(true)
+  usesInventory    Boolean @default(true)
+  usesAppointments Boolean @default(true)
+  usesScheduling   Boolean @default(true)
+
+  // Customer Features
+  usesLoyalty     Boolean @default(true)
+  usesGiftCards   Boolean @default(true)
+  usesMemberships Boolean @default(true)
+  usesReferrals   Boolean @default(true)
+
+  // Financial Features
+  usesRoyalties Boolean @default(false) // Only for franchisors
+  usesTipping   Boolean @default(true)
+  usesDiscounts Boolean @default(true)
+
+  // Sales Features
+  usesRetailProducts Boolean @default(true)
+  usesServices       Boolean @default(true)
+
+  // Marketing Features
+  usesEmailMarketing  Boolean @default(true)
+  usesSMSMarketing    Boolean @default(true)
+  usesReviewManagement Boolean @default(true)
+
+  // Advanced Features
+  usesMultiLocation Boolean @default(false)
+  usesFranchising   Boolean @default(false)
+  usesTimeTracking  Boolean @default(true)
+  usesPayroll       Boolean @default(false)
+  
+  // ============ WORKFLOW SETTINGS ============
+  
+  // Review Request Workflows
+  reviewRequestTiming String  @default("MANUAL") // MANUAL, AT_CHECKOUT, 1_HOUR_AFTER, 24_HOURS_AFTER, NEVER
+  reviewRequestMethod String  @default("SMS")    // SMS, EMAIL, BOTH
+  reviewIncentive     Decimal @default(0)        // e.g., $5 off next visit
+  
+  // Tip Settings
+  tipPromptEnabled    Boolean @default(true)
+  tipPromptTiming     String  @default("AT_CHECKOUT") // AT_CHECKOUT, NEVER
+  tipSuggestions      String  @default("[15,20,25]")  // JSON array of percentages
+  tipPoolingEnabled   Boolean @default(false)
+  
+  // Commission Calculation
+  commissionCalculation String @default("AUTOMATIC") // AUTOMATIC, MANUAL_APPROVAL
+  commissionVisibility  String @default("ALWAYS")    // ALWAYS, PAY_PERIOD_ONLY, NEVER
+  
+  // Loyalty Program Workflows
+  loyaltyPointsAwarding String  @default("AUTOMATIC") // AUTOMATIC, MANUAL
+  loyaltyPointsRatio    Decimal @default(1)           // $1 = 1 point
+  loyaltyBirthdayBonus  Decimal @default(0)           // Bonus points on birthday
+  
+  // Appointment Reminders
+  reminderEnabled     Boolean @default(true)
+  reminderTiming      String  @default("24_HOURS")    // 24_HOURS, 2_HOURS, BOTH
+  reminderMethod      String  @default("SMS")         // SMS, EMAIL, BOTH
+  
+  // Cancellation Policy
+  cancellationFeeEnabled Boolean @default(false)
+  cancellationFeeAmount  Decimal @default(0)
+  cancellationWindow     Int     @default(24)         // Hours before appointment
+  
+  // Membership Workflows
+  membershipAutoBilling  Boolean @default(true)
+  membershipFailedPaymentRetry Int @default(3)       // Retry attempts
+  
+  // Gift Card Settings
+  giftCardAutoEmail Boolean @default(true)
+  giftCardPhysical  Boolean @default(true)
+  
+  // Discount Approval
+  discountRequiresApproval Boolean @default(false)
+  discountMaxPercent       Decimal @default(50)      // Max discount allowed
+  
+  // Inventory Alerts
+  lowStockAlertEnabled Boolean @default(true)
+  lowStockThreshold    Int     @default(5)           // Alert when <= 5 units
+  
+  // Multi-Employee Service
+  allowMultiProvider Boolean @default(false)
+  
+  // New Client Tracking
+  newClientBonusEnabled Boolean @default(false)
+  newClientBonusAmount  Decimal @default(10)
+  
+  // Cash Discount Program (FRANCHISOR-CONTROLLED)
+  // Each salon owner decides if they want dual pricing
+  cashDiscountEnabled   Boolean @default(false)
+  cashDiscountPercent   Decimal @default(3.5)  // Default 3.5%, they can change
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+
 model Lead {
   id           String     @id @default(cuid())
   franchisorId String
-  franchisor   Franchisor @relation(fields: [franchisorId], references: [id])
+  franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
 
   // Lead info
   name    String
@@ -928,7 +1132,7 @@ model Activity {
 model Territory {
   id           String     @id @default(cuid())
   franchisorId String
-  franchisor   Franchisor @relation(fields: [franchisorId], references: [id])
+  franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
   name         String
   states       String // JSON array of state codes
   isAvailable  Boolean    @default(true)
@@ -968,12 +1172,248 @@ model EmailTemplate {
 
 model AuditLog {
   id         String   @id @default(cuid())
-  entityType String   // Lead, Note, Activity, Task
+  
+  // Who performed the action
+  entityType String   // Lead, Note, Activity, Task, Franchisor, User, etc.
   entityId   String
-  action     String   // CREATED, UPDATED, DELETED, VIEWED
+  action     String   // CREATED, UPDATED, DELETED, VIEWED, LOGIN, LOGOUT
   userId     String
+  userEmail  String?
+  userRole   String?
+  
+  // Context
   changes    String?  // JSON before/after
   ipAddress  String?
   userAgent  String?
+  
+  // Status
+  status     String   @default("SUCCESS") // SUCCESS, FAILURE, BLOCKED
+  errorMessage String?
+  
   createdAt  DateTime @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+// ============ ADVANCED COMMISSION SYSTEM ============
+
+model CommissionTier {
+  id         String  @id @default(cuid())
+  employeeId String
+  employee   User    @relation("EmployeeCommissionTiers", fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  // Tier Definition
+  minRevenue Decimal  // e.g., 0
+  maxRevenue Decimal? // e.g., 2000 (null = unlimited)
+  percentage Decimal  // e.g., 0.35 (35%)
+  
+  tierName   String?  // "Bronze", "Silver", "Gold"
+  priority   Int      @default(0) // Order of evaluation
+  
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ServiceCommissionOverride {
+  id         String  @id @default(cuid())
+  employeeId String
+  employee   User    @relation("EmployeeServiceOverrides", fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  // Service reference (flexible - can be service name or future ID)
+  serviceId  String  // Reference to service
+  serviceName String? // Human-readable name
+  
+  percentage Decimal // Override commission for this service
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([employeeId, serviceId])
+}
+
+model EmployeePaymentConfig {
+  id         String @id @default(cuid())
+  employeeId String @unique
+  employee   User   @relation("EmployeePaymentConfig", fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  // Payment Type
+  paymentType String @default("COMMISSION") // COMMISSION, SALARY, HOURLY, BOOTH_RENTAL, HYBRID
+  
+  // Commission Settings
+  defaultCommissionRate Decimal @default(0.40) // 40%
+  usesTieredCommission  Boolean @default(false)
+  
+  // Salary Settings
+  baseSalary     Decimal? // Weekly or monthly base
+  salaryPeriod   String?  // WEEKLY, MONTHLY
+  useMaxSalaryOrCommission Boolean @default(false) // Pay whichever is higher
+  
+  // Hourly Settings
+  hourlyRate     Decimal? // $15/hour
+  useMaxHourlyOrCommission Boolean @default(false)
+  
+  // Booth Rental
+  rentalFee      Decimal? // $300/week
+  rentalPeriod   String?  // DAILY, WEEKLY, MONTHLY
+  rentalKeeps100Percent Boolean @default(false)
+  
+  // Product Commission
+  productCommissionRate Decimal @default(0.10) // 10%
+  useProductCostDeduction Boolean @default(false) // Commission on profit vs gross
+  
+  // Discount Handling
+  commissionOnDiscountedPrice Boolean @default(true) // Most common
+  
+  // New Client Tracking
+  newClientBonusEnabled Boolean @default(false)
+  newClientBonusAmount  Decimal @default(10)
+  
+  // Cash Discount Program (PROVIDER-CONTROLLED)
+  // YOU decide if this feature exists and the percentage
+  cashDiscountEnabled   Boolean @default(false)
+  cashDiscountPercent   Decimal @default(3.5)  // YOU set this
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PayrollRun {
+  id String @id @default(cuid())
+  
+  // Period
+  periodStart DateTime
+  periodEnd   DateTime
+  payDate     DateTime?
+  
+  // Status
+  status String @default("DRAFT") // DRAFT, FINALIZED, PAID
+  
+  // Entries
+  entries PayrollEntry[]
+  
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PayrollEntry {
+  id           String     @id @default(cuid())
+  payrollRunId String
+  payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employeeId   String
+  employee     User       @relation("EmployeePayrollEntries", fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  // Earnings Breakdown
+  serviceRevenue   Decimal @default(0)
+  productRevenue   Decimal @default(0)
+  totalRevenue     Decimal @default(0)
+  
+  serviceCommission Decimal @default(0)
+  productCommission Decimal @default(0)
+  totalCommission   Decimal @default(0)
+  
+  baseSalary       Decimal @default(0)
+  hourlyWages      Decimal @default(0)
+  tips             Decimal @default(0)
+  bonuses          Decimal @default(0)
+  
+  // Deductions
+  rentalFee        Decimal @default(0)
+  
+  // Final Pay
+  grossPay         Decimal @default(0)
+  
+  // Metadata
+  hoursWorked      Decimal @default(0)
+  servicesPerformed Int    @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============ RATE LIMITING ============
+
+model RateLimitRecord {
+  id        String   @id @default(cuid())
+  
+  // Identifier (could be IP, userId, or combination)
+  identifier String
+  endpoint   String
+  
+  // Count and window
+  count     Int      @default(1)
+  windowStart DateTime @default(now())
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([identifier, endpoint])
+  @@index([identifier])
+  @@index([windowStart])
+}
+
+// ============ FEATURE REQUESTS ============
+
+model FeatureRequest {
+  id           String   @id @default(cuid())
+  
+  franchisorId String
+  franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
+  
+  featureKey   String   // e.g., "usesLoyalty", "usesGiftCards"
+  status       String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  // Optional notes
+  requestNotes  String?
+  responseNotes String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([franchisorId])
+  @@index([status])
+}
+
+// ============ DRAWER ACTIVITY (FRAUD PREVENTION) ============
+
+model DrawerActivity {
+  id        String   @id @default(cuid())
+  
+  // Activity Type
+  type      String   // SALE_OPEN, NO_SALE, CASH_DROP, PAID_IN, PAID_OUT, TIP_PAYOUT, REFUND, MANAGER_OVERRIDE
+  
+  // For NO_SALE - reason required
+  reason    String?  // make_change, verify_cash, error_correction, give_receipt, cash_drop, manager_request, other
+  note      String?  // Additional explanation
+  
+  // Amount if applicable (cash drop, paid in/out, tips)
+  amount    Float?
+  
+  // Who and When
+  employeeId String
+  employee   User     @relation(fields: [employeeId], references: [id])
+  timestamp  DateTime @default(now())
+  
+  // Context
+  shiftId       String?
+  shift         CashDrawerSession? @relation(fields: [shiftId], references: [id])
+  locationId    String
+  location      Location @relation(fields: [locationId], references: [id])
+  transactionId String?  // Related transaction if any
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  
+  // Alert tracking
+  alertSent     Boolean @default(false)
+  alertLevel    String? // WARNING, CRITICAL
+  
+  @@index([locationId])
+  @@index([employeeId])
+  @@index([type])
+  @@index([timestamp])
+  @@index([shiftId])
 }

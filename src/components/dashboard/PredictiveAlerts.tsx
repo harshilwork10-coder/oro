@@ -36,10 +36,10 @@ export default function PredictiveAlerts() {
 
     useEffect(() => {
         // Auto-run on mount if no data
-        if (results.length === 0) {
+        if (results.length === 0 && !loading) {
             runAnalysis()
         }
-    }, [])
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     if (results.length === 0 && !loading) return null
 

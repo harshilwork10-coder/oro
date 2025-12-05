@@ -8,13 +8,14 @@ export async function GET(
     try {
         const { token } = await params
 
-        // Find magic link with user and their franchisor details
+        // Find magic link with user and their franchisor/franchise details
         const magicLink = await prisma.magicLink.findUnique({
             where: { token },
             include: {
                 user: {
                     include: {
-                        franchisor: true
+                        franchisor: true,
+                        franchise: true // Include Franchise for Franchisees
                     }
                 }
             }
@@ -59,7 +60,13 @@ export async function GET(
             franchisor: magicLink.user.franchisor ? {
                 name: magicLink.user.franchisor.name,
                 supportFee,
-                type: magicLink.user.franchisor.type // 'INDIVIDUAL' or 'BRAND'
+                type: magicLink.user.franchisor.type, // 'INDIVIDUAL' or 'BRAND'
+                businessType: magicLink.user.franchisor.businessType // 'MULTI_LOCATION_OWNER' or 'BRAND_FRANCHISOR'
+            } : null,
+            franchise: magicLink.user.franchise ? {
+                id: magicLink.user.franchise.id,
+                name: magicLink.user.franchise.name,
+                // Add other relevant franchise fields here if needed
             } : null,
             requiresPasswordSetup: true
         })

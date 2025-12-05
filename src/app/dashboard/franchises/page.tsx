@@ -3,14 +3,28 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { Plus, Search, Edit2, Trash2, Building2 } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Building2, Check, AlertCircle } from 'lucide-react'
 import Modal from '@/components/ui/Modal'
 import Toast from '@/components/ui/Toast'
+
+import ReviewApplicationModal from "@/components/modals/ReviewApplicationModal"
 
 interface Franchise {
     id: string
     name: string
+    approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED'
     createdAt: string
+
+    // Verification Fields
+    ssn?: string
+    fein?: string
+    routingNumber?: string
+    accountNumber?: string
+    voidCheckUrl?: string
+    driverLicenseUrl?: string
+    feinLetterUrl?: string
+    needToDiscussProcessing?: boolean
+
     _count: {
         locations: number
         users: number
@@ -26,16 +40,33 @@ export default function FranchisesPage() {
     })
 
     const [franchises, setFranchises] = useState<Franchise[]>([])
+    const [filteredFranchises, setFilteredFranchises] = useState<Franchise[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingFranchise, setEditingFranchise] = useState<Franchise | null>(null)
+    const [selectedApplicant, setSelectedApplicant] = useState<Franchise | null>(null)
     const [franchiseName, setFranchiseName] = useState('')
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+    const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'APPROVED'>('PENDING')
 
     useEffect(() => {
         fetchFranchises()
     }, [])
+
+    useEffect(() => {
+        let result = [...franchises]
+
+        if (filterStatus !== 'ALL') {
+            result = result.filter(f => f.approvalStatus === filterStatus)
+        }
+
+        if (searchTerm) {
+            result = result.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        }
+
+        setFilteredFranchises(result)
+    }, [franchises, filterStatus, searchTerm])
 
     const fetchFranchises = async () => {
         try {
@@ -99,6 +130,48 @@ export default function FranchisesPage() {
         }
     }
 
+    const handleApprove = async (id: string) => {
+        try {
+            const res = await fetch('/api/franchisor/franchises/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ franchiseId: id, action: 'APPROVE' })
+            })
+
+            if (res.ok) {
+                setToast({ message: 'Franchise approved!', type: 'success' })
+                setSelectedApplicant(null)
+                fetchFranchises()
+            } else {
+                setToast({ message: 'Failed to approve franchise', type: 'error' })
+            }
+        } catch (error) {
+            setToast({ message: 'An error occurred', type: 'error' })
+        }
+    }
+
+    const handleReject = async (id: string) => {
+        if (!confirm('Are you sure you want to reject this application?')) return
+
+        try {
+            const res = await fetch('/api/franchisor/franchises/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ franchiseId: id, action: 'REJECT' })
+            })
+
+            if (res.ok) {
+                setToast({ message: 'Franchise rejected', type: 'success' })
+                setSelectedApplicant(null)
+                fetchFranchises()
+            } else {
+                setToast({ message: 'Failed to reject franchise', type: 'error' })
+            }
+        } catch (error) {
+            setToast({ message: 'An error occurred', type: 'error' })
+        }
+    }
+
     const openModal = (franchise?: Franchise) => {
         if (franchise) {
             setEditingFranchise(franchise)
@@ -115,10 +188,6 @@ export default function FranchisesPage() {
         setEditingFranchise(null)
         setFranchiseName('')
     }
-
-    const filteredFranchises = franchises.filter(f =>
-        f.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
 
     if (status === 'loading' || loading) {
         return (
@@ -145,6 +214,28 @@ export default function FranchisesPage() {
                 </button>
             </div>
 
+            {/* Tabs */}
+            <div className="flex gap-2 border-b border-stone-800">
+                {['PENDING', 'APPROVED', 'ALL'].map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setFilterStatus(tab as any)}
+                        className={`px-4 py-2 text-sm font-medium transition-colors relative ${filterStatus === tab ? 'text-orange-400' : 'text-stone-400 hover:text-stone-200'
+                            }`}
+                    >
+                        {tab === 'ALL' ? 'All Franchises' : tab === 'PENDING' ? 'Pending Approval' : 'Active Franchises'}
+                        {filterStatus === tab && (
+                            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-orange-500 rounded-t-full" />
+                        )}
+                        {tab === 'PENDING' && franchises.filter(f => f.approvalStatus === 'PENDING').length > 0 && (
+                            <span className="ml-2 px-1.5 py-0.5 bg-orange-500/20 text-orange-400 text-[10px] rounded-full">
+                                {franchises.filter(f => f.approvalStatus === 'PENDING').length}
+                            </span>
+                        )}
+                    </button>
+                ))}
+            </div>
+
             {/* Search */}
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-500" />
@@ -162,13 +253,22 @@ export default function FranchisesPage() {
                 {filteredFranchises.map((franchise) => (
                     <div
                         key={franchise.id}
-                        className="glass-panel rounded-xl p-6 hover:border-orange-500/30 transition-all"
+                        className="glass-panel rounded-xl p-6 hover:border-orange-500/30 transition-all flex flex-col"
                     >
                         <div className="flex items-start justify-between mb-4">
                             <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                                 <Building2 className="h-6 w-6 text-white" />
                             </div>
                             <div className="flex gap-2">
+                                {franchise.approvalStatus === 'PENDING' && (
+                                    <button
+                                        onClick={() => setSelectedApplicant(franchise)}
+                                        className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-colors text-emerald-400"
+                                        title="Review & Approve"
+                                    >
+                                        <Check className="h-4 w-4" />
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => openModal(franchise)}
                                     className="p-2 hover:bg-stone-800 rounded-lg transition-colors"
@@ -184,9 +284,14 @@ export default function FranchisesPage() {
                             </div>
                         </div>
 
-                        <h3 className="text-lg font-bold text-stone-100 mb-2">{franchise.name}</h3>
+                        <div className="flex items-center gap-2 mb-2">
+                            <h3 className="text-lg font-bold text-stone-100">{franchise.name}</h3>
+                            {franchise.approvalStatus === 'PENDING' && (
+                                <span className="px-2 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded text-xs font-medium text-amber-400">Pending</span>
+                            )}
+                        </div>
 
-                        <div className="flex gap-4 text-sm text-stone-400">
+                        <div className="flex gap-4 text-sm text-stone-400 mt-auto pt-4 border-t border-stone-800">
                             <div>
                                 <span className="font-medium text-stone-100">{franchise._count.locations}</span> Locations
                             </div>
@@ -243,6 +348,15 @@ export default function FranchisesPage() {
                     </div>
                 </form>
             </Modal>
+
+            <ReviewApplicationModal
+                isOpen={!!selectedApplicant}
+                onClose={() => setSelectedApplicant(null)}
+                onApprove={() => selectedApplicant && handleApprove(selectedApplicant.id)}
+                onReject={() => selectedApplicant && handleReject(selectedApplicant.id)}
+                data={selectedApplicant}
+                type="FRANCHISE"
+            />
 
             {/* Toast */}
             {toast && (

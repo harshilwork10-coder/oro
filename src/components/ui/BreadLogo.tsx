@@ -1,4 +1,7 @@
+'use client'
+
 import React from 'react'
+import { useBranding } from '@/components/providers/BrandProvider'
 
 interface BreadLogoProps {
     size?: number
@@ -6,10 +9,12 @@ interface BreadLogoProps {
 }
 
 export default function BreadLogo({ size = 60, className = '' }: BreadLogoProps) {
+    const { logoUrl } = useBranding()
+
     return (
         <img
-            src="/aura-logo.png"
-            alt="Aura Logo"
+            src={logoUrl || "/aura-logo.png"}
+            alt="Logo"
             width={size}
             height={size}
             className={`object-contain ${className}`}

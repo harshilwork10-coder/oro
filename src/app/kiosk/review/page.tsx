@@ -68,7 +68,7 @@ export default function KioskReviewPage() {
                         <AuraLogo size={24} />
                     </div>
                     <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        Aura Salon
+                        Aura
                     </span>
                 </div>
             </div>
@@ -163,8 +163,8 @@ export default function KioskReviewPage() {
                                 </div>
 
                                 <div className="bg-gray-50 p-4 rounded-xl text-xs text-gray-500 h-32 overflow-y-auto border border-gray-200">
-                                    <p className="mb-2"><strong>Liability Waiver:</strong> By checking the box below, I acknowledge that I have received the services requested and am satisfied with the results. I release Aura Salon and its employees from any liability regarding...</p>
-                                    <p>I also consent to the use of my contact information for future appointment reminders and promotional offers from Aura Salon.</p>
+                                    <p className="mb-2"><strong>Liability Waiver:</strong> By checking the box below, I acknowledge that I have received the services requested and am satisfied with the results. I release Aura and its employees from any liability regarding...</p>
+                                    <p>I also consent to the use of my contact information for future appointment reminders and promotional offers from Aura.</p>
                                 </div>
 
                                 <label className="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors">

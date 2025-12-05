@@ -176,15 +176,15 @@ export default function LocationsPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-stone-100">Locations</h1>
-                    <p className="text-stone-400 mt-1">Manage franchise and direct-owned locations</p>
+                    <h1 className="text-3xl font-bold text-stone-100">My Stores</h1>
+                    <p className="text-stone-400 mt-1">Manage your store locations</p>
                 </div>
                 <button
                     onClick={() => openModal()}
                     className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-medium px-6 py-3 rounded-xl shadow-lg shadow-emerald-900/20 hover:shadow-emerald-900/40 hover:scale-105 transition-all"
                 >
                     <Plus className="h-5 w-5" />
-                    Add Location
+                    Add Store
                 </button>
             </div>
 
@@ -195,86 +195,95 @@ export default function LocationsPage() {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-500" />
                         <input
                             type="text"
-                            placeholder="Search locations..."
+                            placeholder="Search stores..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                         />
                     </div>
-                    <select
-                        value={filterFranchise}
-                        onChange={(e) => setFilterFranchise(e.target.value)}
-                        className="px-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                    >
-                        <option value="all">All Locations</option>
-                        <option value="direct">Direct Owned</option>
-                        {franchises.map(f => (
-                            <option key={f.id} value={f.id}>{f.name}</option>
-                        ))}
-                    </select>
+                    {/* Only show filter dropdown for Provider role who manages multiple clients */}
+                    {session?.user?.role === 'PROVIDER' && franchises.length > 1 && (
+                        <select
+                            value={filterFranchise}
+                            onChange={(e) => setFilterFranchise(e.target.value)}
+                            className="px-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                        >
+                            <option value="all">All Clients</option>
+                            {franchises.map(f => (
+                                <option key={f.id} value={f.id}>{f.name}</option>
+                            ))}
+                        </select>
+                    )}
                 </div>
             </div>
 
             {/* Locations Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredLocations.map((location) => (
-                    <div
-                        key={location.id}
-                        className="glass-panel p-6 rounded-2xl hover:border-emerald-500/30 transition-all group relative overflow-hidden"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                        <div className="flex items-start justify-between mb-6 relative z-10">
-                            <div className={`h-12 w-12 rounded-xl flex items-center justify-center border ${location.franchiseId
-                                ? 'bg-emerald-500/20 border-emerald-500/20'
-                                : 'bg-purple-500/20 border-purple-500/20'
-                                }`}>
-                                <MapPin className={`h-6 w-6 ${location.franchiseId ? 'text-emerald-400' : 'text-purple-400'}`} />
-                            </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setRequestingLocation(location)}
-                                    className="p-2 hover:bg-purple-500/10 rounded-lg transition-colors group/btn"
-                                    title="Request Stations"
-                                >
-                                    <Monitor className="h-4 w-4 text-stone-400 group-hover/btn:text-purple-400" />
-                                </button>
-                                <button
-                                    onClick={() => openModal(location)}
-                                    className="p-2 hover:bg-stone-800 rounded-lg transition-colors"
-                                >
-                                    <Edit2 className="h-4 w-4 text-stone-400 hover:text-stone-200" />
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(location.id)}
-                                    className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
-                                >
-                                    <Trash2 className="h-4 w-4 text-red-400 hover:text-red-300" />
-                                </button>
-                            </div>
-                        </div>
-
-                        <h3 className="text-lg font-bold text-stone-100 mb-1 relative z-10 group-hover:text-emerald-400 transition-colors">{location.name}</h3>
-                        <p className="text-sm text-stone-400 mb-4 relative z-10">{location.address}</p>
-
-                        <div className="flex items-center justify-between text-sm pt-4 border-t border-stone-800 relative z-10">
-                            <div className="flex items-center gap-1">
-                                {location.franchise ? (
-                                    <>
-                                        <Building2 className="h-4 w-4 text-emerald-400" />
-                                        <span className="text-emerald-400 font-medium">{location.franchise.name}</span>
-                                    </>
-                                ) : (
-                                    <span className="text-purple-400 font-medium">Direct Owned</span>
-                                )}
-                            </div>
-                            <div className="text-stone-400">
-                                <span className="font-medium text-stone-200">{location._count.users}</span> Users
-                            </div>
-                        </div>
+            {filteredLocations.length === 0 ? (
+                <div className="glass-panel p-12 rounded-2xl text-center">
+                    <div className="h-16 w-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <MapPin className="h-8 w-8 text-emerald-400" />
                     </div>
-                ))}
-            </div>
+                    <h3 className="text-xl font-bold text-stone-100 mb-2">No stores yet</h3>
+                    <p className="text-stone-400 mb-6">
+                        Add your first store to get started! Click the "Add Store" button to create a location.
+                    </p>
+                    <button
+                        onClick={() => openModal()}
+                        className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-medium px-6 py-3 rounded-xl shadow-lg hover:shadow-emerald-900/40 hover:scale-105 transition-all"
+                    >
+                        <Plus className="h-5 w-5" />
+                        Add Your First Store
+                    </button>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredLocations.map((location) => (
+                        <div
+                            key={location.id}
+                            className="glass-panel p-6 rounded-2xl hover:border-emerald-500/30 transition-all group relative overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                            <div className="flex items-start justify-between mb-6 relative z-10">
+                                <div className="h-12 w-12 rounded-xl flex items-center justify-center border bg-emerald-500/20 border-emerald-500/20">
+                                    <MapPin className="h-6 w-6 text-emerald-400" />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setRequestingLocation(location)}
+                                        className="p-2 hover:bg-purple-500/10 rounded-lg transition-colors group/btn"
+                                        title="Request Stations"
+                                    >
+                                        <Monitor className="h-4 w-4 text-stone-400 group-hover/btn:text-purple-400" />
+                                    </button>
+                                    <button
+                                        onClick={() => openModal(location)}
+                                        className="p-2 hover:bg-stone-800 rounded-lg transition-colors"
+                                    >
+                                        <Edit2 className="h-4 w-4 text-stone-400 hover:text-stone-200" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(location.id)}
+                                        className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 className="h-4 w-4 text-red-400 hover:text-red-300" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <h3 className="text-lg font-bold text-stone-100 mb-1 relative z-10 group-hover:text-emerald-400 transition-colors">{location.name}</h3>
+                            <p className="text-sm text-stone-400 mb-4 relative z-10">{location.address}</p>
+
+                            <div className="flex items-center justify-between text-sm pt-4 border-t border-stone-800 relative z-10">
+                                <span className="text-emerald-400 font-medium">Active</span>
+                                <div className="text-stone-400">
+                                    <span className="font-medium text-stone-200">{location._count.users}</span> Employees
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {filteredLocations.length === 0 && (
                 <div className="text-center py-12">
@@ -287,12 +296,12 @@ export default function LocationsPage() {
             <Modal
                 isOpen={isModalOpen}
                 onClose={closeModal}
-                title={editingLocation ? 'Edit Location' : 'Add Location'}
+                title={editingLocation ? 'Edit Store' : 'Add Store'}
             >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-stone-300 mb-2">
-                            Location Name *
+                            Store Name *
                         </label>
                         <input
                             type="text"
@@ -318,24 +327,24 @@ export default function LocationsPage() {
                         />
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-stone-300 mb-2">
-                            Franchise (Optional)
-                        </label>
-                        <select
-                            value={formData.franchiseId}
-                            onChange={(e) => setFormData({ ...formData, franchiseId: e.target.value })}
-                            className="w-full px-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                        >
-                            <option value="">Direct Owned (No Franchise)</option>
-                            {franchises.map(f => (
-                                <option key={f.id} value={f.id}>{f.name}</option>
-                            ))}
-                        </select>
-                        <p className="text-xs text-stone-500 mt-1">
-                            Leave blank for direct-owned locations
-                        </p>
-                    </div>
+                    {/* Only show franchise selection for Provider managing multiple clients */}
+                    {session?.user?.role === 'PROVIDER' && (
+                        <div>
+                            <label className="block text-sm font-medium text-stone-300 mb-2">
+                                Assign to Client
+                            </label>
+                            <select
+                                value={formData.franchiseId}
+                                onChange={(e) => setFormData({ ...formData, franchiseId: e.target.value })}
+                                className="w-full px-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                            >
+                                <option value="">Select a client's business</option>
+                                {franchises.map(f => (
+                                    <option key={f.id} value={f.id}>{f.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="flex gap-3 pt-4">
                         <button

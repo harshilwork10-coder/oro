@@ -11,7 +11,72 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        let whereClause = {}
+
+        if (session.user.role === 'FRANCHISOR') {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: session.user.id },
+                include: { franchises: true }
+            })
+
+            if (!franchisor) {
+                return NextResponse.json([])
+            }
+
+            // Auto-create a default "store brand" if owner doesn't have any franchises yet
+            let defaultFranchise = franchisor.franchises[0]
+            if (!defaultFranchise) {
+                // Create a default store brand using the business name
+                const slug = (franchisor.name || 'store').toLowerCase()
+                    .replace(/\s+/g, '-')
+                    .replace(/[^\w\-]+/g, '')
+                    .replace(/\-\-+/g, '-')
+
+                defaultFranchise = await prisma.franchise.create({
+                    data: {
+                        name: franchisor.name || 'My Store',
+                        slug: `${slug}-${Date.now()}`,
+                        franchisorId: franchisor.id
+                    }
+                })
+            }
+
+            // Auto-create first location if owner doesn't have any stores yet
+            const existingLocations = await prisma.location.count({
+                where: {
+                    franchise: {
+                        franchisorId: franchisor.id
+                    }
+                }
+            })
+
+            if (existingLocations === 0) {
+                // Create the first store automatically
+                const storeName = franchisor.name || 'My First Store'
+                const storeSlug = storeName.toLowerCase()
+                    .replace(/\s+/g, '-')
+                    .replace(/[^\w\-]+/g, '')
+                    .replace(/\-\-+/g, '-')
+
+                await prisma.location.create({
+                    data: {
+                        name: storeName,
+                        slug: `${storeSlug}-${Date.now()}`,
+                        address: 'Please update your store address',
+                        franchiseId: defaultFranchise.id
+                    }
+                })
+            }
+
+            whereClause = {
+                franchise: {
+                    franchisorId: franchisor.id
+                }
+            }
+        }
+
         const locations = await prisma.location.findMany({
+            where: whereClause,
             include: {
                 franchise: {
                     select: {
@@ -41,7 +106,7 @@ export async function POST(request: Request) {
     try {
         const session = await getServerSession(authOptions)
 
-        if (!session || session.user.role !== 'PROVIDER') {
+        if (!session || (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -68,12 +133,43 @@ export async function POST(request: Request) {
             counter++
         }
 
+        let finalFranchiseId = franchiseId
+
+        // For Franchisors, validate ownership or auto-assign
+        if (session.user.role === 'FRANCHISOR') {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: session.user.id },
+                include: { franchises: true }
+            })
+
+            if (!franchisor) {
+                return NextResponse.json({ error: 'Franchisor profile not found' }, { status: 403 })
+            }
+
+            if (franchiseId) {
+                // Verify they own this franchise
+                const ownsFranchise = franchisor.franchises.some(f => f.id === franchiseId)
+                if (!ownsFranchise) {
+                    return NextResponse.json({ error: 'You do not own this franchise' }, { status: 403 })
+                }
+            } else {
+                // Auto-assign if they only have one franchise
+                if (franchisor.franchises.length === 1) {
+                    finalFranchiseId = franchisor.franchises[0].id
+                } else if (franchisor.franchises.length > 1) {
+                    return NextResponse.json({ error: 'Please select a franchise' }, { status: 400 })
+                } else {
+                    return NextResponse.json({ error: 'You do not have any franchises created yet' }, { status: 400 })
+                }
+            }
+        }
+
         const location = await prisma.location.create({
             data: {
                 name,
                 slug: uniqueSlug,
                 address,
-                franchiseId: franchiseId || null, // null for direct-owned locations
+                franchiseId: finalFranchiseId || null, // null for direct-owned locations (Provider only)
             },
             include: {
                 franchise: {

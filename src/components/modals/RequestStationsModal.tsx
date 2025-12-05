@@ -116,9 +116,6 @@ export default function RequestStationsModal({ isOpen, onClose, locationId, loca
                                     +
                                 </button>
                             </div>
-                            <p className="text-xs text-stone-500 mt-2 text-center">
-                                $29/mo per additional station
-                            </p>
                         </div>
 
                         <div className="pt-2">

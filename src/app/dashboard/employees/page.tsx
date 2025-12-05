@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, MoreVertical, Shield, User, Mail, Calendar } from 'lucide-react'
+import { Plus, Search, MoreVertical, Shield, User, Mail, Calendar, DollarSign } from 'lucide-react'
 import EmployeeModal from '@/components/employees/EmployeeModal'
 
 export default function EmployeesPage() {
@@ -141,6 +141,14 @@ export default function EmployeesPage() {
                                             className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
                                         >
                                             Delete Employee
+                                        </button>
+                                        <div className="border-t border-stone-800 my-1" />
+                                        <button
+                                            onClick={() => window.location.href = `/dashboard/employees/${employee.id}/commission`}
+                                            className="w-full text-left px-4 py-2 text-sm text-orange-400 hover:bg-stone-800 hover:text-orange-300 transition-colors flex items-center gap-2"
+                                        >
+                                            <DollarSign className="h-4 w-4" />
+                                            Configure Commission
                                         </button>
                                     </div>
                                 </div>
