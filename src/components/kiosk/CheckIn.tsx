@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Check, ChevronRight } from 'lucide-react'
-import BreadLogo from '@/components/ui/BreadLogo'
+
 import VirtualKeyboard from './VirtualKeyboard'
 
 export default function CheckIn() {
@@ -143,13 +143,8 @@ export default function CheckIn() {
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-96 bg-orange-500/10 blur-[120px] pointer-events-none" />
 
             <div className="p-6 flex items-center justify-center relative z-10">
-                <div className="flex items-center gap-3 glass-panel px-6 py-3 rounded-full">
-                    <div className="h-24 w-24 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
-                        <BreadLogo size={100} />
-                    </div>
-                    <span className="text-2xl font-bold text-stone-100 tracking-tight">
-                        Aura Salon
-                    </span>
+                <div className="h-24 w-24 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20 p-2">
+                    <img src="/trinex-logo.png" alt="Trinex Logo" className="w-full h-full object-contain rounded-xl" />
                 </div>
             </div>
 
@@ -286,10 +281,10 @@ export default function CheckIn() {
                                     <strong>LIABILITY WAIVER AND RELEASE FORM</strong>
                                 </p>
                                 <p className="mb-4">
-                                    I hereby acknowledge that I am voluntarily participating in services provided by Aura Salon. I understand that these services may involve risks, including but not limited to allergic reactions to products, minor cuts, or other injuries.
+                                    I hereby acknowledge that I am voluntarily participating in services provided by Trinex AI. I understand that these services may involve risks, including but not limited to allergic reactions to products, minor cuts, or other injuries.
                                 </p>
                                 <p className="mb-4">
-                                    I agree to release and hold harmless Aura Salon, its employees, and agents from any and all liability, claims, or causes of action arising out of my participation in these services.
+                                    I agree to release and hold harmless Trinex AI, its employees, and agents from any and all liability, claims, or causes of action arising out of my participation in these services.
                                 </p>
                                 <p>
                                     By clicking "Accept", I acknowledge that I have read and understood this waiver and agree to its terms.
@@ -312,7 +307,7 @@ export default function CheckIn() {
                                 <div className="mx-auto w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-purple-500/20">
                                     <span className="text-4xl">🎁</span>
                                 </div>
-                                <h2 className="text-3xl font-bold text-stone-100 mb-2">Join Aura Rewards?</h2>
+                                <h2 className="text-3xl font-bold text-stone-100 mb-2">Join Trinex AI Rewards?</h2>
                                 <p className="text-stone-400 text-lg">Earn points on every visit and get exclusive offers!</p>
                             </div>
 

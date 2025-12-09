@@ -6,19 +6,23 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session) {
+        const user = session?.user as any
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const { searchParams } = new URL(req.url)
         const franchiseId = searchParams.get('franchiseId')
 
-        if (!franchiseId) {
-            return NextResponse.json({ error: 'Franchise ID required' }, { status: 400 })
+        // Security: Use session franchiseId or verify ownership
+        const targetFranchiseId = franchiseId || user.franchiseId
+        if (targetFranchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         const giftCards = await prisma.giftCard.findMany({
-            where: { franchiseId },
+            where: { franchiseId: targetFranchiseId },
             orderBy: { createdAt: 'desc' }
         })
 
@@ -32,15 +36,23 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session) {
+        const user = session?.user as any
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const body = await req.json()
         const { franchiseId, initialAmount, recipientEmail, purchaserId } = body
 
-        if (!franchiseId || !initialAmount) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+        // Security: Use session franchiseId or verify ownership
+        const targetFranchiseId = franchiseId || user.franchiseId
+        if (targetFranchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+        }
+
+        if (!initialAmount) {
+            return NextResponse.json({ error: 'Initial amount required' }, { status: 400 })
         }
 
         // Generate unique code
@@ -49,7 +61,7 @@ export async function POST(req: Request) {
         const giftCard = await prisma.giftCard.create({
             data: {
                 code,
-                franchiseId,
+                franchiseId: targetFranchiseId,
                 initialAmount: parseFloat(initialAmount),
                 currentBalance: parseFloat(initialAmount),
                 recipientEmail: recipientEmail || null,

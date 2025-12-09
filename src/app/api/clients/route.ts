@@ -21,6 +21,12 @@ export async function POST(req: NextRequest) {
             )
         }
 
+        // Security: Verify user owns this franchise
+        const user = session.user as any
+        if (franchiseId !== user.franchiseId) {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+        }
+
         const client = await prisma.client.create({
             data: {
                 firstName,

@@ -227,7 +227,144 @@ export default function DashboardPage() {
         )
     }
 
-    // Franchisor Dashboard (Franchise Owner)
+    // Get businessType from session for FRANCHISOR users
+    const businessType = (session?.user as any)?.businessType
+
+    // Multi-Location Owner Dashboard (owns their own stores)
+    if (role === 'FRANCHISOR' && businessType === 'MULTI_LOCATION_OWNER') {
+        const [franchisorStats, setFranchisorStats] = useState<any>(null)
+        const [loadingStats, setLoadingStats] = useState(true)
+        const [approvalStatus, setApprovalStatus] = useState<string | null>(null)
+
+        useEffect(() => {
+            async function checkApprovalAndFetchStats() {
+                try {
+                    const res = await fetch('/api/franchisor/stats')
+                    if (res.ok) {
+                        const data = await res.json()
+                        setApprovalStatus(data.approvalStatus)
+
+                        // Redirect if pending
+                        if (data.approvalStatus === 'PENDING') {
+                            redirect('/auth/pending-approval')
+                            return
+                        }
+
+                        setFranchisorStats(data)
+                    }
+                } catch (error) {
+                    console.error('Error fetching franchisor stats:', error)
+                } finally {
+                    setLoadingStats(false)
+                }
+            }
+            checkApprovalAndFetchStats()
+        }, [])
+
+        // Show loading state while checking approval
+        if (loadingStats || approvalStatus === 'PENDING') {
+            return (
+                <div className="flex items-center justify-center min-h-screen bg-stone-950">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+                </div>
+            )
+        }
+
+        return (
+            <div className="p-4 md:p-8 space-y-6 md:space-y-8">
+                {/* Header */}
+                <div>
+                    <h1 className="text-3xl font-bold text-stone-100">
+                        Welcome back, {session?.user?.name?.split(' ')[0] || 'there'}! 👋
+                    </h1>
+                    <p className="text-stone-400 mt-2">Here's what's happening with your business today.</p>
+                </div>
+
+                {/* Statistics Cards - Multi-Store Owner */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-stone-400">My Stores</p>
+                                <p className="text-3xl font-bold text-stone-100 mt-2">{franchisorStats?.totalLocations || 0}</p>
+                                <p className="text-sm text-stone-500 mt-2">Active locations</p>
+                            </div>
+                            <div className="h-14 w-14 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-orange-900/20">
+                                <MapPin className="h-7 w-7 text-white" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-stone-400">Employees</p>
+                                <p className="text-3xl font-bold text-stone-100 mt-2">{franchisorStats?.totalEmployees || 0}</p>
+                                <p className="text-sm text-stone-500 mt-2">Team members</p>
+                            </div>
+                            <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-blue-900/20">
+                                <Users className="h-7 w-7 text-white" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-stone-400">Monthly Revenue</p>
+                                <p className="text-3xl font-bold text-stone-100 mt-2">
+                                    ${franchisorStats?.monthlyRevenue ? `${(franchisorStats.monthlyRevenue / 1000).toFixed(1)}K` : '0'}
+                                </p>
+                                <p className="text-sm text-stone-500 mt-2">Last 30 days</p>
+                            </div>
+                            <div className="h-14 w-14 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-emerald-900/20">
+                                <DollarSign className="h-7 w-7 text-white" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-stone-400">Transactions</p>
+                                <p className="text-3xl font-bold text-stone-100 mt-2">{franchisorStats?.totalTransactions || 0}</p>
+                                <p className="text-sm text-stone-500 mt-2">Last 30 days</p>
+                            </div>
+                            <div className="h-14 w-14 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-purple-900/20">
+                                <CreditCard className="h-7 w-7 text-white" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="glass-panel p-6 rounded-2xl">
+                    <h2 className="text-lg font-semibold text-stone-100 mb-4">Quick Actions</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <Link href="/dashboard/locations" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                            <MapPin className="h-6 w-6 text-orange-400 mx-auto mb-2" />
+                            <p className="text-sm text-stone-300">My Stores</p>
+                        </Link>
+                        <Link href="/dashboard/employees" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                            <Users className="h-6 w-6 text-blue-400 mx-auto mb-2" />
+                            <p className="text-sm text-stone-300">Employees</p>
+                        </Link>
+                        <Link href="/dashboard/transactions" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                            <CreditCard className="h-6 w-6 text-emerald-400 mx-auto mb-2" />
+                            <p className="text-sm text-stone-300">Transactions</p>
+                        </Link>
+                        <Link href="/dashboard/reports" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                            <TrendingUp className="h-6 w-6 text-purple-400 mx-auto mb-2" />
+                            <p className="text-sm text-stone-300">Reports</p>
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+
+    // Brand Franchisor Dashboard (sells franchises) OR fallback for FRANCHISOR without businessType
     if (role === 'FRANCHISOR') {
         const [franchisorStats, setFranchisorStats] = useState<any>(null)
         const [loadingStats, setLoadingStats] = useState(true)
@@ -402,57 +539,57 @@ export default function DashboardPage() {
     // Employee Dashboard
     if (role === 'EMPLOYEE' || role === 'USER') {
         return (
-            <div className="p-4 md:p-8 space-y-8">
-                {/* Header with Quick Actions */}
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+                {/* Clean Header */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-stone-100">
-                            Let's crush it, {session?.user?.name?.split(' ')[0] || 'Team'}! 🚀
+                        <h1 className="text-2xl font-bold text-stone-100">
+                            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {session?.user?.name?.split(' ')[0] || 'there'}
                         </h1>
-                        <p className="text-stone-400 mt-2">
+                        <p className="text-stone-500 text-sm mt-1">
                             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                         </p>
                     </div>
 
-                    <div className="flex gap-3">
-                        <Link href="/dashboard/pos" className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg font-medium transition-colors flex items-center gap-2 border border-stone-700">
+                    <div className="flex gap-2">
+                        <Link href="/dashboard/pos" className="px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 border border-stone-700/50">
                             <CreditCard className="h-4 w-4" />
                             New Sale
                         </Link>
-                        <Link href="/dashboard/appointments" className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-orange-900/20">
+                        <Link href="/dashboard/appointments" className="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
                             <Clock className="h-4 w-4" />
                             Book Appt
                         </Link>
                     </div>
                 </div>
 
-                {/* Performance Stats */}
+                {/* Stats Row */}
                 <EmployeePerformanceStats />
 
-                {/* Main Workflow Area */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column: Next Up & Queue */}
-                    <div className="lg:col-span-2 space-y-8">
-                        <section>
-                            <h2 className="text-lg font-bold text-stone-100 mb-4 flex items-center gap-2">
+                {/* Two Column Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    {/* Main Content - Left */}
+                    <div className="lg:col-span-3 space-y-6">
+                        {/* Up Next Section */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-3">
                                 <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                                Up Next
-                            </h2>
+                                <h2 className="text-sm font-semibold text-stone-400 uppercase tracking-wide">Up Next</h2>
+                            </div>
                             <NextClientSpotlight />
-                        </section>
+                        </div>
 
-                        <section>
-                            <h2 className="text-lg font-bold text-stone-100 mb-4">Waiting Room</h2>
+                        {/* Waiting Room */}
+                        <div>
+                            <h2 className="text-sm font-semibold text-stone-400 uppercase tracking-wide mb-3">Waiting Room</h2>
                             <CheckInQueue />
-                        </section>
+                        </div>
                     </div>
 
-                    {/* Right Column: Today's Schedule List */}
-                    <div className="space-y-8">
-                        <section>
-                            <h2 className="text-lg font-bold text-stone-100 mb-4">Rest of Today</h2>
-                            <TodayAppointments />
-                        </section>
+                    {/* Sidebar - Right */}
+                    <div className="lg:col-span-2">
+                        <h2 className="text-sm font-semibold text-stone-400 uppercase tracking-wide mb-3">Today's Schedule</h2>
+                        <TodayAppointments />
                     </div>
                 </div>
             </div>

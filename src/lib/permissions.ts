@@ -3,12 +3,13 @@ import { User } from '@prisma/client'
 // Define roles matching the database strings
 // We use strings here because we haven't fully migrated the DB enum yet
 export enum Role {
-    PROVIDER = 'PROVIDER',      // Platform/Software owner
-    FRANCHISOR = 'FRANCHISOR',  // Brand owner
-    FRANCHISEE = 'FRANCHISEE',  // Location owner
-    MANAGER = 'MANAGER',        // Operations manager
-    EMPLOYEE = 'EMPLOYEE',      // Front-line staff
-    USER = 'USER'               // Legacy fallback
+    PROVIDER = 'PROVIDER',          // Platform/Software owner
+    FRANCHISOR = 'FRANCHISOR',      // Brand owner
+    FRANCHISEE = 'FRANCHISEE',      // Location owner
+    MANAGER = 'MANAGER',            // Operations manager
+    EMPLOYEE = 'EMPLOYEE',          // Front-line staff
+    SUPPORT_STAFF = 'SUPPORT_STAFF', // Support team member
+    USER = 'USER'                   // Legacy fallback
 }
 
 export type Permission =

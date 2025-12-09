@@ -11,8 +11,8 @@ export interface ProviderSettings {
 export function getProviderSettings(): ProviderSettings {
     return {
         cashDiscountPercent: 3.5, // YOU set this percentage for ALL clients
-        platformName: 'Aura POS',
-        supportEmail: 'support@aurapos.com'
+        platformName: 'Trinex POS',
+        supportEmail: 'support@trinexpos.com'
     }
 }
 

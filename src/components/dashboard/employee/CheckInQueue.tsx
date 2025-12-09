@@ -12,29 +12,28 @@ interface CheckedInCustomer {
 }
 
 export default function CheckInQueue() {
-    const [queue, setQueue] = useState<CheckedInCustomer[]>([
-        {
-            id: '1',
-            customerName: 'John D.',
-            service: 'Haircut',
-            checkedInAt: new Date(Date.now() - 5 * 60 * 1000), // 5 min ago
-            queuePosition: 1
-        },
-        {
-            id: '2',
-            customerName: 'Maria S.',
-            service: 'Color + Style',
-            checkedInAt: new Date(Date.now() - 2 * 60 * 1000), // 2 min ago
-            queuePosition: 2
-        },
-        {
-            id: '3',
-            customerName: 'David K.',
-            service: 'Beard Trim',
-            checkedInAt: new Date(Date.now() - 30 * 1000), // 30 sec ago
-            queuePosition: 3
+    const [queue, setQueue] = useState<CheckedInCustomer[]>([])
+
+    useEffect(() => {
+        const fetchQueue = async () => {
+            try {
+                const res = await fetch('/api/queue')
+                if (res.ok) {
+                    const data = await res.json()
+                    setQueue(data.map((item: any) => ({
+                        ...item,
+                        checkedInAt: new Date(item.checkedInAt)
+                    })))
+                }
+            } catch (err) {
+                console.error('Failed to fetch queue', err)
+            }
         }
-    ])
+
+        fetchQueue()
+        const interval = setInterval(fetchQueue, 15000) // Poll every 15s
+        return () => clearInterval(interval)
+    }, [])
 
     const getWaitTime = (checkedInAt: Date) => {
         const minutes = Math.floor((Date.now() - checkedInAt.getTime()) / 60000)

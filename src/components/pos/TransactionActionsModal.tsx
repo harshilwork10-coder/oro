@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, RotateCcw, Ban, Trash2, CheckSquare, Square, Printer, CreditCard, Banknote } from 'lucide-react'
+import { X, RotateCcw, Ban, Trash2, CheckSquare, Square, Printer, CreditCard, Banknote, CheckCircle, AlertCircle } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { generateReceipt } from '@/lib/receipt-generator'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
@@ -33,10 +33,13 @@ interface Transaction {
     invoiceNumber?: string
 }
 
-interface Transaction {
-    // ... existing fields
-    cardLast4?: string        // ADD THIS
-    invoiceNumber?: string    // ADD THIS  
+interface Props {
+    transaction: Transaction
+    onClose: () => void
+    onSuccess: () => void
+    canProcessRefunds?: boolean
+    canVoid?: boolean
+    canDelete?: boolean
 }
 
 type ActionType = 'none' | 'refund' | 'void' | 'delete'
@@ -49,6 +52,8 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
     const [refundMethod, setRefundMethod] = useState<string>('CASH')
     const [showPaxModal, setShowPaxModal] = useState(false)
     const [paxVerificationPending, setPaxVerificationPending] = useState(false)
+    const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null)
+    const [voidReason, setVoidReason] = useState<string>('')
     const { logoUrl, primaryColor } = useBranding()
 
     useEffect(() => {
@@ -58,6 +63,52 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
             setRefundMethod('CASH')
         }
     }, [transaction.paymentMethod])
+
+    // Auto-hide toast after 3 seconds
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(null), 3000)
+            return () => clearTimeout(timer)
+        }
+    }, [toast])
+
+    const showToast = (type: 'success' | 'error', message: string) => {
+        setToast({ type, message })
+    }
+
+    const toggleItemSelection = (itemId: string, quantity: number) => {
+        const newSelected = new Set(selectedItems)
+        if (newSelected.has(itemId)) {
+            newSelected.delete(itemId)
+        } else {
+            newSelected.add(itemId)
+            setItemQuantities({ ...itemQuantities, [itemId]: quantity })
+        }
+        setSelectedItems(newSelected)
+    }
+
+    const selectAllItems = () => {
+        const allIds = transaction.lineItems.map(item => item.id)
+        const newQuantities: Record<string, number> = {}
+        transaction.lineItems.forEach(item => {
+            newQuantities[item.id] = item.quantity
+        })
+        setSelectedItems(new Set(allIds))
+        setItemQuantities(newQuantities)
+    }
+
+    const calculateRefundAmount = () => {
+        let total = 0
+        selectedItems.forEach(itemId => {
+            const item = transaction.lineItems.find(i => i.id === itemId)
+            if (item) {
+                const qty = itemQuantities[itemId] || item.quantity
+                const pricePerUnit = item.total / item.quantity
+                total += pricePerUnit * qty
+            }
+        })
+        return total
+    }
 
     // ... (existing code)
 
@@ -86,7 +137,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
 
     const handleRefund = async () => {
         if (selectedItems.size === 0) {
-            alert('Please select at least one item to refund')
+            showToast('error', 'Please select at least one item to refund')
             return
         }
 
@@ -123,16 +174,15 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
             })
 
             if (res.ok) {
-                alert('Refund processed successfully')
-                onSuccess()
-                onClose()
+                showToast('success', '✓ Refund processed successfully')
+                setTimeout(() => { onSuccess(); onClose() }, 1500)
             } else {
                 const error = await res.json()
-                alert(`Refund failed: ${error.error || 'Unknown error'}`)
+                showToast('error', `Refund failed: ${error.error || 'Unknown error'}`)
             }
         } catch (error) {
             console.error('Refund error:', error)
-            alert('Failed to process refund')
+            showToast('error', 'Failed to process refund')
         } finally {
             setIsProcessing(false)
         }
@@ -147,7 +197,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
             const currentCardLast4 = response.cardLast4
 
             if (originalCardLast4 && currentCardLast4 !== originalCardLast4) {
-                alert(`❌ Different card detected!\n\nPlease use the original card ending in ${originalCardLast4}.\n\nTransaction cancelled.`)
+                showToast('error', `Different card detected! Use card ending in ${originalCardLast4}`)
                 setPaxVerificationPending(false)
                 setAction('none')
                 return
@@ -160,39 +210,33 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
     }
 
     const handleVoid = async () => {
-        if (!confirm('Are you sure you want to void this transaction? This cannot be undone.')) {
-            return
-        }
-
         setIsProcessing(true)
         try {
             const res = await fetch('/api/pos/void', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ transactionId: transaction.id })
+                body: JSON.stringify({
+                    transactionId: transaction.id,
+                    reason: voidReason || 'No reason provided'
+                })
             })
 
             if (res.ok) {
-                alert('Transaction voided successfully')
-                onSuccess()
-                onClose()
+                showToast('success', '✓ Transaction voided successfully')
+                setTimeout(() => { onSuccess(); onClose() }, 1500)
             } else {
                 const error = await res.json()
-                alert(`Void failed: ${error.error || 'Unknown error'}`)
+                showToast('error', `Void failed: ${error.error || 'Unknown error'}`)
             }
         } catch (error) {
             console.error('Void error:', error)
-            alert('Failed to void transaction')
+            showToast('error', 'Failed to void transaction')
         } finally {
             setIsProcessing(false)
         }
     }
 
     const handleDelete = async () => {
-        if (!confirm('Are you sure you want to delete this transaction? This will permanently remove it.')) {
-            return
-        }
-
         setIsProcessing(true)
         try {
             const res = await fetch(`/api/pos/transaction/${transaction.id}`, {
@@ -200,16 +244,15 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
             })
 
             if (res.ok) {
-                alert('Transaction deleted successfully')
-                onSuccess()
-                onClose()
+                showToast('success', '✓ Transaction deleted')
+                setTimeout(() => { onSuccess(); onClose() }, 1500)
             } else {
                 const error = await res.json()
-                alert(`Delete failed: ${error.error || 'Unknown error'}`)
+                showToast('error', `Delete failed: ${error.error || 'Unknown error'}`)
             }
         } catch (error) {
             console.error('Delete error:', error)
-            alert('Failed to delete transaction')
+            showToast('error', 'Failed to delete transaction')
         } finally {
             setIsProcessing(false)
         }
@@ -217,6 +260,18 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${toast.type === 'success'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-red-600 text-white'
+                    }`}>
+                    {toast.type === 'success'
+                        ? <CheckCircle className="h-5 w-5" />
+                        : <AlertCircle className="h-5 w-5" />}
+                    <span className="font-medium">{toast.message}</span>
+                </div>
+            )}
             <div className="w-full max-w-2xl bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
                 {/* Header */}
                 <div className="p-6 border-b border-stone-800 flex justify-between items-center">
@@ -416,15 +471,35 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                     )}
 
                     {action === 'void' && (
-                        <div className="space-y-4 text-center">
-                            <div className="w-16 h-16 rounded-full bg-orange-500/20 mx-auto flex items-center justify-center">
-                                <Ban className="h-8 w-8 text-orange-400" />
+                        <div className="space-y-4">
+                            <div className="text-center">
+                                <div className="w-16 h-16 rounded-full bg-orange-500/20 mx-auto flex items-center justify-center">
+                                    <Ban className="h-8 w-8 text-orange-400" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mt-3">Void Transaction?</h3>
+                                <p className="text-stone-400 text-sm mt-1">
+                                    This will void the entire transaction. It cannot be refunded after voiding.
+                                </p>
                             </div>
-                            <h3 className="text-xl font-bold text-white">Void Transaction?</h3>
-                            <p className="text-stone-400">
-                                This will void the entire transaction. The transaction will be marked as cancelled
-                                and cannot be refunded.
-                            </p>
+
+                            {/* Void Reason Dropdown */}
+                            <div className="bg-stone-950 rounded-xl p-4 border border-stone-800">
+                                <label className="block text-sm text-stone-400 mb-2">Reason for voiding *</label>
+                                <select
+                                    value={voidReason}
+                                    onChange={(e) => setVoidReason(e.target.value)}
+                                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                >
+                                    <option value="">Select a reason...</option>
+                                    <option value="Customer Request">Customer Request</option>
+                                    <option value="Wrong Amount">Wrong Amount</option>
+                                    <option value="Duplicate Transaction">Duplicate Transaction</option>
+                                    <option value="Employee Error">Employee Error</option>
+                                    <option value="Test Transaction">Test Transaction</option>
+                                    <option value="Fraud Prevention">Fraud Prevention</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
                         </div>
                     )}
 

@@ -5,8 +5,15 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
+    const user = session?.user as any
+
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Permission check: Only users with refund permission or franchise owners
+    if (!user.canProcessRefunds && user.role !== 'FRANCHISOR') {
+        return NextResponse.json({ error: 'Permission denied: Cannot process refunds' }, { status: 403 })
     }
 
     try {
@@ -21,6 +28,11 @@ export async function POST(req: Request) {
 
         if (!originalTx) {
             return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+        }
+
+        // Security: Verify transaction belongs to user's franchise
+        if (originalTx.franchiseId !== user.franchiseId) {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         if (originalTx.status !== 'COMPLETED') {
@@ -65,9 +77,9 @@ export async function POST(req: Request) {
         // Create Refund Transaction (Negative values)
         const refundTx = await prisma.transaction.create({
             data: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 clientId: originalTx.clientId,
-                employeeId: session.user.id,
+                employeeId: user.id,
                 originalTransactionId: originalTx.id,
                 status: 'REFUNDED',
                 paymentMethod: refundMethod || originalTx.paymentMethod,

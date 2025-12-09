@@ -29,7 +29,9 @@ const NO_SALE_REASONS = [
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = session?.user as any
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -47,6 +49,20 @@ export async function POST(request: NextRequest) {
         // Validate required fields
         if (!type || !locationId) {
             return NextResponse.json({ error: 'Type and location required' }, { status: 400 })
+        }
+
+        // Security: Verify location belongs to user's franchise
+        const location = await prisma.location.findUnique({
+            where: { id: locationId },
+            select: { franchiseId: true }
+        })
+
+        if (!location) {
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+        }
+
+        if (location.franchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         // For NO_SALE, reason is required

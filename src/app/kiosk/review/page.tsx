@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Star, Check, ChevronRight, ThumbsUp, MessageSquare, ShieldCheck } from 'lucide-react'
-import AuraLogo from '@/components/ui/AuraLogo'
+import TrinexLogo from '@/components/ui/TrinexLogo'
 import clsx from 'clsx'
 
 export default function KioskReviewPage() {
@@ -65,10 +65,10 @@ export default function KioskReviewPage() {
             <div className="bg-white p-6 shadow-sm flex items-center justify-center">
                 <div className="flex items-center gap-3">
                     <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white">
-                        <AuraLogo size={24} />
+                        <TrinexLogo size={24} />
                     </div>
                     <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        Aura
+                        Trinex
                     </span>
                 </div>
             </div>
@@ -163,8 +163,8 @@ export default function KioskReviewPage() {
                                 </div>
 
                                 <div className="bg-gray-50 p-4 rounded-xl text-xs text-gray-500 h-32 overflow-y-auto border border-gray-200">
-                                    <p className="mb-2"><strong>Liability Waiver:</strong> By checking the box below, I acknowledge that I have received the services requested and am satisfied with the results. I release Aura and its employees from any liability regarding...</p>
-                                    <p>I also consent to the use of my contact information for future appointment reminders and promotional offers from Aura.</p>
+                                    <p className="mb-2"><strong>Liability Waiver:</strong> By checking the box below, I acknowledge that I have received the services requested and am satisfied with the results. I release Trinex and its employees from any liability regarding...</p>
+                                    <p>I also consent to the use of my contact information for future appointment reminders and promotional offers from Trinex.</p>
                                 </div>
 
                                 <label className="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors">

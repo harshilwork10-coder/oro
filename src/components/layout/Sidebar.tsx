@@ -38,9 +38,9 @@ import {
     Plus
 } from 'lucide-react'
 import clsx from 'clsx'
-import BreadLogo from '@/components/ui/BreadLogo'
 import { hasPermission, Role } from '@/lib/permissions'
 import { useBusinessConfig } from '@/hooks/useBusinessConfig'
+import { Sparkles, Armchair } from 'lucide-react'
 
 interface SidebarProps {
     isOpen: boolean
@@ -60,6 +60,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'My Clients', href: '/dashboard/franchisors', icon: Building2 },
         { name: 'Feature Requests', href: '/dashboard/feature-requests', icon: Package },
         { name: 'My Agents', href: '/dashboard/team', icon: Users },
+        { name: 'Support Team', href: '/dashboard/support/team', icon: Headphones },
+        { name: 'Support Inbox', href: '/dashboard/support', icon: MessageSquare },
+        { name: 'SMS Management', href: '/dashboard/provider/sms', icon: MessageSquare },
         { name: 'Terminal Management', href: '/dashboard/terminals/manage', icon: Monitor },
         { name: 'Terminals & Licenses', href: '/dashboard/terminals', icon: Shield },
         { name: 'Shipping', href: '/dashboard/shipping', icon: Truck },
@@ -94,18 +97,21 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Services', href: '/dashboard/services', icon: Briefcase, feature: 'usesServices' as const },
         { name: 'Inventory', href: '/dashboard/inventory/products', icon: ShoppingBag, feature: 'usesInventory' as const },
         { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
+        { name: 'Waitlist', href: '/dashboard/waitlist', icon: Clock, always: true },
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },
-        { name: 'Financials', href: '/dashboard/financials', icon: DollarSign, always: true },
         { name: 'Retention', href: '/dashboard/retention', icon: Heart, feature: 'usesLoyalty' as const },
         { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift, feature: 'usesGiftCards' as const },
+        { name: 'Service Packages', href: '/dashboard/packages', icon: Package, always: true },
+        { name: 'Resources', href: '/dashboard/resources', icon: Armchair, feature: 'enableResources' as const },
         { name: 'Memberships', href: '/dashboard/memberships', icon: Crown, feature: 'usesMemberships' as const },
         { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },
+        { name: 'SMS Auto-Marketing', href: '/dashboard/settings/sms-marketing', icon: MessageSquare, always: true },
         { name: 'Reviews', href: '/dashboard/reviews', icon: MessageSquare, feature: 'usesReviewManagement' as const },
         { name: 'Commissions', href: '/dashboard/commissions', icon: Percent, feature: 'usesCommissions' as const },
         { name: 'Compliance', href: '/dashboard/compliance', icon: Shield, always: true },
         { name: 'Documents', href: '/dashboard/documents', icon: FileText, always: true },
-        { name: 'Features & Add-ons', href: '/dashboard/settings/features', icon: Package, always: true }, // Clients can view/request features
+        { name: 'Features & Add-ons', href: '/dashboard/settings/features', icon: Package, always: true },
     ]
 
     // Filter based on config
@@ -129,9 +135,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Customers', href: '/dashboard/customers', icon: Users },
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
         { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
-        { name: 'Financials', href: '/dashboard/financials', icon: DollarSign },
         { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart },
         { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift },
+        { name: 'Service Packages', href: '/dashboard/packages', icon: Package },
         { name: 'Documents', href: '/dashboard/documents', icon: FileText },
     ]
 
@@ -162,6 +168,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones },
     ]
 
+    // SUPPORT_STAFF: Support team members - only see support inbox
+    const supportStaffLinks = [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Support Inbox', href: '/dashboard/support', icon: Headphones },
+    ]
+
     // Select navigation based on role
     const links =
         session?.user?.role === Role.PROVIDER ? providerLinks :
@@ -170,7 +182,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             ) :
                 session?.user?.role === Role.FRANCHISEE ? franchiseeLinks :
                     session?.user?.role === Role.MANAGER ? managerLinks :
-                        employeeLinks
+                        session?.user?.role === 'SUPPORT_STAFF' ? supportStaffLinks :
+                            employeeLinks
 
     return (
         <>
@@ -192,18 +205,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 )}
             >
                 {/* Logo Header */}
-                <div className="flex h-20 items-center justify-between border-b border-stone-800/50 px-6 bg-gradient-to-r from-stone-900/50 to-transparent">
-                    <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-3 group">
-                            <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
-                                <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                <BreadLogo size={100} className="relative z-10 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
-                            </div>
-                            <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-amber-200 to-orange-400 bg-clip-text text-transparent bg-[length:200%_auto] animate-text-shimmer">
-                                Aura
-                            </span>
+                <div className="flex h-36 items-center justify-center border-b border-stone-800/50 px-6 bg-gradient-to-r from-stone-900/50 to-transparent">
+                    <div className="flex items-center justify-center group">
+                        <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                            <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                            <img src="/trinex-logo.png" alt="Trinex AI" className="relative z-10 h-32 object-contain drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
                         </div>
-                        <p className="text-[10px] text-stone-500 font-medium tracking-wider uppercase ml-11">The ultimate business solution</p>
                     </div>
                     <button
                         type="button"

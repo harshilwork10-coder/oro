@@ -5,13 +5,15 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
+    const user = session?.user as any
+
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
         const body = await req.json()
-        const { transactionId } = body
+        const { transactionId, reason } = body
 
         // Find the transaction
         const transaction = await prisma.transaction.findUnique({
@@ -23,6 +25,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
         }
 
+        // Security: Verify transaction belongs to user's franchise
+        if (transaction.franchiseId !== user.franchiseId) {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+        }
+
         // Check if transaction can be voided
         if (transaction.status !== 'COMPLETED') {
             return NextResponse.json({
@@ -30,13 +37,26 @@ export async function POST(req: Request) {
             }, { status: 400 })
         }
 
-        // Update transaction status to VOID
+        // Update transaction status to VOIDED with audit trail
         const voidedTransaction = await prisma.transaction.update({
             where: { id: transactionId },
-            data: { status: 'VOID' }
+            data: {
+                status: 'VOIDED',
+                voidedById: user.id,
+                voidedAt: new Date(),
+                voidReason: reason || null
+            },
+            include: {
+                employee: {
+                    select: { name: true, email: true }
+                }
+            }
         })
 
-        return NextResponse.json(voidedTransaction)
+        return NextResponse.json({
+            ...voidedTransaction,
+            voidedByName: user.name || user.email || 'Unknown'
+        })
     } catch (error: any) {
         console.error('[POS_VOID_POST]', error)
         return NextResponse.json({

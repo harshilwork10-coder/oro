@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { Loader2, CheckCircle, Clock, AlertCircle, Upload, FileText, RefreshCw } from 'lucide-react'
-import BreadLogo from '@/components/ui/BreadLogo'
+import TrinexLogo from '@/components/ui/TrinexLogo'
 
 export default function PendingApprovalPage() {
     const router = useRouter()
@@ -16,6 +16,13 @@ export default function PendingApprovalPage() {
 
     useEffect(() => {
         checkStatus()
+
+        // Poll every 10 seconds for status changes
+        const interval = setInterval(() => {
+            checkStatus()
+        }, 10000)
+
+        return () => clearInterval(interval)
     }, [])
 
     const checkStatus = async () => {
@@ -84,7 +91,7 @@ export default function PendingApprovalPage() {
     return (
         <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-4">
             <div className="mb-8">
-                <BreadLogo size={60} />
+                <img src="/trinex-logo.png" alt="Trinex AI" className="h-24 object-contain" />
             </div>
 
             <div className="bg-white rounded-2xl shadow-xl border border-stone-200 max-w-lg w-full overflow-hidden">

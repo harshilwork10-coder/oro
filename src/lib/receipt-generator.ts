@@ -62,7 +62,7 @@ export async function generateReceipt(data: ReceiptData) {
     if (data.branding?.primaryColor) {
         doc.setTextColor(data.branding.primaryColor)
     }
-    doc.text(data.franchiseName || 'Aura Business', 40, yPos, { align: 'center' })
+    doc.text(data.franchiseName || 'Trinex Business', 40, yPos, { align: 'center' })
     doc.setTextColor(0, 0, 0) // Reset color
     yPos += 6
 

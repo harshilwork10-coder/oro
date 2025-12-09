@@ -22,7 +22,8 @@ import {
     TrendingUp,
     Globe,
     Building2,
-    Clock
+    Clock,
+    Monitor
 } from 'lucide-react'
 
 export default function BusinessSettingsPage() {
@@ -89,8 +90,8 @@ export default function BusinessSettingsPage() {
         <div
             onClick={onChange}
             className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${value
-                    ? 'border-orange-500 bg-orange-500/10'
-                    : 'border-stone-700 hover:border-stone-600'
+                ? 'border-orange-500 bg-orange-500/10'
+                : 'border-stone-700 hover:border-stone-600'
                 }`}
         >
             <div className="flex items-start gap-3">
@@ -165,6 +166,24 @@ export default function BusinessSettingsPage() {
                 </div>
             </div>
 
+            {/* Hardware Configuration */}
+            <div className="space-y-4">
+                <h2 className="text-xl font-semibold text-stone-200 flex items-center gap-2">
+                    <Monitor className="h-5 w-5 text-cyan-400" />
+                    Hardware Configuration
+                </h2>
+                <div className="grid gap-3">
+                    <FeatureCheckbox
+                        icon={Monitor}
+                        label="Virtual Keypad"
+                        description="Enable on-screen numeric keypads for touchscreens"
+                        value={formData.usesVirtualKeypad}
+                        onChange={() => handleToggle('usesVirtualKeypad')}
+                        recommended="Tablets, All-in-One POS"
+                    />
+                </div>
+            </div>
+
             {/* Customer Features */}
             <div className="space-y-4">
                 <h2 className="text-xl font-semibold text-stone-200 flex items-center gap-2">
@@ -233,6 +252,55 @@ export default function BusinessSettingsPage() {
                         value={formData.usesDiscounts}
                         onChange={() => handleToggle('usesDiscounts')}
                     />
+
+                    {/* Tax Settings */}
+                    <div className="pt-4 border-t border-stone-800 mt-2">
+                        <h3 className="text-sm font-medium text-stone-400 mb-3">Tax Configuration</h3>
+                        <div className="grid gap-3">
+                            <div className="bg-stone-900 p-4 rounded-xl border border-stone-800 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-stone-800 rounded-lg text-emerald-400">
+                                        <Percent className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-white">Tax Rate</h3>
+                                        <p className="text-sm text-stone-400">Global tax percentage</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        value={formData.taxRate ? (formData.taxRate * 100).toFixed(2) : '0.00'}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value)
+                                            setFormData(prev => ({ ...prev, taxRate: isNaN(val) ? 0 : val / 100 }))
+                                        }}
+                                        className="bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-white w-24 text-right focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
+                                    />
+                                    <span className="text-stone-400">%</span>
+                                </div>
+                            </div>
+
+                            <FeatureCheckbox
+                                icon={Briefcase}
+                                label="Tax Services"
+                                description="Apply tax to service items"
+                                value={formData.taxServices}
+                                onChange={() => handleToggle('taxServices')}
+                            />
+
+                            <FeatureCheckbox
+                                icon={ShoppingBag}
+                                label="Tax Products"
+                                description="Apply tax to retail products"
+                                value={formData.taxProducts}
+                                onChange={() => handleToggle('taxProducts')}
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -341,8 +409,8 @@ export default function BusinessSettingsPage() {
                     onClick={handleSave}
                     disabled={saving}
                     className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${saved
-                            ? 'bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/30'
-                            : 'bg-gradient-to-r from-orange-600 to-amber-600 text-white hover:shadow-lg hover:shadow-orange-900/20'
+                        ? 'bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/30'
+                        : 'bg-gradient-to-r from-orange-600 to-amber-600 text-white hover:shadow-lg hover:shadow-orange-900/20'
                         }`}
                 >
                     {saving ? (

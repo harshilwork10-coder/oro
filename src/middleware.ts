@@ -64,6 +64,20 @@ export async function middleware(req: NextRequest) {
     response.headers.set('X-Content-Type-Options', 'nosniff')
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
     response.headers.set('X-XSS-Protection', '1; mode=block')
+    response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+
+    // Content Security Policy - prevents XSS attacks
+    // Note: 'unsafe-inline' and 'unsafe-eval' needed for Next.js/React
+    response.headers.set(
+        'Content-Security-Policy',
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-eval' 'unsafe-inline'; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "font-src 'self' https://fonts.gstatic.com; " +
+        "img-src 'self' data: blob: https:; " +
+        "connect-src 'self' https:; " +
+        "frame-ancestors 'none';"
+    )
 
     return response
 }

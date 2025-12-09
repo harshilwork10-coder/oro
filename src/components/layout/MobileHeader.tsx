@@ -2,7 +2,7 @@
 
 import { Menu, Bell } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import AuraLogo from '@/components/ui/AuraLogo'
+import TrinexLogo from '@/components/ui/TrinexLogo'
 
 interface MobileHeaderProps {
     onMenuClick: () => void
@@ -23,7 +23,7 @@ export default function MobileHeader({ onMenuClick }: MobileHeaderProps) {
                 </button>
                 <div className="flex items-center gap-2">
                     {/* Using BreadLogo logic here if needed, or keeping simple text for mobile */}
-                    <span className="text-lg font-bold text-stone-100">Aura</span>
+                    <span className="text-lg font-bold text-stone-100">Trinex AI</span>
                 </div>
             </div>
 

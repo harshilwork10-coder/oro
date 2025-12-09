@@ -61,7 +61,8 @@ export default function SchedulePage() {
         employeeId: '',
         locationId: '',
         startTime: '09:00',
-        endTime: '17:00'
+        endTime: '17:00',
+        selectedDays: [] as number[] // 0=Sun, 1=Mon, etc.
     })
 
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -161,40 +162,47 @@ export default function SchedulePage() {
 
     const openAddModal = (date: Date) => {
         setSelectedDate(date)
+        setFormData(prev => ({ ...prev, selectedDays: [date.getDay()] }))
         setShowModal(true)
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!selectedDate) return
+        if (formData.selectedDays.length === 0) return
 
         try {
-            // Create full datetime for start and end
-            const startDateTime = new Date(selectedDate)
-            const [startHour, startMin] = formData.startTime.split(':')
-            startDateTime.setHours(parseInt(startHour), parseInt(startMin), 0, 0)
+            // Create shifts for all selected days
+            const promises = formData.selectedDays.map(async (dayOfWeek) => {
+                // Calculate the date for this day in the current week
+                const shiftDate = new Date(currentWeekStart)
+                shiftDate.setDate(currentWeekStart.getDate() + dayOfWeek)
 
-            const endDateTime = new Date(selectedDate)
-            const [endHour, endMin] = formData.endTime.split(':')
-            endDateTime.setHours(parseInt(endHour), parseInt(endMin), 0, 0)
+                // Create full datetime for start and end
+                const startDateTime = new Date(shiftDate)
+                const [startHour, startMin] = formData.startTime.split(':')
+                startDateTime.setHours(parseInt(startHour), parseInt(startMin), 0, 0)
 
-            const res = await fetch('/api/schedule', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    employeeId: formData.employeeId,
-                    locationId: formData.locationId,
-                    date: selectedDate.toISOString(),
-                    startTime: startDateTime.toISOString(),
-                    endTime: endDateTime.toISOString()
+                const endDateTime = new Date(shiftDate)
+                const [endHour, endMin] = formData.endTime.split(':')
+                endDateTime.setHours(parseInt(endHour), parseInt(endMin), 0, 0)
+
+                return fetch('/api/schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        employeeId: formData.employeeId,
+                        locationId: formData.locationId,
+                        date: shiftDate.toISOString(),
+                        startTime: startDateTime.toISOString(),
+                        endTime: endDateTime.toISOString()
+                    })
                 })
             })
 
-            if (res.ok) {
-                fetchSchedules()
-                setShowModal(false)
-                setFormData(prev => ({ ...prev, employeeId: '', startTime: '09:00', endTime: '17:00' }))
-            }
+            await Promise.all(promises)
+            fetchSchedules()
+            setShowModal(false)
+            setFormData(prev => ({ ...prev, employeeId: '', startTime: '09:00', endTime: '17:00', selectedDays: [] }))
         } catch (error) {
             console.error('Error creating schedule:', error)
         }
@@ -406,15 +414,11 @@ export default function SchedulePage() {
             {showModal && selectedDate && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-md w-full p-6">
-                        <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center justify-between mb-4">
                             <div>
                                 <h3 className="text-xl font-bold text-stone-100">Add Shift</h3>
                                 <p className="text-sm text-stone-400 mt-1">
-                                    {selectedDate.toLocaleDateString('en-US', {
-                                        weekday: 'long',
-                                        month: 'long',
-                                        day: 'numeric'
-                                    })}
+                                    Week of {currentWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </p>
                             </div>
                             <button
@@ -423,6 +427,72 @@ export default function SchedulePage() {
                             >
                                 <X className="h-5 w-5 text-stone-400" />
                             </button>
+                        </div>
+
+                        {/* Day Selection */}
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-stone-300 mb-2">
+                                Select Days <span className="text-stone-500">({formData.selectedDays.length} selected)</span>
+                            </label>
+
+                            {/* Quick Presets */}
+                            <div className="flex gap-2 mb-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, selectedDays: [1, 2, 3, 4, 5] }))}
+                                    className="px-3 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-all"
+                                >
+                                    Weekdays
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, selectedDays: [0, 6] }))}
+                                    className="px-3 py-1 text-xs bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-all"
+                                >
+                                    Weekend
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, selectedDays: [0, 1, 2, 3, 4, 5, 6] }))}
+                                    className="px-3 py-1 text-xs bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30 transition-all"
+                                >
+                                    Full Week
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, selectedDays: [] }))}
+                                    className="px-3 py-1 text-xs bg-stone-700 text-stone-400 rounded-lg hover:bg-stone-600 transition-all"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+
+                            {/* Day Checkboxes */}
+                            <div className="grid grid-cols-7 gap-1">
+                                {days.map((day, index) => {
+                                    const isSelected = formData.selectedDays.includes(index)
+                                    return (
+                                        <button
+                                            key={day}
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    selectedDays: isSelected
+                                                        ? prev.selectedDays.filter(d => d !== index)
+                                                        : [...prev.selectedDays, index].sort()
+                                                }))
+                                            }}
+                                            className={`p-2 rounded-lg text-sm font-medium transition-all ${isSelected
+                                                    ? 'bg-orange-500 text-white'
+                                                    : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                                }`}
+                                        >
+                                            {day}
+                                        </button>
+                                    )
+                                })}
+                            </div>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-4">

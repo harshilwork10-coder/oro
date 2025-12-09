@@ -49,10 +49,10 @@ export default function LoginPage() {
                 <div className="relative z-10">
                     <div className="flex items-center gap-4 mb-6">
                         <div className="h-20 w-20 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20 shadow-lg overflow-hidden">
-                            <img src="/aura-logo-v2.png" alt="Aura" className="w-16 h-16 object-contain" />
+                            <img src="/trinex-logo.png" alt="Trinex" className="w-16 h-16 object-contain" />
                         </div>
                         <div>
-                            <h1 className="text-5xl font-bold text-white drop-shadow-lg">Aura</h1>
+                            <h1 className="text-5xl font-bold text-white drop-shadow-lg">Trinex AI</h1>
                             <p className="text-orange-100 text-lg font-medium">Ultimate Business Solution</p>
                         </div>
                     </div>
@@ -110,17 +110,17 @@ export default function LoginPage() {
                         <div className="relative">
                             <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full"></div>
                             <div className="relative h-16 w-16 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                                <img src="/aura-logo-v2.png" alt="Aura" className="w-16 h-16 object-contain" />
+                                <img src="/trinex-logo.png" alt="Trinex" className="w-16 h-16 object-contain" />
                             </div>
                         </div>
-                        <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">Aura</h1>
+                        <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">Trinex AI</h1>
                         <p className="text-stone-400 text-sm">Ultimate Business Solution</p>
                     </div>
 
                     <div className="glass-panel rounded-2xl p-8 border border-stone-800">
                         <div className="text-center mb-8">
                             <h2 className="text-2xl font-bold text-stone-100">Welcome back! 👋</h2>
-                            <p className="mt-2 text-stone-400">Sign in to your Aura account</p>
+                            <p className="mt-2 text-stone-400">Sign in to your Trinex account</p>
                         </div>
 
                         <form className="space-y-5" onSubmit={handleSubmit}>
@@ -188,7 +188,7 @@ export default function LoginPage() {
                     </div>
 
                     <p className="mt-8 text-center text-sm text-stone-600">
-                        © 2024 Aura POS System. All rights reserved.
+                        © 2024 Trinex POS System. All rights reserved.
                     </p>
                 </div>
             </div>

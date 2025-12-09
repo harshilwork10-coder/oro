@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { X, Monitor, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, Monitor, CheckCircle, AlertCircle, Loader2, XCircle } from 'lucide-react'
 import { PaxTerminal, PaxResponse } from '@/lib/pax/pax-terminal'
 
 interface PaxPaymentModalProps {
@@ -11,34 +11,77 @@ interface PaxPaymentModalProps {
 }
 
 export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, invoiceNumber }: PaxPaymentModalProps) {
-    const [status, setStatus] = useState<'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR'>('IDLE')
-    const [message, setMessage] = useState('Ready to process payment')
-    const [terminalIp, setTerminalIp] = useState('10.1.10.96')
+    const [status, setStatus] = useState<'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR' | 'CANCELLING'>('IDLE')
+    const [message, setMessage] = useState('Loading terminal settings...')
+    const [terminalIp, setTerminalIp] = useState('')
     const [terminalPort, setTerminalPort] = useState('10009')
+    const [settingsLoaded, setSettingsLoaded] = useState(false)
+    const abortControllerRef = useRef<AbortController | null>(null)
 
+    // Load PAX settings from database when modal opens
     useEffect(() => {
-        // Load settings from localStorage if available
-        const savedIp = localStorage.getItem('pax_ip')
-        const savedPort = localStorage.getItem('pax_port')
-        if (savedIp) setTerminalIp(savedIp)
-        if (savedPort) setTerminalPort(savedPort)
-    }, [])
-
-    // Auto-start payment when modal opens
-    useEffect(() => {
-        if (isOpen && status === 'IDLE') {
-            handleProcessPayment()
+        if (isOpen && !settingsLoaded) {
+            loadTerminalSettings()
         }
     }, [isOpen])
 
-    const handleProcessPayment = async () => {
+    const loadTerminalSettings = async () => {
+        try {
+            // Fetch PAX settings from current user's location
+            const res = await fetch('/api/pax/settings')
+            if (res.ok) {
+                const data = await res.json()
+                if (data.paxTerminalIP) {
+                    setTerminalIp(data.paxTerminalIP)
+                    setTerminalPort(data.paxTerminalPort || '10009')
+                    setSettingsLoaded(true)
+                    setMessage('Ready to process payment')
+                    // Auto-start after settings loaded
+                    setTimeout(() => handleProcessPayment(data.paxTerminalIP, data.paxTerminalPort || '10009'), 500)
+                } else {
+                    setMessage('PAX terminal not configured. Please contact your administrator.')
+                    setStatus('ERROR')
+                }
+            } else {
+                setMessage('Failed to load terminal settings')
+                setStatus('ERROR')
+            }
+        } catch (error) {
+            console.error('Error loading PAX settings:', error)
+            setMessage('Failed to load terminal settings')
+            setStatus('ERROR')
+        }
+    }
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort()
+            }
+        }
+    }, [])
+
+    const handleProcessPayment = async (ip?: string, port?: string) => {
+        const useIp = ip || terminalIp
+        const usePort = port || terminalPort
+
+        if (!useIp) {
+            setStatus('ERROR')
+            setMessage('PAX terminal IP not configured')
+            return
+        }
+
         setStatus('PROCESSING')
         setMessage('Initializing terminal...')
 
+        // Create abort controller for this request
+        abortControllerRef.current = new AbortController()
+
         try {
             const terminal = new PaxTerminal({
-                ip: terminalIp,
-                port: terminalPort,
+                ip: useIp,
+                port: usePort,
                 timeout: 120000 // 2 minutes
             })
 
@@ -61,15 +104,56 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
             }
 
         } catch (error: any) {
+            // Don't show error if we cancelled
+            if (status === 'CANCELLING') {
+                setStatus('IDLE')
+                setMessage('Transaction cancelled')
+                return
+            }
             console.error('PAX Error:', error)
             setStatus('ERROR')
-            setMessage(error.message || 'Failed to communicate with terminal')
+            setMessage(error.message || 'Failed to communicate with PAX terminal')
         }
     }
 
-    const saveSettings = () => {
-        localStorage.setItem('pax_ip', terminalIp)
-        localStorage.setItem('pax_port', terminalPort)
+    const handleCancelTransaction = async () => {
+        setStatus('CANCELLING')
+        setMessage('Cancelling transaction...')
+
+        // Abort any pending request
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort()
+        }
+
+        try {
+            // Send cancel command to PAX terminal
+            await fetch('/api/pax/cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ip: terminalIp,
+                    port: terminalPort
+                })
+            })
+        } catch (error) {
+            console.error('Cancel error:', error)
+        }
+
+        // Reset to idle state
+        setTimeout(() => {
+            setStatus('IDLE')
+            setMessage('Transaction cancelled - Ready for new payment')
+        }, 1000)
+    }
+
+    const handleClose = () => {
+        if (status === 'PROCESSING') {
+            handleCancelTransaction()
+        }
+        setStatus('IDLE')
+        setMessage('Loading terminal settings...')
+        setSettingsLoaded(false)
+        onClose()
     }
 
     if (!isOpen) return null
@@ -83,9 +167,8 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
                         PAX Terminal
                     </h2>
                     <button
-                        onClick={onClose}
-                        disabled={status === 'PROCESSING'}
-                        className="text-stone-400 hover:text-white disabled:opacity-50"
+                        onClick={handleClose}
+                        className="text-stone-400 hover:text-white"
                     >
                         <X className="h-6 w-6" />
                     </button>
@@ -101,67 +184,55 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
                     {/* Status Display */}
                     <div className={`rounded-xl p-6 border flex flex-col items-center justify-center gap-3 text-center min-h-[160px] transition-colors ${status === 'IDLE' ? 'bg-stone-950 border-stone-800' :
                         status === 'PROCESSING' ? 'bg-blue-900/20 border-blue-500/30' :
-                            status === 'SUCCESS' ? 'bg-emerald-900/20 border-emerald-500/30' :
-                                'bg-red-900/20 border-red-500/30'
+                            status === 'CANCELLING' ? 'bg-amber-900/20 border-amber-500/30' :
+                                status === 'SUCCESS' ? 'bg-emerald-900/20 border-emerald-500/30' :
+                                    'bg-red-900/20 border-red-500/30'
                         }`}>
                         {status === 'IDLE' && <Monitor className="h-12 w-12 text-stone-600" />}
                         {status === 'PROCESSING' && <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />}
+                        {status === 'CANCELLING' && <XCircle className="h-12 w-12 text-amber-500 animate-pulse" />}
                         {status === 'SUCCESS' && <CheckCircle className="h-12 w-12 text-emerald-500" />}
                         {status === 'ERROR' && <AlertCircle className="h-12 w-12 text-red-500" />}
 
                         <p className={`font-medium ${status === 'IDLE' ? 'text-stone-400' :
                             status === 'PROCESSING' ? 'text-blue-200' :
-                                status === 'SUCCESS' ? 'text-emerald-200' :
-                                    'text-red-200'
+                                status === 'CANCELLING' ? 'text-amber-200' :
+                                    status === 'SUCCESS' ? 'text-emerald-200' :
+                                        'text-red-200'
                             }`}>
                             {message}
                         </p>
                     </div>
 
-                    {/* Settings (Only visible when IDLE or ERROR) */}
-                    {(status === 'IDLE' || status === 'ERROR') && (
-                        <div className="space-y-3 pt-4 border-t border-stone-800">
-                            <p className="text-xs font-medium text-stone-500 uppercase">Terminal Settings</p>
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="col-span-2">
-                                    <label className="block text-xs text-stone-400 mb-1">IP Address</label>
-                                    <input
-                                        type="text"
-                                        value={terminalIp}
-                                        onChange={(e) => {
-                                            setTerminalIp(e.target.value)
-                                            saveSettings()
-                                        }}
-                                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
-                                        placeholder="127.0.0.1"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-stone-400 mb-1">Port</label>
-                                    <input
-                                        type="text"
-                                        value={terminalPort}
-                                        onChange={(e) => {
-                                            setTerminalPort(e.target.value)
-                                            saveSettings()
-                                        }}
-                                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
-                                        placeholder="10009"
-                                    />
-                                </div>
-                            </div>
+                    {/* CANCEL Button - Show during PROCESSING */}
+                    {status === 'PROCESSING' && (
+                        <button
+                            onClick={handleCancelTransaction}
+                            className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-lg transition-all border-2 border-red-500 shadow-lg"
+                        >
+                            <span className="flex items-center justify-center gap-2">
+                                <XCircle className="h-5 w-5" />
+                                Cancel Transaction
+                            </span>
+                        </button>
+                    )}
+
+                    {/* Show terminal info when loaded */}
+                    {settingsLoaded && (status === 'IDLE' || status === 'ERROR') && (
+                        <div className="text-center text-xs text-stone-500">
+                            Terminal: {terminalIp}:{terminalPort}
                         </div>
                     )}
 
                     {/* Action Button */}
-                    {status === 'IDLE' || status === 'ERROR' ? (
+                    {(status === 'IDLE' || status === 'ERROR') && settingsLoaded && (
                         <button
-                            onClick={handleProcessPayment}
+                            onClick={() => handleProcessPayment()}
                             className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all shadow-lg shadow-emerald-900/20"
                         >
                             Process Payment
                         </button>
-                    ) : null}
+                    )}
                 </div>
             </div>
         </div>

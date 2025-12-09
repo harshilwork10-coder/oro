@@ -6,8 +6,8 @@ import { Providers } from "./providers";
 const outfit = Outfit({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Aura | The ultimate business solution',
-  description: 'Comprehensive franchise management platform',
+  title: 'Trinex | The All-Seeing Business OS',
+  description: 'Complete franchise and business management platform with insights that see everything',
 };
 
 export const viewport: Viewport = {

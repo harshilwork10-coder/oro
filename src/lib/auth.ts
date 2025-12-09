@@ -50,13 +50,9 @@ export const authOptions: NextAuthOptions = {
                     approvalStatus = franchisor?.approvalStatus || 'PENDING'
                 } else if (user.role === 'ADMIN' || user.role === 'PROVIDER') {
                     approvalStatus = 'APPROVED'
-                } else if (user.locationId) {
-                    // For Franchisees/Employees linked to a location
-                    const location = await prisma.franchise.findUnique({
-                        where: { id: user.locationId },
-                        select: { approvalStatus: true }
-                    })
-                    approvalStatus = location?.approvalStatus || 'PENDING'
+                } else if (user.role === 'EMPLOYEE' || user.role === 'MANAGER') {
+                    // Employees and Managers are auto-approved (added by owner)
+                    approvalStatus = 'APPROVED'
                 } else if (user.role === 'FRANCHISEE' && user.franchiseId) {
                     // For Franchisee Owners linked to a franchise
                     const franchise = await prisma.franchise.findUnique({

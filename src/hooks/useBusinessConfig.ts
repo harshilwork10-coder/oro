@@ -12,6 +12,7 @@ export interface BusinessConfig {
     usesInventory: boolean
     usesAppointments: boolean
     usesScheduling: boolean
+    usesVirtualKeypad: boolean
     // Customer Features
     usesLoyalty: boolean
     usesGiftCards: boolean
@@ -21,6 +22,10 @@ export interface BusinessConfig {
     usesRoyalties: boolean
     usesTipping: boolean
     usesDiscounts: boolean
+    // Tax Configuration
+    taxRate: number
+    taxServices: boolean
+    taxProducts: boolean
     // Sales Features
     usesRetailProducts: boolean
     usesServices: boolean

@@ -24,9 +24,13 @@ export async function GET(request: Request) {
                 subtotal: Number(cart.subtotal),
                 tax: Number(cart.tax),
                 total: Number(cart.total),
-                totalCard: Number(cart.total) * 1.0399,
+                totalCard: Number(cart.total), // Same as cash - no surcharge
                 customerName: cart.customerName,
                 status: cart.status || 'ACTIVE',
+                showTipPrompt: (cart as any).showTipPrompt || false,
+                tipAmount: Number((cart as any).tipAmount || 0),
+                tipType: (cart as any).tipType || 'PERCENT',
+                tipSuggestions: (cart as any).tipSuggestions || '[15,20,25]',
                 empty: false
             })
         }
@@ -53,9 +57,13 @@ export async function GET(request: Request) {
             subtotal: Number(activeCart.subtotal),
             tax: Number(activeCart.tax),
             total: Number(activeCart.total),
-            totalCard: Number(activeCart.total) * 1.0399,
+            totalCard: Number(activeCart.total), // Same as cash - no surcharge
             customerName: activeCart.customerName,
             status: activeCart.status || 'ACTIVE',
+            showTipPrompt: (activeCart as any).showTipPrompt || false,
+            tipAmount: Number((activeCart as any).tipAmount || 0),
+            tipType: (activeCart as any).tipType || 'PERCENT',
+            tipSuggestions: (activeCart as any).tipSuggestions || '[15,20,25]',
             empty: false
         })
     } catch (error) {
@@ -81,7 +89,7 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json()
-        const { items, subtotal, tax, total, customerName, status } = body
+        const { items, subtotal, tax, total, customerName, status, showTipPrompt, tipAmount, tipType, tipSuggestions } = body
 
         await prisma.activeCart.upsert({
             where: { userId: user.id },
@@ -91,8 +99,12 @@ export async function POST(request: Request) {
                 tax,
                 total,
                 customerName,
-                status: status || 'ACTIVE'
-            },
+                status: status || 'ACTIVE',
+                showTipPrompt: showTipPrompt ?? undefined,
+                tipAmount: tipAmount ?? undefined,
+                tipType: tipType ?? undefined,
+                tipSuggestions: tipSuggestions ?? undefined
+            } as any,
             create: {
                 userId: user.id,
                 items: JSON.stringify(items),
@@ -100,8 +112,12 @@ export async function POST(request: Request) {
                 tax,
                 total,
                 customerName,
-                status: status || 'ACTIVE'
-            }
+                status: status || 'ACTIVE',
+                showTipPrompt: showTipPrompt ?? false,
+                tipAmount: tipAmount ?? 0,
+                tipType: tipType ?? 'PERCENT',
+                tipSuggestions: tipSuggestions ?? '[15,20,25]'
+            } as any
         })
 
         return NextResponse.json({ success: true })

@@ -131,16 +131,33 @@ export async function GET(req: Request) {
     // Validate user exists in DB (handle stale sessions after seed)
     const dbUser = await prisma.user.findUnique({
         where: { id: user.id },
-        select: { id: true, locationId: true }
+        select: { id: true, locationId: true, franchiseId: true }
     })
 
     if (!dbUser) {
         return NextResponse.json({ error: 'User not found' }, { status: 401 })
     }
 
+    // Get shiftRequirement from BusinessConfig
+    let shiftRequirement = 'BOTH' // Default
+    if (dbUser.franchiseId) {
+        // Find the franchisor for this franchise
+        const franchise = await prisma.franchise.findUnique({
+            where: { id: dbUser.franchiseId },
+            select: { franchisorId: true }
+        })
+        if (franchise?.franchisorId) {
+            const businessConfig = await prisma.businessConfig.findUnique({
+                where: { franchisorId: franchise.franchisorId },
+                select: { shiftRequirement: true }
+            })
+            if (businessConfig?.shiftRequirement) {
+                shiftRequirement = businessConfig.shiftRequirement
+            }
+        }
+    }
+
     // Get current open session for this user
-    // We assume a user can only have one open session at a time across locations? 
-    // Or strictly filter by current location if available.
     const whereClause: any = {
         status: 'OPEN',
         employeeId: dbUser.id
@@ -153,5 +170,6 @@ export async function GET(req: Request) {
         where: whereClause
     })
 
-    return NextResponse.json({ shift: currentSession })
+    return NextResponse.json({ shift: currentSession, shiftRequirement })
 }
+

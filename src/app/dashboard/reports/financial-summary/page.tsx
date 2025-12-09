@@ -10,18 +10,13 @@ function FinancialSummaryPage() {
             title="Financial Summary"
             description="Comprehensive financial overview across all metrics."
         >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="glass-panel p-6 rounded-xl border-l-4 border-emerald-500">
-                    <p className="text-sm text-stone-500 mb-1">Total Revenue</p>
-                    <p className="text-2xl font-bold text-stone-100">$295,100</p>
-                </div>
-                <div className="glass-panel p-6 rounded-xl border-l-4 border-blue-500">
-                    <p className="text-sm text-stone-500 mb-1">Total Expenses</p>
-                    <p className="text-2xl font-bold text-stone-100">$218,400</p>
-                </div>
-                <div className="glass-panel p-6 rounded-xl border-l-4 border-orange-500">
-                    <p className="text-sm text-stone-500 mb-1">Net Profit</p>
-                    <p className="text-2xl font-bold text-stone-100">$76,700</p>
+            <div className="glass-panel rounded-xl p-12">
+                <div className="text-center">
+                    <DollarSign className="w-16 h-16 text-stone-600 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-stone-300 mb-2">No Financial Data Available</h3>
+                    <p className="text-stone-500 max-w-md mx-auto">
+                        Financial summary will appear here once revenue and expense data is recorded.
+                    </p>
                 </div>
             </div>
         </ReportPageLayout>

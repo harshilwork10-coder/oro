@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { User, Check, ChevronRight } from 'lucide-react'
-import BreadLogo from '@/components/ui/BreadLogo'
+import TrinexLogo from '@/components/ui/TrinexLogo'
 
 export default function KioskCheckInPage() {
     const router = useRouter()
@@ -81,14 +81,14 @@ export default function KioskCheckInPage() {
     // Waiver step
     if (step === 'waiver') {
         return (
-            <div className="min-h-screen bg-stone-950 flex flex-col relative overflow-hidden">
+            <div className="h-screen bg-stone-950 flex flex-col relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-stone-900 to-stone-950 z-0" />
                 <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-orange-600/10 blur-[120px] rounded-full z-0" />
 
                 <div className="relative z-10 bg-stone-900/50 backdrop-blur-md border-b border-stone-800 p-6 shadow-lg flex items-center justify-center">
                     <div className="flex items-center gap-3">
-                        <BreadLogo size={32} />
-                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">Aura</span>
+                        <TrinexLogo size={32} />
+                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">Trinex AI</span>
                     </div>
                 </div>
 
@@ -106,7 +106,7 @@ export default function KioskCheckInPage() {
                                 <ul className="list-disc list-inside space-y-2 pl-2">
                                     <li>I have disclosed any allergies or sensitivities to products or ingredients</li>
                                     <li>I understand that results may vary and are not guaranteed</li>
-                                    <li>I release Aura from any liability for adverse reactions</li>
+                                    <li>I release Trinex from any liability for adverse reactions</li>
                                     <li>I consent to the services being performed by licensed professionals</li>
                                     <li>I agree to follow aftercare instructions provided</li>
                                 </ul>
@@ -142,14 +142,14 @@ export default function KioskCheckInPage() {
     // Loyalty program step
     if (step === 'loyalty') {
         return (
-            <div className="min-h-screen bg-stone-950 flex flex-col relative overflow-hidden">
+            <div className="h-screen bg-stone-950 flex flex-col relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-stone-900 to-stone-950 z-0" />
                 <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-orange-600/10 blur-[120px] rounded-full z-0" />
 
                 <div className="relative z-10 bg-stone-900/50 backdrop-blur-md border-b border-stone-800 p-6 shadow-lg flex items-center justify-center">
                     <div className="flex items-center gap-3">
-                        <BreadLogo size={32} />
-                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">Aura</span>
+                        <TrinexLogo size={32} />
+                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">Trinex AI</span>
                     </div>
                 </div>
 
@@ -207,7 +207,7 @@ export default function KioskCheckInPage() {
 
     if (step === 'welcome') {
         return (
-            <div className="min-h-screen bg-stone-950 flex items-center justify-center p-6 text-white text-center relative overflow-hidden">
+            <div className="h-screen bg-stone-950 flex items-center justify-center p-6 text-white text-center relative overflow-hidden">
                 {/* Background Glow */}
                 <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-orange-900/20 to-stone-900/50 z-0" />
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-orange-500/10 blur-[100px] rounded-full z-0" />
@@ -235,7 +235,7 @@ export default function KioskCheckInPage() {
     }
 
     return (
-        <div className="min-h-screen bg-stone-950 flex flex-col relative overflow-hidden">
+        <div className="h-screen bg-stone-950 flex flex-col relative overflow-hidden">
             {/* Background Glows */}
             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-stone-900 to-stone-950 z-0" />
             <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-orange-600/10 blur-[120px] rounded-full z-0" />
@@ -246,42 +246,42 @@ export default function KioskCheckInPage() {
                 <div className="flex items-center gap-3 group">
                     <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
                         <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                        <BreadLogo size={32} className="relative z-10 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
+                        <TrinexLogo size={32} className="relative z-10 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
                     </div>
                     <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-amber-200 to-orange-400 bg-clip-text text-transparent bg-[length:200%_auto] animate-text-shimmer">
-                        Aura
+                        Trinex
                     </span>
                 </div>
             </div>
 
-            <div className="flex-1 flex items-center justify-center p-6 relative z-10">
-                <div className="max-w-md w-full glass-panel rounded-3xl shadow-2xl p-8 border border-stone-800">
+            <div className="flex-1 flex items-center justify-center p-4 relative z-10">
+                <div className="max-w-md w-full glass-panel rounded-2xl shadow-2xl p-6 border border-stone-800">
                     {step === 'phone' ? (
-                        <form onSubmit={handlePhoneSubmit} className="space-y-6">
-                            <div className="text-center mb-8">
-                                <h2 className="text-2xl font-bold text-stone-100">Welcome! 👋</h2>
-                                <p className="text-stone-400">Please enter your mobile number to check in.</p>
+                        <form onSubmit={handlePhoneSubmit} className="space-y-4">
+                            <div className="text-center mb-4">
+                                <h2 className="text-xl font-bold text-stone-100">Welcome! 👋</h2>
+                                <p className="text-stone-400 text-sm">Please enter your mobile number to check in.</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-stone-400 mb-2">Mobile Number</label>
+                                <label className="block text-xs font-medium text-stone-400 mb-1">MOBILE NUMBER</label>
                                 <input
                                     type="tel"
                                     value={phone}
                                     readOnly
-                                    className="w-full text-3xl font-bold p-4 bg-stone-900/50 border-2 border-stone-800 rounded-2xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 text-center tracking-widest text-white placeholder-stone-700 transition-all cursor-default"
+                                    className="w-full text-2xl font-bold p-3 bg-stone-900/50 border-2 border-stone-800 rounded-xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 text-center tracking-widest text-white placeholder-stone-700 transition-all cursor-default"
                                     placeholder="(555) 555-5555"
                                 />
                             </div>
 
-                            {/* Numeric Keypad */}
-                            <div className="grid grid-cols-3 gap-3 mb-6">
+                            {/* Numeric Keypad - Compact */}
+                            <div className="grid grid-cols-3 gap-2">
                                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                                     <button
                                         key={num}
                                         type="button"
                                         onClick={() => setPhone(prev => prev.length < 10 ? prev + num : prev)}
-                                        className="h-16 text-2xl font-bold bg-stone-800/50 hover:bg-stone-700 text-stone-200 rounded-xl transition-all active:scale-95 border border-stone-700 hover:border-orange-500/50"
+                                        className="h-12 text-xl font-bold bg-stone-800/50 hover:bg-stone-700 text-stone-200 rounded-lg transition-all active:scale-95 border border-stone-700 hover:border-orange-500/50"
                                     >
                                         {num}
                                     </button>
@@ -289,30 +289,30 @@ export default function KioskCheckInPage() {
                                 <button
                                     type="button"
                                     onClick={() => setPhone('')}
-                                    className="h-16 text-sm font-medium bg-stone-800/30 hover:bg-red-900/20 text-stone-400 hover:text-red-400 rounded-xl transition-all active:scale-95 border border-stone-700 hover:border-red-500/30"
+                                    className="h-12 text-xs font-medium bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-all active:scale-95"
                                 >
-                                    Clear
+                                    ⌫
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setPhone(prev => prev.length < 10 ? prev + '0' : prev)}
-                                    className="h-16 text-2xl font-bold bg-stone-800/50 hover:bg-stone-700 text-stone-200 rounded-xl transition-all active:scale-95 border border-stone-700 hover:border-orange-500/50"
+                                    className="h-12 text-xl font-bold bg-stone-800/50 hover:bg-stone-700 text-stone-200 rounded-lg transition-all active:scale-95 border border-stone-700 hover:border-orange-500/50"
                                 >
                                     0
                                 </button>
                                 <button
-                                    type="button"
-                                    onClick={() => setPhone(prev => prev.slice(0, -1))}
-                                    className="h-16 flex items-center justify-center bg-stone-800/30 hover:bg-stone-700 text-stone-400 hover:text-white rounded-xl transition-all active:scale-95 border border-stone-700"
+                                    type="submit"
+                                    disabled={loading || phone.length < 10}
+                                    className="h-12 text-sm font-bold bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                                 >
-                                    <ChevronRight className="h-6 w-6 rotate-180" />
+                                    Enter
                                 </button>
                             </div>
 
                             <button
                                 type="submit"
                                 disabled={loading || phone.length < 10}
-                                className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+                                className="w-full py-3 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-xl font-bold text-lg hover:shadow-[0_0_20px_rgba(234,88,12,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
                             >
                                 {loading ? 'Checking...' : 'Continue'}
                                 {!loading && <ChevronRight className="h-5 w-5" />}

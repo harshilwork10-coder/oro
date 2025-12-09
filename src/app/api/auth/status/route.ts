@@ -39,6 +39,15 @@ export async function GET(req: NextRequest) {
         let documents = {}
         let needToDiscussProcessing = false
 
+        // PROVIDER, ADMIN, EMPLOYEE, MANAGER are always approved (no onboarding needed)
+        if (['PROVIDER', 'ADMIN', 'EMPLOYEE', 'MANAGER'].includes(user.role)) {
+            return NextResponse.json({
+                status: 'APPROVED',
+                needToDiscussProcessing: false,
+                documents: {}
+            })
+        }
+
         // Check if user is franchisor owner
         if (user.franchisor) {
             status = user.franchisor.approvalStatus || 'PENDING'

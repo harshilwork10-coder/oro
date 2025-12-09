@@ -31,6 +31,7 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.11",
     "prisma": "^5.22.0",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-simple-keyboard": "^3.8.137",

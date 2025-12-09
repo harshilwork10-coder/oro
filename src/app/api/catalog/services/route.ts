@@ -30,7 +30,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== 'FRANCHISOR' && session.user.role !== 'PROVIDER')) {
+    const user = session?.user as any
+
+    if (!user?.id || (user.role !== 'FRANCHISOR' && user.role !== 'PROVIDER')) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -40,6 +42,20 @@ export async function POST(req: Request) {
 
         if (!name || !defaultPrice || !franchisorId) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+        }
+
+        // Security: Verify user owns this franchisor or is PROVIDER
+        const franchisor = await prisma.franchisor.findUnique({
+            where: { id: franchisorId },
+            select: { ownerId: true }
+        })
+
+        if (!franchisor) {
+            return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })
+        }
+
+        if (franchisor.ownerId !== user.id && user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         const newService = await prisma.globalService.create({

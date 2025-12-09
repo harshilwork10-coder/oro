@@ -6,41 +6,55 @@ import { DollarSign, X } from 'lucide-react'
 interface TipModalProps {
     isOpen: boolean
     subtotal: number
+    tipType?: 'PERCENT' | 'DOLLAR'
+    suggestions?: number[]
     onTipSelected: (tipAmount: number) => void
     onClose: () => void
 }
 
-const TIP_PERCENTAGES = [15, 18, 20, 25]
+const DEFAULT_PERCENTAGES = [15, 18, 20, 25]
+const DEFAULT_DOLLARS = [2, 5, 10, 15]
 
-export default function TipModal({ isOpen, subtotal, onTipSelected, onClose }: TipModalProps) {
-    const [selectedPercent, setSelectedPercent] = useState<number | null>(null)
+export default function TipModal({
+    isOpen,
+    subtotal,
+    tipType = 'PERCENT',
+    suggestions,
+    onTipSelected,
+    onClose
+}: TipModalProps) {
+    const [selectedOption, setSelectedOption] = useState<number | null>(null)
     const [customTip, setCustomTip] = useState('')
 
     if (!isOpen) return null
 
-    const handlePercentClick = (percent: number) => {
-        setSelectedPercent(percent)
+    const tipOptions = suggestions || (tipType === 'PERCENT' ? DEFAULT_PERCENTAGES : DEFAULT_DOLLARS)
+
+    const handleOptionClick = (value: number) => {
+        setSelectedOption(value)
         setCustomTip('')
-        const tipAmount = subtotal * (percent / 100)
+        const tipAmount = tipType === 'PERCENT' ? subtotal * (value / 100) : value
         onTipSelected(tipAmount)
     }
 
     const handleCustomTipChange = (value: string) => {
         setCustomTip(value)
-        setSelectedPercent(null)
+        setSelectedOption(null)
         const tipAmount = parseFloat(value) || 0
         onTipSelected(tipAmount)
     }
 
     const handleNoTip = () => {
-        setSelectedPercent(null)
+        setSelectedOption(null)
         setCustomTip('')
         onTipSelected(0)
     }
 
     const getTipAmount = () => {
-        if (selectedPercent !== null) {
-            return (subtotal * (selectedPercent / 100)).toFixed(2)
+        if (selectedOption !== null) {
+            return tipType === 'PERCENT'
+                ? (subtotal * (selectedOption / 100)).toFixed(2)
+                : selectedOption.toFixed(2)
         }
         if (customTip) {
             return parseFloat(customTip).toFixed(2)
@@ -50,6 +64,19 @@ export default function TipModal({ isOpen, subtotal, onTipSelected, onClose }: T
 
     const getTotal = () => {
         return (subtotal + parseFloat(getTipAmount())).toFixed(2)
+    }
+
+    const formatOption = (value: number) => {
+        if (tipType === 'PERCENT') {
+            return {
+                label: `${value}%`,
+                amount: `$${(subtotal * (value / 100)).toFixed(2)}`
+            }
+        }
+        return {
+            label: `$${value}`,
+            amount: ''
+        }
     }
 
     return (
@@ -68,23 +95,28 @@ export default function TipModal({ isOpen, subtotal, onTipSelected, onClose }: T
                     <p className="text-6xl font-bold text-white">${subtotal.toFixed(2)}</p>
                 </div>
 
-                {/* Tip Percentage Buttons */}
+                {/* Tip Option Buttons */}
                 <div className="grid grid-cols-4 gap-4 mb-8">
-                    {TIP_PERCENTAGES.map((percent) => (
-                        <button
-                            key={percent}
-                            onClick={() => handlePercentClick(percent)}
-                            className={`py-8 rounded-2xl text-3xl font-bold transition-all transform active:scale-95 ${selectedPercent === percent
+                    {tipOptions.map((value) => {
+                        const formatted = formatOption(value)
+                        return (
+                            <button
+                                key={value}
+                                onClick={() => handleOptionClick(value)}
+                                className={`py-8 rounded-2xl text-3xl font-bold transition-all transform active:scale-95 ${selectedOption === value
                                     ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-[0_0_40px_rgba(34,197,94,0.5)] scale-105'
                                     : 'bg-white/5 text-white hover:bg-white/10 border-2 border-white/20'
-                                }`}
-                        >
-                            {percent}%
-                            <div className="text-lg font-normal mt-2 text-stone-300">
-                                ${(subtotal * (percent / 100)).toFixed(2)}
-                            </div>
-                        </button>
-                    ))}
+                                    }`}
+                            >
+                                {formatted.label}
+                                {formatted.amount && (
+                                    <div className="text-lg font-normal mt-2 text-stone-300">
+                                        {formatted.amount}
+                                    </div>
+                                )}
+                            </button>
+                        )
+                    })}
                 </div>
 
                 {/* Custom Tip Input */}
@@ -109,7 +141,7 @@ export default function TipModal({ isOpen, subtotal, onTipSelected, onClose }: T
                             <p className="text-stone-300 text-lg">Total with Tip</p>
                             <p className="text-5xl font-bold text-white mt-2">${getTotal()}</p>
                         </div>
-                        {(selectedPercent !== null || customTip) && (
+                        {(selectedOption !== null || customTip) && (
                             <div className="text-right">
                                 <p className="text-green-400 text-lg">Tip Amount</p>
                                 <p className="text-3xl font-bold text-green-400 mt-2">${getTipAmount()}</p>
@@ -140,3 +172,4 @@ export default function TipModal({ isOpen, subtotal, onTipSelected, onClose }: T
         </div>
     )
 }
+

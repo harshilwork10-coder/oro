@@ -1,5 +1,5 @@
 /**
- * Aura POS - Eye-Friendly Color System
+ * Trinex POS - Eye-Friendly Color System
  * Optimized for 8+ hour daily use with reduced eye strain
  */
 

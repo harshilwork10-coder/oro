@@ -7,22 +7,37 @@ import { authOptions } from '@/lib/auth'
 export async function GET(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        // Get user's franchise/location
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email },
+            select: { franchiseId: true, locationId: true }
+        })
+
         const { searchParams } = new URL(req.url)
-        const locationId = searchParams.get('locationId')
+        let locationId = searchParams.get('locationId')
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
         const employeeId = searchParams.get('employeeId')
 
-        if (!locationId) {
-            return NextResponse.json({ error: 'Location ID required' }, { status: 400 })
-        }
+        // Build where clause
+        const where: any = {}
 
-        const where: any = {
-            locationId,
+        // If no locationId provided, get appointments for user's franchise
+        if (locationId) {
+            where.locationId = locationId
+        } else if (user?.franchiseId) {
+            // Get all locations for this franchise
+            const locations = await prisma.location.findMany({
+                where: { franchiseId: user.franchiseId },
+                select: { id: true }
+            })
+            where.locationId = { in: locations.map(l => l.id) }
+        } else {
+            return NextResponse.json([])
         }
 
         // Filter by date range
@@ -67,7 +82,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = session?.user as any
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -77,6 +94,20 @@ export async function POST(req: NextRequest) {
         // Validate required fields
         if (!clientId || !serviceId || !employeeId || !locationId || !startTime || !endTime) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+        }
+
+        // Security: Verify location belongs to user's franchise
+        const location = await prisma.location.findUnique({
+            where: { id: locationId },
+            select: { franchiseId: true }
+        })
+
+        if (!location) {
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+        }
+
+        if (location.franchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         // Check for time conflicts

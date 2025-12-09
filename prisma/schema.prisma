@@ -17,6 +17,7 @@ model User {
   password String? // Optional for passwordless/PIN users
   pin      String? // Hashed 4-digit PIN for quick login
   image    String?
+  dailyGoal Float @default(500)
   role     String  @default("EMPLOYEE") // Will migrate to Enum in next step, keeping string for now to avoid breaking existing data immediately, but logic will use Enum values: FRANCHISOR, FRANCHISEE, MANAGER, SHIFT_SUPERVISOR, EMPLOYEE
 
   // Permissions - Now role-based with overrides
@@ -82,6 +83,14 @@ model User {
   commissionTiers    CommissionTier[]       @relation("EmployeeCommissionTiers")
   serviceOverrides   ServiceCommissionOverride[] @relation("EmployeeServiceOverrides")
   payrollEntries     PayrollEntry[]         @relation("EmployeePayrollEntries")
+  
+  // Chat Support Relations
+  assignedChats      ChatConversation[]     @relation("AssignedChats")
+  sentChatMessages   ChatMessage[]          @relation("SentChatMessages")
+  
+  // Live Support Chats
+  supportChats       SupportChat[]
+  assignedSupportChats SupportChat[] @relation("AssignedChats")
 }
 
 model Franchise {
@@ -126,8 +135,14 @@ model Franchise {
   clients           Client[]
   reviews           Review[]
   expansionRequests ExpansionRequest[] // Expansion requests from franchisees
+  chatConversations ChatConversation[] // Customer support chats
 
   settings FranchiseSettings?
+  reminderSettings ReminderSettings?
+  smsCredits       SmsCredits?
+  smsMarketingRules SmsMarketingRule[]
+  customerPromos    CustomerPromo[]
+  servicePackages   ServicePackage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -147,8 +162,188 @@ model FranchiseSettings {
   // Display Options
   showDualPricing Boolean @default(true) // Show both cash/card prices
 
+  // Service Industry Feature Toggles
+  enablePackages         Boolean @default(true)   // Service packages/bundles
+  enableResources        Boolean @default(false)  // Rooms/chairs scheduling (off by default for simpler operations)
+  enableClientPhotos     Boolean @default(false)  // Before/after photos (off - privacy concern)
+  enableRecurringBooking Boolean @default(true)   // Recurring appointments
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Reminder settings for automated appointment notifications
+model ReminderSettings {
+  id              String    @id @default(cuid())
+  franchiseId     String    @unique
+  franchise       Franchise @relation(fields: [franchiseId], references: [id])
+
+  // Email Settings
+  emailEnabled         Boolean @default(true)
+  confirmationEmail    Boolean @default(true)  // Send confirmation on booking
+  reminder24hEmail     Boolean @default(true)  // 24 hour reminder
+  reminder2hEmail      Boolean @default(true)  // 2 hour reminder
+
+  // SMS Settings - franchise-level toggles (uses provider's Twilio)
+  smsEnabled           Boolean @default(false)
+  smsApproved          Boolean @default(false) // Provider must approve SMS access
+  smsRequestedAt       DateTime?               // When franchise requested SMS access
+  confirmationSms      Boolean @default(false)
+  reminder24hSms       Boolean @default(false)
+  reminder2hSms        Boolean @default(false)
+  approvalSms          Boolean @default(true)  // Send SMS when booking approved
+  cancellationSms      Boolean @default(true)  // Send SMS when booking cancelled
+  waitlistSms          Boolean @default(true)  // Send SMS when waitlist turn
+
+  // Legacy franchise-level Twilio (deprecated - use provider-level)
+  twilioAccountSid     String?
+  twilioAuthToken      String?
+  twilioPhoneNumber    String?
+
+  // Custom Message Templates
+  emailSubject         String  @default("Appointment Reminder")
+  emailTemplate        String? // Custom HTML template
+  smsTemplate          String? // Custom SMS text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Provider-level SMS/Twilio configuration
+// Set once by provider, used by all franchises with approved SMS access
+model ProviderSmsConfig {
+  id                   String   @id @default(cuid())
+  
+  // SMS Packages pricing (what you sell to franchises)
+  // Package 1
+  package1Name         String   @default("Starter")
+  package1Credits      Int      @default(100)
+  package1Price        Decimal  @default(4.99)
+  
+  // Package 2
+  package2Name         String   @default("Growth")
+  package2Credits      Int      @default(200)
+  package2Price        Decimal  @default(8.99)
+  
+  // Package 3
+  package3Name         String   @default("Business")
+  package3Credits      Int      @default(500)
+  package3Price        Decimal  @default(19.99)
+  
+  // Package 4
+  package4Name         String   @default("Enterprise")
+  package4Credits      Int      @default(1000)
+  package4Price        Decimal  @default(34.99)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Track SMS credits and usage per franchise
+model SmsCredits {
+  id          String    @id @default(cuid())
+  franchiseId String    @unique
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  
+  creditsRemaining Int      @default(0)  // Current SMS credits
+  creditsUsed      Int      @default(0)  // Total SMS sent
+  lastTopupAt      DateTime?             // Last time credits were added
+  lastPackage      String?               // Last package purchased
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Log each SMS sent for tracking
+model SmsLog {
+  id          String   @id @default(cuid())
+  franchiseId String
+  
+  toPhone     String
+  message     String
+  status      String   @default("sent") // sent, failed, pending
+  twilioSid   String?  // Twilio message SID
+  errorMsg    String?
+  
+  createdAt DateTime @default(now())
+}
+
+// Automated SMS Marketing Rules - Owner configures, system auto-sends
+model SmsMarketingRule {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  
+  name        String               // "Win-Back", "Birthday", "VIP Reward"
+  ruleType    String               // WIN_BACK, BIRTHDAY, VIP, REVIEW_REQUEST, CUSTOM
+  isActive    Boolean   @default(true)
+  
+  // ===== CUSTOMER FILTERS =====
+  // Time-based filters
+  daysInactive    Int?      @default(28)  // Days since last visit
+  daysInactiveMax Int?                     // Max days inactive (e.g., 28-60 days only)
+  
+  // Spending filters
+  minSpendTotal   Decimal?               // Minimum lifetime spend
+  maxSpendTotal   Decimal?               // Maximum lifetime spend
+  minSpendPerVisit Decimal?              // Avg spend per visit minimum
+  
+  // Visit count filters
+  minVisitCount   Int?                   // Min number of visits
+  maxVisitCount   Int?                   // Max visits (target new customers)
+  
+  // Service filters
+  lastServiceId   String?               // Only customers who got this service last
+  anyServiceId    String?               // Customers who ever got this service
+  
+  // Contact filters
+  hasPhone        Boolean  @default(true)  // Must have phone (required for SMS)
+  hasEmail        Boolean  @default(false) // Must have email
+  
+  // ===== REWARD SETTINGS =====
+  discountType    String    @default("PERCENTAGE") // PERCENTAGE, FIXED_AMOUNT
+  discountValue   Decimal   @default(10)           // 10 = 10% or $10
+  validityDays    Int       @default(7)            // Promo expires after X days
+  
+  // Message template
+  messageTemplate String?   // Custom SMS template, uses {firstName}, {discount}, {expiry}
+  
+  // ===== LIMITS =====
+  maxSendsPerDay  Int?                   // Limit daily sends (cost control)
+  maxSendsTotal   Int?                   // Total limit for this rule
+  
+  // Stats
+  sentCount       Int       @default(0)
+  redeemedCount   Int       @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Customer Promos - Auto-generated from rules, redeemed at POS
+model CustomerPromo {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id])
+  
+  ruleType    String               // What triggered this: WIN_BACK, BIRTHDAY, etc.
+  ruleName    String               // Display name: "Win-Back 10% Off"
+  
+  // Discount details
+  discountType    String           // PERCENTAGE, FIXED_AMOUNT
+  discountValue   Decimal          // 10 = 10% or $10
+  
+  // Status
+  status      String    @default("ACTIVE") // ACTIVE, REDEEMED, EXPIRED
+  expiresAt   DateTime
+  redeemedAt  DateTime?
+  
+  // Exclusions
+  excludeFromLoyalty Boolean @default(true) // Discounted portion doesn't earn points
+  
+  createdAt DateTime @default(now())
 }
 
 model Location {
@@ -180,6 +375,16 @@ model Location {
   processorVAR    String? // VAR/Reseller ID (if applicable)
   paxTerminalIP   String? // PAX device IP address
   paxTerminalPort String  @default("10009") // PAX device port
+
+  waitlistEntries WaitlistEntry[] // Walk-in queue
+
+  // Google Reviews Integration
+  googlePlaceId     String? // Google Place ID for review links
+
+  // New Relations
+  resources            Resource[]
+  recurringAppointments RecurringAppointment[]
+  checkIns             CheckIn[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -288,6 +493,11 @@ model Service {
 
   appointments         Appointment[]
   transactionLineItems TransactionLineItem[]
+  waitlistEntries      WaitlistEntry[]
+  
+  // New Relations
+  packages             ServicePackage[]
+  recurringAppointments RecurringAppointment[]
 }
 
 model Client {
@@ -300,6 +510,16 @@ model Client {
   liabilitySigned Boolean @default(false)
   loyaltyJoined   Boolean @default(false)
 
+  // Client Notes & Preferences
+  allergies        String?   // "Latex, essential oils, etc."
+  preferences      String?   // "Light pressure, prefers silence"
+  internalNotes    String?   // Staff-only notes
+  vipStatus        Boolean   @default(false)
+
+  // Photo Consent
+  photoConsent     Boolean   @default(false)
+  photoConsentDate DateTime?
+
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
@@ -308,6 +528,15 @@ model Client {
   loyalty      ClientLoyalty?
   transactions Transaction[]
   reviews      Review[]
+  chatConversations ChatConversation[] // Support chat conversations
+  customerPromos    CustomerPromo[]    // Auto-applied promotions
+  
+  // New Relations
+  photos           ClientPhoto[]
+  notes            ClientNote[]
+  packagePurchases PackagePurchase[]
+  recurringAppointments RecurringAppointment[]
+  checkIns             CheckIn[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -326,6 +555,14 @@ model Appointment {
 
   employeeId String
   employee   User   @relation(fields: [employeeId], references: [id])
+
+  // Resource (chair/room) - Optional
+  resourceId String?
+  resource   Resource? @relation(fields: [resourceId], references: [id])
+
+  // Recurring appointment - Optional
+  recurringId String?
+  recurring   RecurringAppointment? @relation(fields: [recurringId], references: [id])
 
   startTime DateTime
   endTime   DateTime
@@ -416,6 +653,11 @@ model Transaction {
   cardType    String? // Visa, MasterCard, etc.
 
   status String @default("COMPLETED") // COMPLETED, REFUNDED, VOIDED
+
+  // Void Tracking (Audit Trail)
+  voidedById  String?   // User who voided this transaction
+  voidedAt    DateTime? // When the transaction was voided
+  voidReason  String?   // Optional reason for voiding
 
   cashDrawerSessionId String?
   cashDrawerSession   CashDrawerSession? @relation(fields: [cashDrawerSessionId], references: [id])
@@ -691,19 +933,9 @@ model CommissionRule {
   createdAt DateTime @default(now())
 }
 
+
 // ============ LOYALTY & GIFT CARDS ============
-
-model LoyaltyProgram {
-  id          String    @id @default(cuid())
-  franchiseId String    @unique
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
-
-  isEnabled       Boolean @default(true)
-  pointsPerDollar Decimal @default(1.0)
-  redemptionRatio Decimal @default(0.01) // 100 points = $1.00
-
-  createdAt DateTime @default(now())
-}
+// Note: LoyaltyProgram model is defined in MULTI-BRAND LOYALTY SYSTEM section below
 
 model ClientLoyalty {
   id       String @id @default(cuid())
@@ -875,10 +1107,14 @@ model Review {
   feedbackTag String? // Selected feedback tag (e.g., "Amazing service! ⭐")
   comment     String? // Optional text comment
 
-  // Google Business integration (future)
-  googleReviewId String? // Google My Business review ID when posted
-  postedToGoogle Boolean   @default(false)
-  postedAt       DateTime?
+  // Location reference
+  locationId String? // Which location this review is for
+
+  // Google Business integration
+  googleReviewId    String?   // Google My Business review ID when posted
+  postedToGoogle    Boolean   @default(false)
+  redirectedToGoogle Boolean  @default(false) // Was customer redirected to Google?
+  postedAt          DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -962,6 +1198,7 @@ model BusinessConfig {
   usesInventory    Boolean @default(true)
   usesAppointments Boolean @default(true)
   usesScheduling   Boolean @default(true)
+  usesVirtualKeypad Boolean @default(true)
 
   // Customer Features
   usesLoyalty     Boolean @default(true)
@@ -973,6 +1210,11 @@ model BusinessConfig {
   usesRoyalties Boolean @default(false) // Only for franchisors
   usesTipping   Boolean @default(true)
   usesDiscounts Boolean @default(true)
+  
+  // Tax Configuration
+  taxRate       Float    @default(0.08)
+  taxServices   Boolean  @default(true)
+  taxProducts   Boolean  @default(true)
 
   // Sales Features
   usesRetailProducts Boolean @default(true)
@@ -989,6 +1231,13 @@ model BusinessConfig {
   usesTimeTracking  Boolean @default(true)
   usesPayroll       Boolean @default(false)
   
+  // Shift Requirement for POS employees
+  // CLOCK_IN_ONLY = Simple clock in, no cash counting
+  // CASH_COUNT_ONLY = Cash counting only, no time tracking
+  // BOTH = Full clock-in with cash counting (default)
+  // NONE = No shift required, go straight to POS
+  shiftRequirement  String  @default("BOTH")
+  
   // ============ WORKFLOW SETTINGS ============
   
   // Review Request Workflows
@@ -999,7 +1248,8 @@ model BusinessConfig {
   // Tip Settings
   tipPromptEnabled    Boolean @default(true)
   tipPromptTiming     String  @default("AT_CHECKOUT") // AT_CHECKOUT, NEVER
-  tipSuggestions      String  @default("[15,20,25]")  // JSON array of percentages
+  tipSuggestions      String  @default("[15,20,25]")  // JSON array of percentages or dollar amounts
+  tipType             String  @default("PERCENT")     // PERCENT or DOLLAR
   tipPoolingEnabled   Boolean @default(false)
   
   // Commission Calculation
@@ -1416,4 +1666,409 @@ model DrawerActivity {
   @@index([type])
   @@index([timestamp])
   @@index([shiftId])
+}
+
+// ============ CUSTOMER SUPPORT CHAT ============
+
+model ChatConversation {
+  id           String   @id @default(cuid())
+  franchiseId  String
+  franchise    Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  // Customer info (can be guest or registered client)
+  customerName  String?
+  customerEmail String?
+  customerPhone String?
+  clientId      String?  // If linked to existing client
+  client        Client?  @relation(fields: [clientId], references: [id])
+  
+  // Status and assignment
+  status       String   @default("OPEN") // OPEN, RESOLVED, SPAM
+  assignedToId String?  // Staff member ID
+  assignedTo   User?    @relation("AssignedChats", fields: [assignedToId], references: [id])
+  
+  // Tracking
+  lastMessageAt DateTime?
+  unreadCount   Int      @default(0)
+  
+  messages     ChatMessage[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@index([franchiseId])
+  @@index([status])
+  @@index([lastMessageAt])
+}
+
+model ChatMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  senderType     String   // CUSTOMER, STAFF, SYSTEM
+  senderId       String?  // User ID if staff sent it
+  sender         User?    @relation("SentChatMessages", fields: [senderId], references: [id])
+  
+  content        String
+  isRead         Boolean  @default(false)
+  
+  createdAt      DateTime @default(now())
+  
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+// Waitlist / Walk-in Queue
+model WaitlistEntry {
+  id            String   @id @default(cuid())
+  locationId    String
+  customerName  String
+  customerPhone String?
+  customerEmail String?
+  partySize     Int      @default(1)
+  serviceId     String?
+  notes         String?
+  status        String   @default("WAITING") // WAITING, NOTIFIED, SEATED, NO_SHOW, CANCELLED
+  position      Int
+  estimatedWait Int?     // minutes
+  checkedInAt   DateTime @default(now())
+  seatedAt      DateTime?
+  notifiedAt    DateTime?
+  
+  location      Location  @relation(fields: [locationId], references: [id])
+  service       Service?  @relation(fields: [serviceId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([locationId])
+  @@index([status])
+  @@index([checkedInAt])
+}
+
+// Client Waiver / Liability Form - Stores signed consent forms for legal protection
+model ClientWaiver {
+  id            String   @id @default(cuid())
+  franchiseId   String
+  clientId      String?  // Optional - may not exist yet for new customers
+  appointmentId String?  // Link to the appointment if signed during booking
+
+  // Customer Info (stored separately in case client record changes)
+  customerName  String
+  customerEmail String
+  customerPhone String?
+
+  // Waiver Details
+  waiverVersion String   @default("1.0") // Version of the waiver text
+  waiverText    String   // The actual waiver/terms text they agreed to
+  
+  // Digital Signature / Consent
+  signatureName  String   // Typed name as signature
+  signatureDate  DateTime @default(now()) // When they signed
+  consentGiven   Boolean  @default(true)
+  
+  // Legal Evidence
+  ipAddress     String?  // IP address when signed
+  userAgent     String?  // Browser info
+  
+  // Status
+  isActive      Boolean  @default(true) // False if superseded by newer waiver
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([franchiseId])
+  @@index([clientId])
+  @@index([customerEmail])
+  @@index([signatureDate])
+}
+
+// ============ LIVE CHAT SUPPORT ============
+
+model SupportChat {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  status       String   @default("OPEN") // OPEN, CLOSED, WAITING_SUPPORT, WAITING_USER
+  priority     String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  subject      String?
+  
+  // Assignment
+  assigneeId   String?
+  assignee     User?    @relation("AssignedChats", fields: [assigneeId], references: [id])
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  closedAt     DateTime?
+  
+  messages     SupportMessage[]
+  
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@index([assigneeId])
+}
+
+model SupportMessage {
+  id        String      @id @default(cuid())
+  chatId    String
+  chat      SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  content   String
+  sender    String      // USER or SUPPORT
+  senderId  String?     // User ID if USER, null for system/support
+  
+  readAt    DateTime?
+  createdAt DateTime    @default(now())
+  
+  @@index([chatId])
+  @@index([createdAt])
+}
+
+// ============ MULTI-BRAND LOYALTY SYSTEM ============
+
+// Brand-specific loyalty program configuration
+model LoyaltyProgram {
+  id              String    @id @default(cuid())
+  franchiseId     String    @unique
+  franchise       Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  name            String    @default("Rewards")
+  isEnabled       Boolean   @default(true)
+  pointsPerDollar Decimal   @default(1)    // Points earned per dollar spent
+  redemptionRatio Decimal   @default(0.01) // Dollar value per point (0.01 = 1 cent)
+  
+  members         LoyaltyMember[]
+  pointsHistory   PointsTransaction[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Customer membership in a specific loyalty program
+model LoyaltyMember {
+  id              String         @id @default(cuid())
+  programId       String
+  program         LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  
+  // Customer identification
+  phone           String         // Primary lookup key
+  email           String?
+  name            String?
+  
+  // Points balance for THIS program (used when not linked)
+  pointsBalance   Int            @default(0)
+  lifetimePoints  Int            @default(0)
+  lifetimeSpend   Decimal        @default(0)
+  
+  // Link to master account for cross-brand pooled balance
+  masterAccountId String?
+  masterAccount   LoyaltyMasterAccount? @relation(fields: [masterAccountId], references: [id])
+  
+  enrolledAt      DateTime       @default(now())
+  lastActivity    DateTime       @default(now())
+  
+  @@unique([programId, phone])
+  @@index([phone])
+  @@index([masterAccountId])
+}
+
+// Master account for pooled cross-brand loyalty
+model LoyaltyMasterAccount {
+  id              String          @id @default(cuid())
+  
+  // Customer identity
+  phone           String          @unique
+  email           String?
+  name            String?
+  
+  // POOLED balance across all linked programs
+  pooledBalance   Int             @default(0)
+  lifetimePoints  Int             @default(0)
+  
+  // Linked program memberships
+  linkedMembers   LoyaltyMember[]
+  pointsHistory   PointsTransaction[]
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Points transaction history
+model PointsTransaction {
+  id              String               @id @default(cuid())
+  
+  // Can belong to program OR master account
+  programId       String?
+  program         LoyaltyProgram?      @relation(fields: [programId], references: [id])
+  masterAccountId String?
+  masterAccount   LoyaltyMasterAccount? @relation(fields: [masterAccountId], references: [id])
+  
+  type            String               // EARN, REDEEM, ADJUST, LINK_TRANSFER
+  points          Int                  // Positive for earn, negative for redeem
+  description     String?
+  
+  // Reference to sale transaction
+  transactionId   String?
+  franchiseId     String?              // Which location the transaction occurred at
+  
+  createdAt       DateTime             @default(now())
+  
+  @@index([programId, createdAt])
+  @@index([masterAccountId, createdAt])
+}
+
+// ============ SERVICE INDUSTRY FEATURES ============
+
+// Service Packages - "Buy 5 massages, get 1 free"
+model ServicePackage {
+  id           String    @id @default(cuid())
+  franchiseId  String
+  franchise    Franchise @relation(fields: [franchiseId], references: [id])
+  
+  name         String                    // "5 Massage Bundle"
+  description  String?
+  serviceId    String                    // Which service this covers
+  service      Service   @relation(fields: [serviceId], references: [id])
+  
+  sessionsIncluded Int                   // 5, 10, etc.
+  price           Decimal               // Package price
+  validityDays    Int       @default(365) // Expires after X days
+  isActive        Boolean   @default(true)
+  
+  purchases    PackagePurchase[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// Purchase of a package by a client
+model PackagePurchase {
+  id           String         @id @default(cuid())
+  packageId    String
+  package      ServicePackage @relation(fields: [packageId], references: [id])
+  clientId     String
+  client       Client         @relation(fields: [clientId], references: [id])
+  
+  sessionsUsed    Int       @default(0)
+  sessionsRemaining Int
+  purchaseDate    DateTime  @default(now())
+  expiresAt       DateTime
+  transactionId   String?               // Original purchase transaction
+  
+  usages       PackageUsage[]
+  createdAt    DateTime  @default(now())
+}
+
+// Track each time a package session is used
+model PackageUsage {
+  id           String          @id @default(cuid())
+  purchaseId   String
+  purchase     PackagePurchase @relation(fields: [purchaseId], references: [id])
+  
+  usedAt       DateTime  @default(now())
+  appointmentId String?                 // Optional link to appointment
+  employeeId    String?                 // Who performed service
+  notes         String?
+}
+
+// Resources - Chairs, Rooms, Equipment
+model Resource {
+  id           String    @id @default(cuid())
+  locationId   String
+  location     Location  @relation(fields: [locationId], references: [id])
+  
+  name         String                    // "Chair 1", "Room A", "Laser Machine"
+  type         String    @default("CHAIR") // CHAIR, ROOM, EQUIPMENT
+  description  String?
+  capacity     Int       @default(1)     // How many clients at once
+  isActive     Boolean   @default(true)
+  sortOrder    Int       @default(0)
+  
+  // Services that can use this resource (comma-separated IDs or null for all)
+  allowedServiceIds String?
+  
+  appointments Appointment[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// Client Before/After Photos
+model ClientPhoto {
+  id           String    @id @default(cuid())
+  clientId     String
+  client       Client    @relation(fields: [clientId], references: [id])
+  
+  photoUrl     String                    // Storage URL
+  photoType    String    @default("PROGRESS") // BEFORE, AFTER, PROGRESS
+  caption      String?
+  serviceId    String?                   // What service this relates to
+  takenAt      DateTime  @default(now())
+  takenBy      String?                   // Employee who took it
+  
+  createdAt    DateTime  @default(now())
+}
+
+// Time-stamped Client Notes
+model ClientNote {
+  id           String    @id @default(cuid())
+  clientId     String
+  client       Client    @relation(fields: [clientId], references: [id])
+  
+  note         String
+  noteType     String    @default("GENERAL") // GENERAL, ALLERGY, PREFERENCE, APPOINTMENT, SERVICE
+  isPinned     Boolean   @default(false)     // Show prominently
+  createdBy    String?                  // Employee who added
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// Recurring Appointments - "Same time every 4 weeks"
+model RecurringAppointment {
+  id           String    @id @default(cuid())
+  locationId   String
+  location     Location  @relation(fields: [locationId], references: [id])
+  
+  clientId     String
+  client       Client    @relation(fields: [clientId], references: [id])
+  serviceId    String
+  service      Service   @relation(fields: [serviceId], references: [id])
+  employeeId   String?                   // Preferred employee (optional)
+  
+  // Pattern
+  frequency    String                    // WEEKLY, BIWEEKLY, MONTHLY
+  dayOfWeek    Int?                      // 0-6 for weekly (0 = Sunday)
+  dayOfMonth   Int?                      // 1-31 for monthly
+  preferredTime String                   // "10:00"
+  
+  // Limits
+  startDate    DateTime
+  endDate      DateTime?                 // Optional end date
+  maxOccurrences Int?                    // Or max number of appointments
+  
+  isActive     Boolean   @default(true)
+  lastGeneratedDate DateTime?            // Last date we generated an appointment
+  
+  // Generated appointments from this pattern
+  appointments Appointment[]
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model CheckIn {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id])
+  locationId String
+  location  Location @relation(fields: [locationId], references: [id])
+  status    String   @default("WAITING") // WAITING, SERVED, CANCELLED
+  checkedInAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([locationId])
+  @@index([status])
+  @@index([checkedInAt])
 }

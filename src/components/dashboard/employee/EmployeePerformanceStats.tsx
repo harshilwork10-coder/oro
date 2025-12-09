@@ -1,6 +1,6 @@
 'use client'
 
-import { DollarSign, TrendingUp, Star, Target } from 'lucide-react'
+import { DollarSign, TrendingUp, Star, Target, Edit2, Check, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface EmployeeStats {
@@ -19,6 +19,32 @@ interface EmployeeStats {
 export default function EmployeePerformanceStats() {
     const [stats, setStats] = useState<EmployeeStats | null>(null)
     const [loading, setLoading] = useState(true)
+    const [isEditingGoal, setIsEditingGoal] = useState(false)
+    const [newGoal, setNewGoal] = useState('')
+    const [updatingGoal, setUpdatingGoal] = useState(false)
+
+    const handleUpdateGoal = async () => {
+        if (!newGoal || isNaN(Number(newGoal))) return
+
+        setUpdatingGoal(true)
+        try {
+            const res = await fetch('/api/employee/goal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dailyGoal: Number(newGoal) })
+            })
+
+            if (res.ok) {
+                const updatedUser = await res.json()
+                setStats(prev => prev ? { ...prev, dailyGoal: updatedUser.dailyGoal } : null)
+                setIsEditingGoal(false)
+            }
+        } catch (error) {
+            console.error('Failed to update goal', error)
+        } finally {
+            setUpdatingGoal(false)
+        }
+    }
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -46,76 +72,87 @@ export default function EmployeePerformanceStats() {
     const goalProgress = Math.min((stats.totalEarnings / stats.dailyGoal) * 100, 100)
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Main Earnings Card */}
-            <div className="md:col-span-2 glass-panel p-6 rounded-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <DollarSign className="h-32 w-32 text-emerald-500" />
-                </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Earnings Card */}
+            <div className="glass-panel p-4 rounded-xl">
+                <p className="text-xs text-stone-500 uppercase tracking-wide mb-1">Today's Earnings</p>
+                <p className="text-2xl font-bold text-white">${stats.totalEarnings.toFixed(2)}</p>
+                <p className="text-xs text-emerald-500 mt-1 flex items-center">
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    On track
+                </p>
+            </div>
 
-                <div className="relative z-10">
-                    <h3 className="text-stone-400 font-medium mb-1">Today's Earnings</h3>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-bold text-white">
-                            ${stats.totalEarnings.toFixed(2)}
-                        </span>
-                        <span className="text-emerald-500 text-sm font-medium flex items-center">
-                            <TrendingUp className="h-3 w-3 mr-1" />
-                            On track
-                        </span>
-                    </div>
+            {/* Commission Card */}
+            <div className="glass-panel p-4 rounded-xl">
+                <p className="text-xs text-stone-500 uppercase tracking-wide mb-1">Commission</p>
+                <p className="text-2xl font-bold text-stone-200">${stats.commission.toFixed(2)}</p>
+            </div>
 
-                    <div className="mt-6 grid grid-cols-2 gap-4">
-                        <div className="bg-stone-900/50 p-3 rounded-xl border border-stone-800">
-                            <p className="text-xs text-stone-500 uppercase tracking-wider">Commission</p>
-                            <p className="text-lg font-semibold text-stone-200">${stats.commission.toFixed(2)}</p>
-                        </div>
-                        <div className="bg-stone-900/50 p-3 rounded-xl border border-stone-800">
-                            <p className="text-xs text-stone-500 uppercase tracking-wider">Tips</p>
-                            <p className="text-lg font-semibold text-emerald-400">+${stats.tips.toFixed(2)}</p>
-                        </div>
-                    </div>
-                </div>
+            {/* Tips Card */}
+            <div className="glass-panel p-4 rounded-xl">
+                <p className="text-xs text-stone-500 uppercase tracking-wide mb-1">Tips</p>
+                <p className="text-2xl font-bold text-emerald-400">+${stats.tips.toFixed(2)}</p>
             </div>
 
             {/* Daily Goal Card */}
-            <div className="glass-panel p-6 rounded-2xl flex flex-col items-center justify-center relative">
-                <h3 className="text-stone-400 font-medium mb-4 absolute top-6 left-6">Daily Goal</h3>
-
-                {/* Circular Progress */}
-                <div className="relative h-32 w-32 mt-4">
-                    <svg className="h-full w-full transform -rotate-90">
-                        {/* Background Circle */}
-                        <circle
-                            cx="64"
-                            cy="64"
-                            r="56"
-                            className="stroke-stone-800"
-                            strokeWidth="12"
-                            fill="none"
-                        />
-                        {/* Progress Circle */}
-                        <circle
-                            cx="64"
-                            cy="64"
-                            r="56"
-                            className="stroke-orange-500 transition-all duration-1000 ease-out"
-                            strokeWidth="12"
-                            fill="none"
-                            strokeDasharray={351.86} // 2 * pi * 56
-                            strokeDashoffset={351.86 - (351.86 * goalProgress) / 100}
-                            strokeLinecap="round"
-                        />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-2xl font-bold text-white">{Math.round(goalProgress)}%</span>
-                        <Target className="h-4 w-4 text-orange-500 mt-1" />
-                    </div>
+            <div className="glass-panel p-4 rounded-xl relative group">
+                <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs text-stone-500 uppercase tracking-wide">Daily Goal</p>
+                    {isEditingGoal ? (
+                        <div className="flex gap-1">
+                            <button
+                                onClick={handleUpdateGoal}
+                                disabled={updatingGoal}
+                                className="p-1 hover:bg-emerald-500/20 text-stone-500 hover:text-emerald-500 rounded transition-colors"
+                            >
+                                <Check className="h-3 w-3" />
+                            </button>
+                            <button
+                                onClick={() => setIsEditingGoal(false)}
+                                className="p-1 hover:bg-red-500/20 text-stone-500 hover:text-red-500 rounded transition-colors"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                setIsEditingGoal(true)
+                                setNewGoal(stats.dailyGoal.toString())
+                            }}
+                            className="p-1 opacity-0 group-hover:opacity-100 hover:bg-stone-800 text-stone-500 rounded transition-all"
+                        >
+                            <Edit2 className="h-3 w-3" />
+                        </button>
+                    )}
                 </div>
 
-                <p className="text-sm text-stone-500 mt-4">
-                    ${(stats.dailyGoal - stats.totalEarnings).toFixed(0)} to reach goal
-                </p>
+                {isEditingGoal ? (
+                    <div className="flex items-center gap-2 h-8">
+                        <span className="text-stone-400 font-bold">$</span>
+                        <input
+                            type="number"
+                            value={newGoal}
+                            onChange={(e) => setNewGoal(e.target.value)}
+                            className="bg-stone-900 border-none rounded px-2 py-1 text-white font-bold w-full focus:ring-1 focus:ring-orange-500"
+                            autoFocus
+                        />
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex items-center gap-3">
+                            <p className="text-2xl font-bold text-orange-400">{Math.round(goalProgress)}%</p>
+                            <div className="flex-1 h-2 bg-stone-800 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-500"
+                                    style={{ width: `${goalProgress}%` }}
+                                />
+                            </div>
+                        </div>
+                        <p className="text-xs text-stone-500 mt-1">${Math.max(0, stats.dailyGoal - stats.totalEarnings).toFixed(0)} to reach goal</p>
+                    </>
+                )}
             </div>
         </div>
     )

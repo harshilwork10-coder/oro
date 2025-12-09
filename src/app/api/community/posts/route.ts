@@ -6,7 +6,9 @@ import { prisma } from '@/lib/prisma'
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = session?.user as any
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -14,9 +16,11 @@ export async function GET(request: NextRequest) {
         const type = searchParams.get('type')
         const tag = searchParams.get('tag')
 
+        // Scope posts to user's franchise (PROVIDER sees all)
         const where: any = {}
-        // if (type && type !== 'ALL') where.type = type
-        // if (tag) where.tags = { contains: tag }
+        if (user.role !== 'PROVIDER' && user.franchiseId) {
+            where.author = { franchiseId: user.franchiseId }
+        }
 
         const posts = await prisma.post.findMany({
             where,

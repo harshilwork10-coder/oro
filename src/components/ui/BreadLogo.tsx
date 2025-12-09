@@ -13,7 +13,7 @@ export default function BreadLogo({ size = 60, className = '' }: BreadLogoProps)
 
     return (
         <img
-            src={logoUrl || "/aura-logo.png"}
+            src={logoUrl || "/aura-logo-v2.png"}
             alt="Logo"
             width={size}
             height={size}

@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react"
 import { redirect, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Building2, Plus, Search, MoreVertical, Edit, Trash2, Eye, Download, Settings, AlertTriangle, X, CheckCircle, Clock, XCircle } from "lucide-react"
+import { Building2, Plus, Search, MoreVertical, Edit, Trash2, Eye, Download, Settings, AlertTriangle, X, CheckCircle, Clock, XCircle, Key, EyeOff } from "lucide-react"
 import AddFranchisorModal from "@/components/modals/AddFranchisorModal"
 import EditClientModal from "@/components/modals/EditClientModal"
 import BusinessConfigModal from "@/components/provider/BusinessConfigModal"
@@ -46,6 +46,12 @@ export default function MyClientsPage() {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
     const [deleting, setDeleting] = useState(false)
+    const [reminderConfirm, setReminderConfirm] = useState<{ id: string; name: string; missingDocs: string[] } | null>(null)
+    const [sendingReminder, setSendingReminder] = useState(false)
+    const [passwordModal, setPasswordModal] = useState<{ open: boolean; ownerId: string; ownerName: string } | null>(null)
+    const [newPassword, setNewPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
+    const [resettingPassword, setResettingPassword] = useState(false)
 
     async function fetchFranchisors() {
         try {
@@ -122,13 +128,71 @@ export default function MyClientsPage() {
                 })
                 fetchFranchisors()
             } else {
-                setToast({ message: `Failed to ${action.toLowerCase()} client`, type: 'error' })
+                const errorData = await res.json()
+                // Check if this is a missing documents error - show reminder dialog
+                if (errorData.canSendReminder && errorData.missingFields) {
+                    setReminderConfirm({ id, name, missingDocs: errorData.missingFields })
+                } else {
+                    const errorMessage = errorData.message || errorData.error || `Failed to ${action.toLowerCase()} client`
+                    setToast({ message: errorMessage, type: 'error' })
+                }
             }
         } catch (error) {
             console.error('Error approving client:', error)
             setToast({ message: 'An error occurred', type: 'error' })
         }
         setActiveMenu(null)
+    }
+
+    async function sendReminder(id: string, name: string) {
+        setSendingReminder(true)
+        try {
+            const res = await fetch('/api/admin/franchisors/send-reminder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ franchisorId: id })
+            })
+
+            if (res.ok) {
+                setToast({ message: `Reminder email sent to ${name}`, type: 'success' })
+            } else {
+                setToast({ message: 'Failed to send reminder', type: 'error' })
+            }
+        } catch (error) {
+            console.error('Error sending reminder:', error)
+            setToast({ message: 'Error sending reminder', type: 'error' })
+        } finally {
+            setSendingReminder(false)
+            setReminderConfirm(null)
+        }
+    }
+
+    async function handleResetOwnerPassword() {
+        if (!passwordModal) return
+        if (newPassword.length < 8) return
+
+        setResettingPassword(true)
+        try {
+            const res = await fetch('/api/admin/reset-owner-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ownerId: passwordModal.ownerId, password: newPassword })
+            })
+
+            if (res.ok) {
+                setToast({ message: `Password reset for ${passwordModal.ownerName}`, type: 'success' })
+                setPasswordModal(null)
+                setNewPassword('')
+            } else {
+                const data = await res.json()
+                setToast({ message: data.error || 'Failed to reset password', type: 'error' })
+            }
+        } catch (error) {
+            console.error('Error resetting password:', error)
+            setToast({ message: 'Error resetting password', type: 'error' })
+        } finally {
+            setResettingPassword(false)
+        }
     }
 
     // Filter and search logic
@@ -327,16 +391,33 @@ export default function MyClientsPage() {
                                             <Eye className="h-4 w-4" />
                                             View Details
                                         </button>
+                                        {(session?.user as any)?.role === 'PROVIDER' && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setConfiguringClient({ id: client.id, name: client.name })
+                                                    setActiveMenu(null)
+                                                }}
+                                                className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-orange-400"
+                                            >
+                                                <Settings className="h-4 w-4" />
+                                                Configure Settings
+                                            </button>
+                                        )}
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
-                                                setConfiguringClient({ id: client.id, name: client.name })
+                                                setPasswordModal({
+                                                    open: true,
+                                                    ownerId: (client as any).ownerId || client.id,
+                                                    ownerName: client.owner?.name || client.name
+                                                })
                                                 setActiveMenu(null)
                                             }}
-                                            className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-orange-400"
+                                            className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-amber-400"
                                         >
-                                            <Settings className="h-4 w-4" />
-                                            Configure Settings
+                                            <Key className="h-4 w-4" />
+                                            Reset Password
                                         </button>
                                         <button
                                             onClick={(e) => {
@@ -479,6 +560,133 @@ export default function MyClientsPage() {
                                     </>
                                 ) : (
                                     <>Delete Client</>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reminder Confirmation Modal */}
+            {reminderConfirm && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                    <div className="bg-stone-800 rounded-xl border border-stone-700 p-6 max-w-md w-full mx-4 shadow-2xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 bg-orange-500/20 rounded-lg">
+                                <AlertTriangle className="h-6 w-6 text-orange-400" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-white">Documents Pending</h3>
+                        </div>
+                        <p className="text-stone-300 mb-2">
+                            <span className="font-semibold text-white">{reminderConfirm.name}</span> has not uploaded required documents:
+                        </p>
+                        <ul className="text-orange-400 text-sm mb-4 list-disc list-inside">
+                            {reminderConfirm.missingDocs.map((doc, i) => (
+                                <li key={i}>{doc}</li>
+                            ))}
+                        </ul>
+                        <p className="text-stone-400 text-sm mb-6">
+                            Would you like to send them a reminder email with the link to complete their onboarding?
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setReminderConfirm(null)}
+                                disabled={sendingReminder}
+                                className="px-4 py-2 bg-stone-700 text-stone-300 rounded-lg hover:bg-stone-600 transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => sendReminder(reminderConfirm.id, reminderConfirm.name)}
+                                disabled={sendingReminder}
+                                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {sendingReminder ? (
+                                    <>
+                                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Sending...
+                                    </>
+                                ) : (
+                                    <>Send Reminder</>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Password Reset Modal */}
+            {passwordModal?.open && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                    <div className="bg-stone-800 rounded-xl border border-stone-700 p-6 max-w-md w-full mx-4 shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-amber-500/20 rounded-lg">
+                                    <Key className="h-6 w-6 text-amber-400" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-white">Reset Password</h3>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setPasswordModal(null)
+                                    setNewPassword('')
+                                    setShowPassword(false)
+                                }}
+                                className="p-1 hover:bg-stone-700 rounded-lg transition-colors"
+                            >
+                                <X className="h-5 w-5 text-stone-400" />
+                            </button>
+                        </div>
+                        <p className="text-stone-300 mb-4">
+                            Set a new password for <span className="font-semibold text-white">{passwordModal.ownerName}</span>
+                        </p>
+                        <div className="relative mb-4">
+                            <input
+                                type={showPassword ? 'text' : 'password'}
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="Enter new password (min 8 characters)"
+                                className="w-full px-4 py-3 bg-stone-900/50 border border-stone-700 rounded-lg text-white placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500 pr-12"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-stone-700 rounded transition-colors"
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="h-5 w-5 text-stone-400" />
+                                ) : (
+                                    <Eye className="h-5 w-5 text-stone-400" />
+                                )}
+                            </button>
+                        </div>
+                        {newPassword.length > 0 && newPassword.length < 8 && (
+                            <p className="text-red-400 text-sm mb-4">Password must be at least 8 characters</p>
+                        )}
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => {
+                                    setPasswordModal(null)
+                                    setNewPassword('')
+                                    setShowPassword(false)
+                                }}
+                                disabled={resettingPassword}
+                                className="px-4 py-2 bg-stone-700 text-stone-300 rounded-lg hover:bg-stone-600 transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleResetOwnerPassword}
+                                disabled={resettingPassword || newPassword.length < 8}
+                                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {resettingPassword ? (
+                                    <>
+                                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Resetting...
+                                    </>
+                                ) : (
+                                    <>Reset Password</>
                                 )}
                             </button>
                         </div>

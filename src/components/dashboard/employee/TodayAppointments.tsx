@@ -12,12 +12,7 @@ interface TodayAppointment {
 }
 
 export default function TodayAppointments() {
-    const appointments: TodayAppointment[] = [
-        { id: '1', time: '09:00 AM', customerName: 'Sarah M.', service: 'Hair Color', provider: 'You', status: 'upcoming' },
-        { id: '2', time: '10:30 AM', customerName: 'Mike T.', service: 'Haircut', provider: 'You', status: 'upcoming' },
-        { id: '3', time: '02:00 PM', customerName: 'Emily R.', service: 'Styling', provider: 'You', status: 'upcoming' },
-        { id: '4', time: '04:30 PM', customerName: 'Robert W.', service: 'Beard Trim', provider: 'You', status: 'upcoming' }
-    ]
+    const appointments: TodayAppointment[] = []
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -40,26 +35,33 @@ export default function TodayAppointments() {
                 </div>
             </div>
 
-            <div className="space-y-3">
-                {appointments.map((apt) => (
-                    <div
-                        key={apt.id}
-                        className="flex items-center gap-3 p-3 bg-stone-900/30 rounded-lg border border-stone-800"
-                    >
-                        <div className="flex flex-col items-center justify-center min-w-[60px] bg-stone-950 rounded-lg p-2">
-                            <Clock className="h-4 w-4 text-stone-400 mb-1" />
-                            <span className="text-xs font-bold text-stone-300">{apt.time}</span>
+            {appointments.length === 0 ? (
+                <div className="text-center py-8 text-stone-500">
+                    <Calendar className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                    <p className="text-sm">No appointments scheduled</p>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {appointments.map((apt) => (
+                        <div
+                            key={apt.id}
+                            className="flex items-center gap-3 p-3 bg-stone-900/30 rounded-lg border border-stone-800"
+                        >
+                            <div className="flex flex-col items-center justify-center min-w-[60px] bg-stone-950 rounded-lg p-2">
+                                <Clock className="h-4 w-4 text-stone-400 mb-1" />
+                                <span className="text-xs font-bold text-stone-300">{apt.time}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-medium text-stone-200 truncate">{apt.customerName}</p>
+                                <p className="text-sm text-stone-400 truncate">{apt.service}</p>
+                            </div>
+                            <span className={`px-2 py-1 rounded text-[10px] font-medium border ${getStatusColor(apt.status)} whitespace-nowrap`}>
+                                {apt.status}
+                            </span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="font-medium text-stone-200 truncate">{apt.customerName}</p>
-                            <p className="text-sm text-stone-400 truncate">{apt.service}</p>
-                        </div>
-                        <span className={`px-2 py-1 rounded text-[10px] font-medium border ${getStatusColor(apt.status)} whitespace-nowrap`}>
-                            {apt.status}
-                        </span>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     )
 }

@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
             take: limit,
             select: {
                 id: true,
+                ownerId: true, // Needed for password reset
                 name: true,
                 approvalStatus: true,
                 createdAt: true,

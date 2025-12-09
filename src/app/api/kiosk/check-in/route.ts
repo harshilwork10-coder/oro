@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { applyRateLimit } from '@/lib/security'
 
 export async function POST(request: Request) {
     try {
+        // Rate limit by IP - max 30 check-ins per minute per IP to prevent abuse
+        const rateLimitResponse = await applyRateLimit(
+            '/api/kiosk/check-in',
+            { limit: 18, windowSeconds: 60, identifierType: 'ip' }
+        )
+        if (rateLimitResponse) return rateLimitResponse
+
         const body = await request.json()
         const { name, email, phone, liabilitySigned, loyaltyJoined, locationId } = body
 
@@ -15,6 +23,7 @@ export async function POST(request: Request) {
 
         // Get the location's franchiseId
         let franchiseId: string | null = null
+        let resolvedLocationId: string | null = locationId || null
 
         if (locationId) {
             const location = await prisma.location.findUnique({
@@ -27,9 +36,10 @@ export async function POST(request: Request) {
         // If no locationId provided, get the first location (for testing)
         if (!franchiseId) {
             const firstLocation = await prisma.location.findFirst({
-                select: { franchiseId: true }
+                select: { franchiseId: true, id: true }
             })
             franchiseId = firstLocation?.franchiseId || null
+            resolvedLocationId = firstLocation?.id || null
         }
 
         if (!franchiseId) {
@@ -69,6 +79,17 @@ export async function POST(request: Request) {
                     liabilitySigned: liabilitySigned || false,
                     loyaltyJoined: loyaltyJoined || false,
                     franchiseId: franchiseId
+                }
+            })
+        }
+
+        // Create Check-In Record
+        if (resolvedLocationId) {
+            await (prisma as any).checkIn.create({
+                data: {
+                    clientId: customer.id,
+                    locationId: resolvedLocationId,
+                    status: 'WAITING'
                 }
             })
         }

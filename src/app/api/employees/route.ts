@@ -12,12 +12,29 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const users = await prisma.user.findMany({
-            where: {
-                role: {
-                    not: 'PROVIDER' // Don't show provider users
+        // PROVIDER sees all non-provider users
+        // FRANCHISOR only sees users in their franchises (via Franchisor record)
+        let whereClause: any = {
+            role: { not: 'PROVIDER' }
+        }
+
+        if (session.user.role === 'FRANCHISOR') {
+            // Get the franchisor record for this user
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: session.user.id },
+                select: {
+                    franchises: {
+                        select: { id: true }
+                    }
                 }
-            },
+            })
+
+            const franchiseIds = franchisor?.franchises.map(f => f.id) || []
+            whereClause.franchiseId = { in: franchiseIds }
+        }
+
+        const users = await prisma.user.findMany({
+            where: whereClause,
             include: {
                 franchise: {
                     select: {

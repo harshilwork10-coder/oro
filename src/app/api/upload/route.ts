@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { uploadToS3 } from '@/lib/s3'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 // File upload limits
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -7,6 +10,14 @@ const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'
 
 export async function POST(request: NextRequest) {
     try {
+        // Security: Require authentication
+        const session = await getServerSession(authOptions)
+        const user = session?.user as any
+
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const formData = await request.formData()
         const file = formData.get('file') as File
         const franchisorId = formData.get('franchisorId') as string
@@ -19,6 +30,20 @@ export async function POST(request: NextRequest) {
 
         if (!franchisorId) {
             return NextResponse.json({ error: 'Franchisor ID required' }, { status: 400 })
+        }
+
+        // Security: Verify user owns this franchisor or is PROVIDER
+        const franchisor = await prisma.franchisor.findUnique({
+            where: { id: franchisorId },
+            select: { ownerId: true }
+        })
+
+        if (!franchisor) {
+            return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })
+        }
+
+        if (franchisor.ownerId !== user.id && user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         if (file.size > MAX_FILE_SIZE) {

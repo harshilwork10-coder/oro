@@ -151,15 +151,9 @@ export default function ProductsPage() {
                                 </div>
                             </div>
                             {product.description && <p className="text-sm text-stone-400 mb-4">{product.description}</p>}
-                            <div className="space-y-2">
-                                <div className="flex justify-between">
-                                    <span className="text-xs text-stone-500">Cash:</span>
-                                    <span className="text-sm font-bold text-emerald-400">${Number(product.price).toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-xs text-stone-500">Card:</span>
-                                    <span className="text-sm font-bold text-stone-300">${(Number(product.price) * 1.0399).toFixed(2)}</span>
-                                </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-stone-500">Price:</span>
+                                <span className="text-lg font-bold text-emerald-400">${Number(product.price).toFixed(2)}</span>
                             </div>
                         </div>
                     )

@@ -66,6 +66,19 @@ export async function GET(req: Request) {
             franchiseId: service.franchiseId
         }))
 
+        // Add built-in "Open Item" for custom pricing (always available)
+        const openItem = {
+            id: 'open-item',
+            name: 'Open Item',
+            description: 'Enter any custom amount for miscellaneous services',
+            price: 0,
+            duration: 0,
+            category: 'CUSTOM',
+            franchiseId: franchiseId,
+            isOpenItem: true
+        }
+        servicesFormatted.unshift(openItem)
+
         // Transform products for POS
         const productsFormatted = products.map(product => ({
             id: product.id,

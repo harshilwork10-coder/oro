@@ -47,7 +47,8 @@ export default function CustomersPage() {
 
     const filteredCustomers = customers.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.email.toLowerCase().includes(searchTerm.toLowerCase())
+        c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.phone.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, ''))
     )
 
     return (
@@ -76,7 +77,7 @@ export default function CustomersPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-stone-500" />
                     <input
                         type="text"
-                        placeholder="Search customers by name or email..."
+                        placeholder="Search by name, email, or phone..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-3 bg-stone-900 border border-stone-800 rounded-lg text-stone-100 placeholder-stone-500 focus:ring-2 focus:ring-blue-500 outline-none"

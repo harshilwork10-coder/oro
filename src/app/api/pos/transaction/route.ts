@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json()
-        const { items, subtotal, tax, total, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType } = body
+        const { items, subtotal, tax, total, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType, tip } = body
 
         console.log('[POS_TRANSACTION_POST] Received data:', {
             itemsCount: items?.length,
@@ -61,6 +61,7 @@ export async function POST(req: Request) {
             authCode: authCode || null,
             cardLast4: cardLast4 || null,
             cardType: cardType || null,
+            tip: (tip || 0).toString(),
             status: 'COMPLETED',
             cashDrawerSessionId: cashDrawerSessionId || null,
             lineItems: {
@@ -136,6 +137,11 @@ export async function GET(req: Request) {
 
             if (!transaction) {
                 return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+            }
+
+            // Security: Verify transaction belongs to user's franchise
+            if (transaction.franchiseId !== session.user.franchiseId) {
+                return NextResponse.json({ error: 'Access denied' }, { status: 403 })
             }
 
             // Calculate daily sequence number

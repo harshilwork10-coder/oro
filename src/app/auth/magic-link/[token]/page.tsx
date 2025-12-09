@@ -8,7 +8,7 @@ import {
     Building2, User, FileText, Upload, CreditCard, ChevronRight, ChevronLeft,
     Quote, Star, ShieldCheck, Zap, Globe, Eye, EyeOff, Palette, Phone
 } from 'lucide-react'
-import BreadLogo from '@/components/ui/BreadLogo'
+import TrinexLogo from '@/components/ui/TrinexLogo'
 
 export default function MagicLinkPage({ params }: { params: Promise<{ token: string }> }) {
     const router = useRouter()
@@ -122,26 +122,27 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0]
-            // Upload to S3 immediately logic (simplified for brevity, assume works like before)
-            // For now, we'll simulate success or implement real upload if needed. 
-            // Reusing the logic from previous version:
             try {
                 const uploadFormData = new FormData()
                 uploadFormData.append('file', file)
-                uploadFormData.append('franchisorId', user?.id || 'temp')
+                uploadFormData.append('userId', user?.id || 'temp')
                 uploadFormData.append('documentType', field)
 
-                const response = await fetch('/api/upload', { method: 'POST', body: uploadFormData })
-                if (!response.ok) throw new Error('Upload failed')
+                // Use onboarding-specific upload endpoint
+                const response = await fetch('/api/upload/onboarding', { method: 'POST', body: uploadFormData })
+                if (!response.ok) {
+                    const errorData = await response.json()
+                    throw new Error(errorData.error || 'Upload failed')
+                }
                 const data = await response.json()
 
                 setFormData(prev => ({
                     ...prev,
                     [field]: { name: data.fileName, s3Key: data.s3Key, uploaded: true }
                 }))
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error uploading file:', error)
-                setError(`Failed to upload ${field}.`)
+                setError(`Failed to upload ${field}: ${error.message}`)
             }
         }
     }
@@ -239,7 +240,7 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
             <div className="w-full lg:w-1/2 flex flex-col justify-center p-6 lg:p-12 overflow-y-auto">
                 <div className="max-w-xl mx-auto w-full">
                     <div className="mb-8">
-                        <BreadLogo size={60} />
+                        <img src="/trinex-logo.png" alt="Trinex AI" className="h-24 object-contain" />
                     </div>
 
                     <div className="mb-8">

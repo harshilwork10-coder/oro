@@ -146,9 +146,27 @@ export default function AddFranchisorModal({ isOpen, onClose, onSuccess }: AddFr
                                 <input
                                     type="tel"
                                     value={formData.phone}
-                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                    onChange={(e) => {
+                                        // Strip non-digits
+                                        const digits = e.target.value.replace(/\D/g, '')
+                                        // Limit to 10 digits
+                                        const limited = digits.slice(0, 10)
+                                        // Format as (XXX) XXX-XXXX
+                                        let formatted = ''
+                                        if (limited.length > 0) {
+                                            formatted = '(' + limited.slice(0, 3)
+                                        }
+                                        if (limited.length >= 3) {
+                                            formatted += ') ' + limited.slice(3, 6)
+                                        }
+                                        if (limited.length >= 6) {
+                                            formatted += '-' + limited.slice(6, 10)
+                                        }
+                                        setFormData({ ...formData, phone: formatted })
+                                    }}
                                     className="w-full pl-9 pr-4 py-2.5 bg-stone-900/50 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-600 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-sm"
                                     placeholder="(555) 123-4567"
+                                    maxLength={14}
                                 />
                             </div>
                             <p className="text-xs text-stone-500 mt-1">

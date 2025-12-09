@@ -110,6 +110,33 @@ export async function POST(request: NextRequest) {
             }
         })
 
+        // For MULTI_LOCATION_OWNER, create default franchise and location
+        if (finalBusinessType === 'MULTI_LOCATION_OWNER') {
+            // Create a slug from company name
+            const baseSlug = sanitizedCompanyName
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '')
+
+            const franchise = await prisma.franchise.create({
+                data: {
+                    name: sanitizedCompanyName,
+                    slug: baseSlug,
+                    franchisorId: franchisor.id,
+                    approvalStatus: 'PENDING'
+                }
+            })
+
+            // Create the default location (first store)
+            await prisma.location.create({
+                data: {
+                    name: sanitizedCompanyName,
+                    slug: `${baseSlug}-main`,
+                    franchiseId: franchise.id
+                }
+            })
+        }
+
         // Auto-license generation removed - stations are added by franchisor post-signup
 
         // Generate magic link
@@ -131,11 +158,11 @@ export async function POST(request: NextRequest) {
         // Send Email
         await sendEmail({
             to: sanitizedEmail,
-            subject: 'Welcome to Aura - Setup Your Franchise Account',
+            subject: 'Welcome to Trinex - Setup Your Franchise Account',
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h1>Welcome to Aura!</h1>
-                    <p>You have been invited to join Aura as a ${finalBusinessType === 'BRAND_FRANCHISOR' ? 'Franchise Brand Owner' : 'Multi-Location Owner'}.</p>
+                    <h1>Welcome to Trinex!</h1>
+                    <p>You have been invited to join Trinex as a ${finalBusinessType === 'BRAND_FRANCHISOR' ? 'Franchise Brand Owner' : 'Multi-Location Owner'}.</p>
                     <p><strong>Company:</strong> ${sanitizedCompanyName}</p>
                     <br/>
                     <p>Click the link below to accept the terms and set up your account:</p>

@@ -47,6 +47,7 @@ export default function BusinessConfigModal({ franchisorId, franchisorName, onCl
     const [config, setConfig] = useState<BusinessConfig | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
         fetchConfig()
@@ -54,13 +55,18 @@ export default function BusinessConfigModal({ franchisorId, franchisorName, onCl
 
     const fetchConfig = async () => {
         try {
+            setError(null)
             const response = await fetch(`/api/business-config/${franchisorId}`)
             if (response.ok) {
                 const data = await response.json()
                 setConfig(data)
+            } else {
+                const errData = await response.json().catch(() => ({}))
+                setError(errData.error || 'Failed to load configuration')
             }
         } catch (error) {
             console.error('Error fetching config:', error)
+            setError('Failed to connect to server')
         } finally {
             setLoading(false)
         }
@@ -112,7 +118,31 @@ export default function BusinessConfigModal({ franchisorId, franchisorName, onCl
     }
 
     if (!config) {
-        return null
+        return (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-stone-900 rounded-xl p-6 max-w-md w-full">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-stone-100">Configure Settings</h2>
+                        <button onClick={onClose} className="text-stone-400 hover:text-stone-200">
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+                    <div className="text-center py-6">
+                        <div className="text-red-400 mb-4">
+                            <X className="h-12 w-12 mx-auto" />
+                        </div>
+                        <p className="text-red-400 font-medium mb-2">{error || 'Failed to load configuration'}</p>
+                        <p className="text-stone-400 text-sm mb-4">Please try again or contact support.</p>
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-2 bg-stone-800 hover:bg-stone-700 rounded-lg text-stone-200"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )
     }
 
     return (

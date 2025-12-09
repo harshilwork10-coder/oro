@@ -1,9 +1,9 @@
 'use client'
 
 import { ShoppingCart, User } from 'lucide-react'
-import BreadLogo from '@/components/ui/BreadLogo'
 import TipModal from './TipModal'
 import ReviewModal from './ReviewModal'
+import TrinexLogo from '@/components/ui/TrinexLogo'
 
 interface CustomerDisplayProps {
     cart: any
@@ -27,10 +27,10 @@ export default function CustomerDisplay({
     if (!cart || !cart.items || cart.items.length === 0) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
-                <div className="mb-8 animate-pulse">
-                    <BreadLogo size={100} />
+                <div className="mb-8">
+                    <TrinexLogo size={96} />
                 </div>
-                <h1 className="text-4xl font-bold text-gray-900 mb-4">Welcome to Aura</h1>
+                <h1 className="text-4xl font-bold text-gray-900 mb-4">Welcome to Trinex AI</h1>
                 <p className="text-xl text-gray-500">We're ready when you are.</p>
             </div>
         )
@@ -41,11 +41,11 @@ export default function CustomerDisplay({
             {/* Header */}
             <div className="bg-white p-6 shadow-sm flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="h-24 w-24 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center text-white">
-                        <BreadLogo size={100} />
+                    <div className="h-24 w-24 rounded-xl flex items-center justify-center">
+                        <TrinexLogo size={80} />
                     </div>
                     <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
-                        Aura
+                        Trinex AI
                     </span>
                 </div>
                 {cart.customerName && (
@@ -71,8 +71,7 @@ export default function CustomerDisplay({
                             <div className="col-span-1 text-center">#</div>
                             <div className="col-span-5">Item</div>
                             <div className="col-span-1 text-center">Qty</div>
-                            <div className="col-span-2 text-center">Cash</div>
-                            <div className="col-span-3 text-center">Card</div>
+                            <div className="col-span-5 text-center">Price</div>
                         </div>
 
                         {/* Table Rows */}
@@ -109,22 +108,11 @@ export default function CustomerDisplay({
                                         )}
                                     </div>
 
-                                    {/* Cash Price */}
-                                    <div className="col-span-2 text-center">
-                                        <div className="inline-block bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                                            <div className="text-xs text-emerald-600 font-semibold mb-0.5">CASH</div>
+                                    {/* Price */}
+                                    <div className="col-span-5 text-center">
+                                        <div className="inline-block bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2">
                                             <div className="text-lg font-bold text-emerald-700">
                                                 ${(item.cashPrice || item.price).toFixed(2)}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Card Price */}
-                                    <div className="col-span-3 text-center">
-                                        <div className="inline-block bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                                            <div className="text-xs text-blue-600 font-semibold mb-0.5">CARD</div>
-                                            <div className="text-lg font-bold text-blue-700">
-                                                ${(item.cardPrice || item.price * 1.0399).toFixed(2)}
                                             </div>
                                         </div>
                                     </div>
@@ -148,12 +136,8 @@ export default function CustomerDisplay({
                         <div className="h-px bg-white/20 my-4" />
                         <div className="space-y-3">
                             <div className="flex justify-between text-3xl font-bold">
-                                <span>Cash Total</span>
+                                <span>Total</span>
                                 <span>${cart.total.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-2xl font-semibold text-orange-100">
-                                <span>Card Total</span>
-                                <span>${cart.totalCard.toFixed(2)}</span>
                             </div>
                         </div>
                     </div>

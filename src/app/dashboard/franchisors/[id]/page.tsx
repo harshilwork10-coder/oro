@@ -228,7 +228,7 @@ export default function ClientDetailsPage() {
                                 <span className={client.voidCheckUrl ? 'text-emerald-400 font-medium' : 'text-stone-400'}>Voided Check</span>
                             </div>
                             {client.voidCheckUrl && (
-                                <a href={client.voidCheckUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:underline flex items-center gap-1">
+                                <a href={`/api/documents/view?key=${encodeURIComponent(client.voidCheckUrl)}`} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:underline flex items-center gap-1">
                                     <ExternalLink className="h-3 w-3" /> View Document
                                 </a>
                             )}
@@ -243,7 +243,7 @@ export default function ClientDetailsPage() {
                                 <span className={client.driverLicenseUrl ? 'text-emerald-400 font-medium' : 'text-stone-400'}>Driver's License</span>
                             </div>
                             {client.driverLicenseUrl && (
-                                <a href={client.driverLicenseUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:underline flex items-center gap-1">
+                                <a href={`/api/documents/view?key=${encodeURIComponent(client.driverLicenseUrl)}`} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:underline flex items-center gap-1">
                                     <ExternalLink className="h-3 w-3" /> View Document
                                 </a>
                             )}
@@ -258,7 +258,7 @@ export default function ClientDetailsPage() {
                                 <span className={client.feinLetterUrl ? 'text-emerald-400 font-medium' : 'text-stone-400'}>FEIN Letter</span>
                             </div>
                             {client.feinLetterUrl && (
-                                <a href={client.feinLetterUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:underline flex items-center gap-1">
+                                <a href={`/api/documents/view?key=${encodeURIComponent(client.feinLetterUrl)}`} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:underline flex items-center gap-1">
                                     <ExternalLink className="h-3 w-3" /> View Document
                                 </a>
                             )}

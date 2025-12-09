@@ -79,7 +79,9 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = session?.user as any
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -87,6 +89,20 @@ export async function PUT(request: Request) {
 
         if (!id || !name) {
             return NextResponse.json({ error: 'Category ID and name are required' }, { status: 400 })
+        }
+
+        // Security: Verify category belongs to user's franchise
+        const existingCategory = await prisma.serviceCategory.findUnique({
+            where: { id },
+            select: { franchiseId: true }
+        })
+
+        if (!existingCategory) {
+            return NextResponse.json({ error: 'Category not found' }, { status: 404 })
+        }
+
+        if (existingCategory.franchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         const category = await prisma.serviceCategory.update({
@@ -108,7 +124,9 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = session?.user as any
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -116,6 +134,20 @@ export async function DELETE(request: Request) {
 
         if (!id) {
             return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })
+        }
+
+        // Security: Verify category belongs to user's franchise
+        const existingCategory = await prisma.serviceCategory.findUnique({
+            where: { id },
+            select: { franchiseId: true }
+        })
+
+        if (!existingCategory) {
+            return NextResponse.json({ error: 'Category not found' }, { status: 404 })
+        }
+
+        if (existingCategory.franchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         // Check if any services are using this category

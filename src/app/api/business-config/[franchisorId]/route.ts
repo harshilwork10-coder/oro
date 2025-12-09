@@ -55,15 +55,22 @@ export async function GET(
             usesFranchising: false,
             usesTimeTracking: true,
             usesPayroll: false,
+            // Cash Discount settings
+            cashDiscountEnabled: false,
+            cashDiscountPercent: 3.5,
+            // Workflow settings
+            reviewRequestTiming: 'MANUAL',
+            commissionCalculation: 'AUTOMATIC',
+            commissionVisibility: 'ALWAYS',
             createdAt: new Date(),
             updatedAt: new Date()
         }
 
         return NextResponse.json(config)
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error fetching business config:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return NextResponse.json({ error: 'Internal Server Error', details: error?.message }, { status: 500 })
     }
 }
 

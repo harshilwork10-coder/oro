@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, Search, MoreVertical, Shield, User, Mail, Calendar, DollarSign } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Search, MoreVertical, Shield, User, Mail, Calendar, DollarSign, Key, X, Eye, EyeOff } from 'lucide-react'
 import EmployeeModal from '@/components/employees/EmployeeModal'
 
 export default function EmployeesPage() {
@@ -10,6 +10,12 @@ export default function EmployeesPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+    const [passwordModal, setPasswordModal] = useState<{ open: boolean; employee: any | null }>({ open: false, employee: null })
+    const [newPassword, setNewPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
+    const [resetting, setResetting] = useState(false)
+    const menuRef = useRef<HTMLDivElement>(null)
 
     const fetchEmployees = async () => {
         try {
@@ -27,6 +33,17 @@ export default function EmployeesPage() {
 
     useEffect(() => {
         fetchEmployees()
+    }, [])
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setOpenMenuId(null)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
     const handleSaveEmployee = async (data: any) => {
@@ -62,6 +79,32 @@ export default function EmployeesPage() {
             fetchEmployees()
         } catch (error) {
             console.error('Error deleting employee:', error)
+        }
+    }
+
+    const handleResetPassword = async () => {
+        if (!passwordModal.employee) return
+        if (newPassword.length < 8) {
+            return
+        }
+        setResetting(true)
+        try {
+            const res = await fetch(`/api/franchise/employees/${passwordModal.employee.id}/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: newPassword })
+            })
+            if (res.ok) {
+                setPasswordModal({ open: false, employee: null })
+                setNewPassword('')
+            } else {
+                const data = await res.json()
+                console.error(data.error || 'Failed to reset password')
+            }
+        } catch (error) {
+            console.error('Error resetting password:', error)
+        } finally {
+            setResetting(false)
         }
     }
 
@@ -109,7 +152,7 @@ export default function EmployeesPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredEmployees.map((employee) => (
-                        <div key={employee.id} className="glass-panel p-6 rounded-2xl hover:border-blue-500/30 transition-all group relative overflow-hidden">
+                        <div key={employee.id} className="glass-panel p-6 rounded-2xl hover:border-blue-500/30 transition-all group relative">
                             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
                             <div className="flex items-start justify-between mb-6 relative z-10">
@@ -122,39 +165,70 @@ export default function EmployeesPage() {
                                         <p className="text-sm text-stone-400">{employee.email}</p>
                                     </div>
                                 </div>
-                                <div className="relative group/menu">
-                                    <button className="p-2 hover:bg-stone-800 rounded-lg text-stone-500 hover:text-stone-300 transition-colors">
+                                <div className="relative" ref={openMenuId === employee.id ? menuRef : null}>
+                                    <button
+                                        onClick={() => setOpenMenuId(openMenuId === employee.id ? null : employee.id)}
+                                        className="p-2 hover:bg-stone-800 rounded-lg text-stone-500 hover:text-stone-300 transition-colors"
+                                    >
                                         <MoreVertical className="h-5 w-5" />
                                     </button>
-                                    <div className="absolute right-0 mt-2 w-48 bg-stone-900 rounded-xl shadow-xl border border-stone-800 py-1 hidden group-hover/menu:block z-20">
-                                        <button
-                                            onClick={() => {
-                                                setSelectedEmployee(employee)
-                                                setIsModalOpen(true)
-                                            }}
-                                            className="w-full text-left px-4 py-2 text-sm text-stone-300 hover:bg-stone-800 hover:text-white transition-colors"
+                                    {openMenuId === employee.id && (
+                                        <div
+                                            className="absolute right-0 top-full mt-2 w-56 rounded-xl shadow-xl py-1.5 z-[100] overflow-hidden"
+                                            style={{ backgroundColor: '#0c0a09', border: '1px solid #292524' }}
                                         >
-                                            Edit Permissions
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteEmployee(employee.id)}
-                                            className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
-                                        >
-                                            Delete Employee
-                                        </button>
-                                        <div className="border-t border-stone-800 my-1" />
-                                        <button
-                                            onClick={() => window.location.href = `/dashboard/employees/${employee.id}/commission`}
-                                            className="w-full text-left px-4 py-2 text-sm text-orange-400 hover:bg-stone-800 hover:text-orange-300 transition-colors flex items-center gap-2"
-                                        >
-                                            <DollarSign className="h-4 w-4" />
-                                            Configure Commission
-                                        </button>
-                                    </div>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedEmployee(employee)
+                                                    setIsModalOpen(true)
+                                                    setOpenMenuId(null)
+                                                }}
+                                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-stone-800 transition-colors flex items-center gap-3"
+                                                style={{ color: '#e7e5e4' }}
+                                            >
+                                                <Shield className="h-4 w-4 text-blue-400" />
+                                                Edit Permissions
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setOpenMenuId(null)
+                                                    window.location.href = `/dashboard/employees/${employee.id}/commission`
+                                                }}
+                                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-stone-800 transition-colors flex items-center gap-3"
+                                                style={{ color: '#e7e5e4' }}
+                                            >
+                                                <DollarSign className="h-4 w-4 text-orange-400" />
+                                                Configure Commission
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setOpenMenuId(null)
+                                                    setPasswordModal({ open: true, employee })
+                                                }}
+                                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-stone-800 transition-colors flex items-center gap-3"
+                                                style={{ color: '#e7e5e4' }}
+                                            >
+                                                <Key className="h-4 w-4 text-amber-400" />
+                                                Reset Password
+                                            </button>
+                                            <div style={{ borderTop: '1px solid #292524', margin: '4px 0' }} />
+                                            <button
+                                                onClick={() => {
+                                                    handleDeleteEmployee(employee.id)
+                                                    setOpenMenuId(null)
+                                                }}
+                                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-red-500/10 transition-colors flex items-center gap-3"
+                                                style={{ color: '#f87171' }}
+                                            >
+                                                <User className="h-4 w-4" />
+                                                Delete Employee
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
-                            <div className="space-y-3 relative z-10">
+                            <div className="space-y-3">
                                 <div className="flex items-center gap-2 text-sm text-stone-500">
                                     <Shield className="h-4 w-4 text-indigo-400" />
                                     <span className="font-medium">Active Permissions:</span>
@@ -197,6 +271,69 @@ export default function EmployeesPage() {
                 employee={selectedEmployee}
                 onSave={handleSaveEmployee}
             />
+
+            {/* Password Reset Modal */}
+            {passwordModal.open && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+                    <div className="w-full max-w-md rounded-2xl p-6" style={{ backgroundColor: '#0c0a09', border: '1px solid #292524' }}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-white">Reset Password</h3>
+                            <button
+                                onClick={() => {
+                                    setPasswordModal({ open: false, employee: null })
+                                    setNewPassword('')
+                                }}
+                                className="p-2 hover:bg-stone-800 rounded-lg text-stone-400"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <p className="text-stone-400 mb-4">
+                            Enter a new password for <span className="text-white font-medium">{passwordModal.employee?.name}</span>
+                        </p>
+                        <div className="relative mb-4">
+                            <input
+                                type={showPassword ? 'text' : 'password'}
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="Enter new password (min 8 characters)"
+                                className="w-full px-4 py-3 pr-12 rounded-xl text-white placeholder-stone-500 focus:ring-2 focus:ring-orange-500 outline-none"
+                                style={{ backgroundColor: '#1c1917', border: '1px solid #292524' }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300"
+                            >
+                                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                            </button>
+                        </div>
+                        {newPassword.length > 0 && newPassword.length < 8 && (
+                            <p className="text-red-400 text-sm mb-4">Password must be at least 8 characters</p>
+                        )}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setPasswordModal({ open: false, employee: null })
+                                    setNewPassword('')
+                                }}
+                                className="flex-1 px-4 py-3 rounded-xl text-stone-300 hover:bg-stone-800 transition-colors"
+                                style={{ border: '1px solid #292524' }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleResetPassword}
+                                disabled={newPassword.length < 8 || resetting}
+                                className="flex-1 px-4 py-3 rounded-xl text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ backgroundColor: newPassword.length >= 8 ? '#ea580c' : '#44403c' }}
+                            >
+                                {resetting ? 'Resetting...' : 'Reset Password'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import {
     Search,
@@ -21,11 +21,15 @@ import {
     Monitor,
     ChevronRight,
     UserPlus,
-    DollarSign
+    DollarSign,
+    Gift
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 import TransactionActionsModal from '@/components/pos/TransactionActionsModal'
+import CustomerDiscounts from '@/components/pos/CustomerDiscounts'
+import { useFeature, useBusinessConfig } from '@/hooks/useBusinessConfig'
+import { QRCodeSVG } from 'qrcode.react'
 
 // Removed hardcoded maps
 
@@ -71,18 +75,53 @@ interface Transaction {
     invoiceNumber?: string
 }
 
-const SERVICE_CATEGORIES: Record<string, any> = {
-    'THREADING': { icon: Scissors, color: 'text-pink-400', bg: 'bg-pink-400/10', border: 'border-pink-400/20' },
-    'WAXING': { icon: Scissors, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20' },
-    'SPA': { icon: Scissors, color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20' },
-    'ADDITIONS': { icon: Plus, color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20' },
-    'PRODUCTS': { icon: ShoppingBag, color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/20' }
+// Categories are now dynamically loaded from services - no hardcoded list
+
+// Component to poll for tip selection from customer display
+function TipPollingEffect({ onTipReceived }: { onTipReceived: (tipAmount: number) => void }) {
+    useEffect(() => {
+        let pollCount = 0
+        const maxPolls = 120 // 2 minutes timeout
+
+        const pollForTip = async () => {
+            try {
+                const res = await fetch('/api/pos/cart')
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.status === 'TIP_SELECTED') {
+                        onTipReceived(Number(data.tipAmount || 0))
+                        return true // Stop polling
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling for tip:', error)
+            }
+            return false
+        }
+
+        const interval = setInterval(async () => {
+            pollCount++
+            const tipReceived = await pollForTip()
+            if (tipReceived || pollCount >= maxPolls) {
+                clearInterval(interval)
+                if (pollCount >= maxPolls) {
+                    onTipReceived(0) // Timeout - no tip
+                }
+            }
+        }, 1000)
+
+        return () => clearInterval(interval)
+    }, [onTipReceived])
+
+    return null
 }
 
 export default function POSPage() {
     console.log('POSPage: Rendering...')
     const { data: session } = useSession()
     const user = session?.user as any
+    const { data: config } = useBusinessConfig()
+    const usesVirtualKeypad = useFeature('usesVirtualKeypad')
     const [view, setView] = useState<'POS' | 'HISTORY'>('POS')
     const [cart, setCart] = useState<CartItem[]>([])
     const [menu, setMenu] = useState<MenuData>({ services: [], products: [], discounts: [] })
@@ -109,14 +148,69 @@ export default function POSPage() {
     const [showTransactionModal, setShowTransactionModal] = useState(false)
     const [selectedTxForActions, setSelectedTxForActions] = useState<Transaction | null>(null)
 
+    // Customer and display state
+    const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
+    const [showDisplayModal, setShowDisplayModal] = useState(false)
+    const [showOpenItemModal, setShowOpenItemModal] = useState(false)
+    const [openItemPrice, setOpenItemPrice] = useState('15')
+    const [showCustomerModal, setShowCustomerModal] = useState(false)
+
+    // Tip prompt state
+    const [showTipWaiting, setShowTipWaiting] = useState(false)
+    const [pendingTipAmount, setPendingTipAmount] = useState(0)
+    const [tipSettings, setTipSettings] = useState<{ enabled: boolean; type: string; suggestions: string }>({ enabled: true, type: 'PERCENT', suggestions: '[15,20,25]' })
+
+    // Customer discounts state
+    const [showDiscounts, setShowDiscounts] = useState(false)
+    const [appliedDiscount, setAppliedDiscount] = useState(0)
+    const [appliedDiscountSource, setAppliedDiscountSource] = useState<string | null>(null)
+    const [checkedInCustomers, setCheckedInCustomers] = useState<any[]>([])
+
+    // Pin pad state for cash drawer modal
+    const [selectedDenom, setSelectedDenom] = useState<string | null>(null)
+    const [pinPadValue, setPinPadValue] = useState('')
+
+    // Dynamically extract categories from services data
+    const serviceCategories = useMemo(() => {
+        const categories = new Set<string>()
+
+        // Extract unique categories from services
+        menu.services.forEach(service => {
+            if (service.category) {
+                categories.add(service.category)
+            }
+        })
+
+        // Always add PRODUCTS if there are products
+        if (menu.products && menu.products.length > 0) {
+            categories.add('PRODUCTS')
+        }
+
+        // Convert to array and sort alphabetically
+        return Array.from(categories).sort()
+    }, [menu.services, menu.products])
+
     useEffect(() => {
         fetchMenu()
         fetchTransactions()
         checkShift()
+        fetchCheckedInCustomers()
         if (session?.user) {
             fetchDetails()
         }
     }, [session])
+
+    const fetchCheckedInCustomers = async () => {
+        try {
+            const res = await fetch('/api/pos/checked-in')
+            if (res.ok) {
+                const data = await res.json()
+                setCheckedInCustomers(data)
+            }
+        } catch (error) {
+            console.error('Failed to fetch checked-in customers:', error)
+        }
+    }
 
     const fetchDetails = async () => {
         try {
@@ -133,6 +227,14 @@ export default function POSPage() {
                 if (res.ok) {
                     const data = await res.json()
                     setFranchiseName(data.name)
+                    // Load tip settings from franchise settings
+                    if (data.settings) {
+                        setTipSettings({
+                            enabled: data.settings.tipPromptEnabled ?? true,
+                            type: data.settings.tipType || 'PERCENT',
+                            suggestions: data.settings.tipSuggestions || '[15,20,25]'
+                        })
+                    }
                 }
             }
         } catch (error) {
@@ -142,14 +244,41 @@ export default function POSPage() {
 
     const calculateTotal = () => {
         const subtotal = cart.reduce((sum, item) => sum + getItemPrice(item), 0)
-        const tax = subtotal * 0.08
-        const totalCash = subtotal + tax
+        const discountedSubtotal = Math.max(0, subtotal - appliedDiscount)
+
+        // Calculate Tax based on config
+        let tax = 0
+        if (config) {
+            const taxableSubtotal = cart.reduce((sum, item) => {
+                const price = getItemPrice(item)
+                const isTaxable = (item.type === 'SERVICE' && config.taxServices) ||
+                    (item.type === 'PRODUCT' && config.taxProducts)
+                return isTaxable ? sum + price : sum
+            }, 0)
+
+            // Apply global discount proportionally to taxable amount
+            if (subtotal > 0 && taxableSubtotal > 0) {
+                const ratio = taxableSubtotal / subtotal
+                const taxableDiscount = appliedDiscount * ratio
+                const taxableAmount = Math.max(0, taxableSubtotal - taxableDiscount)
+                tax = taxableAmount * (config.taxRate || 0)
+            }
+        } else {
+            // Fallback to legacy 8% if config not loaded
+            tax = discountedSubtotal * 0.08
+        }
+
+        const totalCash = discountedSubtotal + tax
         const totalCard = totalCash * 1.0399
+        const totalWithTip = totalCash + pendingTipAmount
         return {
             subtotal,
+            discount: appliedDiscount,
             tax,
+            tip: pendingTipAmount,
             totalCash,
-            totalCard
+            totalCard,
+            totalWithTip
         }
     }
 
@@ -426,20 +555,21 @@ export default function POSPage() {
 
         setIsLoading(true)
         try {
-            const { subtotal, tax, totalCash, totalCard } = calculateTotal()
-            const total = paymentMethod === 'CASH' ? totalCash : totalCard
+            const { subtotal, tax, totalCash, totalCard, tip } = calculateTotal()
+            const baseTotal = paymentMethod === 'CASH' ? totalCash : totalCard
+            const total = baseTotal + tip // Include tip in final total
 
-            // For split payments, validate totals match
+            // For split payments, validate totals match (with tip)
             if (paymentMethod === 'SPLIT') {
                 const splitTotal = (cashAmount || 0) + (cardAmount || 0)
-                if (Math.abs(splitTotal - totalCard) > 0.01) {
-                    alert(`Split amounts must equal total (${formatCurrency(totalCard)})`)
+                if (Math.abs(splitTotal - total) > 0.01) {
+                    alert(`Split amounts must equal total (${formatCurrency(total)})`)
                     setIsLoading(false)
                     return
                 }
             }
 
-            console.log('Processing Checkout:', { paymentMethod, cashAmount, cardAmount, paymentDetails })
+            console.log('Processing Checkout:', { paymentMethod, cashAmount, cardAmount, paymentDetails, tip })
 
             const res = await fetch('/api/pos/transaction', {
                 method: 'POST',
@@ -448,6 +578,7 @@ export default function POSPage() {
                     items: cart,
                     subtotal,
                     tax,
+                    tip, // Include tip amount
                     total,
                     paymentMethod,
                     cashDrawerSessionId: shift?.id,
@@ -460,8 +591,24 @@ export default function POSPage() {
             if (res.ok) {
                 const transaction = await res.json()
                 setCart([])
+                setPendingTipAmount(0) // Reset tip after successful transaction
                 setShowCheckoutModal(false)
                 fetchTransactions()
+
+                // Clear cart from customer display
+                await fetch('/api/pos/cart', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: [],
+                        subtotal: 0,
+                        tax: 0,
+                        total: 0,
+                        status: 'IDLE',
+                        showTipPrompt: false,
+                        tipAmount: 0
+                    })
+                })
 
                 // Prompt for receipt
                 if (confirm('Transaction Successful! Print Receipt?')) {
@@ -539,92 +686,206 @@ export default function POSPage() {
             setDenominations(prev => ({ ...prev, [key]: num >= 0 ? num : 0 }))
         }
 
+        const handlePinPadInput = (digit: string) => {
+            if (!selectedDenom) return
+            if (digit === 'clear') {
+                setPinPadValue('')
+                updateDenom(selectedDenom, '0')
+            } else if (digit === 'backspace') {
+                const newValue = pinPadValue.slice(0, -1)
+                setPinPadValue(newValue)
+                updateDenom(selectedDenom, newValue || '0')
+            } else {
+                const newValue = pinPadValue + digit
+                setPinPadValue(newValue)
+                updateDenom(selectedDenom, newValue)
+            }
+        }
+
+        const selectDenom = (key: string) => {
+            setSelectedDenom(key)
+            setPinPadValue(denominations[key as keyof typeof denominations]?.toString() || '')
+        }
+
+        const allDenominations = [
+            { label: '$100', key: 'hundreds', mult: 100, type: 'bill' },
+            { label: '$50', key: 'fifties', mult: 50, type: 'bill' },
+            { label: '$20', key: 'twenties', mult: 20, type: 'bill' },
+            { label: '$10', key: 'tens', mult: 10, type: 'bill' },
+            { label: '$5', key: 'fives', mult: 5, type: 'bill' },
+            { label: '$1', key: 'ones', mult: 1, type: 'bill' },
+            { label: '25¢', key: 'quarters', mult: 0.25, type: 'coin' },
+            { label: '10¢', key: 'dimes', mult: 0.10, type: 'coin' },
+            { label: '5¢', key: 'nickels', mult: 0.05, type: 'coin' },
+            { label: '1¢', key: 'pennies', mult: 0.01, type: 'coin' },
+        ]
+
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 overflow-y-auto">
-                <div className="w-full max-w-2xl p-8 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl my-8">
-                    <div className="text-center mb-8">
-                        <div className="h-16 w-16 bg-stone-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Banknote className="h-8 w-8 text-emerald-500" />
+                <div className={`p-6 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl my-8 flex gap-6 ${usesVirtualKeypad ? 'w-full max-w-4xl' : 'w-[600px] flex-col'}`}>
+                    <div className="flex-1">
+                        <div className="text-center mb-6">
+                            <div className="h-14 w-14 bg-stone-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <Banknote className="h-7 w-7 text-emerald-500" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-white">Open Cash Drawer</h2>
+                            <p className="text-stone-400 mt-1">
+                                {usesVirtualKeypad
+                                    ? 'Tap a denomination, then use the keypad to enter count'
+                                    : 'Enter the count for each denomination'}
+                            </p>
                         </div>
-                        <h2 className="text-2xl font-bold text-white">Open Cash Drawer</h2>
-                        <p className="text-stone-400 mt-2">Count your starting cash</p>
+
+                        <div className="space-y-4">
+                            {/* Bills */}
+                            <div>
+                                <h3 className="text-xs font-medium text-stone-500 mb-2 uppercase tracking-wider">Bills</h3>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {allDenominations.filter(d => d.type === 'bill').map(({ label, key, mult }) => (
+                                        <div
+                                            key={key}
+                                            onClick={() => usesVirtualKeypad && selectDenom(key)}
+                                            className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center relative ${usesVirtualKeypad
+                                                ? selectedDenom === key
+                                                    ? 'bg-emerald-600/20 border-emerald-500 ring-2 ring-emerald-500/50 cursor-pointer'
+                                                    : 'bg-stone-950 border-stone-700 hover:border-stone-600 cursor-pointer'
+                                                : 'bg-stone-950 border-stone-700'
+                                                }`}
+                                        >
+                                            <span className={`font-bold text-lg ${usesVirtualKeypad && selectedDenom === key ? 'text-emerald-400' : 'text-emerald-500'}`}>{label}</span>
+                                            {usesVirtualKeypad ? (
+                                                <span className="text-2xl font-bold text-white mt-1">{denominations[key as keyof typeof denominations]}</span>
+                                            ) : (
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={denominations[key as keyof typeof denominations] || ''}
+                                                    onChange={(e) => updateDenom(key, e.target.value)}
+                                                    className="w-full text-center bg-transparent text-2xl font-bold text-white mt-1 focus:outline-none focus:ring-0 border-b border-stone-700 focus:border-emerald-500"
+                                                    placeholder="0"
+                                                />
+                                            )}
+                                            <span className="text-xs text-stone-500 mt-1">
+                                                ${(denominations[key as keyof typeof denominations] * mult).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Coins */}
+                            <div>
+                                <h3 className="text-xs font-medium text-stone-500 mb-2 uppercase tracking-wider">Coins</h3>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {allDenominations.filter(d => d.type === 'coin').map(({ label, key, mult }) => (
+                                        <div
+                                            key={key}
+                                            onClick={() => usesVirtualKeypad && selectDenom(key)}
+                                            className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center relative ${usesVirtualKeypad
+                                                ? selectedDenom === key
+                                                    ? 'bg-amber-600/20 border-amber-500 ring-2 ring-amber-500/50 cursor-pointer'
+                                                    : 'bg-stone-950 border-stone-700 hover:border-stone-600 cursor-pointer'
+                                                : 'bg-stone-950 border-stone-700'
+                                                }`}
+                                        >
+                                            <span className={`font-bold text-lg ${usesVirtualKeypad && selectedDenom === key ? 'text-amber-400' : 'text-amber-500'}`}>{label}</span>
+                                            {usesVirtualKeypad ? (
+                                                <span className="text-2xl font-bold text-white mt-1">{denominations[key as keyof typeof denominations]}</span>
+                                            ) : (
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={denominations[key as keyof typeof denominations] || ''}
+                                                    onChange={(e) => updateDenom(key, e.target.value)}
+                                                    className="w-full text-center bg-transparent text-2xl font-bold text-white mt-1 focus:outline-none focus:ring-0 border-b border-stone-700 focus:border-amber-500"
+                                                    placeholder="0"
+                                                />
+                                            )}
+                                            <span className="text-xs text-stone-500 mt-1">
+                                                ${(denominations[key as keyof typeof denominations] * mult).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Total */}
+                            <div className="bg-gradient-to-r from-emerald-900/20 to-emerald-900/10 border border-emerald-500/30 rounded-xl p-4">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-base font-medium text-stone-300">Total Starting Cash</span>
+                                    <span className="text-3xl font-bold text-emerald-400">${totalAmount.toFixed(2)}</span>
+                                </div>
+                            </div>
+
+                            {!usesVirtualKeypad && (
+                                <button
+                                    onClick={() => handleShiftAction('OPEN', totalAmount)}
+                                    disabled={totalAmount === 0}
+                                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-98"
+                                >
+                                    Open Shift
+                                </button>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="space-y-6">
-                        {/* Bills */}
-                        <div>
-                            <h3 className="text-sm font-medium text-stone-400 mb-3">Bills</h3>
-                            <div className="grid grid-cols-2 gap-3">
-                                {[
-                                    { label: '$100', key: 'hundreds', mult: 100 },
-                                    { label: '$50', key: 'fifties', mult: 50 },
-                                    { label: '$20', key: 'twenties', mult: 20 },
-                                    { label: '$10', key: 'tens', mult: 10 },
-                                    { label: '$5', key: 'fives', mult: 5 },
-                                    { label: '$1', key: 'ones', mult: 1 },
-                                ].map(({ label, key, mult }) => (
-                                    <div key={key} className="flex items-center gap-3 bg-stone-950 p-3 rounded-lg border border-stone-800">
-                                        <span className="text-emerald-400 font-bold text-lg w-12">{label}</span>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            value={denominations[key as keyof typeof denominations] || ''}
-                                            onChange={(e) => updateDenom(key, e.target.value)}
-                                            className="flex-1 bg-stone-800 border border-stone-700 rounded px-3 py-2 text-white text-center focus:ring-1 focus:ring-emerald-500 outline-none"
-                                            placeholder="0"
-                                        />
-                                        <span className="text-stone-500 text-sm w-16 text-right">
-                                            ${(denominations[key as keyof typeof denominations] * mult).toFixed(2)}
-                                        </span>
-                                    </div>
+                    {/* Right side - Pin Pad (Only show if enabled) */}
+                    {usesVirtualKeypad && (
+                        <div className="w-64 flex flex-col">
+                            {/* Display */}
+                            <div className={`mb-4 p-4 rounded-xl border-2 ${selectedDenom
+                                ? 'bg-stone-950 border-stone-600'
+                                : 'bg-stone-950/50 border-stone-800'
+                                }`}>
+                                <div className="text-center">
+                                    {selectedDenom ? (
+                                        <>
+                                            <p className="text-xs text-stone-500 uppercase tracking-wider mb-1">
+                                                {allDenominations.find(d => d.key === selectedDenom)?.label} Count
+                                            </p>
+                                            <p className="text-4xl font-bold text-white">
+                                                {pinPadValue || '0'}
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <p className="text-stone-500 py-3">Select a denomination</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Keypad */}
+                            <div className="grid grid-cols-3 gap-2 flex-1">
+                                {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((key) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => {
+                                            if (key === 'C') handlePinPadInput('clear')
+                                            else if (key === '⌫') handlePinPadInput('backspace')
+                                            else handlePinPadInput(key)
+                                        }}
+                                        disabled={!selectedDenom}
+                                        className={`aspect-square rounded-xl text-2xl font-bold transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed ${key === 'C'
+                                            ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-600/30'
+                                            : key === '⌫'
+                                                ? 'bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 border border-amber-600/30'
+                                                : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700'
+                                            }`}
+                                    >
+                                        {key}
+                                    </button>
                                 ))}
                             </div>
-                        </div>
 
-                        {/* Coins */}
-                        <div>
-                            <h3 className="text-sm font-medium text-stone-400 mb-3">Coins</h3>
-                            <div className="grid grid-cols-2 gap-3">
-                                {[
-                                    { label: '25¢', key: 'quarters', mult: 0.25 },
-                                    { label: '10¢', key: 'dimes', mult: 0.10 },
-                                    { label: '5¢', key: 'nickels', mult: 0.05 },
-                                    { label: '1¢', key: 'pennies', mult: 0.01 },
-                                ].map(({ label, key, mult }) => (
-                                    <div key={key} className="flex items-center gap-3 bg-stone-950 p-3 rounded-lg border border-stone-800">
-                                        <span className="text-amber-400 font-bold text-lg w-12">{label}</span>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            value={denominations[key as keyof typeof denominations] || ''}
-                                            onChange={(e) => updateDenom(key, e.target.value)}
-                                            className="flex-1 bg-stone-800 border border-stone-700 rounded px-3 py-2 text-white text-center focus:ring-1 focus:ring-amber-500 outline-none"
-                                            placeholder="0"
-                                        />
-                                        <span className="text-stone-500 text-sm w-16 text-right">
-                                            ${(denominations[key as keyof typeof denominations] * mult).toFixed(2)}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
+                            {/* Open Shift Button */}
+                            <button
+                                onClick={() => handleShiftAction('OPEN', totalAmount)}
+                                disabled={totalAmount === 0}
+                                className="mt-4 w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-98"
+                            >
+                                Open Shift
+                            </button>
                         </div>
-
-                        {/* Total */}
-                        <div className="bg-gradient-to-r from-emerald-900/20 to-emerald-900/10 border border-emerald-500/30 rounded-xl p-6">
-                            <div className="flex justify-between items-center">
-                                <span className="text-lg font-medium text-stone-300">Total Starting Cash</span>
-                                <span className="text-3xl font-bold text-emerald-400">${totalAmount.toFixed(2)}</span>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={() => handleShiftAction('OPEN', totalAmount)}
-                            disabled={totalAmount === 0}
-                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Open Shift
-                        </button>
-                    </div>
+                    )}
                 </div>
             </div>
         )
@@ -710,6 +971,14 @@ export default function POSPage() {
                         )}
                     </div>
 
+                    <button
+                        onClick={() => setShowDisplayModal(true)}
+                        className="mr-3 p-2 bg-blue-600/20 hover:bg-blue-600/40 rounded-lg text-blue-400 transition-colors"
+                        title="Open Customer Display"
+                    >
+                        <Monitor className="h-5 w-5" />
+                    </button>
+
                     {view === 'POS' && (
                         <button
                             onClick={() => {
@@ -743,7 +1012,7 @@ export default function POSPage() {
                         <>
                             {!selectedCategory && !searchQuery ? (
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    {Object.keys(SERVICE_CATEGORIES).map(cat => (
+                                    {serviceCategories.map(cat => (
                                         <button
                                             key={cat}
                                             onClick={() => setSelectedCategory(cat)}
@@ -775,6 +1044,9 @@ export default function POSPage() {
                                                     const isOwnerClick = (session?.user as any)?.role === 'FRANCHISOR'
                                                     if (!shift && !isOwnerClick) {
                                                         setShowShiftModal(true)
+                                                    } else if (item.name === 'Open Item') {
+                                                        setShowOpenItemModal(true)
+                                                        setOpenItemPrice('')
                                                     } else {
                                                         addToCart(item, item.category === 'PRODUCTS' ? 'PRODUCT' : 'SERVICE')
                                                     }
@@ -842,10 +1114,51 @@ export default function POSPage() {
                         {/* Cart Header */}
                         <div className="h-20 border-b border-stone-800 flex items-center justify-between px-6">
                             <h2 className="text-xl font-bold text-white">Current Order</h2>
-                            <button className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 transition-colors">
-                                <User className="h-5 w-5" />
-                            </button>
+                            <div className="flex items-center gap-2">
+
+
+
+                                {/* Customer Button */}
+                                <button
+                                    onClick={() => setShowCustomerModal(true)}
+                                    className={`p-2 rounded-lg transition-colors ${selectedCustomer ? 'bg-emerald-600/30 text-emerald-400' : 'hover:bg-stone-800 text-stone-400'}`}
+                                    title={selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : 'Select Customer'}
+                                >
+                                    <User className="h-5 w-5" />
+                                </button>
+                                {/* Discounts Button */}
+                                <button
+                                    onClick={() => setShowDiscounts(true)}
+                                    className={`p-2 rounded-lg transition-colors ${appliedDiscount > 0 ? 'bg-pink-600/20 text-pink-400' : 'bg-purple-600/20 hover:bg-purple-600/40 text-purple-400'}`}
+                                    title="Customer Discounts"
+                                >
+                                    <Gift className="h-5 w-5" />
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Selected Customer Strip */}
+                        {selectedCustomer && (
+                            <div className="px-4 py-2 bg-emerald-900/20 border-b border-emerald-800/30 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4 text-emerald-400" />
+                                    <span className="text-emerald-400 text-sm font-medium">
+                                        {selectedCustomer.firstName} {selectedCustomer.lastName}
+                                    </span>
+                                    {selectedCustomer.loyaltyPoints > 0 && (
+                                        <span className="text-amber-400 text-xs">
+                                            ⭐ {selectedCustomer.loyaltyPoints} pts
+                                        </span>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => setSelectedCustomer(null)}
+                                    className="text-emerald-400 hover:text-red-400 transition-colors text-xs"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        )}
 
                         {/* Cart Items */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -916,6 +1229,12 @@ export default function POSPage() {
                                     <span>Subtotal</span>
                                     <span>{formatCurrency(subtotal)}</span>
                                 </div>
+                                {appliedDiscount > 0 && (
+                                    <div className="flex justify-between text-pink-400">
+                                        <span>Discount</span>
+                                        <span>-{formatCurrency(appliedDiscount)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between text-stone-400">
                                     <span>Tax (8%)</span>
                                     <span>{formatCurrency(tax)}</span>
@@ -931,7 +1250,30 @@ export default function POSPage() {
                             </div>
 
                             <button
-                                onClick={() => setShowCheckoutModal(true)}
+                                onClick={async () => {
+                                    // Check if tips are enabled
+                                    if (tipSettings.enabled) {
+                                        // Set cart to awaiting tip mode
+                                        await fetch('/api/pos/cart', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                items: cart,
+                                                subtotal,
+                                                tax,
+                                                total: totalCash,
+                                                status: 'AWAITING_TIP',
+                                                showTipPrompt: true,
+                                                tipAmount: 0,
+                                                tipType: tipSettings.type,
+                                                tipSuggestions: tipSettings.suggestions
+                                            })
+                                        })
+                                        setShowTipWaiting(true)
+                                    } else {
+                                        setShowCheckoutModal(true)
+                                    }
+                                }}
                                 disabled={cart.length === 0}
                                 className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-900/20"
                             >
@@ -1165,6 +1507,375 @@ export default function POSPage() {
                         canVoid={true}
                         canDelete={true}
                     />
+                )}
+
+                {/* Tip Waiting Modal */}
+                {showTipWaiting && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+                        <div className="bg-stone-900 rounded-2xl border border-stone-700 p-8 max-w-md w-full text-center">
+                            <div className="mb-6">
+                                <div className="w-16 h-16 mx-auto bg-orange-500/20 rounded-full flex items-center justify-center mb-4">
+                                    <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-white mb-2">Waiting for Customer</h2>
+                                <p className="text-stone-400">Please ask the customer to select a tip on their display</p>
+                            </div>
+
+                            <div className="bg-stone-800 rounded-xl p-4 mb-6">
+                                <p className="text-stone-300 text-sm">Order Total</p>
+                                <p className="text-3xl font-bold text-emerald-400">{formatCurrency(totalCash)}</p>
+                            </div>
+
+                            <button
+                                onClick={async () => {
+                                    // Cancel tip waiting and clear cart tip status
+                                    await fetch('/api/pos/cart', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            items: cart,
+                                            subtotal,
+                                            tax,
+                                            total: totalCash,
+                                            status: 'ACTIVE',
+                                            showTipPrompt: false,
+                                            tipAmount: 0
+                                        })
+                                    })
+                                    setShowTipWaiting(false)
+                                    setPendingTipAmount(0)
+                                    setShowCheckoutModal(true) // Skip to checkout
+                                }}
+                                className="w-full py-3 bg-stone-700 hover:bg-stone-600 text-white rounded-xl font-semibold transition-all"
+                            >
+                                Skip Tip / Continue
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Tip Polling Effect */}
+                {showTipWaiting && <TipPollingEffect onTipReceived={(tipAmount: number) => {
+                    setPendingTipAmount(tipAmount)
+                    setShowTipWaiting(false)
+                    setShowCheckoutModal(true)
+                }} />}
+
+                {/* Custom Item Modal with Pin Pad */}
+                {showOpenItemModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="bg-stone-900 rounded-2xl border border-stone-700 p-6 w-[400px] shadow-2xl">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-bold text-white">Custom Item</h3>
+                                <button
+                                    onClick={() => {
+                                        setShowOpenItemModal(false)
+                                        setOpenItemPrice('')
+                                    }}
+                                    className="text-stone-400 hover:text-white text-2xl"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            {/* Price Display */}
+                            <div className="mb-6">
+                                <label className="block text-stone-400 text-sm mb-2">Price</label>
+                                <div className="relative">
+                                    <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-emerald-500" />
+                                    {usesVirtualKeypad ? (
+                                        <div className="w-full pl-14 pr-4 py-4 bg-stone-800 border border-stone-700 rounded-xl text-white text-3xl font-bold text-center min-h-[60px] flex items-center justify-center">
+                                            {openItemPrice || '0.00'}
+                                        </div>
+                                    ) : (
+                                        <input
+                                            type="number"
+                                            value={openItemPrice}
+                                            onChange={(e) => setOpenItemPrice(e.target.value)}
+                                            className="w-full pl-14 pr-4 py-4 bg-stone-800 border border-stone-700 rounded-xl text-white text-3xl font-bold text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
+                                            placeholder="0.00"
+                                            autoFocus
+                                        />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Pin Pad (Only if enabled) */}
+                            {usesVirtualKeypad && (
+                                <div className="grid grid-cols-3 gap-2 mb-6">
+                                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map((key) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => {
+                                                if (key === '⌫') {
+                                                    setOpenItemPrice(prev => prev.slice(0, -1))
+                                                } else if (key === '.') {
+                                                    if (!openItemPrice.includes('.')) {
+                                                        setOpenItemPrice(prev => prev + '.')
+                                                    }
+                                                } else {
+                                                    // Prevent more than 2 decimal places
+                                                    const parts = openItemPrice.split('.')
+                                                    if (parts.length === 2 && parts[1].length >= 2) return
+                                                    setOpenItemPrice(prev => prev + key)
+                                                }
+                                            }}
+                                            className={`h-14 rounded-xl text-2xl font-bold transition-all active:scale-95 ${key === '⌫'
+                                                ? 'bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 border border-amber-600/30'
+                                                : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700'
+                                                }`}
+                                        >
+                                            {key}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Quick Amount Buttons */}
+                            <div className="grid grid-cols-4 gap-2 mb-6">
+                                {['10', '15', '20', '25'].map((amount) => (
+                                    <button
+                                        key={amount}
+                                        onClick={() => setOpenItemPrice(amount)}
+                                        className="py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg font-semibold text-sm border border-stone-700"
+                                    >
+                                        ${amount}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        const price = parseFloat(openItemPrice) || 0
+                                        if (price <= 0) return
+                                        const newItem: CartItem = {
+                                            id: `custom-${Date.now()}`,
+                                            type: 'SERVICE',
+                                            name: 'Custom Item',
+                                            price: price,
+                                            quantity: 1,
+                                            discount: 0
+                                        }
+                                        setCart(prev => [...prev, newItem])
+                                        setShowOpenItemModal(false)
+                                        setOpenItemPrice('')
+                                    }}
+                                    disabled={!openItemPrice || parseFloat(openItemPrice) <= 0}
+                                    className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Add ${openItemPrice || '0.00'} to Cart
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Customer Discounts Modal */}
+                {showDiscounts && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <CustomerDiscounts
+                            franchiseId={user?.franchiseId || ''}
+                            customerPhone={selectedCustomer?.phone}
+                            customerId={selectedCustomer?.id}
+                            orderTotal={calculateTotal().subtotal}
+                            onDiscountApplied={(discount, source, details) => {
+                                setAppliedDiscount(discount)
+                                setAppliedDiscountSource(source)
+                                setShowDiscounts(false)
+                            }}
+                            onClose={() => setShowDiscounts(false)}
+                        />
+                    </div>
+                )}
+
+                {/* Customer Display Modal */}
+                {showDisplayModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-stone-700">
+                            <h2 className="text-xl font-bold text-white text-center mb-2">Customer Display</h2>
+                            <p className="text-stone-400 text-center text-sm mb-6">Open this URL on your second tablet</p>
+
+                            {/* Display URL */}
+                            <div className="bg-stone-800 rounded-lg p-3 mb-4">
+                                <p className="text-stone-500 text-xs mb-1">Display URL (Location Specific):</p>
+                                <div className="flex items-center gap-2">
+                                    <code className="flex-1 text-orange-400 text-sm break-all">
+                                        {typeof window !== 'undefined' ? `${window.location.origin}/kiosk/display?locationId=${user?.locationId || ''}` : ''}
+                                    </code>
+                                    <button
+                                        onClick={() => {
+                                            const url = `${window.location.origin}/kiosk/display?locationId=${user?.locationId || ''}`
+                                            navigator.clipboard.writeText(url)
+                                        }}
+                                        className="px-3 py-1 bg-orange-600 hover:bg-orange-500 text-white text-sm rounded-lg"
+                                    >
+                                        Copy
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Location Sync Status */}
+                            <div className="bg-emerald-900/30 border border-emerald-700/50 rounded-lg p-3 mb-4 text-center">
+                                <p className="text-emerald-400 font-medium">✓ Location-specific sync enabled</p>
+                                <p className="text-emerald-600 text-xs">Only this location's cart will show</p>
+                            </div>
+
+                            {/* QR Code */}
+                            <div className="bg-white rounded-lg p-4 mb-4 flex items-center justify-center">
+                                <QRCodeSVG
+                                    value={typeof window !== 'undefined' ? `${window.location.origin}/kiosk/display?locationId=${user?.locationId || ''}` : ''}
+                                    size={160}
+                                    bgColor="#FFFFFF"
+                                    fgColor="#000000"
+                                    level="M"
+                                    includeMargin={false}
+                                />
+                            </div>
+                            <p className="text-stone-500 text-xs text-center mb-4">For separate tablet: Scan QR code</p>
+
+                            {/* Actions */}
+                            <div className="space-y-2">
+                                <button
+                                    onClick={() => {
+                                        const url = `/kiosk/display?locationId=${user?.locationId || ''}`
+                                        window.open(url, '_blank', 'fullscreen=yes')
+                                        setShowDisplayModal(false)
+                                    }}
+                                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold flex items-center justify-center gap-2"
+                                >
+                                    <Monitor className="h-5 w-5" />
+                                    Open on 2nd Screen (USB/HDMI)
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const url = `/kiosk/display?locationId=${user?.locationId || ''}`
+                                        window.open(url, 'CustomerDisplay', 'width=1024,height=768')
+                                        setShowDisplayModal(false)
+                                    }}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold"
+                                >
+                                    Open in Popup Window
+                                </button>
+                                <button
+                                    onClick={() => setShowDisplayModal(false)}
+                                    className="w-full py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-xl font-semibold"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Customer Selection Modal */}
+                {showCustomerModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-stone-700 max-h-[80vh] flex flex-col">
+                            <h2 className="text-xl font-bold text-white text-center mb-2">Select Customer</h2>
+                            <p className="text-stone-400 text-center text-sm mb-4">Choose a checked-in customer or search by phone</p>
+
+                            {/* Search Input */}
+                            <div className="relative mb-4">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-stone-500" />
+                                <input
+                                    type="text"
+                                    placeholder="Search by name or phone..."
+                                    className="w-full pl-10 pr-4 py-3 bg-stone-800 border border-stone-700 rounded-xl text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                                    onChange={async (e) => {
+                                        const query = e.target.value
+                                        if (query.length >= 3 && user?.franchiseId) {
+                                            try {
+                                                const res = await fetch(`/api/clients/search?query=${encodeURIComponent(query)}&franchiseId=${user.franchiseId}`)
+                                                if (res.ok) {
+                                                    const data = await res.json()
+                                                    if (data.length > 0) {
+                                                        setCheckedInCustomers(data)
+                                                    }
+                                                }
+                                            } catch (err) {
+                                                console.error('Search error:', err)
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
+
+                            {/* Selected Customer Display */}
+                            {selectedCustomer && (
+                                <div className="bg-emerald-900/30 border border-emerald-700/50 rounded-lg p-3 mb-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-emerald-400 font-medium">
+                                                {selectedCustomer.firstName} {selectedCustomer.lastName}
+                                            </p>
+                                            <p className="text-emerald-600 text-sm">{selectedCustomer.phone}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setSelectedCustomer(null)}
+                                            className="text-emerald-400 hover:text-red-400 transition-colors"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Customer List */}
+                            <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+                                {checkedInCustomers.length === 0 ? (
+                                    <div className="text-center py-8 text-stone-500">
+                                        <User className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                                        <p>No checked-in customers</p>
+                                        <p className="text-sm">Search by phone to find a customer</p>
+                                    </div>
+                                ) : (
+                                    checkedInCustomers.map((customer: any) => (
+                                        <button
+                                            key={customer.id}
+                                            onClick={() => {
+                                                setSelectedCustomer(customer)
+                                                setShowCustomerModal(false)
+                                            }}
+                                            className={`w-full p-3 rounded-lg text-left transition-colors ${selectedCustomer?.id === customer.id
+                                                ? 'bg-orange-600/30 border border-orange-500'
+                                                : 'bg-stone-800 hover:bg-stone-700 border border-stone-700'
+                                                }`}
+                                        >
+                                            <p className="text-white font-medium">
+                                                {customer.firstName} {customer.lastName}
+                                            </p>
+                                            <p className="text-stone-400 text-sm">{customer.phone}</p>
+                                            {customer.loyaltyPoints > 0 && (
+                                                <p className="text-amber-400 text-xs mt-1">
+                                                    ⭐ {customer.loyaltyPoints} loyalty points
+                                                </p>
+                                            )}
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setSelectedCustomer(null)
+                                        setShowCustomerModal(false)
+                                    }}
+                                    className="flex-1 py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-xl font-semibold transition-all"
+                                >
+                                    Clear & Close
+                                </button>
+                                <button
+                                    onClick={() => setShowCustomerModal(false)}
+                                    className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-semibold transition-all"
+                                >
+                                    Done
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
         </div >
