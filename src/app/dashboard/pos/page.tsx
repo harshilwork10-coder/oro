@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
     Search,
@@ -125,7 +126,8 @@ function TipPollingEffect({ onTipReceived, locationId }: { onTipReceived: (tipAm
     return null
 }
 
-export default function POSPage() {
+function POSContent() {
+    const searchParams = useSearchParams()
     console.log('POSPage: Rendering...')
     const { data: session } = useSession()
     const user = session?.user as any
@@ -192,6 +194,8 @@ export default function POSPage() {
     const [splitCashAmount, setSplitCashAmount] = useState('')
     const [splitCashReceived, setSplitCashReceived] = useState('')
     const [splitQuickSelect, setSplitQuickSelect] = useState(false)
+    const [isSplitPayment, setIsSplitPayment] = useState(false) // Flag to indicate split payment mode
+    const [paxAmount, setPaxAmount] = useState(0) // Custom amount for PAX (card portion in split)
 
     // Franchise pricing settings
     const [pricingSettings, setPricingSettings] = useState<{ pricingModel: string; cardSurchargeType: string; cardSurcharge: number; showDualPricing: boolean }>({
@@ -242,6 +246,36 @@ export default function POSPage() {
         }
     }, [session])
 
+    // Handle appointment checkout URL params - auto-add service to cart
+    useEffect(() => {
+        const checkoutParam = searchParams.get('checkout')
+        if (checkoutParam) {
+            try {
+                const checkoutData = JSON.parse(checkoutParam)
+                if (checkoutData.serviceName && checkoutData.servicePrice) {
+                    // Add appointment service to cart
+                    const appointmentItem: CartItem = {
+                        id: `appt-${checkoutData.appointmentId || Date.now()}`,
+                        type: 'SERVICE',
+                        name: checkoutData.serviceName,
+                        price: parseFloat(checkoutData.servicePrice),
+                        quantity: 1
+                    }
+                    setCart([appointmentItem])
+                    setToast({
+                        message: `Added ${checkoutData.serviceName} from appointment`,
+                        type: 'success'
+                    })
+
+                    // Clear the URL param to prevent re-adding on refresh
+                    window.history.replaceState({}, '', '/dashboard/pos')
+                }
+            } catch (e) {
+                console.error('Error parsing checkout param:', e)
+            }
+        }
+    }, [searchParams])
+
     // Sync cart to customer display - especially when cart becomes empty (cancel/delete)
     // But DON'T sync when checkout/tip modals are active (would interfere with payment flow)
     useEffect(() => {
@@ -259,7 +293,7 @@ export default function POSPage() {
                     body: JSON.stringify({
                         locationId: user.locationId,
                         cart: cart.length === 0
-                            ? { items: [], status: 'IDLE', subtotal: 0, tax: 0, total: 0 }
+                            ? { items: [], status: 'IDLE', subtotal: 0, tax: 0, total: 0, customerName: null }
                             : {
                                 items: cart.map(item => ({
                                     name: item.name,
@@ -268,7 +302,8 @@ export default function POSPage() {
                                     quantity: item.quantity
                                 })),
                                 status: 'ACTIVE',
-                                subtotal: cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+                                subtotal: cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+                                customerName: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : null
                             }
                     })
                 })
@@ -280,7 +315,7 @@ export default function POSPage() {
         // Debounce to avoid too many requests
         const timeoutId = setTimeout(syncCartToDisplay, 300)
         return () => clearTimeout(timeoutId)
-    }, [cart, session, showCheckoutModal, showTipWaiting])
+    }, [cart, session, showCheckoutModal, showTipWaiting, selectedCustomer])
 
     const fetchCheckedInCustomers = async () => {
         try {
@@ -1524,8 +1559,25 @@ export default function POSPage() {
                             <div className="h-16 xl:h-20 border-b border-stone-800 flex items-center justify-between px-3 xl:px-6">
                                 <h2 className="text-base xl:text-xl font-bold text-white">Order</h2>
                                 <div className="flex items-center gap-1 xl:gap-2">
-
-
+                                    {/* Clear Cart Button - Only show when cart has items */}
+                                    {cart.length > 0 && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm('Clear all items from cart?')) {
+                                                    setCart([])
+                                                    setPendingTipAmount(0)
+                                                    setSelectedCustomer(null)
+                                                    setAppliedDiscount(0)
+                                                    setAppliedDiscountSource(null)
+                                                    setToast({ message: 'Cart cleared', type: 'success' })
+                                                }
+                                            }}
+                                            className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                                            title="Clear Cart"
+                                        >
+                                            <Trash2 className="h-5 w-5" />
+                                        </button>
+                                    )}
 
                                     {/* Customer Button */}
                                     <button
@@ -1778,6 +1830,7 @@ export default function POSPage() {
                                     {/* Card Payment (PAX Terminal) */}
                                     <button
                                         onClick={() => {
+                                            setIsSplitPayment(false) // Ensure not in split mode
                                             setShowCheckoutModal(false)
                                             setShowPaxModal(true)
                                         }}
@@ -2123,9 +2176,9 @@ export default function POSPage() {
                                         <button
                                             onClick={() => {
                                                 if (!isValidSplit) return
-                                                // Store split amounts for PAX
-                                                (window as any).splitPaymentCash = cashAmt;
-                                                (window as any).splitPaymentCard = cardAmt;
+                                                // Use React state instead of window globals
+                                                setIsSplitPayment(true)
+                                                setPaxAmount(cardAmt)
                                                 setShowSplitPayment(false)
                                                 setShowPaxModal(true)
                                             }}
@@ -2200,11 +2253,11 @@ export default function POSPage() {
                     {/* PAX Terminal Payment Modal */}
                     <PaxPaymentModal
                         isOpen={showPaxModal}
-                        onClose={() => setShowPaxModal(false)}
+                        onClose={() => {
+                            setShowPaxModal(false)
+                            setIsSplitPayment(false) // Reset split mode on close
+                        }}
                         onSuccess={(response) => {
-                            const splitCash = (window as any).splitPaymentCash
-                            const splitCard = (window as any).splitPaymentCard
-
                             // Extract PAX details
                             const paymentDetails: PaymentDetails = {
                                 gatewayTxId: response.transactionId,
@@ -2213,14 +2266,18 @@ export default function POSPage() {
                                 cardType: response.cardType
                             }
 
-                            if (splitCash && splitCard) {
-                                handleCheckout('SPLIT', splitCash, splitCard, paymentDetails)
+                            if (isSplitPayment) {
+                                // Use split amounts from state
+                                const cashAmt = parseFloat(splitCashAmount || '0')
+                                const cardAmt = paxAmount
+                                handleCheckout('SPLIT', cashAmt, cardAmt, paymentDetails)
+                                setIsSplitPayment(false) // Reset after processing
                             } else {
                                 handleCheckout('CREDIT_CARD', undefined, undefined, paymentDetails)
                             }
                             setShowPaxModal(false)
                         }}
-                        amount={totalCard}
+                        amount={isSplitPayment ? paxAmount : totalCard}
                         invoiceNumber={Date.now().toString().slice(-6)}
                     />
 
@@ -2694,5 +2751,18 @@ export default function POSPage() {
                 )
             }
         </>
+    )
+}
+
+// Export with Suspense wrapper for useSearchParams
+export default function POSPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+            </div>
+        }>
+            <POSContent />
+        </Suspense>
     )
 }

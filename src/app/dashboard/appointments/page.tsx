@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, Clock, User, MapPin, X, Check, XCircle, Phone, Mail, Loader2 } from 'lucide-react'
+import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, Clock, User, MapPin, X, Check, XCircle, Phone, Mail, Loader2, CreditCard } from 'lucide-react'
 import BookingModal from '@/components/appointments/BookingModal'
 
 type Appointment = {
@@ -393,20 +393,43 @@ export default function AppointmentsPage() {
                             )}
 
                             {selectedAppointment.status === 'SCHEDULED' && (
-                                <button
-                                    onClick={() => handleAppointmentAction(selectedAppointment.id, 'cancel')}
-                                    disabled={actionLoading === selectedAppointment.id}
-                                    className="flex-1 py-3 bg-red-600/20 text-red-300 border border-red-600/30 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-red-600/30 transition-all disabled:opacity-50"
-                                >
-                                    {actionLoading === selectedAppointment.id ? (
-                                        <Loader2 className="h-5 w-5 animate-spin" />
-                                    ) : (
-                                        <>
-                                            <XCircle className="h-5 w-5" />
-                                            Cancel Appointment
-                                        </>
-                                    )}
-                                </button>
+                                <div className="flex gap-3 w-full">
+                                    {/* Start Checkout Button - Navigate to POS with service */}
+                                    <button
+                                        onClick={() => {
+                                            // Encode appointment data for POS checkout
+                                            const checkoutData = {
+                                                appointmentId: selectedAppointment.id,
+                                                serviceName: selectedAppointment.service.name,
+                                                servicePrice: selectedAppointment.service.price,
+                                                customerName: `${selectedAppointment.client.firstName} ${selectedAppointment.client.lastName}`,
+                                                customerEmail: selectedAppointment.client.email
+                                            }
+                                            const params = new URLSearchParams({
+                                                checkout: JSON.stringify(checkoutData)
+                                            })
+                                            window.location.href = `/dashboard/pos?${params.toString()}`
+                                        }}
+                                        className="flex-1 py-3 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-all"
+                                    >
+                                        <CreditCard className="h-5 w-5" />
+                                        Start Checkout
+                                    </button>
+                                    <button
+                                        onClick={() => handleAppointmentAction(selectedAppointment.id, 'cancel')}
+                                        disabled={actionLoading === selectedAppointment.id}
+                                        className="flex-1 py-3 bg-red-600/20 text-red-300 border border-red-600/30 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-red-600/30 transition-all disabled:opacity-50"
+                                    >
+                                        {actionLoading === selectedAppointment.id ? (
+                                            <Loader2 className="h-5 w-5 animate-spin" />
+                                        ) : (
+                                            <>
+                                                <XCircle className="h-5 w-5" />
+                                                Cancel
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             )}
 
                             {(selectedAppointment.status === 'CANCELLED' || selectedAppointment.status === 'COMPLETED') && (
