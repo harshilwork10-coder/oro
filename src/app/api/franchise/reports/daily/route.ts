@@ -19,28 +19,52 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
+
+    // Support date range (startDate, endDate) or single date
+    const startDateParam = searchParams.get('startDate')
+    const endDateParam = searchParams.get('endDate')
     const dateParam = searchParams.get('date')
-    // Default to today if no date provided
-    const date = dateParam ? new Date(dateParam) : new Date()
 
-    // Set start and end of the day
-    const startOfDay = new Date(date)
-    startOfDay.setHours(0, 0, 0, 0)
+    let startOfDay: Date
+    let endOfDay: Date
 
-    const endOfDay = new Date(date)
-    endOfDay.setHours(23, 59, 59, 999)
+    if (startDateParam && endDateParam) {
+        // Date range mode
+        startOfDay = new Date(startDateParam)
+        startOfDay.setHours(0, 0, 0, 0)
+        endOfDay = new Date(endDateParam)
+        endOfDay.setHours(23, 59, 59, 999)
+    } else {
+        // Single date mode (backwards compatible)
+        const date = dateParam ? new Date(dateParam) : new Date()
+        startOfDay = new Date(date)
+        startOfDay.setHours(0, 0, 0, 0)
+        endOfDay = new Date(date)
+        endOfDay.setHours(23, 59, 59, 999)
+    }
+
+    // Optional location filter
+    const locationId = searchParams.get('locationId')
 
     try {
-        // Fetch all transactions for the day
-        const transactions = await prisma.transaction.findMany({
-            where: {
-                franchiseId: user.franchiseId,
-                createdAt: {
-                    gte: startOfDay,
-                    lte: endOfDay
-                },
-                status: 'COMPLETED' // Only count completed transactions
+        // Build where clause
+        const whereClause: any = {
+            franchiseId: user.franchiseId,
+            createdAt: {
+                gte: startOfDay,
+                lte: endOfDay
             },
+            status: 'COMPLETED'
+        }
+
+        // Add location filter if specified
+        if (locationId) {
+            whereClause.locationId = locationId
+        }
+
+        // Fetch all transactions for the date range
+        const transactions = await prisma.transaction.findMany({
+            where: whereClause,
             include: {
                 lineItems: {
                     include: {

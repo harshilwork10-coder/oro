@@ -54,6 +54,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
     const [paxVerificationPending, setPaxVerificationPending] = useState(false)
     const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null)
     const [voidReason, setVoidReason] = useState<string>('')
+    const [refundReason, setRefundReason] = useState<string>('')
     const { logoUrl, primaryColor } = useBranding()
 
     useEffect(() => {
@@ -141,6 +142,11 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
             return
         }
 
+        if (!refundReason) {
+            showToast('error', 'Please select a reason for the refund')
+            return
+        }
+
         // If CARD refund and original was card payment, verify card matches
         if (refundMethod === 'CARD' && (transaction.paymentMethod === 'CREDIT_CARD' || transaction.paymentMethod === 'DEBIT_CARD')) {
             setPaxVerificationPending(true)
@@ -167,7 +173,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                     originalTransactionId: transaction.id,
                     refundType: selectedItems.size === transaction.lineItems.length ? 'FULL' : 'PARTIAL',
                     items: refundItems,
-                    reason: 'Customer request',
+                    reason: refundReason,
                     refundMethod,
                     cardLast4: paxResponse?.cardLast4
                 })
@@ -429,6 +435,26 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                                 })}
                             </div>
 
+                            {/* Refund Reason Selection */}
+                            <div className="bg-stone-950 rounded-xl p-4 border border-stone-800">
+                                <label className="block text-sm text-stone-400 mb-2">Reason for refund *</label>
+                                <select
+                                    value={refundReason}
+                                    onChange={(e) => setRefundReason(e.target.value)}
+                                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                >
+                                    <option value="">Select a reason...</option>
+                                    <option value="Customer Request">Customer Request</option>
+                                    <option value="Defective Product">Defective Product</option>
+                                    <option value="Wrong Item Charged">Wrong Item Charged</option>
+                                    <option value="Service Not Performed">Service Not Performed</option>
+                                    <option value="Customer Dissatisfaction">Customer Dissatisfaction</option>
+                                    <option value="Price Adjustment">Price Adjustment</option>
+                                    <option value="Duplicate Charge">Duplicate Charge</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+
                             {/* Refund Method Selection */}
                             <div className="bg-stone-950 rounded-xl p-4 border border-stone-800">
                                 <h4 className="text-white font-medium mb-3">Refund Method</h4>
@@ -536,7 +562,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                         {action === 'refund' && (
                             <button
                                 onClick={handleRefund}
-                                disabled={selectedItems.size === 0 || isProcessing}
+                                disabled={selectedItems.size === 0 || !refundReason || isProcessing}
                                 className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-stone-800 disabled:text-stone-500 text-white rounded-xl font-bold transition-colors disabled:cursor-not-allowed"
                             >
                                 {isProcessing ? 'Processing...' : 'Process Refund'}
@@ -545,7 +571,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                         {action === 'void' && (
                             <button
                                 onClick={handleVoid}
-                                disabled={isProcessing}
+                                disabled={!voidReason || isProcessing}
                                 className="px-6 py-3 bg-orange-600 hover:bg-orange-500 disabled:bg-stone-800 disabled:text-stone-500 text-white rounded-xl font-bold transition-colors disabled:cursor-not-allowed"
                             >
                                 {isProcessing ? 'Processing...' : 'Void Transaction'}

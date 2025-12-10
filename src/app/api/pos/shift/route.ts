@@ -157,7 +157,7 @@ export async function GET(req: Request) {
         }
     }
 
-    // Get current open session for this user
+    // Get current open session for this user with linked transactions
     const whereClause: any = {
         status: 'OPEN',
         employeeId: dbUser.id
@@ -167,9 +167,39 @@ export async function GET(req: Request) {
     }
 
     const currentSession = await prisma.cashDrawerSession.findFirst({
-        where: whereClause
+        where: whereClause,
+        include: {
+            transactions: {
+                where: {
+                    status: 'COMPLETED',
+                    paymentMethod: 'CASH'
+                },
+                select: { total: true }
+            }
+        }
     })
 
-    return NextResponse.json({ shift: currentSession, shiftRequirement })
+    // Calculate cash sales from linked transactions
+    let shiftData = null
+    if (currentSession) {
+        const cashSales = currentSession.transactions?.reduce(
+            (sum: number, tx: any) => sum + Number(tx.total || 0), 0
+        ) || 0
+
+        const startingCash = Number(currentSession.startingCash || 0)
+
+        shiftData = {
+            ...currentSession,
+            cashTotal: cashSales,
+            expectedCash: startingCash + cashSales,
+            // Also add these aliases for frontend compatibility
+            openingAmount: startingCash,
+            cashSales: cashSales
+        }
+        // Remove raw transactions array from response
+        delete (shiftData as any).transactions
+    }
+
+    return NextResponse.json({ shift: shiftData, shiftRequirement })
 }
 

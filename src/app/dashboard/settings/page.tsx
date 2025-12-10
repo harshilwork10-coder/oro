@@ -15,6 +15,11 @@ export default function SettingsPage() {
     const [surchargeType, setSurchargeType] = useState('PERCENTAGE')
     const [surchargeValue, setSurchargeValue] = useState('3.99')
 
+    // Tip Settings
+    const [tipEnabled, setTipEnabled] = useState(true)
+    const [tipType, setTipType] = useState('PERCENT')
+    const [tipSuggestions, setTipSuggestions] = useState('15,20,25')
+
     // Employee List
     const [employees, setEmployees] = useState<any[]>([])
 
@@ -29,9 +34,13 @@ export default function SettingsPage() {
             if (res.ok) {
                 const data = await res.json()
                 if (data) {
-                    setPricingModel(data.pricingModel || 'DUAL_PRICING')
+                    setPricingModel(data.pricingModel || 'STANDARD')
                     setSurchargeType(data.cardSurchargeType || 'PERCENTAGE')
                     setSurchargeValue(data.cardSurcharge?.toString() || '3.99')
+                    // Tip settings
+                    setTipEnabled(data.tipPromptEnabled ?? true)
+                    setTipType(data.tipType || 'PERCENT')
+                    setTipSuggestions(data.tipSuggestions?.replace(/[\[\]]/g, '') || '15,20,25')
                 }
             }
         } catch (error) {
@@ -53,7 +62,7 @@ export default function SettingsPage() {
         }
     }
 
-    const savePricingSettings = async () => {
+    const saveSettings = async () => {
         setSaving(true)
         setMessage('')
 
@@ -64,12 +73,17 @@ export default function SettingsPage() {
                 body: JSON.stringify({
                     pricingModel,
                     cardSurchargeType: surchargeType,
-                    cardSurcharge: parseFloat(surchargeValue)
+                    cardSurcharge: parseFloat(surchargeValue),
+                    showDualPricing: pricingModel === 'DUAL_PRICING',
+                    // Tip settings
+                    tipPromptEnabled: tipEnabled,
+                    tipType,
+                    tipSuggestions: `[${tipSuggestions}]`
                 })
             })
 
             if (res.ok) {
-                setMessage('✅ Pricing settings saved successfully!')
+                setMessage('✅ Settings saved successfully!')
             } else {
                 setMessage('❌ Failed to save settings')
             }
@@ -158,8 +172,8 @@ export default function SettingsPage() {
                             <button
                                 onClick={() => setPricingModel('STANDARD')}
                                 className={`flex-1 p-4 rounded-xl border-2 transition-all ${pricingModel === 'STANDARD'
-                                        ? 'border-orange-500 bg-orange-50'
-                                        : 'border-gray-200 hover:border-gray-300'
+                                    ? 'border-orange-500 bg-orange-50'
+                                    : 'border-gray-200 hover:border-gray-300'
                                     }`}
                             >
                                 <div className="font-bold">Standard Pricing</div>
@@ -168,8 +182,8 @@ export default function SettingsPage() {
                             <button
                                 onClick={() => setPricingModel('DUAL_PRICING')}
                                 className={`flex-1 p-4 rounded-xl border-2 transition-all ${pricingModel === 'DUAL_PRICING'
-                                        ? 'border-orange-500 bg-orange-50'
-                                        : 'border-gray-200 hover:border-gray-300'
+                                    ? 'border-orange-500 bg-orange-50'
+                                    : 'border-gray-200 hover:border-gray-300'
                                     }`}
                             >
                                 <div className="font-bold">Dual Pricing</div>
@@ -187,8 +201,8 @@ export default function SettingsPage() {
                                     <button
                                         onClick={() => setSurchargeType('PERCENTAGE')}
                                         className={`flex-1 p-3 rounded-lg border-2 transition-all ${surchargeType === 'PERCENTAGE'
-                                                ? 'border-orange-500 bg-orange-50'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            ? 'border-orange-500 bg-orange-50'
+                                            : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                     >
                                         <div className="font-semibold">Percentage (%)</div>
@@ -196,8 +210,8 @@ export default function SettingsPage() {
                                     <button
                                         onClick={() => setSurchargeType('FLAT_AMOUNT')}
                                         className={`flex-1 p-3 rounded-lg border-2 transition-all ${surchargeType === 'FLAT_AMOUNT'
-                                                ? 'border-orange-500 bg-orange-50'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            ? 'border-orange-500 bg-orange-50'
+                                            : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                     >
                                         <div className="font-semibold">Flat Amount ($)</div>
@@ -250,17 +264,104 @@ export default function SettingsPage() {
                             </div>
                         </>
                     )}
-
-                    {/* Save Button */}
-                    <button
-                        onClick={savePricingSettings}
-                        disabled={saving}
-                        className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-lg hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50"
-                    >
-                        <Save className="h-5 w-5" />
-                        {saving ? 'Saving...' : 'Save Pricing Settings'}
-                    </button>
                 </div>
+            </div>
+
+            {/* Tip Settings */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="h-12 w-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                        <DollarSign className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold">Tip Settings</h2>
+                        <p className="text-gray-600">Configure tip prompt on customer display</p>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    {/* Tip Enable/Disable */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                        <div>
+                            <div className="font-semibold">Enable Tip Prompt</div>
+                            <div className="text-sm text-gray-600">Show tip options on customer display during checkout</div>
+                        </div>
+                        <button
+                            onClick={() => setTipEnabled(!tipEnabled)}
+                            className={`relative w-14 h-8 rounded-full transition-all ${tipEnabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                        >
+                            <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-all ${tipEnabled ? 'left-7' : 'left-1'}`} />
+                        </button>
+                    </div>
+
+                    {tipEnabled && (
+                        <>
+                            {/* Tip Type */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-3">Tip Type</label>
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={() => setTipType('PERCENT')}
+                                        className={`flex-1 p-3 rounded-lg border-2 transition-all ${tipType === 'PERCENT'
+                                            ? 'border-green-500 bg-green-50'
+                                            : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                    >
+                                        <div className="font-semibold">Percentage (%)</div>
+                                    </button>
+                                    <button
+                                        onClick={() => setTipType('DOLLAR')}
+                                        className={`flex-1 p-3 rounded-lg border-2 transition-all ${tipType === 'DOLLAR'
+                                            ? 'border-green-500 bg-green-50'
+                                            : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                    >
+                                        <div className="font-semibold">Dollar Amount ($)</div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Tip Suggestions */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Tip Suggestions ({tipType === 'PERCENT' ? 'percentages' : 'dollar amounts'})
+                                </label>
+                                <input
+                                    type="text"
+                                    value={tipSuggestions}
+                                    onChange={(e) => setTipSuggestions(e.target.value)}
+                                    placeholder={tipType === 'PERCENT' ? '15,18,20,25' : '2,5,10,15'}
+                                    className="w-full max-w-sm px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                                />
+                                <p className="text-sm text-gray-500 mt-2">Enter comma-separated values (e.g., 15,20,25)</p>
+                            </div>
+
+                            {/* Preview */}
+                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border border-green-200">
+                                <div className="font-bold text-green-900 mb-3">Tip Options Preview</div>
+                                <div className="flex gap-3">
+                                    {tipSuggestions.split(',').map((tip, i) => (
+                                        <div key={i} className="px-4 py-2 bg-white border border-green-300 rounded-lg font-semibold text-green-700">
+                                            {tipType === 'PERCENT' ? `${tip.trim()}%` : `$${tip.trim()}`}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Save All Settings Button */}
+            <div className="mb-8">
+                <button
+                    onClick={saveSettings}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 shadow-lg"
+                >
+                    <Save className="h-6 w-6" />
+                    {saving ? 'Saving...' : 'Save All Settings'}
+                </button>
             </div>
 
             {/* Employee Permissions */}

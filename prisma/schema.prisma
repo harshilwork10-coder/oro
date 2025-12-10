@@ -10,6 +10,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// NOTE: SQLite doesn't support enums. These values are documented here for reference:
+// UserRole: PROVIDER, ADMIN, FRANCHISOR, FRANCHISEE, MANAGER, SHIFT_SUPERVISOR, EMPLOYEE
+// TransactionStatus: PENDING, COMPLETED, REFUNDED, VOIDED, PARTIALLY_REFUNDED
+// PaymentMethod: CASH, CREDIT_CARD, DEBIT_CARD, SPLIT, GIFT_CARD
+// AppointmentStatus: SCHEDULED, CONFIRMED, CHECKED_IN, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW
+
+// ============ NORMALIZED PERMISSIONS (Replaces boolean columns) ============
+
+model Permission {
+  id          String @id @default(cuid())
+  name        String @unique // e.g., "ADD_SERVICES", "PROCESS_REFUNDS"
+  description String?
+  category    String? // "INVENTORY", "SALES", "EMPLOYEES", etc.
+  
+  userPermissions UserPermission[]
+  roleDefaults    RoleDefaultPermission[]
+  
+  createdAt DateTime @default(now())
+}
+
+model UserPermission {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  granted      Boolean    @default(true) // false = explicitly denied
+  
+  @@unique([userId, permissionId])
+}
+
+model RoleDefaultPermission {
+  id           String     @id @default(cuid())
+  role         String     // UserRole enum value as string for SQLite compatibility
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  @@unique([role, permissionId])
+}
+
 model User {
   id       String  @id @default(cuid())
   name     String?
@@ -29,6 +69,10 @@ model User {
   // Terms Acceptance
   acceptedTermsAt      DateTime?
   acceptedTermsVersion String?
+
+  // Security: Account Lockout
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
 
   // Employee Permissions (configurable by franchise owner)
   canAddServices     Boolean @default(false) // Can create/edit services
@@ -91,6 +135,9 @@ model User {
   // Live Support Chats
   supportChats       SupportChat[]
   assignedSupportChats SupportChat[] @relation("AssignedChats")
+  
+  // Normalized Permissions (new system - replaces boolean columns)
+  permissions        UserPermission[]
 }
 
 model Franchise {
@@ -481,8 +528,7 @@ model Service {
   description     String?
   duration        Int // in minutes
   price           Decimal
-  category        String? // Deprecated - keeping for backward compatibility
-  categoryId      String? // New: Link to ServiceCategory
+  categoryId      String? // Link to ServiceCategory
   serviceCategory ServiceCategory? @relation(fields: [categoryId], references: [id])
   franchiseId     String
   franchise       Franchise        @relation(fields: [franchiseId], references: [id], onDelete: Cascade)

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { hash } from 'bcrypt'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { validatePassword, getPasswordRequirementsText } from '@/lib/security'
 
 export async function POST(request: NextRequest) {
     try {
@@ -13,8 +14,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Password is required' }, { status: 400 })
         }
 
-        if (password.length < 8) {
-            return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+        // Validate password complexity
+        const validation = validatePassword(password)
+        if (!validation.valid) {
+            return NextResponse.json({
+                error: 'Password does not meet requirements',
+                details: validation.errors,
+                requirements: getPasswordRequirementsText()
+            }, { status: 400 })
         }
 
         let targetUserId: string

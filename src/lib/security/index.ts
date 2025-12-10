@@ -45,3 +45,17 @@ export {
     getSecureHeaders,
     securityHeadersConfig
 } from './headers'
+
+// Password security
+export {
+    validatePassword,
+    getPasswordRequirementsText,
+    checkAccountLockout,
+    recordFailedLogin,
+    resetFailedLogins,
+    PASSWORD_REQUIREMENTS,
+    LOCKOUT_CONFIG,
+    type PasswordValidationResult,
+    type PasswordRequirements,
+    type LoginAttemptResult
+} from './password'

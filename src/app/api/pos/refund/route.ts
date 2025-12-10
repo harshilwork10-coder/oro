@@ -86,6 +86,7 @@ export async function POST(req: Request) {
                 subtotal: -refundSubtotal,
                 tax: -refundTax,
                 total: -refundTotal,
+                voidReason: reason || 'No reason provided', // Store refund reason for audit
                 cashDrawerSessionId: originalTx.cashDrawerSessionId,
                 lineItems: {
                     create: refundItems

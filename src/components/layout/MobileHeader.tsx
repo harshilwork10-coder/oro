@@ -6,13 +6,14 @@ import TrinexLogo from '@/components/ui/TrinexLogo'
 
 interface MobileHeaderProps {
     onMenuClick: () => void
+    forceShow?: boolean
 }
 
-export default function MobileHeader({ onMenuClick }: MobileHeaderProps) {
+export default function MobileHeader({ onMenuClick, forceShow }: MobileHeaderProps) {
     const { data: session } = useSession()
 
     return (
-        <header className="flex h-16 items-center justify-between border-b border-stone-800 bg-stone-950/80 backdrop-blur-md px-4 lg:hidden sticky top-0 z-50">
+        <header className={`flex h-16 items-center justify-between border-b border-stone-800 bg-stone-950/80 backdrop-blur-md px-4 sticky top-0 z-50 ${forceShow ? '' : 'lg:hidden'}`}>
             <div className="flex items-center gap-3">
                 <button
                     onClick={onMenuClick}

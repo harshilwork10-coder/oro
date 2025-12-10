@@ -20,24 +20,50 @@ export async function GET() {
             return NextResponse.json({ error: 'No franchise found' }, { status: 404 })
         }
 
+        // Get franchise with franchisor
+        const franchise = await prisma.franchise.findUnique({
+            where: { id: user.franchiseId },
+            include: { franchisor: true }
+        })
+
         // Get or create settings
         let settings = await prisma.franchiseSettings.findUnique({
             where: { franchiseId: user.franchiseId }
         })
 
         if (!settings) {
-            // Create default settings
+            // Create default settings with STANDARD pricing
             settings = await prisma.franchiseSettings.create({
                 data: {
                     franchiseId: user.franchiseId,
-                    pricingModel: 'DUAL_PRICING',
+                    pricingModel: 'STANDARD',
                     cardSurchargeType: 'PERCENTAGE',
-                    cardSurcharge: 3.99
+                    cardSurcharge: 3.99,
+                    showDualPricing: false
                 }
             })
         }
 
-        return NextResponse.json(settings)
+        // Get tip settings from BusinessConfig
+        let tipSettings = null
+        if (franchise?.franchisorId) {
+            tipSettings = await prisma.businessConfig.findUnique({
+                where: { franchisorId: franchise.franchisorId },
+                select: {
+                    tipPromptEnabled: true,
+                    tipType: true,
+                    tipSuggestions: true
+                }
+            })
+        }
+
+        // Merge settings
+        return NextResponse.json({
+            ...settings,
+            tipPromptEnabled: tipSettings?.tipPromptEnabled ?? true,
+            tipType: tipSettings?.tipType ?? 'PERCENT',
+            tipSuggestions: tipSettings?.tipSuggestions ?? '[15,20,25]'
+        })
     } catch (error) {
         console.error('Error fetching franchise settings:', error)
         return NextResponse.json({ error: 'Internal error' }, { status: 500 })
@@ -61,22 +87,55 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json()
-        const { pricingModel, cardSurchargeType, cardSurcharge } = body
+        const {
+            pricingModel,
+            cardSurchargeType,
+            cardSurcharge,
+            showDualPricing,
+            tipPromptEnabled,
+            tipType,
+            tipSuggestions
+        } = body
 
         const settings = await prisma.franchiseSettings.upsert({
             where: { franchiseId: user.franchiseId },
             update: {
                 pricingModel,
                 cardSurchargeType,
-                cardSurcharge
+                cardSurcharge,
+                showDualPricing: showDualPricing ?? (pricingModel === 'DUAL_PRICING')
             },
             create: {
                 franchiseId: user.franchiseId,
                 pricingModel,
                 cardSurchargeType,
-                cardSurcharge
+                cardSurcharge,
+                showDualPricing: showDualPricing ?? (pricingModel === 'DUAL_PRICING')
             }
         })
+
+        // Also update tip settings in BusinessConfig if user's franchisor has one
+        const franchise = await prisma.franchise.findUnique({
+            where: { id: user.franchiseId },
+            include: { franchisor: true }
+        })
+
+        if (franchise?.franchisorId) {
+            await prisma.businessConfig.upsert({
+                where: { franchisorId: franchise.franchisorId },
+                update: {
+                    tipPromptEnabled: tipPromptEnabled ?? true,
+                    tipType: tipType || 'PERCENT',
+                    tipSuggestions: tipSuggestions || '[15,20,25]'
+                },
+                create: {
+                    franchisorId: franchise.franchisorId,
+                    tipPromptEnabled: tipPromptEnabled ?? true,
+                    tipType: tipType || 'PERCENT',
+                    tipSuggestions: tipSuggestions || '[15,20,25]'
+                }
+            })
+        }
 
         return NextResponse.json(settings)
     } catch (error) {

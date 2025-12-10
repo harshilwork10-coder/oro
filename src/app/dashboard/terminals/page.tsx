@@ -12,23 +12,45 @@ import {
     Smartphone,
     ArrowRightLeft,
     Search,
-    Key
+    Key,
+    Monitor,
+    Edit,
+    Save,
+    X
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import TransferTerminalModal from '@/components/modals/TransferTerminalModal'
+import AddTerminalModal from '@/components/modals/AddTerminalModal'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function TerminalsPage() {
     const { data: session } = useSession()
     const [licenses, setLicenses] = useState<any[]>([])
     const [requests, setRequests] = useState<any[]>([])
-    const [activeTab, setActiveTab] = useState<'licenses' | 'requests'>('licenses')
+    const [activeTab, setActiveTab] = useState<'licenses' | 'requests' | 'pax'>('licenses')
     const [approving, setApproving] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
+    const [locations, setLocations] = useState<{ id: string, name: string }[]>([])
+
+    // PAX Configuration State
+    type PaxTerminal = {
+        id: string
+        locationId: string
+        location: { id: string; name: string; franchise: { name: string } }
+        paxTerminalIP: string | null
+        paxTerminalPort: string
+        processorMID: string | null
+    }
+    const [paxTerminals, setPaxTerminals] = useState<PaxTerminal[]>([])
+    const [paxLoading, setPaxLoading] = useState(false)
+    const [paxEditingId, setPaxEditingId] = useState<string | null>(null)
+    const [paxSaving, setPaxSaving] = useState(false)
+    const [paxEditForm, setPaxEditForm] = useState({ paxTerminalIP: '', paxTerminalPort: '10009', processorMID: '' })
 
     // Modal state
     const [showTransferModal, setShowTransferModal] = useState(false)
+    const [showAddModal, setShowAddModal] = useState(false)
     const [selectedTerminal, setSelectedTerminal] = useState<any>(null)
 
     // Only Franchisors/Providers can add new terminals (provisioning)
@@ -36,10 +58,58 @@ export default function TerminalsPage() {
 
     useEffect(() => {
         fetchLicenses()
+        if (canManageTerminals) {
+            fetchLocations()
+        }
         if (session?.user?.role === 'PROVIDER') {
             fetchRequests()
+            fetchPaxTerminals()
         }
     }, [session])
+
+    // PAX Terminal Functions
+    const fetchPaxTerminals = async () => {
+        setPaxLoading(true)
+        try {
+            const res = await fetch('/api/terminals/manage')
+            if (res.ok) setPaxTerminals(await res.json())
+        } catch (e) { console.error(e) }
+        finally { setPaxLoading(false) }
+    }
+
+    const startPaxEdit = (terminal: PaxTerminal) => {
+        setPaxEditingId(terminal.locationId)
+        setPaxEditForm({
+            paxTerminalIP: terminal.paxTerminalIP || '',
+            paxTerminalPort: terminal.paxTerminalPort || '10009',
+            processorMID: terminal.processorMID || ''
+        })
+    }
+
+    const handlePaxUpdate = async (locationId: string) => {
+        setPaxSaving(true)
+        try {
+            const res = await fetch(`/api/terminals/manage/${locationId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(paxEditForm)
+            })
+            if (res.ok) {
+                await fetchPaxTerminals()
+                setPaxEditingId(null)
+                setPaxEditForm({ paxTerminalIP: '', paxTerminalPort: '10009', processorMID: '' })
+            } else { alert('Failed to save') }
+        } catch (e) { console.error(e); alert('Error') }
+        finally { setPaxSaving(false) }
+    }
+
+    const fetchLocations = async () => {
+        try {
+            const res = await fetch('/api/franchise/locations') // Assuming this endpoint exists, or I might need to create it
+            const data = await res.json()
+            if (data.locations) setLocations(data.locations)
+        } catch (e) { console.error(e) }
+    }
 
     const fetchLicenses = async () => {
         setIsLoading(true)
@@ -108,6 +178,13 @@ export default function TerminalsPage() {
                 {canManageTerminals && (
                     <div className="flex gap-2">
                         <button
+                            onClick={() => setShowAddModal(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg transition-colors font-medium"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add Terminal
+                        </button>
+                        <button
                             onClick={() => { fetchLicenses(); fetchRequests(); }}
                             className="p-2 bg-stone-900 border border-stone-800 rounded-lg text-stone-400 hover:text-white"
                         >
@@ -138,6 +215,14 @@ export default function TerminalsPage() {
                             </span>
                         )}
                         {activeTab === 'requests' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('pax')}
+                        className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'pax' ? 'text-orange-500' : 'text-stone-400 hover:text-stone-200'}`}
+                    >
+                        <Monitor className="h-4 w-4 inline mr-1" />
+                        PAX Configuration
+                        {activeTab === 'pax' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />}
                     </button>
                 </div>
             )}
@@ -259,7 +344,7 @@ export default function TerminalsPage() {
                         )}
                     </div>
                 </>
-            ) : (
+            ) : activeTab === 'requests' ? (
                 /* Requests Tab */
                 <div className="grid grid-cols-1 gap-4">
                     {requests.length === 0 ? (
@@ -289,6 +374,63 @@ export default function TerminalsPage() {
                         ))
                     )}
                 </div>
+            ) : (
+                /* PAX Configuration Tab */
+                <div className="space-y-4">
+                    <p className="text-stone-400 text-sm">Configure PAX terminal connections for all locations ({paxTerminals.length} total)</p>
+                    {paxLoading ? (
+                        <p className="text-stone-500 text-center py-10">Loading PAX terminals...</p>
+                    ) : paxTerminals.length === 0 ? (
+                        <div className="text-center py-12 bg-white/5 border border-white/10 rounded-xl">
+                            <Monitor className="h-16 w-16 text-stone-500 mx-auto mb-4" />
+                            <p className="text-stone-400">No locations found. Locations appear here once franchisees are created.</p>
+                        </div>
+                    ) : (
+                        paxTerminals.map((terminal) => (
+                            <div key={terminal.id} className="bg-white/5 border border-white/10 rounded-xl p-6 hover:border-purple-500/30 transition-colors">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-white">{terminal.location.name}</h3>
+                                        <p className="text-sm text-stone-400">{terminal.location.franchise.name}</p>
+                                    </div>
+                                    {paxEditingId !== terminal.locationId && (
+                                        <button onClick={() => startPaxEdit(terminal)} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-2 transition-colors">
+                                            <Edit className="h-4 w-4" /> Edit
+                                        </button>
+                                    )}
+                                </div>
+                                {paxEditingId === terminal.locationId ? (
+                                    <div className="space-y-4 bg-stone-900/50 p-4 rounded-lg border border-stone-700">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-medium text-stone-400 mb-2">PAX Terminal IP*</label>
+                                                <input type="text" value={paxEditForm.paxTerminalIP} onChange={(e) => setPaxEditForm({ ...paxEditForm, paxTerminalIP: e.target.value })} placeholder="192.168.1.100" className="w-full px-4 py-2 bg-stone-900 border border-stone-700 rounded-lg text-white" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-stone-400 mb-2">Port</label>
+                                                <input type="text" value={paxEditForm.paxTerminalPort} onChange={(e) => setPaxEditForm({ ...paxEditForm, paxTerminalPort: e.target.value })} placeholder="10009" className="w-full px-4 py-2 bg-stone-900 border border-stone-700 rounded-lg text-white" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-stone-400 mb-2">Merchant ID (MID)</label>
+                                                <input type="text" value={paxEditForm.processorMID} onChange={(e) => setPaxEditForm({ ...paxEditForm, processorMID: e.target.value })} placeholder="Merchant ID" className="w-full px-4 py-2 bg-stone-900 border border-stone-700 rounded-lg text-white" />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3 justify-end">
+                                            <button onClick={() => setPaxEditingId(null)} disabled={paxSaving} className="px-4 py-2 bg-stone-700 hover:bg-stone-600 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"><X className="h-4 w-4" /> Cancel</button>
+                                            <button onClick={() => handlePaxUpdate(terminal.locationId)} disabled={paxSaving} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"><Save className="h-4 w-4" /> {paxSaving ? 'Saving...' : 'Save Changes'}</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-6">
+                                        <div><p className="text-xs text-stone-500 mb-1">IP Address</p><p className="text-white font-mono text-lg">{terminal.paxTerminalIP || <span className="text-stone-600">Not set</span>}</p></div>
+                                        <div><p className="text-xs text-stone-500 mb-1">Port</p><p className="text-white font-mono text-lg">{terminal.paxTerminalPort}</p></div>
+                                        <div><p className="text-xs text-stone-500 mb-1">Merchant ID</p><p className="text-white font-mono text-lg">{terminal.processorMID || <span className="text-stone-600">—</span>}</p></div>
+                                    </div>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </div>
             )}
 
             <TransferTerminalModal
@@ -298,6 +440,15 @@ export default function TerminalsPage() {
                 onSuccess={() => {
                     fetchLicenses()
                 }}
+            />
+
+            <AddTerminalModal
+                isOpen={showAddModal}
+                onClose={() => setShowAddModal(false)}
+                onSuccess={() => {
+                    fetchLicenses()
+                }}
+                locations={locations}
             />
         </div>
     )

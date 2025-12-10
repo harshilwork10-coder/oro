@@ -62,7 +62,7 @@ export async function GET(req: Request) {
             description: service.description,
             price: parseFloat(service.price.toString()),
             duration: service.duration,
-            category: service.serviceCategory?.name || service.category || 'SERVICES',
+            category: service.serviceCategory?.name || 'SERVICES',
             franchiseId: service.franchiseId
         }))
 

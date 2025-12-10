@@ -19,13 +19,57 @@ export async function GET() {
     }
 }
 
-// Transfer terminal to different license (admin)
+// Create or Transfer terminal
 export async function POST(req: NextRequest) {
     try {
-        const { terminalId, newLicenseId, reason, performedBy } = await req.json()
+        const body = await req.json()
+        const { terminalId, newLicenseId, reason, performedBy, serialNumber, model, locationId } = body
 
+        // --- CREATION LOGIC ---
+        if (serialNumber && model && locationId) {
+            // 1. Check if terminal exists
+            const existing = await prisma.registeredTerminal.findUnique({
+                where: { serialNumber }
+            })
+            if (existing) {
+                return NextResponse.json({ error: 'Terminal with this S/N already exists' }, { status: 409 })
+            }
+
+            // 2. Find or Create License for Location
+            // Simplified: We assume we need a license to attach meaningful status. 
+            // Or we just create RegisteredTerminal attached to location via License?
+            // Schema check: RegisteredTerminal -> License -> Location.
+            // We need to find an ACTIVE license for this location, or create one?
+            // Let's create a LICENSE first if needed, or find one.
+
+            // For simplicity in this "Add Terminal" flow: 
+            // We create a new License Key for this terminal.
+            const licenseKey = `LIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+
+            const newLicense = await prisma.license.create({
+                data: {
+                    licenseKey,
+                    status: 'ACTIVE',
+                    type: 'TERMINAL',
+                    locationId: locationId
+                }
+            })
+
+            const newTerminal = await prisma.registeredTerminal.create({
+                data: {
+                    serialNumber,
+                    model,
+                    status: 'ACTIVE',
+                    licenseId: newLicense.id
+                }
+            })
+
+            return NextResponse.json({ success: true, terminal: newTerminal, message: 'Terminal added successfully' })
+        }
+
+        // --- TRANSFER LOGIC ---
         if (!terminalId) {
-            return NextResponse.json({ error: 'Terminal ID is required' }, { status: 400 })
+            return NextResponse.json({ error: 'Terminal ID (for transfer) or Serial/Model/Location (for create) required' }, { status: 400 })
         }
 
         const terminal = await prisma.registeredTerminal.findUnique({
@@ -37,10 +81,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Terminal not found' }, { status: 404 })
         }
 
-        // If newLicenseId is null, unassign the terminal
+        // ... (rest of transfer logic)
         const oldLicenseId = terminal.licenseId
-
-        // Update terminal
         const updatedTerminal = await prisma.registeredTerminal.update({
             where: { id: terminalId },
             data: {
@@ -49,7 +91,6 @@ export async function POST(req: NextRequest) {
             }
         })
 
-        // Log the transfer
         await prisma.terminalTransferLog.create({
             data: {
                 terminalId,
@@ -67,8 +108,8 @@ export async function POST(req: NextRequest) {
         })
 
     } catch (error) {
-        console.error('Transfer terminal error:', error)
-        return NextResponse.json({ error: 'Failed to transfer terminal' }, { status: 500 })
+        console.error('Terminal Action error:', error)
+        return NextResponse.json({ error: 'Failed to process request' }, { status: 500 })
     }
 }
 

@@ -14,23 +14,8 @@ export async function POST(req: Request) {
         const body = await req.json()
         const { items, subtotal, tax, total, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType, tip } = body
 
-        console.log('[POS_TRANSACTION_POST] Received data:', {
-            itemsCount: items?.length,
-            subtotal,
-            tax,
-            total,
-            paymentMethod,
-            cashDrawerSessionId,
-            clientId,
-            cashAmount,
-            cardAmount,
-            gatewayTxId,
-            authCode,
-            cardLast4,
-            cardType,
-            franchiseId: session.user.franchiseId,
-            employeeId: session.user.id
-        })
+        // Security: Log minimal info only
+        console.log(`[POS_TRANSACTION] Processing ${paymentMethod} transaction for ${items?.length || 0} items`)
 
         // Validate split payment
         if (paymentMethod === 'SPLIT') {
@@ -72,9 +57,10 @@ export async function POST(req: Request) {
 
                     return {
                         type: item.type,
-                        // Only set IDs if they exist in database (non-mock data)
-                        serviceId: (item.type === 'SERVICE' && item.id && !item.id.startsWith('s')) ? item.id : null,
-                        productId: (item.type === 'PRODUCT' && item.id && !item.id.startsWith('p')) ? item.id : null,
+                        // Only set IDs if they are valid CUIDs (real database records)
+                        // Skip mock data (starts with 's' or 'p') and custom items (starts with 'custom-')
+                        serviceId: (item.type === 'SERVICE' && item.id && !item.id.startsWith('s') && !item.id.startsWith('custom')) ? item.id : null,
+                        productId: (item.type === 'PRODUCT' && item.id && !item.id.startsWith('p') && !item.id.startsWith('custom')) ? item.id : null,
                         quantity: parseInt(item.quantity.toString()),
                         price: item.price.toString(),
                         discount: (item.discount || 0).toString(),
@@ -96,16 +82,12 @@ export async function POST(req: Request) {
 
         return NextResponse.json(transaction)
     } catch (error: any) {
-        console.error('[POS_TRANSACTION_POST]', error)
-        console.error('Error details:', {
-            code: error.code,
-            meta: error.meta,
-            message: error.message
-        })
+        // Log detailed error server-side only
+        console.error('[POS_TRANSACTION_POST] Error:', error.code, error.message)
+
+        // Return generic error to client (don't expose internal details)
         return NextResponse.json({
-            error: error.message || 'Internal Server Error',
-            code: error.code,
-            details: error.meta
+            error: 'Transaction failed. Please try again.'
         }, { status: 500 })
     }
 }
@@ -246,7 +228,14 @@ export async function GET(req: Request) {
             where,
             include: {
                 client: true,
-                lineItems: true
+                lineItems: true,
+                employee: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                }
             },
             orderBy: {
                 createdAt: 'desc'

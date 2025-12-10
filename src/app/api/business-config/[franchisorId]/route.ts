@@ -103,14 +103,35 @@ export async function PATCH(
 
         const body = await req.json()
 
+        // Extract only valid config fields (exclude id, franchisorId, timestamps)
+        const {
+            usesCommissions, usesInventory, usesAppointments, usesScheduling,
+            usesLoyalty, usesGiftCards, usesMemberships, usesReferrals,
+            usesTipping, usesDiscounts, usesRetailProducts, usesServices,
+            usesEmailMarketing, usesSMSMarketing, usesReviewManagement,
+            usesMultiLocation, usesTimeTracking, usesPayroll,
+            cashDiscountEnabled, cashDiscountPercent,
+            reviewRequestTiming, commissionCalculation, commissionVisibility
+        } = body
+
+        const configData = {
+            usesCommissions, usesInventory, usesAppointments, usesScheduling,
+            usesLoyalty, usesGiftCards, usesMemberships, usesReferrals,
+            usesTipping, usesDiscounts, usesRetailProducts, usesServices,
+            usesEmailMarketing, usesSMSMarketing, usesReviewManagement,
+            usesMultiLocation, usesTimeTracking, usesPayroll,
+            cashDiscountEnabled, cashDiscountPercent,
+            reviewRequestTiming, commissionCalculation, commissionVisibility
+        }
+
         // Upsert config (create if doesn't exist, update if exists)
         const config = await prisma.businessConfig.upsert({
             where: { franchisorId },
             create: {
                 franchisorId,
-                ...body
+                ...configData
             },
-            update: body
+            update: configData
         })
 
         return NextResponse.json({ success: true, config })

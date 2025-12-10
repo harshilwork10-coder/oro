@@ -158,6 +158,49 @@ export default function ReportsPage() {
     const [loading, setLoading] = useState(false)
     const [cards, setCards] = useState(REPORT_CARDS)
 
+    // Date Range State
+    const today = new Date().toISOString().split('T')[0]
+    const [startDate, setStartDate] = useState(today)
+    const [endDate, setEndDate] = useState(today)
+    const [datePreset, setDatePreset] = useState<'today' | 'week' | 'month' | 'custom'>('today')
+
+    const setPreset = (preset: 'today' | 'week' | 'month' | 'custom') => {
+        setDatePreset(preset)
+        const now = new Date()
+        if (preset === 'today') {
+            const d = now.toISOString().split('T')[0]
+            setStartDate(d)
+            setEndDate(d)
+        } else if (preset === 'week') {
+            const start = new Date(now)
+            start.setDate(now.getDate() - now.getDay())
+            setStartDate(start.toISOString().split('T')[0])
+            setEndDate(now.toISOString().split('T')[0])
+        } else if (preset === 'month') {
+            const start = new Date(now.getFullYear(), now.getMonth(), 1)
+            setStartDate(start.toISOString().split('T')[0])
+            setEndDate(now.toISOString().split('T')[0])
+        }
+    }
+
+    // Location Filter State
+    const [locations, setLocations] = useState<{ id: string; name: string }[]>([])
+    const [selectedLocationId, setSelectedLocationId] = useState<string>('all')
+
+    // Fetch locations on mount
+    useEffect(() => {
+        const fetchLocations = async () => {
+            try {
+                const res = await fetch('/api/franchise/locations')
+                if (res.ok) {
+                    const data = await res.json()
+                    setLocations(data)
+                }
+            } catch (e) { console.error(e) }
+        }
+        fetchLocations()
+    }, [])
+
     // Fetch quick stats for cards
     useEffect(() => {
         fetchQuickStats()
@@ -194,10 +237,11 @@ export default function ReportsPage() {
         try {
             // Fetch report data based on type
             let data: any = null
+            const locationParam = selectedLocationId !== 'all' ? `&locationId=${selectedLocationId}` : ''
 
             switch (reportId) {
                 case 'daily-sales':
-                    const dailyRes = await fetch(`/api/franchise/reports/daily?date=${new Date().toISOString().split('T')[0]}`)
+                    const dailyRes = await fetch(`/api/franchise/reports/daily?startDate=${startDate}&endDate=${endDate}${locationParam}`)
                     if (dailyRes.ok) data = await dailyRes.json()
                     break
                 case 'weekly-summary':
@@ -232,25 +276,12 @@ export default function ReportsPage() {
                     }
                     break
                 case 'tips':
-                    data = {
-                        totalTips: 856.50,
-                        tipPercent: 18.2,
-                        employees: [
-                            { name: 'John Smith', tips: 245.00, transactions: 42 },
-                            { name: 'Sarah Johnson', tips: 312.50, transactions: 38 },
-                            { name: 'Mike Davis', tips: 198.00, transactions: 35 },
-                            { name: 'Emily Chen', tips: 101.00, transactions: 28 }
-                        ]
-                    }
+                    const tipsRes = await fetch(`/api/franchise/reports/tips?startDate=${startDate}&endDate=${endDate}${locationParam}`)
+                    if (tipsRes.ok) data = await tipsRes.json()
                     break
                 case 'tax':
-                    data = {
-                        totalTaxCollected: 1245.87,
-                        salesTax: 1145.87,
-                        otherTax: 100.00,
-                        taxableRevenue: 14323.50,
-                        exemptRevenue: 850.00
-                    }
+                    const taxRes = await fetch(`/api/franchise/reports/tax?startDate=${startDate}&endDate=${endDate}${locationParam}`)
+                    if (taxRes.ok) data = await taxRes.json()
                     break
                 case 'inventory':
                     data = {
@@ -266,17 +297,8 @@ export default function ReportsPage() {
                     }
                     break
                 case 'customers':
-                    data = {
-                        totalCustomers: 1250,
-                        newThisMonth: 45,
-                        returning: 85,
-                        avgSpend: 65.50,
-                        topCustomers: [
-                            { name: 'Jennifer Lopez', visits: 12, spent: 1450.00 },
-                            { name: 'Robert Johnson', visits: 8, spent: 920.00 },
-                            { name: 'Maria Garcia', visits: 6, spent: 780.00 }
-                        ]
-                    }
+                    const custRes = await fetch(`/api/franchise/reports/customers?startDate=${startDate}&endDate=${endDate}${locationParam}`)
+                    if (custRes.ok) data = await custRes.json()
                     break
                 case 'gift-cards':
                     data = {
@@ -288,22 +310,13 @@ export default function ReportsPage() {
                     }
                     break
                 case 'refunds':
-                    data = {
-                        totalRefunds: 3,
-                        refundAmount: 245.00,
-                        voids: 5,
-                        voidAmount: 125.00,
-                        refundsList: [
-                            { date: '2024-12-04', amount: 85.00, reason: 'Service not completed', employee: 'John Smith' },
-                            { date: '2024-12-03', amount: 120.00, reason: 'Customer complaint', employee: 'Sarah Johnson' },
-                            { date: '2024-12-02', amount: 40.00, reason: 'Wrong service', employee: 'Mike Davis' }
-                        ]
-                    }
+                    const refundsRes = await fetch(`/api/franchise/reports/refunds?startDate=${startDate}&endDate=${endDate}${locationParam}`)
+                    if (refundsRes.ok) data = await refundsRes.json()
                     break
                 case 'payroll':
                     data = {
-                        periodStart: '2024-11-25',
-                        periodEnd: '2024-12-08',
+                        periodStart: startDate,
+                        periodEnd: endDate,
                         totalHours: 485,
                         totalGross: 9245.00,
                         employees: [
@@ -330,12 +343,24 @@ export default function ReportsPage() {
     }
 
     const handleDownload = () => {
-        // Generate CSV or PDF download
-        alert('Download feature coming soon!')
+        // Add print class to body for print-specific styling
+        document.body.classList.add('printing-report')
+
+        // Trigger print dialog (users can save as PDF from here)
+        window.print()
+
+        // Remove print class after dialog closes
+        setTimeout(() => {
+            document.body.classList.remove('printing-report')
+        }, 500)
     }
 
     const handlePrint = () => {
+        document.body.classList.add('printing-report')
         window.print()
+        setTimeout(() => {
+            document.body.classList.remove('printing-report')
+        }, 500)
     }
 
     if (status === "loading") {
@@ -368,6 +393,44 @@ export default function ReportsPage() {
                     Reports Center
                 </h1>
                 <p className="text-stone-400 mt-2">Click any report to view instantly • Download or print anytime</p>
+
+                {/* Date Range Picker */}
+                <div className="mt-6 p-4 bg-stone-900/50 border border-stone-800 rounded-xl">
+                    <div className="flex flex-wrap items-center gap-4">
+                        {/* Preset Buttons */}
+                        <div className="flex gap-2">
+                            <button onClick={() => setPreset('today')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${datePreset === 'today' ? 'bg-orange-600 text-white' : 'bg-stone-800 text-stone-400 hover:bg-stone-700'}`}>Today</button>
+                            <button onClick={() => setPreset('week')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${datePreset === 'week' ? 'bg-orange-600 text-white' : 'bg-stone-800 text-stone-400 hover:bg-stone-700'}`}>This Week</button>
+                            <button onClick={() => setPreset('month')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${datePreset === 'month' ? 'bg-orange-600 text-white' : 'bg-stone-800 text-stone-400 hover:bg-stone-700'}`}>This Month</button>
+                            <button onClick={() => setDatePreset('custom')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${datePreset === 'custom' ? 'bg-orange-600 text-white' : 'bg-stone-800 text-stone-400 hover:bg-stone-700'}`}>Custom</button>
+                        </div>
+
+                        {/* Date Inputs */}
+                        <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-stone-500" />
+                            <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setDatePreset('custom') }} className="px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-white text-sm" />
+                            <span className="text-stone-500">to</span>
+                            <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setDatePreset('custom') }} className="px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-white text-sm" />
+                        </div>
+
+                        {/* Location Filter */}
+                        {locations.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-stone-500 text-sm">Location:</span>
+                                <select
+                                    value={selectedLocationId}
+                                    onChange={(e) => setSelectedLocationId(e.target.value)}
+                                    className="px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-white text-sm min-w-[150px]"
+                                >
+                                    <option value="all">All Locations</option>
+                                    {locations.map(loc => (
+                                        <option key={loc.id} value={loc.id}>{loc.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* Report Cards Grid */}
@@ -432,9 +495,15 @@ export default function ReportsPage() {
                     <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-stone-900 rounded-2xl border border-stone-700">
                         {/* Modal Header */}
                         <div className="sticky top-0 bg-stone-900 border-b border-stone-700 p-4 flex items-center justify-between z-10">
-                            <h2 className="text-xl font-bold text-white">
-                                {cards.find(c => c.id === selectedReport)?.title}
-                            </h2>
+                            <div>
+                                <h2 className="text-xl font-bold text-white">
+                                    {cards.find(c => c.id === selectedReport)?.title}
+                                </h2>
+                                <p className="text-sm text-stone-400 flex items-center gap-2 mt-1">
+                                    <Calendar className="h-4 w-4" />
+                                    {startDate === endDate ? startDate : `${startDate} to ${endDate}`}
+                                </p>
+                            </div>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={handlePrint}
