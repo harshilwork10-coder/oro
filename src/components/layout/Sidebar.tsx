@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
+import OronexLogo from '@/components/ui/OronexLogo'
 import {
     LayoutDashboard,
     BarChart3,
@@ -35,7 +36,8 @@ import {
     Percent,
     Crown,
     Mail,
-    Plus
+    Plus,
+    Settings
 } from 'lucide-react'
 import clsx from 'clsx'
 import { hasPermission, Role } from '@/lib/permissions'
@@ -91,26 +93,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, always: true },
         { name: 'My Stores', href: '/dashboard/locations', icon: MapPin, always: true },
         { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
-        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar, feature: 'usesScheduling' as const },
-        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar, feature: 'usesAppointments' as const },
-        { name: 'Services', href: '/dashboard/services', icon: Briefcase, feature: 'usesServices' as const },
+        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar, always: true },  // Merged Schedule+Appointments
+        { name: 'Services', href: '/dashboard/services', icon: Briefcase, feature: 'usesServices' as const },  // Merged Services+Packages
         { name: 'Inventory', href: '/dashboard/inventory/products', icon: ShoppingBag, feature: 'usesInventory' as const },
-        { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
-        { name: 'Waitlist', href: '/dashboard/waitlist', icon: Clock, always: true },
+        { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },  // Merged Customers+Loyalty+GiftCards
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },
-        { name: 'Retention', href: '/dashboard/retention', icon: Heart, feature: 'usesLoyalty' as const },
-        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift, feature: 'usesGiftCards' as const },
-        { name: 'Service Packages', href: '/dashboard/packages', icon: Package, always: true },
+        { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },  // Merged Marketing+SMS
         { name: 'Resources', href: '/dashboard/resources', icon: Armchair, feature: 'enableResources' as const },
-        { name: 'Memberships', href: '/dashboard/memberships', icon: Crown, feature: 'usesMemberships' as const },
-        { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },
-        { name: 'SMS Auto-Marketing', href: '/dashboard/settings/sms-marketing', icon: MessageSquare, always: true },
-        { name: 'Reviews', href: '/dashboard/reviews', icon: MessageSquare, feature: 'usesReviewManagement' as const },
-        { name: 'Commissions', href: '/dashboard/commissions', icon: Percent, feature: 'usesCommissions' as const },
-        { name: 'Compliance', href: '/dashboard/compliance', icon: Shield, always: true },
-        { name: 'Documents', href: '/dashboard/documents', icon: FileText, always: true },
-        { name: 'Features & Add-ons', href: '/dashboard/settings/features', icon: Package, always: true },
+        { name: 'Settings', href: '/dashboard/settings/features', icon: Package, always: true },
     ]
 
     // Filter based on config
@@ -125,19 +116,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     const franchiseeLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'My Locations', href: '/dashboard/my-locations', icon: MapPin },
-        { name: 'Request Expansion', href: '/dashboard/expansion-requests', icon: Plus },
         { name: 'Employees', href: '/dashboard/employees', icon: Users },
-        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
-        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar },
-        { name: 'Services', href: '/dashboard/services', icon: Briefcase },
+        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar },  // Merged Schedule+Appointments
+        { name: 'Services', href: '/dashboard/services', icon: Briefcase },  // Merged Services+Packages
         { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
-        { name: 'Customers', href: '/dashboard/customers', icon: Users },
+        { name: 'Customers', href: '/dashboard/customers', icon: Users },  // Merged Customers+Loyalty+GiftCards
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
         { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
-        { name: 'Loyalty', href: '/dashboard/loyalty', icon: Heart },
-        { name: 'Gift Cards', href: '/dashboard/gift-cards', icon: Gift },
-        { name: 'Service Packages', href: '/dashboard/packages', icon: Package },
-        { name: 'Documents', href: '/dashboard/documents', icon: FileText },
+        { name: 'Settings', href: '/dashboard/settings', icon: Package },
     ]
 
     // MANAGER: Operations manager
@@ -145,10 +131,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
         { name: 'Employees', href: '/dashboard/employees', icon: Users },
-        { name: 'Schedule', href: '/dashboard/schedule', icon: Calendar },
+        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar },  // Merged Schedule+Appointments
         { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock },
-        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
-        { name: 'Services', href: '/dashboard/services', icon: Briefcase },
         { name: 'Customers', href: '/dashboard/customers', icon: Users },
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
         { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
@@ -159,9 +143,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
         { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock },
-        { name: 'My Schedule', href: '/dashboard/schedule/me', icon: Calendar },
-        { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
-        { name: 'Services', href: '/dashboard/services', icon: Briefcase },
+        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar },  // Merged Schedule+Appointments
         { name: 'My Performance', href: '/dashboard/employee/me', icon: UserCircle },
         { name: 'Customers', href: '/dashboard/customers', icon: Users },
         { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones },
@@ -206,9 +188,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 {/* Logo Header - Compact */}
                 <div className="flex h-20 xl:h-28 items-center justify-center border-b border-stone-800/50 px-4 bg-gradient-to-r from-stone-900/50 to-transparent">
                     <div className="flex items-center justify-center group">
-                        <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
-                            <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                            <img src="/trinex-logo.png" alt="Trinex AI" className="relative z-10 h-16 xl:h-24 object-contain drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
+                        <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+                            <img src="/Oronex-logo.png" alt="Oronex" className="h-12 xl:h-16 object-contain" />
                         </div>
                     </div>
                     <button

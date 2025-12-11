@@ -1,35 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 
-export async function GET(req: NextRequest) {
+// STUB: Sales agent tracking feature not yet implemented in current schema
+// The salesAgentId and deletedAt fields don't exist on Franchisor
+
+export async function GET() {
     const session = await getServerSession(authOptions)
 
-    if (!session?.user || session.user.role !== 'PROVIDER' || session.user.providerRole !== 'SALES') {
+    if (!session?.user || session.user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    try {
-        const sales = await prisma.franchisor.findMany({
-            where: {
-                salesAgentId: session.user.id,
-                deletedAt: null
-            },
-            include: {
-                owner: {
-                    select: {
-                        name: true,
-                        email: true
-                    }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        })
-
-        return NextResponse.json(sales)
-    } catch (error) {
-        console.error('Error fetching sales:', error)
-        return NextResponse.json({ error: 'Failed to fetch sales' }, { status: 500 })
-    }
+    return NextResponse.json({
+        success: false,
+        error: 'Sales agent tracking feature is not yet implemented',
+        sales: []
+    }, { status: 501 })
 }

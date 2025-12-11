@@ -144,7 +144,7 @@ export default function CheckIn() {
 
             <div className="p-6 flex items-center justify-center relative z-10">
                 <div className="h-24 w-24 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20 p-2">
-                    <img src="/trinex-logo.png" alt="Trinex Logo" className="w-full h-full object-contain rounded-xl" />
+                    <img src="/Oronex-logo.png" alt="Oronex Logo" className="w-full h-full object-contain rounded-xl" />
                 </div>
             </div>
 
@@ -281,10 +281,10 @@ export default function CheckIn() {
                                     <strong>LIABILITY WAIVER AND RELEASE FORM</strong>
                                 </p>
                                 <p className="mb-4">
-                                    I hereby acknowledge that I am voluntarily participating in services provided by Trinex AI. I understand that these services may involve risks, including but not limited to allergic reactions to products, minor cuts, or other injuries.
+                                    I hereby acknowledge that I am voluntarily participating in services provided by Oronex. I understand that these services may involve risks, including but not limited to allergic reactions to products, minor cuts, or other injuries.
                                 </p>
                                 <p className="mb-4">
-                                    I agree to release and hold harmless Trinex AI, its employees, and agents from any and all liability, claims, or causes of action arising out of my participation in these services.
+                                    I agree to release and hold harmless Oronex, its employees, and agents from any and all liability, claims, or causes of action arising out of my participation in these services.
                                 </p>
                                 <p>
                                     By clicking "Accept", I acknowledge that I have read and understood this waiver and agree to its terms.
@@ -307,7 +307,7 @@ export default function CheckIn() {
                                 <div className="mx-auto w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-purple-500/20">
                                     <span className="text-4xl">🎁</span>
                                 </div>
-                                <h2 className="text-3xl font-bold text-stone-100 mb-2">Join Trinex AI Rewards?</h2>
+                                <h2 className="text-3xl font-bold text-stone-100 mb-2">Join Oronex Rewards?</h2>
                                 <p className="text-stone-400 text-lg">Earn points on every visit and get exclusive offers!</p>
                             </div>
 

@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react"
 import { redirect, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Building2, Plus, Search, MoreVertical, Edit, Trash2, Eye, Download, Settings, AlertTriangle, X, CheckCircle, Clock, XCircle, Key, EyeOff } from "lucide-react"
+import { Building2, Plus, Search, MoreVertical, Edit, Trash2, Eye, Download, Settings, AlertTriangle, X, CheckCircle, Clock, XCircle, Key, EyeOff, Pause, Play, Ban } from "lucide-react"
 import AddFranchisorModal from "@/components/modals/AddFranchisorModal"
 import EditClientModal from "@/components/modals/EditClientModal"
 import BusinessConfigModal from "@/components/provider/BusinessConfigModal"
@@ -14,6 +14,8 @@ type Franchisor = {
     id: string
     name: string
     approvalStatus?: string
+    accountStatus?: string  // ACTIVE, SUSPENDED, TERMINATED
+    suspendedReason?: string
     owner: {
         name: string
         email: string
@@ -52,6 +54,9 @@ export default function MyClientsPage() {
     const [newPassword, setNewPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
     const [resettingPassword, setResettingPassword] = useState(false)
+    const [suspendModal, setSuspendModal] = useState<{ id: string; name: string; action: 'SUSPEND' | 'ACTIVATE' | 'TERMINATE' } | null>(null)
+    const [suspendReason, setSuspendReason] = useState('')
+    const [suspending, setSuspending] = useState(false)
 
     async function fetchFranchisors() {
         try {
@@ -192,6 +197,40 @@ export default function MyClientsPage() {
             setToast({ message: 'Error resetting password', type: 'error' })
         } finally {
             setResettingPassword(false)
+        }
+    }
+
+    async function handleSuspendAccount() {
+        if (!suspendModal) return
+
+        setSuspending(true)
+        try {
+            const res = await fetch('/api/admin/franchisors/suspend', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    franchisorId: suspendModal.id,
+                    action: suspendModal.action,
+                    reason: suspendReason || undefined
+                })
+            })
+
+            if (res.ok) {
+                const actionText = suspendModal.action === 'SUSPEND' ? 'suspended' :
+                    suspendModal.action === 'ACTIVATE' ? 'reactivated' : 'terminated'
+                setToast({ message: `${suspendModal.name} has been ${actionText}`, type: 'success' })
+                setSuspendModal(null)
+                setSuspendReason('')
+                fetchFranchisors()
+            } else {
+                const data = await res.json()
+                setToast({ message: data.error || 'Failed to update account status', type: 'error' })
+            }
+        } catch (error) {
+            console.error('Error updating account status:', error)
+            setToast({ message: 'Error updating account status', type: 'error' })
+        } finally {
+            setSuspending(false)
         }
     }
 
@@ -442,12 +481,53 @@ export default function MyClientsPage() {
                                             Delete Client
                                         </button>
 
+                                        {/* Account Status Management */}
+                                        {client.accountStatus !== 'SUSPENDED' && client.accountStatus !== 'TERMINATED' && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setSuspendModal({ id: client.id, name: client.name || 'Unknown', action: 'SUSPEND' })
+                                                    setActiveMenu(null)
+                                                }}
+                                                className="w-full px-4 py-2 text-left hover:bg-orange-900/20 transition-colors flex items-center gap-2 text-orange-400 border-t border-stone-700"
+                                            >
+                                                <Pause className="h-4 w-4" />
+                                                Suspend Account
+                                            </button>
+                                        )}
+                                        {client.accountStatus === 'SUSPENDED' && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setSuspendModal({ id: client.id, name: client.name || 'Unknown', action: 'ACTIVATE' })
+                                                    setActiveMenu(null)
+                                                }}
+                                                className="w-full px-4 py-2 text-left hover:bg-emerald-900/20 transition-colors flex items-center gap-2 text-emerald-400 border-t border-stone-700"
+                                            >
+                                                <Play className="h-4 w-4" />
+                                                Reactivate Account
+                                            </button>
+                                        )}
+                                        {client.accountStatus !== 'TERMINATED' && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setSuspendModal({ id: client.id, name: client.name || 'Unknown', action: 'TERMINATE' })
+                                                    setActiveMenu(null)
+                                                }}
+                                                className="w-full px-4 py-2 text-left hover:bg-red-900/20 transition-colors flex items-center gap-2 text-red-500"
+                                            >
+                                                <Ban className="h-4 w-4" />
+                                                Terminate Account
+                                            </button>
+                                        )}
+
                                         {/* Magic Link Helper */}
                                         {client.owner?.magicLinks?.[0]?.token && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation()
-                                                    const link = `${window.location.origin}/auth/magic-link/${client.owner.magicLinks[0].token}`
+                                                    const link = `${window.location.origin}/auth/magic-link/${client.owner?.magicLinks?.[0]?.token}`
                                                     navigator.clipboard.writeText(link)
                                                     setToast({ message: 'Magic Link copied to clipboard!', type: 'success' })
                                                     setActiveMenu(null)
@@ -472,14 +552,24 @@ export default function MyClientsPage() {
                                         <Clock className="h-3 w-3" /> Pending
                                     </span>
                                 )}
-                                {client.approvalStatus === 'APPROVED' && (
+                                {client.approvalStatus === 'APPROVED' && client.accountStatus !== 'SUSPENDED' && client.accountStatus !== 'TERMINATED' && (
                                     <span className="px-2 py-0.5 text-xs font-medium bg-emerald-500/20 text-emerald-400 rounded-full flex items-center gap-1">
-                                        <CheckCircle className="h-3 w-3" /> Approved
+                                        <CheckCircle className="h-3 w-3" /> Active
                                     </span>
                                 )}
                                 {client.approvalStatus === 'REJECTED' && (
                                     <span className="px-2 py-0.5 text-xs font-medium bg-red-500/20 text-red-400 rounded-full flex items-center gap-1">
                                         <XCircle className="h-3 w-3" /> Rejected
+                                    </span>
+                                )}
+                                {client.accountStatus === 'SUSPENDED' && (
+                                    <span className="px-2 py-0.5 text-xs font-medium bg-orange-500/20 text-orange-400 rounded-full flex items-center gap-1">
+                                        <Pause className="h-3 w-3" /> Suspended
+                                    </span>
+                                )}
+                                {client.accountStatus === 'TERMINATED' && (
+                                    <span className="px-2 py-0.5 text-xs font-medium bg-red-500/20 text-red-500 rounded-full flex items-center gap-1">
+                                        <Ban className="h-3 w-3" /> Terminated
                                     </span>
                                 )}
                             </div>
@@ -687,6 +777,99 @@ export default function MyClientsPage() {
                                     </>
                                 ) : (
                                     <>Reset Password</>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Suspend/Activate/Terminate Account Modal */}
+            {suspendModal && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                    <div className="bg-stone-800 rounded-xl border border-stone-700 p-6 max-w-md w-full mx-4 shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${suspendModal.action === 'SUSPEND' ? 'bg-orange-500/20' :
+                                        suspendModal.action === 'ACTIVATE' ? 'bg-emerald-500/20' : 'bg-red-500/20'
+                                    }`}>
+                                    {suspendModal.action === 'SUSPEND' && <Pause className="h-6 w-6 text-orange-400" />}
+                                    {suspendModal.action === 'ACTIVATE' && <Play className="h-6 w-6 text-emerald-400" />}
+                                    {suspendModal.action === 'TERMINATE' && <Ban className="h-6 w-6 text-red-400" />}
+                                </div>
+                                <h3 className="text-lg font-semibold text-white">
+                                    {suspendModal.action === 'SUSPEND' && 'Suspend Account'}
+                                    {suspendModal.action === 'ACTIVATE' && 'Reactivate Account'}
+                                    {suspendModal.action === 'TERMINATE' && 'Terminate Account'}
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setSuspendModal(null)
+                                    setSuspendReason('')
+                                }}
+                                className="p-1 hover:bg-stone-700 rounded-lg transition-colors"
+                            >
+                                <X className="h-5 w-5 text-stone-400" />
+                            </button>
+                        </div>
+
+                        <p className="text-stone-300 mb-4">
+                            {suspendModal.action === 'SUSPEND' && (
+                                <>Are you sure you want to suspend <span className="font-semibold text-white">{suspendModal.name}</span>? They will be blocked from logging in.</>
+                            )}
+                            {suspendModal.action === 'ACTIVATE' && (
+                                <>Reactivate <span className="font-semibold text-white">{suspendModal.name}</span>? They will be able to login again.</>
+                            )}
+                            {suspendModal.action === 'TERMINATE' && (
+                                <>Permanently terminate <span className="font-semibold text-white">{suspendModal.name}</span>? This is a hard block and should only be used for closed accounts.</>
+                            )}
+                        </p>
+
+                        {(suspendModal.action === 'SUSPEND' || suspendModal.action === 'TERMINATE') && (
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-stone-300 mb-2">
+                                    Reason (optional)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={suspendReason}
+                                    onChange={(e) => setSuspendReason(e.target.value)}
+                                    placeholder={suspendModal.action === 'SUSPEND' ? 'e.g., Payment overdue' : 'e.g., Account closed by owner'}
+                                    className="w-full px-4 py-3 bg-stone-900/50 border border-stone-700 rounded-lg text-white placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => {
+                                    setSuspendModal(null)
+                                    setSuspendReason('')
+                                }}
+                                disabled={suspending}
+                                className="px-4 py-2 bg-stone-700 text-stone-300 rounded-lg hover:bg-stone-600 transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSuspendAccount}
+                                disabled={suspending}
+                                className={`px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 ${suspendModal.action === 'SUSPEND' ? 'bg-orange-600 hover:bg-orange-500' :
+                                        suspendModal.action === 'ACTIVATE' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'
+                                    }`}
+                            >
+                                {suspending ? (
+                                    <>
+                                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        {suspendModal.action === 'SUSPEND' && 'Suspend Account'}
+                                        {suspendModal.action === 'ACTIVATE' && 'Reactivate Account'}
+                                        {suspendModal.action === 'TERMINATE' && 'Terminate Account'}
+                                    </>
                                 )}
                             </button>
                         </div>

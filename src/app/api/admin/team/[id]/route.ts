@@ -4,13 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 // Helper to check permissions
-async function checkPermission(req: NextRequest) {
+async function checkPermission() {
     const session = await getServerSession(authOptions)
     if (!session?.user || session.user.role !== 'PROVIDER') {
-        return null
-    }
-    const userRole = session.user.providerRole
-    if (userRole && userRole !== 'SUPER_ADMIN' && userRole !== 'MANAGER') {
         return null
     }
     return session
@@ -19,26 +15,29 @@ async function checkPermission(req: NextRequest) {
 // PUT: Update Team Member
 export async function PUT(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await checkPermission(req)
+    const session = await checkPermission()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     try {
-        const { id } = params
+        const { id } = await params
         const body = await req.json()
-        const { role, permissions } = body
-
-        // Prevent modifying own role if not SUPER_ADMIN (or prevent locking oneself out)
-        if (id === session.user.id) {
-            // Optional: Allow updating own details but maybe warn about role changes
-        }
+        const { name, email } = body
 
         const updated = await prisma.user.update({
             where: { id },
             data: {
-                providerRole: role,
-                providerPermissions: JSON.stringify(permissions || {})
+                name,
+                email
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                createdAt: true,
+                updatedAt: true
             }
         })
 
@@ -49,24 +48,23 @@ export async function PUT(
     }
 }
 
-// DELETE: Remove Team Member (Soft Delete)
+// DELETE: Remove Team Member (Hard Delete - no deletedAt field in schema)
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await checkPermission(req)
+    const session = await checkPermission()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     try {
-        const { id } = params
+        const { id } = await params
 
         if (id === session.user.id) {
             return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 })
         }
 
-        await prisma.user.update({
-            where: { id },
-            data: { deletedAt: new Date() }
+        await prisma.user.delete({
+            where: { id }
         })
 
         return NextResponse.json({ success: true })

@@ -112,8 +112,7 @@ export async function POST(request: Request) {
                 description,
                 duration: parseInt(duration),
                 price: parseFloat(price),
-                category,
-                categoryId: categoryId || null,
+                categoryId: categoryId || category || null,  // Accept either field from frontend
                 franchiseId: finalFranchiseId,
             },
             include: { serviceCategory: true }
@@ -159,8 +158,7 @@ export async function PUT(request: Request) {
                 description,
                 duration: parseInt(duration),
                 price: parseFloat(price),
-                category,
-                categoryId: categoryId || null,
+                categoryId: categoryId || category || null,  // Accept either field from frontend
             }
         })
 

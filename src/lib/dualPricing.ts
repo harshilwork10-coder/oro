@@ -11,22 +11,24 @@ export interface ProviderSettings {
 export function getProviderSettings(): ProviderSettings {
     return {
         cashDiscountPercent: 3.5, // YOU set this percentage for ALL clients
-        platformName: 'Trinex POS',
-        supportEmail: 'support@trinexpos.com'
+        platformName: 'Oronex POS',
+        supportEmail: 'support@oronexpos.com'
     }
 }
 
 /**
  * Check if cash discount is enabled for a specific franchisor
  * ONLY PROVIDER can enable this
+ * 
+ * NOTE: The cashDiscountEnabled field does not exist on the Franchisor model.
+ * This feature requires a schema update to add this field.
+ * Currently returns false (cash discount disabled by default).
  */
 export async function isCashDiscountEnabled(franchisorId: string): Promise<boolean> {
-    const franchisor = await prisma.franchisor.findUnique({
-        where: { id: franchisorId },
-        select: { cashDiscountEnabled: true }
-    })
-
-    return franchisor?.cashDiscountEnabled || false
+    // Feature not implemented in schema - always return false
+    // TODO: Add cashDiscountEnabled field to Franchisor model when implementing dual pricing
+    console.log(`Cash discount check for franchisor ${franchisorId}: Feature not yet implemented in schema`)
+    return false
 }
 
 /**

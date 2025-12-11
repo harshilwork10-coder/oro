@@ -17,15 +17,16 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ results: [] })
         }
 
-        const results: any[] = []
+        const results: { title: string | null; description: string | null | undefined; type: string; href: string }[] = []
+        const user = session.user as { role?: string }
 
         // Search clients
-        if (session.user.role === 'PROVIDER') {
+        if (user.role === 'PROVIDER') {
             const clients = await prisma.franchisor.findMany({
                 where: {
                     OR: [
-                        { name: { contains: query, mode: 'insensitive' } },
-                        { owner: { email: { contains: query, mode: 'insensitive' } } }
+                        { name: { contains: query } },
+                        { owner: { email: { contains: query } } }
                     ]
                 },
                 take: 5,
@@ -47,8 +48,8 @@ export async function GET(request: NextRequest) {
             const locations = await prisma.location.findMany({
                 where: {
                     OR: [
-                        { name: { contains: query, mode: 'insensitive' } },
-                        { address: { contains: query, mode: 'insensitive' } }
+                        { name: { contains: query } },
+                        { address: { contains: query } }
                     ]
                 },
                 take: 5,
@@ -71,8 +72,8 @@ export async function GET(request: NextRequest) {
                 where: {
                     role: 'AGENT',
                     OR: [
-                        { name: { contains: query, mode: 'insensitive' } },
-                        { email: { contains: query, mode: 'insensitive' } }
+                        { name: { contains: query } },
+                        { email: { contains: query } }
                     ]
                 },
                 take: 5,

@@ -42,7 +42,7 @@ export async function PUT(
                 description,
                 duration: parseInt(duration),
                 price: parseFloat(price),
-                category
+                categoryId: category  // category is the ID passed from frontend
             }
         })
 

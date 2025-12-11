@@ -1,5 +1,5 @@
 /**
- * Trinex POS - Eye-Friendly Color System
+ * Oronex POS - Eye-Friendly Color System
  * Optimized for 8+ hour daily use with reduced eye strain
  */
 

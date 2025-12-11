@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
                 reason: reason || null,
                 note: note || null,
                 amount: amount ? parseFloat(amount) : null,
-                employeeId: session.user.id,
+                employeeId: user.id,
                 shiftId: shiftId || null,
                 locationId,
                 transactionId: transactionId || null,
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
 
         // Check if this triggers an alert (too many no-sales)
         if (type === 'NO_SALE') {
-            await checkNoSaleAlerts(locationId, session.user.id)
+            await checkNoSaleAlerts(locationId, user.id)
         }
 
         return NextResponse.json(activity)
@@ -183,9 +183,13 @@ async function checkNoSaleAlerts(locationId: string, employeeId: string) {
             const location = await prisma.location.findUnique({
                 where: { id: locationId },
                 include: {
-                    franchisee: {
+                    franchise: {
                         include: {
-                            owner: { select: { id: true, email: true, name: true } }
+                            franchisor: {
+                                include: {
+                                    owner: { select: { id: true, email: true, name: true } }
+                                }
+                            }
                         }
                     }
                 }

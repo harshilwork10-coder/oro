@@ -6,22 +6,16 @@ import { hash } from 'bcrypt'
 import crypto from 'crypto'
 
 // Helper to check if user is allowed to manage team
-async function checkPermission(req: NextRequest) {
+async function checkPermission() {
     const session = await getServerSession(authOptions)
     if (!session?.user || session.user.role !== 'PROVIDER') {
-        return null
-    }
-    // Only SUPER_ADMIN or MANAGER can manage team
-    // If providerRole is null, assume SUPER_ADMIN (the owner)
-    const userRole = session.user.providerRole
-    if (userRole && userRole !== 'SUPER_ADMIN' && userRole !== 'MANAGER') {
         return null
     }
     return session
 }
 
 // GET: List all Provider Team Members
-export async function GET(req: NextRequest) {
+export async function GET() {
     const session = await getServerSession(authOptions)
     if (!session?.user || session.user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
@@ -30,16 +24,13 @@ export async function GET(req: NextRequest) {
     try {
         const team = await prisma.user.findMany({
             where: {
-                role: 'PROVIDER',
-                deletedAt: null
+                role: 'PROVIDER'
             },
             select: {
                 id: true,
                 name: true,
                 email: true,
                 image: true,
-                providerRole: true,
-                providerPermissions: true,
                 createdAt: true
             },
             orderBy: { createdAt: 'desc' }
@@ -54,14 +45,14 @@ export async function GET(req: NextRequest) {
 
 // POST: Create a new Team Member
 export async function POST(req: NextRequest) {
-    const session = await checkPermission(req)
+    const session = await checkPermission()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     try {
         const body = await req.json()
-        const { name, email, role, permissions } = body
+        const { name, email } = body
 
-        if (!name || !email || !role) {
+        if (!name || !email) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
@@ -83,9 +74,14 @@ export async function POST(req: NextRequest) {
                 name,
                 email,
                 password: hashedPassword,
-                role: 'PROVIDER', // Crucial: They are part of the Provider team
-                providerRole: role,
-                providerPermissions: JSON.stringify(permissions || {})
+                role: 'PROVIDER'
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                createdAt: true
             }
         })
 

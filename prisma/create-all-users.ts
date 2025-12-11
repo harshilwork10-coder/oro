@@ -36,13 +36,13 @@ async function main() {
     })
 
     let brandFranchisorEntity = await prisma.franchisor.findUnique({
-        where: { userId: brandFranchisor.id }
+        where: { ownerId: brandFranchisor.id }
     })
 
     if (!brandFranchisorEntity) {
         brandFranchisorEntity = await prisma.franchisor.create({
             data: {
-                userId: brandFranchisor.id,
+                ownerId: brandFranchisor.id,
                 name: 'Brand Franchise Corp',
                 businessType: 'BRAND_FRANCHISOR'
             }
@@ -71,13 +71,13 @@ async function main() {
     })
 
     let multiOwnerEntity = await prisma.franchisor.findUnique({
-        where: { userId: multiOwner.id }
+        where: { ownerId: multiOwner.id }
     })
 
     if (!multiOwnerEntity) {
         multiOwnerEntity = await prisma.franchisor.create({
             data: {
-                userId: multiOwner.id,
+                ownerId: multiOwner.id,
                 name: 'Multi-Location Operations',
                 businessType: 'MULTI_LOCATION_OWNER'
             }
@@ -130,13 +130,9 @@ async function main() {
         location = await prisma.location.create({
             data: {
                 name: 'Downtown Store',
+                slug: 'downtown-store',
                 franchiseId: franchise.id,
-                address: '123 Main St',
-                city: 'Test City',
-                state: 'CA',
-                zip: '90001',
-                email: 'store@test.com',
-                phone: '555-0100'
+                address: '123 Main St, Test City, CA 90001'
             }
         })
     }

@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -14,7 +14,7 @@ export async function POST(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const employeeId = params.id
+        const { id: employeeId } = await params
         const body = await req.json()
 
         const { tiers } = body // Array of tier objects
@@ -50,7 +50,7 @@ export async function POST(
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -59,7 +59,7 @@ export async function GET(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const employeeId = params.id
+        const { id: employeeId } = await params
 
         const tiers = await prisma.commissionTier.findMany({
             where: { employeeId },

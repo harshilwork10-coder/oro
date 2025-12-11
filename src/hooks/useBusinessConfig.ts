@@ -38,6 +38,7 @@ export interface BusinessConfig {
     usesFranchising: boolean
     usesTimeTracking: boolean
     usesPayroll: boolean
+    enableResources: boolean  // Enable resources/equipment booking
     createdAt: Date
     updatedAt: Date
 }

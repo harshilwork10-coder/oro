@@ -1,8 +1,8 @@
 'use client'
 
-import { Menu, Bell } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import TrinexLogo from '@/components/ui/TrinexLogo'
+import NotificationsDropdown from '@/components/layout/NotificationsDropdown'
 
 interface MobileHeaderProps {
     onMenuClick: () => void
@@ -23,16 +23,12 @@ export default function MobileHeader({ onMenuClick, forceShow }: MobileHeaderPro
                     <Menu className="h-6 w-6" aria-hidden="true" />
                 </button>
                 <div className="flex items-center gap-2">
-                    {/* Using BreadLogo logic here if needed, or keeping simple text for mobile */}
-                    <span className="text-lg font-bold text-stone-100">Trinex AI</span>
+                    <span className="text-lg font-bold text-stone-100">Oronex</span>
                 </div>
             </div>
 
-            <div className="flex items-center gap-4">
-                <button className="text-stone-400 hover:text-stone-100">
-                    <span className="sr-only">View notifications</span>
-                    <Bell className="h-6 w-6" />
-                </button>
+            <div className="flex items-center gap-3">
+                <NotificationsDropdown />
                 <div className="h-8 w-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-semibold text-xs shadow-lg shadow-orange-900/20">
                     {session?.user?.name?.charAt(0).toUpperCase()}
                 </div>

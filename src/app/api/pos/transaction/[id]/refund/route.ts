@@ -40,13 +40,13 @@ export async function POST(
 
         const refundAmount = itemsToRefund.reduce((sum, item) => sum + Number(item.total), 0)
 
-        // Create a refund transaction
+        // Create a refund transaction (linked to original via originalTransactionId)
         const refundTransaction = await prisma.transaction.create({
             data: {
                 franchiseId: transaction.franchiseId,
                 employeeId: transaction.employeeId,
                 clientId: transaction.clientId,
-                type: 'REFUND',
+                originalTransactionId: transactionId,  // Link to original transaction
                 status: 'COMPLETED',
                 paymentMethod: transaction.paymentMethod,
                 subtotal: -refundAmount,
@@ -56,7 +56,6 @@ export async function POST(
                 cardFee: 0,
                 total: -(refundAmount + Number(transaction.tax)),
                 invoiceNumber: `REFUND-${transaction.invoiceNumber}`,
-                notes: `Refund for transaction ${transaction.id}`,
                 lineItems: {
                     create: itemsToRefund.map(item => ({
                         type: item.type,

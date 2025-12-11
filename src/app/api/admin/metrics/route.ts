@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
             select: {
                 id: true,
                 name: true,
-                type: true,
-                status: true,
+                businessType: true,
+                approvalStatus: true,
                 createdAt: true,
                 owner: {
                     select: {

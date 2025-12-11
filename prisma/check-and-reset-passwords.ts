@@ -44,7 +44,7 @@ async function main() {
         // Create franchisor entity
         await prisma.franchisor.create({
             data: {
-                userId: franchisorUser.id,
+                ownerId: franchisorUser.id,
                 name: 'CRM Test Company',
                 businessType: 'BRAND_FRANCHISOR'
             }

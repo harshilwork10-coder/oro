@@ -41,7 +41,7 @@ export class InterventionAutomationService {
                 // Send Email
                 if (resend) {
                     await resend.emails.send({
-                        from: 'Trinex System <system@trinex-crm.com>',
+                        from: 'Oronex System <system@oronex-crm.com>',
                         to: owner.email,
                         subject: 'Action Required: Compliance Alert',
                         html: `
@@ -52,7 +52,7 @@ export class InterventionAutomationService {
                             <p>Please log in to your dashboard to address this immediately.</p>
                             <br>
                             <p>Best regards,</p>
-                            <p>Trinex Compliance Team</p>
+                            <p>Oronex Compliance Team</p>
                         `
                     })
                 } else {

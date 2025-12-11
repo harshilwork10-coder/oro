@@ -11,16 +11,13 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
-        // Get all franchisors (active and archived)
+        // Get all franchisors with their business configuration
         const franchisors = await prisma.franchisor.findMany({
             select: {
                 id: true,
-                type: true,
-                supportFee: true,
-                baseRate: true,
-                enableCommission: true,
-                deletedAt: true,
-                salesAgentId: true,
+                name: true,
+                businessType: true,
+                approvalStatus: true,
                 createdAt: true,
                 _count: {
                     select: {
@@ -31,27 +28,16 @@ export async function GET() {
         })
 
         // Calculate metrics
-        const activeFranchisors = franchisors.filter(f => !f.deletedAt)
-        const archivedCount = franchisors.filter(f => f.deletedAt).length
+        const approvedFranchisors = franchisors.filter(f => f.approvalStatus === 'APPROVED')
+        const pendingCount = franchisors.filter(f => f.approvalStatus === 'PENDING').length
+        const rejectedCount = franchisors.filter(f => f.approvalStatus === 'REJECTED').length
 
-        // Count by type
-        const brandAccounts = activeFranchisors.filter(f => f.type === 'BRAND')
-        const individualAccounts = activeFranchisors.filter(f => f.type === 'INDIVIDUAL')
-
-        // Calculate MRR (Monthly Recurring Revenue)
-        const totalMRR = activeFranchisors.reduce((sum, f) => sum + Number(f.supportFee || 0), 0)
-        const brandMRR = brandAccounts.reduce((sum, f) => sum + Number(f.supportFee || 0), 0)
-        const individualMRR = individualAccounts.reduce((sum, f) => sum + Number(f.supportFee || 0), 0)
-
-        // Calculate commission payable
-        const totalCommission = activeFranchisors.reduce((sum, f) => {
-            if (!f.enableCommission || !f.salesAgentId) return sum
-            const markup = Number(f.supportFee || 0) - Number(f.baseRate || 99)
-            return sum + Math.max(0, markup)
-        }, 0)
+        // Count by business type
+        const brandAccounts = approvedFranchisors.filter(f => f.businessType === 'BRAND_FRANCHISOR')
+        const multiLocationAccounts = approvedFranchisors.filter(f => f.businessType === 'MULTI_LOCATION_OWNER')
 
         // Growth calculation (comparing to last month - simplified)
-        const thisMonthAccounts = activeFranchisors.filter(f => {
+        const thisMonthAccounts = approvedFranchisors.filter(f => {
             const createdDate = new Date(f.createdAt)
             const now = new Date()
             const thisMonth = now.getMonth()
@@ -59,30 +45,31 @@ export async function GET() {
             return createdDate.getMonth() === thisMonth && createdDate.getFullYear() === thisYear
         }).length
 
-        const growthRate = activeFranchisors.length > 0
-            ? ((thisMonthAccounts / activeFranchisors.length) * 100)
+        const growthRate = approvedFranchisors.length > 0
+            ? ((thisMonthAccounts / approvedFranchisors.length) * 100)
             : 0
 
         // Total locations across all franchisors
-        const totalLocations = activeFranchisors.reduce((sum, f) => sum + (f._count.franchises || 0), 0)
+        const totalLocations = approvedFranchisors.reduce((sum, f) => sum + (f._count.franchises || 0), 0)
 
         return NextResponse.json({
             overview: {
-                totalMRR,
-                activeAccounts: activeFranchisors.length,
-                totalCommission,
+                totalMRR: 0, // MRR tracking not implemented yet
+                activeAccounts: approvedFranchisors.length,
+                totalCommission: 0, // Commission tracking not implemented yet
                 growthRate,
-                archivedCount,
+                pendingCount,
+                rejectedCount,
                 totalLocations
             },
             breakdown: {
                 brand: {
                     count: brandAccounts.length,
-                    mrr: brandMRR
+                    mrr: 0
                 },
-                individual: {
-                    count: individualAccounts.length,
-                    mrr: individualMRR
+                multiLocation: {
+                    count: multiLocationAccounts.length,
+                    mrr: 0
                 }
             },
             // Simple monthly trend (last 6 months)
@@ -94,18 +81,12 @@ export async function GET() {
                 // Count accounts created before or during this month
                 const accountsUpToMonth = franchisors.filter(f => {
                     const createdDate = new Date(f.createdAt)
-                    return createdDate <= date && !f.deletedAt
+                    return createdDate <= date && f.approvalStatus === 'APPROVED'
                 }).length
-
-                // Calculate MRR for accounts up to this month
-                const mrrUpToMonth = franchisors.filter(f => {
-                    const createdDate = new Date(f.createdAt)
-                    return createdDate <= date && !f.deletedAt
-                }).reduce((sum, f) => sum + Number(f.supportFee || 0), 0)
 
                 return {
                     month,
-                    mrr: mrrUpToMonth,
+                    mrr: 0,
                     accounts: accountsUpToMonth
                 }
             })

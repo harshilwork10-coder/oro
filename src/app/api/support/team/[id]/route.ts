@@ -6,9 +6,10 @@ import { prisma } from '@/lib/prisma'
 // DELETE - Remove a support team member
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params
         const session = await getServerSession(authOptions)
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,7 +20,7 @@ export async function DELETE(
         // Verify the user belongs to this franchise
         const teamMember = await prisma.user.findFirst({
             where: {
-                id: params.id,
+                id,
                 franchiseId: user.franchiseId,
                 role: 'SUPPORT_STAFF'
             }
@@ -31,7 +32,7 @@ export async function DELETE(
 
         // Delete the user
         await prisma.user.delete({
-            where: { id: params.id }
+            where: { id }
         })
 
         return NextResponse.json({ success: true })

@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { Decimal } from '@prisma/client/runtime/library'
 
 // Helper to check permissions
-async function checkPermission(req: NextRequest) {
+async function checkPermission() {
     const session = await getServerSession(authOptions)
     if (!session?.user || session.user.role !== 'PROVIDER') {
         return null
@@ -16,22 +15,31 @@ async function checkPermission(req: NextRequest) {
 // PUT: Update Franchisor Details
 export async function PUT(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await checkPermission(req)
+    const session = await checkPermission()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     try {
-        const { id } = params
+        const { id } = await params
         const body = await req.json()
-        const { name, supportFee, type } = body
+        const { name, businessType, approvalStatus } = body
 
         const updated = await prisma.franchisor.update({
             where: { id },
             data: {
                 name,
-                supportFee: supportFee ? new Decimal(supportFee) : undefined,
-                type
+                businessType,
+                approvalStatus
+            },
+            select: {
+                id: true,
+                name: true,
+                businessType: true,
+                approvalStatus: true,
+                ownerId: true,
+                createdAt: true,
+                updatedAt: true
             }
         })
 
@@ -42,114 +50,61 @@ export async function PUT(
     }
 }
 
-// DELETE: Soft Delete (Archive)
+// DELETE: Hard Delete Franchisor
+// NOTE: Soft delete (deletedAt) is not implemented in current schema
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await checkPermission(req)
+    const session = await checkPermission()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     try {
-        const { id } = params
-        const now = new Date()
+        const { id } = await params
 
-        // Transaction to soft delete everything related
-        await prisma.$transaction(async (tx) => {
-            // 1. Archive Franchisor
-            const franchisor = await tx.franchisor.update({
-                where: { id },
-                data: { deletedAt: now }
-            })
-
-            // 2. Archive Owner User
-            if (franchisor.ownerId) {
-                await tx.user.update({
-                    where: { id: franchisor.ownerId },
-                    data: { deletedAt: now }
-                })
-            }
-
-            // 3. Archive all Franchises
-            await tx.franchise.updateMany({
-                where: { franchisorId: id },
-                data: { deletedAt: now }
-            })
-
-            // 4. Archive all Users in those Franchises (Employees)
-            // First find all franchises to get IDs
-            const franchises = await tx.franchise.findMany({
-                where: { franchisorId: id },
-                select: { id: true }
-            })
-            const franchiseIds = franchises.map(f => f.id)
-
-            if (franchiseIds.length > 0) {
-                await tx.user.updateMany({
-                    where: { franchiseId: { in: franchiseIds } },
-                    data: { deletedAt: now }
-                })
-            }
+        // Delete franchisor (cascade will handle related records)
+        await prisma.franchisor.delete({
+            where: { id }
         })
 
-        return NextResponse.json({ success: true, message: 'Archived successfully' })
+        return NextResponse.json({ success: true, message: 'Deleted successfully' })
     } catch (error) {
-        console.error('Error archiving franchisor:', error)
-        return NextResponse.json({ error: 'Failed to archive' }, { status: 500 })
+        console.error('Error deleting franchisor:', error)
+        return NextResponse.json({ error: 'Failed to delete' }, { status: 500 })
     }
 }
 
-// PATCH: Restore (Un-archive)
+// PATCH: Update Approval Status
 export async function PATCH(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await checkPermission(req)
+    const session = await checkPermission()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     try {
-        const { id } = params
+        const { id } = await params
+        const body = await req.json()
+        const { approvalStatus } = body
 
-        // Transaction to restore everything
-        await prisma.$transaction(async (tx) => {
-            // 1. Restore Franchisor
-            const franchisor = await tx.franchisor.update({
-                where: { id },
-                data: { deletedAt: null }
-            })
+        if (!approvalStatus || !['PENDING', 'APPROVED', 'REJECTED'].includes(approvalStatus)) {
+            return NextResponse.json({ error: 'Invalid approval status' }, { status: 400 })
+        }
 
-            // 2. Restore Owner User
-            if (franchisor.ownerId) {
-                await tx.user.update({
-                    where: { id: franchisor.ownerId },
-                    data: { deletedAt: null }
-                })
-            }
-
-            // 3. Restore all Franchises
-            await tx.franchise.updateMany({
-                where: { franchisorId: id },
-                data: { deletedAt: null }
-            })
-
-            // 4. Restore all Users in those Franchises
-            const franchises = await tx.franchise.findMany({
-                where: { franchisorId: id },
-                select: { id: true }
-            })
-            const franchiseIds = franchises.map(f => f.id)
-
-            if (franchiseIds.length > 0) {
-                await tx.user.updateMany({
-                    where: { franchiseId: { in: franchiseIds } },
-                    data: { deletedAt: null }
-                })
+        const updated = await prisma.franchisor.update({
+            where: { id },
+            data: { approvalStatus },
+            select: {
+                id: true,
+                name: true,
+                approvalStatus: true,
+                updatedAt: true
             }
         })
 
-        return NextResponse.json({ success: true, message: 'Restored successfully' })
+        return NextResponse.json({ success: true, franchisor: updated, message: `Status updated to ${approvalStatus}` })
     } catch (error) {
-        console.error('Error restoring franchisor:', error)
-        return NextResponse.json({ error: 'Failed to restore' }, { status: 500 })
+        console.error('Error updating franchisor status:', error)
+        return NextResponse.json({ error: 'Failed to update status' }, { status: 500 })
     }
 }

@@ -17,14 +17,8 @@ export async function GET() {
                 email: 'provider@aura.com',
                 password: hashedPassword,
                 pin: await hash('1111', 10),
-                role: 'PROVIDER',
-                providerRole: 'SUPER_ADMIN',
-                providerPermissions: JSON.stringify({
-                    canManageTeam: true,
-                    canManageFranchisors: true,
-                    canViewReports: true,
-                    canManageBilling: true
-                })
+                role: 'PROVIDER'
+                // Note: providerRole and providerPermissions removed - not in schema
             }
         })
 
@@ -46,8 +40,8 @@ export async function GET() {
             franchisor = await prisma.franchisor.create({
                 data: {
                     name: 'Tesla Style Franchise',
-                    ownerId: franchisorUser.id,
-                    supportFee: 99.00
+                    ownerId: franchisorUser.id
+                    // Note: supportFee removed - not in schema
                 }
             })
         }

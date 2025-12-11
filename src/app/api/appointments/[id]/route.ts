@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth'
 // PUT: Update appointment
 export async function PUT(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -14,6 +14,7 @@ export async function PUT(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const { id } = await params
         const body = await req.json()
         const { startTime, endTime, status, notes, employeeId } = body
 
@@ -29,7 +30,7 @@ export async function PUT(
         if (startTime && endTime && employeeId) {
             const existingAppointment = await prisma.appointment.findFirst({
                 where: {
-                    id: { not: params.id },
+                    id: { not: id },
                     employeeId,
                     status: { not: 'CANCELLED' },
                     OR: [
@@ -58,7 +59,7 @@ export async function PUT(
         }
 
         const appointment = await prisma.appointment.update({
-            where: { id: params.id },
+            where: { id },
             data: updateData,
             include: {
                 client: true,
@@ -83,7 +84,7 @@ export async function PUT(
 // DELETE: Cancel appointment
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -91,8 +92,9 @@ export async function DELETE(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const { id } = await params
         const appointment = await prisma.appointment.update({
-            where: { id: params.id },
+            where: { id },
             data: { status: 'CANCELLED' },
             include: {
                 client: true,

@@ -5,7 +5,19 @@ import { getToken } from 'next-auth/jwt'
 export async function middleware(req: NextRequest) {
     const token = await getToken({ req })
     const isAuth = !!token
-    const isPending = token?.approvalStatus === 'PENDING' || token?.approvalStatus === 'REJECTED'
+
+    // Debug: Log token info (remove in production)
+    if (token) {
+        console.log('[Middleware] Token:', { role: token.role, approvalStatus: token.approvalStatus })
+    }
+
+    // PROVIDER, ADMIN, EMPLOYEE, MANAGER are always approved - don't check their approvalStatus
+    const alwaysApprovedRoles = ['PROVIDER', 'ADMIN', 'EMPLOYEE', 'MANAGER']
+    const isAlwaysApproved = token?.role && alwaysApprovedRoles.includes(token.role as string)
+
+    // Only consider pending if NOT an always-approved role AND explicitly PENDING/REJECTED
+    // If approvalStatus is undefined or APPROVED, treat as approved
+    const isPending = !isAlwaysApproved && (token?.approvalStatus === 'PENDING' || token?.approvalStatus === 'REJECTED')
 
     const { pathname } = req.nextUrl
 
@@ -25,7 +37,7 @@ export async function middleware(req: NextRequest) {
 
     // 2. If authenticated...
     if (isAuth) {
-        // If Pending/Rejected...
+        // If Pending/Rejected, redirect to pending page (except for that page and API)
         if (isPending) {
             // Allow access to Pending page and API
             if (pathname === '/auth/pending-approval' || pathname.startsWith('/api')) {
@@ -35,16 +47,9 @@ export async function middleware(req: NextRequest) {
             return NextResponse.redirect(new URL('/auth/pending-approval', req.url))
         }
 
-        // If Approved...
-        if (!isPending) {
-            // If trying to access Pending page -> Dashboard
-            if (pathname === '/auth/pending-approval') {
-                return NextResponse.redirect(new URL('/dashboard', req.url))
-            }
-            // If trying to access Login -> Dashboard
-            if (pathname === '/login') {
-                return NextResponse.redirect(new URL('/dashboard', req.url))
-            }
+        // If trying to access Login -> Dashboard
+        if (pathname === '/login') {
+            return NextResponse.redirect(new URL('/dashboard', req.url))
         }
     }
 

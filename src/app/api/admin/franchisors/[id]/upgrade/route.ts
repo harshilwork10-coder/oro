@@ -3,9 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// POST: Upgrade a franchisor from MULTI_LOCATION_OWNER to BRAND_FRANCHISOR
 export async function POST(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -14,36 +15,45 @@ export async function POST(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
-        const { id } = params
-        const body = await req.json()
-        const { newSupportFee } = body // Optional: admin can set new price
+        const { id } = await params
 
         // Get current account
         const current = await prisma.franchisor.findUnique({
-            where: { id }
+            where: { id },
+            select: {
+                id: true,
+                name: true,
+                businessType: true,
+                approvalStatus: true
+            }
         })
 
         if (!current) {
             return NextResponse.json({ error: 'Account not found' }, { status: 404 })
         }
 
-        if (current.type === 'BRAND') {
-            return NextResponse.json({ error: 'Already a Brand account' }, { status: 400 })
+        if (current.businessType === 'BRAND_FRANCHISOR') {
+            return NextResponse.json({ error: 'Already a Brand Franchisor account' }, { status: 400 })
         }
 
-        // Upgrade to Brand
+        // Upgrade to Brand Franchisor
         const upgraded = await prisma.franchisor.update({
             where: { id },
             data: {
-                type: 'BRAND',
-                baseRate: 499.00,
-                supportFee: newSupportFee || 499.00 // Use provided fee or default to 499
+                businessType: 'BRAND_FRANCHISOR'
+            },
+            select: {
+                id: true,
+                name: true,
+                businessType: true,
+                approvalStatus: true,
+                updatedAt: true
             }
         })
 
         return NextResponse.json({
             success: true,
-            message: 'Account upgraded to Brand successfully',
+            message: 'Account upgraded to Brand Franchisor successfully',
             franchisor: upgraded
         })
     } catch (error) {

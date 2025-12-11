@@ -8,7 +8,7 @@ import {
     Building2, User, FileText, Upload, CreditCard, ChevronRight, ChevronLeft,
     Quote, Star, ShieldCheck, Zap, Globe, Eye, EyeOff, Palette, Phone
 } from 'lucide-react'
-import TrinexLogo from '@/components/ui/TrinexLogo'
+import OronexLogo from '@/components/ui/OronexLogo'
 
 export default function MagicLinkPage({ params }: { params: Promise<{ token: string }> }) {
     const router = useRouter()
@@ -240,7 +240,7 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
             <div className="w-full lg:w-1/2 flex flex-col justify-center p-6 lg:p-12 overflow-y-auto">
                 <div className="max-w-xl mx-auto w-full">
                     <div className="mb-8">
-                        <img src="/trinex-logo.png" alt="Trinex AI" className="h-24 object-contain" />
+                        <img src="/Oronex-logo.png" alt="Oronex" className="h-24 object-contain" />
                     </div>
 
                     <div className="mb-8">

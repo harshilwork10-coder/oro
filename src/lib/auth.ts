@@ -39,27 +39,56 @@ export const authOptions: NextAuthOptions = {
                 }
 
                 let approvalStatus = 'PENDING'
+                let accountStatus = 'ACTIVE'
                 let businessType = null
 
+                // Check franchisor account status for franchisor owners
                 if (user.role === 'FRANCHISOR') {
                     const franchisor = await prisma.franchisor.findUnique({
                         where: { ownerId: user.id },
-                        select: { businessType: true, approvalStatus: true }
+                        select: { businessType: true, approvalStatus: true, accountStatus: true }
                     })
                     businessType = franchisor?.businessType || null
                     approvalStatus = franchisor?.approvalStatus || 'PENDING'
+                    accountStatus = franchisor?.accountStatus || 'ACTIVE'
+
+                    // Block login for suspended/terminated accounts
+                    if (accountStatus === 'SUSPENDED' || accountStatus === 'TERMINATED') {
+                        throw new Error(`ACCOUNT_${accountStatus}`)
+                    }
                 } else if (user.role === 'ADMIN' || user.role === 'PROVIDER') {
                     approvalStatus = 'APPROVED'
                 } else if (user.role === 'EMPLOYEE' || user.role === 'MANAGER') {
-                    // Employees and Managers are auto-approved (added by owner)
+                    // Employees and Managers - check their franchise's franchisor status
                     approvalStatus = 'APPROVED'
+
+                    if (user.franchiseId) {
+                        const franchise = await prisma.franchise.findUnique({
+                            where: { id: user.franchiseId },
+                            include: { franchisor: { select: { accountStatus: true } } }
+                        })
+                        accountStatus = franchise?.franchisor?.accountStatus || 'ACTIVE'
+
+                        // Block employee login if their franchisor is suspended
+                        if (accountStatus === 'SUSPENDED' || accountStatus === 'TERMINATED') {
+                            throw new Error(`ACCOUNT_${accountStatus}`)
+                        }
+                    }
                 } else if (user.role === 'FRANCHISEE' && user.franchiseId) {
                     // For Franchisee Owners linked to a franchise
                     const franchise = await prisma.franchise.findUnique({
                         where: { id: user.franchiseId },
-                        select: { approvalStatus: true }
+                        include: {
+                            franchisor: { select: { accountStatus: true } }
+                        }
                     })
                     approvalStatus = franchise?.approvalStatus || 'PENDING'
+                    accountStatus = franchise?.franchisor?.accountStatus || 'ACTIVE'
+
+                    // Block franchisee login if their franchisor is suspended
+                    if (accountStatus === 'SUSPENDED' || accountStatus === 'TERMINATED') {
+                        throw new Error(`ACCOUNT_${accountStatus}`)
+                    }
                 }
 
                 return {
@@ -73,6 +102,7 @@ export const authOptions: NextAuthOptions = {
                     canManageShifts: user.canManageShifts,
                     businessType,
                     approvalStatus,
+                    accountStatus,
                 }
             }
         })
@@ -91,11 +121,13 @@ export const authOptions: NextAuthOptions = {
                     canManageShifts: token.canManageShifts,
                     businessType: token.businessType,
                     approvalStatus: token.approvalStatus,
+                    accountStatus: token.accountStatus,
                 }
             }
         },
         async jwt({ token, user }) {
             if (user) {
+                // Initial login - set all values from authorize()
                 return {
                     ...token,
                     id: user.id,
@@ -106,9 +138,30 @@ export const authOptions: NextAuthOptions = {
                     canManageShifts: (user as any).canManageShifts,
                     businessType: (user as any).businessType,
                     approvalStatus: (user as any).approvalStatus,
+                    accountStatus: (user as any).accountStatus,
                 }
             }
+
+            // FRESH LOOKUP: On subsequent requests, fetch fresh approval status
+            // This prevents stale token issues when approval status changes
+            if (token.id && token.role === 'FRANCHISOR') {
+                try {
+                    const franchisor = await prisma.franchisor.findFirst({
+                        where: { ownerId: token.id as string },
+                        select: { approvalStatus: true, accountStatus: true }
+                    })
+                    if (franchisor) {
+                        token.approvalStatus = franchisor.approvalStatus
+                        token.accountStatus = franchisor.accountStatus
+                    }
+                } catch (e) {
+                    // Silently fail - use existing token values
+                    console.error('[JWT] Failed to refresh approval status:', e)
+                }
+            }
+
             return token
         }
     }
 }
+

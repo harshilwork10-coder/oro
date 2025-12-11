@@ -175,7 +175,7 @@ export default function HelpDeskPage() {
 
                     {/* Email Support */}
                     <a
-                        href="mailto:support@trinex.com"
+                        href="mailto:support@Oronex.com"
                         className="bg-stone-900 border border-stone-800 rounded-2xl p-6 hover:border-orange-500/50 transition-all group text-left"
                     >
                         <div className="h-14 w-14 rounded-full bg-orange-500/10 flex items-center justify-center mb-4 group-hover:bg-orange-500/20 transition-colors">
@@ -183,7 +183,7 @@ export default function HelpDeskPage() {
                         </div>
                         <h3 className="text-xl font-bold text-white mb-2">Email Us</h3>
                         <p className="text-stone-400 text-sm mb-4">For non-urgent inquiries</p>
-                        <p className="text-orange-400">support@trinex.com</p>
+                        <p className="text-orange-400">support@Oronex.com</p>
                     </a>
                 </div>
 
@@ -254,7 +254,7 @@ export default function HelpDeskPage() {
                                     <Headphones className="h-5 w-5 text-white" />
                                 </div>
                                 <div>
-                                    <p className="font-semibold text-white">Trinex Support</p>
+                                    <p className="font-semibold text-white">Oronex Support</p>
                                     <div className="flex items-center gap-1.5 text-xs text-emerald-400">
                                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                         Online

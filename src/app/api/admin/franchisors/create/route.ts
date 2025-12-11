@@ -158,11 +158,11 @@ export async function POST(request: NextRequest) {
         // Send Email
         await sendEmail({
             to: sanitizedEmail,
-            subject: 'Welcome to Trinex - Setup Your Franchise Account',
+            subject: 'Welcome to Oronex - Setup Your Franchise Account',
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h1>Welcome to Trinex!</h1>
-                    <p>You have been invited to join Trinex as a ${finalBusinessType === 'BRAND_FRANCHISOR' ? 'Franchise Brand Owner' : 'Multi-Location Owner'}.</p>
+                    <h1>Welcome to Oronex!</h1>
+                    <p>You have been invited to join Oronex as a ${finalBusinessType === 'BRAND_FRANCHISOR' ? 'Franchise Brand Owner' : 'Multi-Location Owner'}.</p>
                     <p><strong>Company:</strong> ${sanitizedCompanyName}</p>
                     <br/>
                     <p>Click the link below to accept the terms and set up your account:</p>

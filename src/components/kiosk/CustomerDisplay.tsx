@@ -3,7 +3,7 @@
 import { ShoppingCart, User } from 'lucide-react'
 import TipModal from './TipModal'
 import ReviewModal from './ReviewModal'
-import TrinexLogo from '@/components/ui/TrinexLogo'
+import OronexLogo from '@/components/ui/OronexLogo'
 
 interface CustomerDisplayProps {
     cart: any
@@ -28,9 +28,9 @@ export default function CustomerDisplay({
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
                 <div className="mb-8">
-                    <TrinexLogo size={96} />
+                    <OronexLogo size={96} />
                 </div>
-                <h1 className="text-4xl font-bold text-gray-900 mb-4">Welcome to Trinex AI</h1>
+                <h1 className="text-4xl font-bold text-gray-900 mb-4">Welcome to Oronex</h1>
                 <p className="text-xl text-gray-500">We're ready when you are.</p>
             </div>
         )
@@ -42,10 +42,10 @@ export default function CustomerDisplay({
             <div className="bg-white p-6 shadow-sm flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="h-24 w-24 rounded-xl flex items-center justify-center">
-                        <TrinexLogo size={80} />
+                        <OronexLogo size={80} />
                     </div>
                     <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
-                        Trinex AI
+                        Oronex
                     </span>
                 </div>
                 {cart.customerName && (

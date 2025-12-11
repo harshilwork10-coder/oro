@@ -1178,6 +1178,11 @@ model Franchisor {
   // Approval Status
   approvalStatus String @default("PENDING") // PENDING, APPROVED, REJECTED
 
+  // Account Status (for suspension/termination)
+  accountStatus    String    @default("ACTIVE") // ACTIVE, SUSPENDED, TERMINATED
+  suspendedAt      DateTime?
+  suspendedReason  String?
+
   // Business Type
   businessType String @default("MULTI_LOCATION_OWNER") // "BRAND_FRANCHISOR" | "MULTI_LOCATION_OWNER"
 
@@ -1226,6 +1231,9 @@ model Franchisor {
   
   // Business Configuration (PROVIDER sets this for each franchisor)
   config BusinessConfig?
+  
+  // Integrations enabled for this franchisor (JSON string: {"googleBooking":true,"facebookBooking":false})
+  integrations String?
   
   // Feature Requests
   featureRequests FeatureRequest[]
@@ -1344,6 +1352,10 @@ model BusinessConfig {
   // Each salon owner decides if they want dual pricing
   cashDiscountEnabled   Boolean @default(false)
   cashDiscountPercent   Decimal @default(3.5)  // Default 3.5%, they can change
+
+  // Data Export Permissions (PROVIDER-CONTROLLED)
+  canExportData    Boolean @default(false)  // Can export customer/transaction data
+  canExportReports Boolean @default(false)  // Can export reports to CSV/PDF
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

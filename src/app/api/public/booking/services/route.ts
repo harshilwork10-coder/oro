@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
                 description: s.description,
                 duration: s.duration,
                 price: Number(s.price),
-                category: s.serviceCategory?.name || s.category
+                category: s.serviceCategory?.name || null
             })),
             staff: staff.filter(s => s.name)
         })

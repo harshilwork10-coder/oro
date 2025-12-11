@@ -42,7 +42,7 @@ export async function GET(req: Request) {
             await prisma.supportMessage.create({
                 data: {
                     chatId: chat.id,
-                    content: "👋 Welcome to Trinex Support! How can we help you today?",
+                    content: "👋 Welcome to Oronex Support! How can we help you today?",
                     sender: 'SUPPORT'
                 }
             })

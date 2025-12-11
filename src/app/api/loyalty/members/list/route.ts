@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
                     }
                 }
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { enrolledAt: 'desc' },
             skip,
             take: limit
         })

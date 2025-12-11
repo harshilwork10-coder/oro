@@ -48,6 +48,7 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
                 email: employee.email,
                 password: '', // Don't show password
                 pin: '', // Don't show existing hash, but allow reset
+                locationId: employee.locationId || '', // Include locationId from employee
                 permissions: {
                     canAddServices: employee.canAddServices,
                     canAddProducts: employee.canAddProducts,
@@ -226,8 +227,8 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
                                 <label
                                     key={perm.key}
                                     className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${formData.permissions[perm.key as keyof typeof formData.permissions]
-                                            ? 'bg-blue-50 text-blue-700'
-                                            : 'hover:bg-gray-50 text-gray-700'
+                                        ? 'bg-blue-50 text-blue-700'
+                                        : 'hover:bg-gray-50 text-gray-700'
                                         }`}
                                 >
                                     <input

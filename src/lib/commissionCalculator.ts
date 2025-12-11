@@ -75,7 +75,7 @@ export async function calculateCommission(
         newClientBonusAmount: new Decimal(0)
     }
 
-    // Get transactions for period
+    // Get transactions for period where this employee performed services
     const transactions = await prisma.transaction.findMany({
         where: {
             createdAt: {
@@ -84,14 +84,14 @@ export async function calculateCommission(
             },
             lineItems: {
                 some: {
-                    providerId: employeeId
+                    staffId: employeeId  // staffId is the field for who performed the service
                 }
             }
         },
         include: {
             lineItems: {
                 where: {
-                    providerId: employeeId
+                    staffId: employeeId
                 }
             }
         }
@@ -111,14 +111,18 @@ export async function calculateCommission(
                 servicesPerformed++
 
                 // Get service-specific override if exists
-                const override = await prisma.serviceCommissionOverride.findUnique({
-                    where: {
-                        employeeId_serviceId: {
-                            employeeId,
-                            serviceId: item.itemId
+                const serviceId = item.serviceId
+                let override = null
+                if (serviceId) {
+                    override = await prisma.serviceCommissionOverride.findUnique({
+                        where: {
+                            employeeId_serviceId: {
+                                employeeId,
+                                serviceId
+                            }
                         }
-                    }
-                })
+                    })
+                }
 
                 let rate = override
                     ? Number(override.percentage)
@@ -133,14 +137,13 @@ export async function calculateCommission(
                     }
                 }
 
-                // Handle discounts
-                const price = item.finalPrice
-                const revenue = Number(price)
+                // Handle discounts - use total which is the final price after discounts
+                const revenue = Number(item.total)
                 serviceRevenue += revenue
                 serviceCommission += revenue * rate
 
             } else if (item.type === 'PRODUCT') {
-                const revenue = Number(item.finalPrice)
+                const revenue = Number(item.total)
                 productRevenue += revenue
 
                 // TODO: Implement product cost deduction when GlobalProduct has COGS
@@ -251,14 +254,14 @@ async function getMonthlyRevenue(employeeId: string, date: Date): Promise<number
             },
             lineItems: {
                 some: {
-                    providerId: employeeId
+                    staffId: employeeId
                 }
             }
         },
         include: {
             lineItems: {
                 where: {
-                    providerId: employeeId
+                    staffId: employeeId
                 }
             }
         }
@@ -266,7 +269,7 @@ async function getMonthlyRevenue(employeeId: string, date: Date): Promise<number
 
     return transactions.reduce((sum, txn) => {
         return sum + txn.lineItems.reduce((itemSum, item) => {
-            return itemSum + Number(item.finalPrice)
+            return itemSum + Number(item.total)
         }, 0)
     }, 0)
 }
@@ -306,18 +309,18 @@ async function getTipsForPeriod(
                 gte: periodStart,
                 lte: periodEnd
             },
-            tipAmount: {
+            tip: {
                 gt: 0
             },
             lineItems: {
                 some: {
-                    providerId: employeeId
+                    staffId: employeeId
                 }
             }
         }
     })
 
-    return transactions.reduce((sum, txn) => sum + Number(txn.tipAmount || 0), 0)
+    return transactions.reduce((sum, txn) => sum + Number(txn.tip || 0), 0)
 }
 
 /**

@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { Decimal } from '@prisma/client/runtime/library'
 
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const user = session?.user as { franchiseId?: string; role?: string }
 
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -36,14 +37,14 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const user = session?.user as { franchiseId?: string; role?: string }
 
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const body = await req.json()
-        const { franchiseId, name, serviceCommission, productCommission, type } = body
+        const { franchiseId, name, servicePercent, productPercent } = body
 
         // Security: Use session franchiseId or verify ownership
         const targetFranchiseId = franchiseId || user.franchiseId
@@ -55,9 +56,8 @@ export async function POST(req: Request) {
             data: {
                 franchiseId: targetFranchiseId,
                 name,
-                serviceCommission: parseFloat(serviceCommission),
-                productCommission: parseFloat(productCommission),
-                type: type || 'STANDARD'
+                servicePercent: new Decimal(parseFloat(servicePercent) || 0),
+                productPercent: new Decimal(parseFloat(productPercent) || 0)
             }
         })
 

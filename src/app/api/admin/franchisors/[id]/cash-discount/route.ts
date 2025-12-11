@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 
-// ONLY PROVIDER can use this endpoint
+// STUB: Cash discount feature not yet implemented in current schema
 export async function PATCH(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params
         const session = await getServerSession(authOptions)
 
         // ONLY PROVIDER ROLE
@@ -16,31 +16,12 @@ export async function PATCH(
             return NextResponse.json({ error: 'Unauthorized - Provider only' }, { status: 403 })
         }
 
-        const franchisorId = params.id
-        const body = await req.json()
-
-        const { cashDiscountEnabled } = body
-
-        // Update franchisor
-        const updated = await prisma.franchisor.update({
-            where: { id: franchisorId },
-            data: {
-                cashDiscountEnabled
-            },
-            select: {
-                id: true,
-                name: true,
-                cashDiscountEnabled: true
-            }
-        })
-
+        // Feature not implemented yet
         return NextResponse.json({
-            success: true,
-            franchisor: updated,
-            message: cashDiscountEnabled
-                ? 'Cash discount enabled for this salon'
-                : 'Cash discount disabled for this salon'
-        })
+            success: false,
+            error: 'Cash discount feature is not yet implemented in the current schema',
+            franchisorId: id
+        }, { status: 501 })
 
     } catch (error) {
         console.error('Error updating cash discount:', error)

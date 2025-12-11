@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
             select: {
                 id: true,
                 name: true,
-                status: true,
+                approvalStatus: true,
                 createdAt: true,
                 owner: {
                     select: {
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
                 type: 'client_added',
                 title: `New client: ${c.name}`,
                 description: `Owner: ${c.owner?.name || 'Unknown'}`,
-                status: c.status,
+                status: c.approvalStatus,
                 timestamp: c.createdAt
             })),
             ...recentLocations.map(l => ({

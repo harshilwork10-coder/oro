@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -14,7 +14,7 @@ export async function GET(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const employeeId = params.id
+        const { id: employeeId } = await params
 
         // Get employee payment config
         const config = await prisma.employeePaymentConfig.findUnique({
@@ -63,7 +63,7 @@ export async function GET(
 
 export async function PATCH(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -72,7 +72,7 @@ export async function PATCH(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const employeeId = params.id
+        const { id: employeeId } = await params
         const body = await req.json()
 
         // Upsert payment config

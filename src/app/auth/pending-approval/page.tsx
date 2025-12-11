@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { Loader2, CheckCircle, Clock, AlertCircle, Upload, FileText, RefreshCw } from 'lucide-react'
-import TrinexLogo from '@/components/ui/TrinexLogo'
+import OronexLogo from '@/components/ui/OronexLogo'
 
 export default function PendingApprovalPage() {
     const router = useRouter()
@@ -35,7 +35,8 @@ export default function PendingApprovalPage() {
                 setNeedToDiscuss(data.needToDiscussProcessing)
 
                 if (data.status === 'APPROVED') {
-                    router.push('/dashboard')
+                    // Use window.location.href to force full page reload and session refresh
+                    window.location.href = '/dashboard'
                 }
             }
         } catch (error) {
@@ -91,7 +92,7 @@ export default function PendingApprovalPage() {
     return (
         <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-4">
             <div className="mb-8">
-                <img src="/trinex-logo.png" alt="Trinex AI" className="h-24 object-contain" />
+                <img src="/Oronex-logo.png" alt="Oronex" className="h-24 object-contain" />
             </div>
 
             <div className="bg-white rounded-2xl shadow-xl border border-stone-200 max-w-lg w-full overflow-hidden">
@@ -112,9 +113,18 @@ export default function PendingApprovalPage() {
                     </h1>
 
                     <p className="text-stone-600">
-                        {status === 'APPROVED' ? 'Redirecting you to your dashboard...' :
-                            status === 'REJECTED' ? 'Please contact support for more information.' :
-                                'Your account is currently pending approval from an administrator.'}
+                        {status === 'APPROVED' ? (
+                            <>
+                                Redirecting you to your dashboard...
+                                <button
+                                    onClick={() => window.location.href = '/dashboard'}
+                                    className="block mx-auto mt-4 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition-colors"
+                                >
+                                    Go to Dashboard
+                                </button>
+                            </>
+                        ) : status === 'REJECTED' ? 'Please contact support for more information.' :
+                            'Your account is currently pending approval from an administrator.'}
                     </p>
                 </div>
 

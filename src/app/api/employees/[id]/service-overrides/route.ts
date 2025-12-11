@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -14,7 +14,7 @@ export async function POST(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const employeeId = params.id
+        const { id: employeeId } = await params
         const body = await req.json()
 
         const { serviceId, serviceName, percentage } = body
@@ -48,7 +48,7 @@ export async function POST(
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -57,7 +57,7 @@ export async function GET(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const employeeId = params.id
+        const { id: employeeId } = await params
 
         const overrides = await prisma.serviceCommissionOverride.findMany({
             where: { employeeId }
@@ -73,9 +73,10 @@ export async function GET(
 
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id: employeeId } = await params
         const session = await getServerSession(authOptions)
 
         if (!session?.user?.email) {
@@ -92,7 +93,7 @@ export async function DELETE(
         await prisma.serviceCommissionOverride.delete({
             where: {
                 employeeId_serviceId: {
-                    employeeId: params.id,
+                    employeeId,
                     serviceId
                 }
             }

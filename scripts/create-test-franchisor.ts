@@ -39,6 +39,7 @@ async function createTestFranchisor() {
         await prisma.magicLink.create({
             data: {
                 token,
+                email,
                 userId: user.id,
                 expiresAt,
             }

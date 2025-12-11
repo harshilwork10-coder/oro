@@ -19,8 +19,7 @@ async function main() {
                 name: 'Platform Admin',
                 email: providerEmail,
                 password: hashedPassword,
-                role: 'PROVIDER',
-                providerRole: 'SUPER_ADMIN'
+                role: 'PROVIDER'
             }
         })
     } else {
@@ -53,19 +52,34 @@ async function main() {
         franchisor = await prisma.franchisor.create({
             data: {
                 name: 'Tesla Style Franchise',
-                ownerId: franchisorUser.id,
-                supportFee: 99.00
+                ownerId: franchisorUser.id
             }
         })
     } else {
         console.log('🏢 Franchisor Company already exists.')
     }
 
-    // 4. Create Location
+    // 4. Create Franchise
+    let franchise = await prisma.franchise.findFirst({ where: { franchisorId: franchisor.id } })
+
+    if (!franchise) {
+        console.log('🏬 Creating Franchise...')
+        franchise = await prisma.franchise.create({
+            data: {
+                name: 'Test Franchise Brand',
+                slug: 'test-franchise-brand',
+                franchisorId: franchisor.id
+            }
+        })
+    } else {
+        console.log('🏬 Franchise already exists.')
+    }
+
+    // 5. Create Location
     const locationName = 'Downtown Test Store'
     let location = await prisma.location.findFirst({
         where: {
-            franchisorId: franchisor.id,
+            franchiseId: franchise.id,
             name: locationName
         }
     })
@@ -75,13 +89,9 @@ async function main() {
         location = await prisma.location.create({
             data: {
                 name: locationName,
-                franchisorId: franchisor.id,
-                address: '123 Test St',
-                city: 'Tech City',
-                state: 'CA',
-                zip: '90210',
-                email: 'store@test.com',
-                phone: '555-0123'
+                slug: 'downtown-test-store',
+                franchiseId: franchise.id,
+                address: '123 Test St, Tech City, CA 90210'
             }
         })
     } else {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { DollarSign, AlertTriangle } from 'lucide-react'
-import TrinexLogo from '@/components/ui/TrinexLogo'
+import OronexLogo from '@/components/ui/OronexLogo'
 
 interface TipModalProps {
     isOpen: boolean
@@ -157,7 +157,7 @@ export default function TipModal({
             {/* Header with Logo */}
             <div className="w-full max-w-2xl mb-6 text-center">
                 <div className="flex justify-center mb-4">
-                    <TrinexLogo size={64} />
+                    <OronexLogo size={64} />
                 </div>
                 <h1 className="text-5xl font-bold text-white mb-4">Add a Tip?</h1>
                 <p className="text-2xl text-stone-400">Your service provider would greatly appreciate it!</p>

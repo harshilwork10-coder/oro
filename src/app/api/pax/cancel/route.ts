@@ -1,8 +1,37 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import net from 'net'
 
+// Helper to create promise-based socket connection
+function sendPaxCommand(ip: string, port: number, command: Buffer): Promise<{ success: boolean; message: string }> {
+    return new Promise((resolve) => {
+        const socket = new net.Socket()
+        socket.setTimeout(5000)
+
+        socket.connect(port, ip, () => {
+            socket.write(command)
+        })
+
+        socket.on('data', () => {
+            console.log('[PAX Cancel] Response received')
+            socket.destroy()
+            resolve({ success: true, message: 'Cancel sent' })
+        })
+
+        socket.on('timeout', () => {
+            socket.destroy()
+            resolve({ success: true, message: 'Cancel sent (no response)' })
+        })
+
+        socket.on('error', (err) => {
+            console.error('[PAX Cancel] Error:', err)
+            socket.destroy()
+            resolve({ success: true, message: 'Cancel attempted' })
+        })
+    })
+}
+
 // PAX Cancel Command - A14 (Reset/Cancel)
-export async function POST(request: Request) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const { ip, port } = await request.json()
 
@@ -29,37 +58,12 @@ export async function POST(request: Request) {
         }
 
         const fullCommand = STX + rawData + String.fromCharCode(lrc)
-        const base64Command = Buffer.from(fullCommand).toString('base64')
 
         console.log('[PAX Cancel] Sending reset command to', ip, port)
 
         // Send via socket
-        return new Promise((resolve) => {
-            const socket = new net.Socket()
-            socket.setTimeout(5000)
-
-            socket.connect(parseInt(port), ip, () => {
-                socket.write(Buffer.from(fullCommand))
-            })
-
-            socket.on('data', (data) => {
-                console.log('[PAX Cancel] Response received')
-                socket.destroy()
-                resolve(NextResponse.json({ success: true, message: 'Cancel sent' }))
-            })
-
-            socket.on('timeout', () => {
-                socket.destroy()
-                resolve(NextResponse.json({ success: true, message: 'Cancel sent (no response)' }))
-            })
-
-            socket.on('error', (err) => {
-                console.error('[PAX Cancel] Error:', err)
-                socket.destroy()
-                // Still return success - the cancel attempt was made
-                resolve(NextResponse.json({ success: true, message: 'Cancel attempted' }))
-            })
-        })
+        const result = await sendPaxCommand(ip, parseInt(port), Buffer.from(fullCommand))
+        return NextResponse.json(result)
 
     } catch (error: any) {
         console.error('[PAX Cancel] Error:', error)

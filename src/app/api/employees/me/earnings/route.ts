@@ -35,15 +35,15 @@ export async function GET(req: NextRequest) {
         // Check if employee has an active shift
         const activeShift = await prisma.cashDrawerSession.findFirst({
             where: {
-                userId: user.id,
-                closedAt: null
+                employeeId: user.id,
+                endTime: null  // null means shift is still open
             },
             orderBy: {
-                openedAt: 'desc'
+                startTime: 'desc'
             }
         })
 
-        const periodStart = activeShift?.openedAt || startOfDay
+        const periodStart = activeShift?.startTime || startOfDay
         const periodEnd = now
 
         // Calculate earnings
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
 
         // Get shift duration
         const shiftDuration = activeShift
-            ? (now.getTime() - activeShift.openedAt.getTime()) / (1000 * 60 * 60)
+            ? (now.getTime() - activeShift.startTime.getTime()) / (1000 * 60 * 60)
             : (now.getTime() - startOfDay.getTime()) / (1000 * 60 * 60)
 
         return NextResponse.json({

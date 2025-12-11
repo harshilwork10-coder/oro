@@ -28,14 +28,14 @@ async function main() {
 
     // Check if franchisor entity exists
     let franchisor = await prisma.franchisor.findUnique({
-        where: { userId: franchisorUser.id }
+        where: { ownerId: franchisorUser.id }
     })
 
     if (!franchisor) {
         console.log('👤 Creating Franchisor entity...')
         franchisor = await prisma.franchisor.create({
             data: {
-                userId: franchisorUser.id,
+                ownerId: franchisorUser.id,
                 name: 'Test Franchise Brand',
                 businessType: 'BRAND_FRANCHISOR'
             }

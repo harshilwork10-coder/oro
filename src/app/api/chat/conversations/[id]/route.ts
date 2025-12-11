@@ -6,9 +6,10 @@ import { prisma } from '@/lib/prisma'
 // GET - Get a single conversation with messages
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params
         // Security: Require authentication
         const session = await getServerSession(authOptions)
         const user = session?.user as any
@@ -18,7 +19,7 @@ export async function GET(
         }
 
         const conversation = await prisma.chatConversation.findUnique({
-            where: { id: params.id },
+            where: { id },
             include: {
                 client: {
                     select: {
@@ -63,9 +64,10 @@ export async function GET(
 // PATCH - Update conversation (status, assignment)
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params
         const session = await getServerSession(authOptions)
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -81,7 +83,7 @@ export async function PATCH(
         if (markAsRead) updateData.unreadCount = 0
 
         const conversation = await prisma.chatConversation.update({
-            where: { id: params.id },
+            where: { id },
             data: updateData,
             include: {
                 messages: {
@@ -94,7 +96,7 @@ export async function PATCH(
         if (markAsRead) {
             await prisma.chatMessage.updateMany({
                 where: {
-                    conversationId: params.id,
+                    conversationId: id,
                     senderType: 'CUSTOMER',
                     isRead: false
                 },

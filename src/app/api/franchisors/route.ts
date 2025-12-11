@@ -33,6 +33,8 @@ export async function GET(request: NextRequest) {
                 ownerId: true, // Needed for password reset
                 name: true,
                 approvalStatus: true,
+                accountStatus: true,       // Account suspension status
+                suspendedReason: true,     // Reason for suspension
                 createdAt: true,
 
                 // Business Info

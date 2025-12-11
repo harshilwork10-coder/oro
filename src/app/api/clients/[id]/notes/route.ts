@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 // GET - Get notes for a client
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -16,7 +16,7 @@ export async function GET(
 
         const user = session.user as any
         const franchiseId = user.franchiseId
-        const clientId = params.id
+        const { id: clientId } = await params
 
         // Verify client belongs to franchise
         const client = await prisma.client.findFirst({
@@ -51,7 +51,7 @@ export async function GET(
 // POST - Add a note to a client
 export async function POST(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -61,7 +61,7 @@ export async function POST(
 
         const user = session.user as any
         const franchiseId = user.franchiseId
-        const clientId = params.id
+        const { id: clientId } = await params
 
         // Verify client belongs to franchise
         const client = await prisma.client.findFirst({
@@ -99,7 +99,7 @@ export async function POST(
 // PUT - Update client notes (inline fields or specific note)
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -109,7 +109,7 @@ export async function PUT(
 
         const user = session.user as any
         const franchiseId = user.franchiseId
-        const clientId = params.id
+        const { id: clientId } = await params
 
         // Verify client belongs to franchise
         const client = await prisma.client.findFirst({
@@ -170,7 +170,7 @@ export async function PUT(
 // DELETE - Delete a note
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -180,7 +180,7 @@ export async function DELETE(
 
         const user = session.user as any
         const franchiseId = user.franchiseId
-        const clientId = params.id
+        const { id: clientId } = await params
         const { searchParams } = new URL(request.url)
         const noteId = searchParams.get('noteId')
 

@@ -296,7 +296,7 @@ function ZReportPageContent() {
 
                     <div className="text-center text-xs text-gray-500 mt-8 pt-4 border-t border-black">
                         <p>Printed: {new Date().toLocaleString()}</p>
-                        <p>Trinex POS System</p>
+                        <p>Oronex POS System</p>
                     </div>
                 </div>
             </div>

@@ -38,15 +38,6 @@ export async function GET(
             }, { status: 400 })
         }
 
-        // Get support fee if user is a franchisor owner
-        let supportFee = '99.00' // Default fallback
-        if (magicLink.user.franchisor) {
-            const fee = magicLink.user.franchisor.supportFee
-            if (fee) {
-                supportFee = fee.toString()
-            }
-        }
-
         // Return user info (frontend will handle session creation)
         // We do NOT delete the token here anymore, as it's reusable until completion
         return NextResponse.json({
@@ -59,14 +50,12 @@ export async function GET(
             },
             franchisor: magicLink.user.franchisor ? {
                 name: magicLink.user.franchisor.name,
-                supportFee,
-                type: magicLink.user.franchisor.type, // 'INDIVIDUAL' or 'BRAND'
-                businessType: magicLink.user.franchisor.businessType // 'MULTI_LOCATION_OWNER' or 'BRAND_FRANCHISOR'
+                businessType: magicLink.user.franchisor.businessType,
+                approvalStatus: magicLink.user.franchisor.approvalStatus
             } : null,
             franchise: magicLink.user.franchise ? {
                 id: magicLink.user.franchise.id,
-                name: magicLink.user.franchise.name,
-                // Add other relevant franchise fields here if needed
+                name: magicLink.user.franchise.name
             } : null,
             requiresPasswordSetup: true
         })

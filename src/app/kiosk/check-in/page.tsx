@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { User, Check, ChevronRight } from 'lucide-react'
-import TrinexLogo from '@/components/ui/TrinexLogo'
+import OronexLogo from '@/components/ui/OronexLogo'
 
 export default function KioskCheckInPage() {
     const router = useRouter()
@@ -87,8 +87,8 @@ export default function KioskCheckInPage() {
 
                 <div className="relative z-10 bg-stone-900/50 backdrop-blur-md border-b border-stone-800 p-6 shadow-lg flex items-center justify-center">
                     <div className="flex items-center gap-3">
-                        <TrinexLogo size={32} />
-                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">Trinex AI</span>
+                        <OronexLogo size={32} />
+                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">Oronex</span>
                     </div>
                 </div>
 
@@ -106,7 +106,7 @@ export default function KioskCheckInPage() {
                                 <ul className="list-disc list-inside space-y-2 pl-2">
                                     <li>I have disclosed any allergies or sensitivities to products or ingredients</li>
                                     <li>I understand that results may vary and are not guaranteed</li>
-                                    <li>I release Trinex from any liability for adverse reactions</li>
+                                    <li>I release Oronex from any liability for adverse reactions</li>
                                     <li>I consent to the services being performed by licensed professionals</li>
                                     <li>I agree to follow aftercare instructions provided</li>
                                 </ul>
@@ -148,8 +148,8 @@ export default function KioskCheckInPage() {
 
                 <div className="relative z-10 bg-stone-900/50 backdrop-blur-md border-b border-stone-800 p-6 shadow-lg flex items-center justify-center">
                     <div className="flex items-center gap-3">
-                        <TrinexLogo size={32} />
-                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">Trinex AI</span>
+                        <OronexLogo size={32} />
+                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">Oronex</span>
                     </div>
                 </div>
 
@@ -246,10 +246,10 @@ export default function KioskCheckInPage() {
                 <div className="flex items-center gap-3 group">
                     <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
                         <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                        <TrinexLogo size={32} className="relative z-10 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
+                        <OronexLogo size={32} className="relative z-10 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
                     </div>
                     <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-amber-200 to-orange-400 bg-clip-text text-transparent bg-[length:200%_auto] animate-text-shimmer">
-                        Trinex
+                        Oronex
                     </span>
                 </div>
             </div>

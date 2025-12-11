@@ -6,16 +6,17 @@ import { prisma } from '@/lib/prisma'
 // Get gift card by code
 export async function GET(
     req: Request,
-    { params }: { params: { code: string } }
+    { params }: { params: Promise<{ code: string }> }
 ) {
     try {
+        const { code } = await params
         const session = await getServerSession(authOptions)
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const giftCard = await prisma.giftCard.findUnique({
-            where: { code: params.code }
+            where: { code }
         })
 
         if (!giftCard) {
@@ -32,9 +33,10 @@ export async function GET(
 // Redeem gift card
 export async function POST(
     req: Request,
-    { params }: { params: { code: string } }
+    { params }: { params: Promise<{ code: string }> }
 ) {
     try {
+        const { code } = await params
         const session = await getServerSession(authOptions)
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -44,7 +46,7 @@ export async function POST(
         const { amount } = body
 
         const giftCard = await prisma.giftCard.findUnique({
-            where: { code: params.code }
+            where: { code }
         })
 
         if (!giftCard) {
@@ -55,19 +57,20 @@ export async function POST(
             return NextResponse.json({ error: 'Gift card is inactive' }, { status: 400 })
         }
 
-        if (giftCard.currentBalance < amount) {
+        const currentBalance = Number(giftCard.currentBalance)
+        if (currentBalance < amount) {
             return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 })
         }
 
         // Update balance
         const updated = await prisma.giftCard.update({
-            where: { code: params.code },
+            where: { code },
             data: {
-                currentBalance: giftCard.currentBalance - amount
+                currentBalance: currentBalance - amount
             }
         })
 
-        console.log(`✅ Gift card redeemed: ${params.code} - $${amount} (Remaining: $${updated.currentBalance})`)
+        console.log(`✅ Gift card redeemed: ${code} - $${amount} (Remaining: $${updated.currentBalance})`)
 
         return NextResponse.json(updated)
     } catch (error) {
