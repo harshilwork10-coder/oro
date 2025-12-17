@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { AlertTriangle, Package, ShoppingCart, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+import { AlertTriangle, Package, ShoppingCart, ArrowRight, ArrowLeft } from 'lucide-react'
+
 
 type Alert = {
     id: string
@@ -57,9 +59,14 @@ export default function InventoryAlertsPage() {
 
     return (
         <div className="p-8 max-w-7xl mx-auto">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white mb-2">Inventory Alerts</h1>
-                <p className="text-stone-400">Low stock warnings and reorder suggestions</p>
+            <div className="mb-8 flex items-center gap-4">
+                <Link href="/dashboard/inventory/retail" className="p-2 hover:bg-stone-800 rounded-lg transition-colors">
+                    <ArrowLeft className="h-5 w-5 text-stone-400" />
+                </Link>
+                <div>
+                    <h1 className="text-3xl font-bold text-white mb-1">Inventory Alerts</h1>
+                    <p className="text-stone-400">Low stock warnings and reorder suggestions</p>
+                </div>
             </div>
 
             {/* Summary Cards */}

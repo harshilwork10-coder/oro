@@ -24,6 +24,7 @@ export async function middleware(req: NextRequest) {
     // Public paths that don't require auth
     const isPublic =
         pathname.startsWith('/login') ||
+        pathname.startsWith('/employee-login') ||  // Employee PIN login page
         pathname.startsWith('/register') ||
         pathname.startsWith('/auth/magic-link') ||
         pathname.startsWith('/api') ||

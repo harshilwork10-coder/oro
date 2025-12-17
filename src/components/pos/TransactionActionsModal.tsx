@@ -284,7 +284,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                     <div>
                         <h2 className="text-2xl font-bold text-white">Transaction Actions</h2>
                         <p className="text-stone-400 text-sm mt-1">
-                            Invoice #{transaction.id.slice(-8).toUpperCase()}
+                            Invoice #{transaction.invoiceNumber || transaction.id.slice(-8)}
                         </p>
                     </div>
                     <button
@@ -600,7 +600,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                     }}
                     onSuccess={handlePaxSuccess}
                     amount={calculateRefundAmount()}
-                    invoiceNumber={transaction.invoiceNumber || Date.now().toString().slice(-6)}
+                    invoiceNumber={(transaction.invoiceNumber || '1').slice(-4) || '1'}
                 />
             )}
         </div>

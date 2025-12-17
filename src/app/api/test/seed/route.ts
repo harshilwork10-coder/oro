@@ -2,9 +2,29 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcrypt'
 
+// SECURITY: Only allow seeding in development environment
 export async function GET() {
+    // CRITICAL SECURITY: Block in production
+    if (process.env.NODE_ENV === 'production') {
+        console.warn('[SECURITY] Attempted to access seed endpoint in production!')
+        return NextResponse.json(
+            { error: 'This endpoint is disabled in production' },
+            { status: 403 }
+        )
+    }
+
+    // Additional check for NEXTAUTH_URL to detect production
+    const baseUrl = process.env.NEXTAUTH_URL || ''
+    if (baseUrl.includes('https://') && !baseUrl.includes('localhost')) {
+        console.warn('[SECURITY] Attempted to access seed endpoint on production URL!')
+        return NextResponse.json(
+            { error: 'This endpoint is disabled in production' },
+            { status: 403 }
+        )
+    }
+
     try {
-        console.log('🌱 Starting database seed via API...')
+        console.log('🌱 Starting database seed via API (DEVELOPMENT ONLY)...')
 
         const hashedPassword = await hash('password123', 10)
 
@@ -18,7 +38,6 @@ export async function GET() {
                 password: hashedPassword,
                 pin: await hash('1111', 10),
                 role: 'PROVIDER'
-                // Note: providerRole and providerPermissions removed - not in schema
             }
         })
 
@@ -41,7 +60,6 @@ export async function GET() {
                 data: {
                     name: 'Tesla Style Franchise',
                     ownerId: franchisorUser.id
-                    // Note: supportFee removed - not in schema
                 }
             })
         }
@@ -71,7 +89,7 @@ export async function GET() {
             })
         }
 
-        return NextResponse.json({ success: true, message: 'Database seeded successfully' })
+        return NextResponse.json({ success: true, message: 'Database seeded successfully (dev only)' })
     } catch (error) {
         console.error('Seed error:', error)
         return NextResponse.json({ error: 'Failed to seed database' }, { status: 500 })

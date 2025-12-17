@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
 
 // Webhook handler for Reserve with Google bookings
 // Google will send booking data to this endpoint when customers book via Google Search/Maps
+//
+// NOTE: This is a STUB implementation. Full integration requires:
+// 1. Google Business Profile API setup
+// 2. Proper merchant_id to franchise/location mapping
+// 3. Service ID mapping to your service catalog
 
 interface GoogleBookingPayload {
     booking_id: string
@@ -27,6 +31,8 @@ export async function POST(request: NextRequest) {
         const payload: GoogleBookingPayload = await request.json()
 
         console.log('[Google Booking] Received booking:', payload.booking_id)
+        console.log('[Google Booking] Merchant:', payload.merchant_id)
+        console.log('[Google Booking] Customer:', payload.user_information.name)
 
         // Validate required fields
         if (!payload.booking_id || !payload.slot || !payload.user_information) {
@@ -36,47 +42,28 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Find or create client
-        let client = await prisma.client.findFirst({
-            where: { email: payload.user_information.email }
+        // Log the booking request for manual processing
+        console.log('[Google Booking] Booking details:', {
+            booking_id: payload.booking_id,
+            merchant_id: payload.merchant_id,
+            customer: payload.user_information,
+            slot: payload.slot,
+            service: payload.service_name || payload.service_id,
+            notes: payload.notes
         })
 
-        if (!client) {
-            // Create new client from booking
-            client = await prisma.client.create({
-                data: {
-                    name: payload.user_information.name,
-                    email: payload.user_information.email,
-                    phone: payload.user_information.phone || '',
-                    source: 'GOOGLE_BOOKING',
-                    // TODO: Associate with correct franchise based on merchant_id
-                }
-            })
-            console.log('[Google Booking] Created new client:', client.id)
-        }
-
-        // Create appointment
-        const appointment = await prisma.appointment.create({
-            data: {
-                clientId: client.id,
-                startTime: new Date(payload.slot.start_time),
-                endTime: new Date(payload.slot.end_time),
-                status: 'CONFIRMED',
-                notes: `Google Booking ID: ${payload.booking_id}\n${payload.notes || ''}`,
-                source: 'GOOGLE',
-                // TODO: Map service_id to actual service
-                // TODO: Associate with correct location/employee
-            }
-        })
-
-        console.log('[Google Booking] Created appointment:', appointment.id)
+        // TODO: Implement full integration:
+        // 1. Map merchant_id to franchise/location
+        // 2. Create or find client with proper franchiseId
+        // 3. Map service_id to actual Service in database
+        // 4. Create appointment with all required fields (locationId, serviceId, employeeId)
+        // 5. Send confirmation to customer
 
         // Return success response in Google's expected format
         return NextResponse.json({
             status: 'SUCCESS',
             booking_id: payload.booking_id,
-            appointment_id: appointment.id,
-            message: 'Booking confirmed'
+            message: 'Booking request received. Confirmation will be sent shortly.'
         })
 
     } catch (error) {

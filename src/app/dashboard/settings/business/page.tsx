@@ -301,6 +301,32 @@ export default function BusinessSettingsPage() {
                             />
                         </div>
                     </div>
+
+                    {/* Shift/Clock-in Settings */}
+                    <div className="pt-4 border-t border-stone-800 mt-2">
+                        <h3 className="text-sm font-medium text-stone-400 mb-3">Employee Shift Settings</h3>
+                        <div className="bg-stone-900 p-4 rounded-xl border border-stone-800">
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="p-2 bg-stone-800 rounded-lg text-emerald-400">
+                                    <Clock className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-white">Shift Requirement</h3>
+                                    <p className="text-sm text-stone-400">What employees need to do before using POS</p>
+                                </div>
+                            </div>
+                            <select
+                                value={formData.shiftRequirement || 'BOTH'}
+                                onChange={(e) => setFormData(prev => ({ ...prev, shiftRequirement: e.target.value as any }))}
+                                className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                            >
+                                <option value="BOTH">Clock In + Count Drawer (Most Secure)</option>
+                                <option value="CLOCK_IN_ONLY">Clock In Only (No Drawer Count)</option>
+                                <option value="CASH_COUNT_ONLY">Count Drawer Only (No Clock In)</option>
+                                <option value="NONE">No Requirement (Direct to POS)</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
 

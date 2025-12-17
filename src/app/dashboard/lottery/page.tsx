@@ -1,0 +1,468 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useSession } from "next-auth/react"
+import { redirect } from "next/navigation"
+import {
+    Ticket,
+    Plus,
+    Search,
+    Package,
+    DollarSign,
+    TrendingUp,
+    AlertCircle,
+    CheckCircle,
+    Clock,
+    X,
+    Gift,
+    Banknote,
+    ArrowLeft
+} from "lucide-react"
+import Link from 'next/link'
+
+interface LotteryGame {
+    id: string
+    gameName: string
+    gameNumber: string
+    ticketPrice: string
+    isActive: boolean
+    _count?: { packs: number }
+}
+
+interface LotteryPack {
+    id: string
+    packNumber: string
+    ticketCount: number
+    soldCount: number
+    status: string
+    game: LotteryGame
+}
+
+export default function LotteryPage() {
+    const { data: session, status } = useSession({
+        required: true,
+        onUnauthenticated() {
+            redirect('/login')
+        },
+    })
+
+    const [games, setGames] = useState<LotteryGame[]>([])
+    const [packs, setPacks] = useState<LotteryPack[]>([])
+    const [loading, setLoading] = useState(true)
+    const [showAddGameModal, setShowAddGameModal] = useState(false)
+    const [showAddPackModal, setShowAddPackModal] = useState(false)
+    const [selectedGameId, setSelectedGameId] = useState('')
+
+    // Form state
+    const [newGame, setNewGame] = useState({
+        gameName: '',
+        gameNumber: '',
+        ticketPrice: ''
+    })
+    const [newPack, setNewPack] = useState({
+        gameId: '',
+        packNumber: '',
+        ticketCount: 300
+    })
+
+    useEffect(() => {
+        fetchData()
+    }, [])
+
+    const fetchData = async () => {
+        try {
+            const [gamesRes, packsRes] = await Promise.all([
+                fetch('/api/lottery/games'),
+                fetch('/api/lottery/packs?status=ACTIVATED')
+            ])
+
+            if (gamesRes.ok) {
+                const data = await gamesRes.json()
+                setGames(data.games || [])
+            }
+            if (packsRes.ok) {
+                const data = await packsRes.json()
+                setPacks(data.packs || [])
+            }
+        } catch (error) {
+            console.error('Failed to fetch lottery data:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const createGame = async () => {
+        try {
+            const res = await fetch('/api/lottery/games', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...newGame,
+                    ticketPrice: parseFloat(newGame.ticketPrice)
+                })
+            })
+
+            if (res.ok) {
+                setShowAddGameModal(false)
+                setNewGame({ gameName: '', gameNumber: '', ticketPrice: '' })
+                fetchData()
+            }
+        } catch (error) {
+            console.error('Failed to create game:', error)
+        }
+    }
+
+    const createPack = async () => {
+        try {
+            const res = await fetch('/api/lottery/packs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newPack)
+            })
+
+            if (res.ok) {
+                setShowAddPackModal(false)
+                setNewPack({ gameId: '', packNumber: '', ticketCount: 300 })
+                fetchData()
+            }
+        } catch (error) {
+            console.error('Failed to create pack:', error)
+        }
+    }
+
+    const activatePack = async (packId: string) => {
+        try {
+            await fetch(`/api/lottery/packs/${packId}/activate`, { method: 'POST' })
+            fetchData()
+        } catch (error) {
+            console.error('Failed to activate pack:', error)
+        }
+    }
+
+    const formatCurrency = (value: string | number) => {
+        const num = typeof value === 'string' ? parseFloat(value) : value
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num || 0)
+    }
+
+    if (status === "loading" || loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-stone-950">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+            </div>
+        )
+    }
+
+    // Calculate stats
+    const totalActivePacks = packs.filter(p => p.status === 'ACTIVATED').length
+    const totalSold = packs.reduce((sum, p) => sum + p.soldCount, 0)
+    const totalRevenue = packs.reduce((sum, p) => {
+        const price = parseFloat(p.game?.ticketPrice || '0')
+        return sum + (p.soldCount * price)
+    }, 0)
+
+    return (
+        <div className="p-6 space-y-6">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <Link href="/dashboard" className="p-2 hover:bg-stone-800 rounded-lg transition-colors">
+                        <ArrowLeft className="h-5 w-5 text-stone-400" />
+                    </Link>
+                    <div>
+                        <h1 className="text-2xl font-bold text-stone-100 flex items-center gap-2">
+                            <Ticket className="h-6 w-6 text-purple-500" />
+                            Lottery Management
+                        </h1>
+                        <p className="text-stone-500 text-sm">Track scratch-off games, packs, and payouts</p>
+                    </div>
+                </div>
+
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setShowAddGameModal(true)}
+                        className="px-4 py-2 bg-stone-700 hover:bg-stone-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Add Game
+                    </button>
+                    <button
+                        onClick={() => setShowAddPackModal(true)}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    >
+                        <Package className="h-4 w-4" />
+                        Add Pack
+                    </button>
+                </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="glass-panel p-4 rounded-xl">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                            <Ticket className="h-5 w-5 text-purple-500" />
+                        </div>
+                        <div>
+                            <p className="text-xs text-stone-500 uppercase">Active Games</p>
+                            <p className="text-xl font-bold text-stone-100">{games.filter(g => g.isActive).length}</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="glass-panel p-4 rounded-xl">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                            <Package className="h-5 w-5 text-blue-500" />
+                        </div>
+                        <div>
+                            <p className="text-xs text-stone-500 uppercase">Active Packs</p>
+                            <p className="text-xl font-bold text-stone-100">{totalActivePacks}</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="glass-panel p-4 rounded-xl">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                            <TrendingUp className="h-5 w-5 text-emerald-500" />
+                        </div>
+                        <div>
+                            <p className="text-xs text-stone-500 uppercase">Tickets Sold</p>
+                            <p className="text-xl font-bold text-stone-100">{totalSold}</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="glass-panel p-4 rounded-xl">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                            <DollarSign className="h-5 w-5 text-amber-500" />
+                        </div>
+                        <div>
+                            <p className="text-xs text-stone-500 uppercase">Revenue</p>
+                            <p className="text-xl font-bold text-stone-100">{formatCurrency(totalRevenue)}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Games List */}
+            <div className="glass-panel rounded-xl p-6">
+                <h2 className="text-lg font-semibold text-stone-100 mb-4">Lottery Games</h2>
+
+                {games.length === 0 ? (
+                    <div className="text-center py-8 text-stone-500">
+                        <Ticket className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p>No lottery games configured</p>
+                        <p className="text-sm mt-1">Add games to start tracking scratch-offs</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {games.map(game => (
+                            <div key={game.id} className="p-4 bg-stone-800/50 rounded-xl border border-stone-700">
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <h3 className="font-medium text-stone-200">{game.gameName}</h3>
+                                        <p className="text-sm text-stone-500">Game #{game.gameNumber}</p>
+                                    </div>
+                                    <span className={`px-2 py-1 rounded text-xs ${game.isActive
+                                            ? 'bg-emerald-500/20 text-emerald-400'
+                                            : 'bg-stone-500/20 text-stone-400'
+                                        }`}>
+                                        {game.isActive ? 'Active' : 'Inactive'}
+                                    </span>
+                                </div>
+                                <div className="mt-3 flex justify-between items-center">
+                                    <span className="text-lg font-bold text-purple-400">{formatCurrency(game.ticketPrice)}</span>
+                                    <span className="text-sm text-stone-500">{game._count?.packs || 0} packs</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Active Packs */}
+            <div className="glass-panel rounded-xl p-6">
+                <h2 className="text-lg font-semibold text-stone-100 mb-4">Active Packs</h2>
+
+                {packs.length === 0 ? (
+                    <div className="text-center py-8 text-stone-500">
+                        <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p>No active lottery packs</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-stone-800/50">
+                                <tr>
+                                    <th className="text-left px-4 py-3 text-xs text-stone-400 uppercase">Pack #</th>
+                                    <th className="text-left px-4 py-3 text-xs text-stone-400 uppercase">Game</th>
+                                    <th className="text-left px-4 py-3 text-xs text-stone-400 uppercase">Price</th>
+                                    <th className="text-left px-4 py-3 text-xs text-stone-400 uppercase">Sold</th>
+                                    <th className="text-left px-4 py-3 text-xs text-stone-400 uppercase">Remaining</th>
+                                    <th className="text-left px-4 py-3 text-xs text-stone-400 uppercase">Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-stone-800">
+                                {packs.map(pack => {
+                                    const price = parseFloat(pack.game?.ticketPrice || '0')
+                                    const revenue = pack.soldCount * price
+                                    const remaining = pack.ticketCount - pack.soldCount
+                                    const percentSold = (pack.soldCount / pack.ticketCount) * 100
+
+                                    return (
+                                        <tr key={pack.id} className="hover:bg-stone-800/30">
+                                            <td className="px-4 py-3 font-mono text-stone-200">{pack.packNumber}</td>
+                                            <td className="px-4 py-3 text-stone-300">{pack.game?.gameName}</td>
+                                            <td className="px-4 py-3 text-stone-400">{formatCurrency(price)}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-stone-200">{pack.soldCount}</span>
+                                                    <div className="w-16 h-2 bg-stone-700 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-purple-500 rounded-full"
+                                                            style={{ width: `${percentSold}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-stone-400">{remaining}</td>
+                                            <td className="px-4 py-3 font-medium text-emerald-400">{formatCurrency(revenue)}</td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* Add Game Modal */}
+            {showAddGameModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="glass-panel w-full max-w-md mx-4 rounded-xl p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold text-stone-100">Add Lottery Game</h2>
+                            <button onClick={() => setShowAddGameModal(false)} className="text-stone-500 hover:text-stone-300">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-stone-400 mb-1">Game Name</label>
+                                <input
+                                    type="text"
+                                    value={newGame.gameName}
+                                    onChange={(e) => setNewGame({ ...newGame, gameName: e.target.value })}
+                                    placeholder="e.g., Cash Explosion"
+                                    className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:border-purple-500 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-stone-400 mb-1">Game Number</label>
+                                <input
+                                    type="text"
+                                    value={newGame.gameNumber}
+                                    onChange={(e) => setNewGame({ ...newGame, gameNumber: e.target.value })}
+                                    placeholder="e.g., 1234"
+                                    className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:border-purple-500 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-stone-400 mb-1">Ticket Price</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={newGame.ticketPrice}
+                                    onChange={(e) => setNewGame({ ...newGame, ticketPrice: e.target.value })}
+                                    placeholder="e.g., 5.00"
+                                    className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:border-purple-500 focus:outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => setShowAddGameModal(false)}
+                                className="flex-1 py-2 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={createGame}
+                                disabled={!newGame.gameName || !newGame.ticketPrice}
+                                className="flex-1 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg disabled:opacity-50"
+                            >
+                                Add Game
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Pack Modal */}
+            {showAddPackModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="glass-panel w-full max-w-md mx-4 rounded-xl p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold text-stone-100">Add Lottery Pack</h2>
+                            <button onClick={() => setShowAddPackModal(false)} className="text-stone-500 hover:text-stone-300">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-stone-400 mb-1">Game</label>
+                                <select
+                                    value={newPack.gameId}
+                                    onChange={(e) => setNewPack({ ...newPack, gameId: e.target.value })}
+                                    className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:border-purple-500 focus:outline-none"
+                                >
+                                    <option value="">Select a game...</option>
+                                    {games.filter(g => g.isActive).map(game => (
+                                        <option key={game.id} value={game.id}>{game.gameName} ({formatCurrency(game.ticketPrice)})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-stone-400 mb-1">Pack Number</label>
+                                <input
+                                    type="text"
+                                    value={newPack.packNumber}
+                                    onChange={(e) => setNewPack({ ...newPack, packNumber: e.target.value })}
+                                    placeholder="Scan or enter pack number"
+                                    className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:border-purple-500 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-stone-400 mb-1">Ticket Count</label>
+                                <input
+                                    type="number"
+                                    value={newPack.ticketCount}
+                                    onChange={(e) => setNewPack({ ...newPack, ticketCount: parseInt(e.target.value) || 0 })}
+                                    className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:border-purple-500 focus:outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => setShowAddPackModal(false)}
+                                className="flex-1 py-2 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={createPack}
+                                disabled={!newPack.gameId || !newPack.packNumber}
+                                className="flex-1 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg disabled:opacity-50"
+                            >
+                                Add Pack
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}

@@ -1,25 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { uploadToS3 } from '@/lib/s3'
 
 // File upload limits
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']
 
-// Special upload endpoint for onboarding - doesn't require existing franchisor
+// Special upload endpoint for onboarding documents
+// SECURITY: Requires authentication - user can only upload for themselves
 export async function POST(request: NextRequest) {
     try {
+        // SECURITY: Require authentication
+        const session = await getServerSession(authOptions)
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const formData = await request.formData()
         const file = formData.get('file') as File
-        const userId = formData.get('userId') as string
         const documentType = formData.get('documentType') as string
+
+        // SECURITY: Use session user ID, not user-provided ID
+        const userId = session.user.id
 
         // Validation
         if (!file) {
             return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-        }
-
-        if (!userId) {
-            return NextResponse.json({ error: 'User ID required' }, { status: 400 })
         }
 
         if (file.size > MAX_FILE_SIZE) {
@@ -34,7 +41,7 @@ export async function POST(request: NextRequest) {
         const bytes = await file.arrayBuffer()
         const buffer = Buffer.from(bytes)
 
-        // Upload to S3 using userId as the folder (since franchisor doesn't exist yet)
+        // Upload to S3 using session user ID (secure)
         const s3Key = await uploadToS3(
             buffer,
             file.name,
@@ -42,7 +49,7 @@ export async function POST(request: NextRequest) {
             file.type
         )
 
-        console.log(`✅ Onboarding file uploaded to S3: ${s3Key}`)
+        console.log(`✅ Onboarding file uploaded to S3: ${s3Key} by user ${userId}`)
 
         return NextResponse.json({
             success: true,

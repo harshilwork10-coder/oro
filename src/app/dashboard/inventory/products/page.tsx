@@ -1,14 +1,35 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { ShoppingBag, Plus, Edit, Trash2, X, Package, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { ShoppingBag, Plus, Edit, Trash2, X, Package, AlertTriangle, Barcode, Loader2, Sparkles, Brain } from 'lucide-react'
+import Link from 'next/link'
+
+interface SKULookupResult {
+    found: boolean
+    barcode: string
+    name?: string
+    brand?: string
+    category?: string
+    description?: string
+    imageUrl?: string
+    suggestedPrice?: number
+    size?: string
+    source?: string
+    message?: string
+}
 
 export default function ProductsPage() {
     const [products, setProducts] = useState<any[]>([])
     const [showModal, setShowModal] = useState(false)
     const [editingProduct, setEditingProduct] = useState<any>(null)
     const [loading, setLoading] = useState(true)
-    const [formData, setFormData] = useState({ name: '', sku: '', price: '', stock: '0', description: '' })
+    const [formData, setFormData] = useState({ name: '', sku: '', barcode: '', price: '', stock: '0', description: '', category: '', size: '' })
+
+    // AI SKU Lookup states
+    const [barcodeInput, setBarcodeInput] = useState('')
+    const [lookingUpSKU, setLookingUpSKU] = useState(false)
+    const [skuLookupResult, setSKULookupResult] = useState<SKULookupResult | null>(null)
+    const barcodeInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => { fetchProducts() }, [])
 
@@ -41,7 +62,7 @@ export default function ProductsPage() {
                 await fetchProducts()
                 setShowModal(false)
                 setEditingProduct(null)
-                setFormData({ name: '', sku: '', price: '', stock: '0', description: '' })
+                setFormData({ name: '', sku: '', barcode: '', price: '', stock: '0', description: '', category: '', size: '' })
             }
         } catch (error) {
             console.error('Failed to save product:', error)
@@ -64,8 +85,58 @@ export default function ProductsPage() {
 
     const openEdit = (product: any) => {
         setEditingProduct(product)
-        setFormData({ name: product.name, sku: product.sku || '', price: product.price.toString(), stock: (product.stock || 0).toString(), description: product.description || '' })
+        setFormData({
+            name: product.name,
+            sku: product.sku || '',
+            barcode: product.barcode || '',
+            price: product.price.toString(),
+            stock: (product.stock || 0).toString(),
+            description: product.description || '',
+            category: product.category || '',
+            size: product.size || ''
+        })
         setShowModal(true)
+        setSKULookupResult(null)
+    }
+
+    // AI SKU Lookup function
+    const handleSKULookup = async (barcode: string) => {
+        if (!barcode || barcode.length < 8) return
+
+        setLookingUpSKU(true)
+        setSKULookupResult(null)
+
+        try {
+            const res = await fetch(`/api/ai/sku-lookup?barcode=${encodeURIComponent(barcode)}`)
+            const data = await res.json()
+
+            setSKULookupResult(data)
+
+            if (data.found) {
+                // Auto-fill the form with looked up data
+                setFormData(prev => ({
+                    ...prev,
+                    barcode: data.barcode,
+                    name: data.name || prev.name,
+                    category: data.category || prev.category,
+                    description: data.brand ? `${data.brand} - ${data.name}` : prev.description,
+                    price: data.suggestedPrice?.toString() || prev.price,
+                    size: data.size || prev.size
+                }))
+            }
+        } catch (error) {
+            console.error('SKU lookup failed:', error)
+            setSKULookupResult({ found: false, barcode, message: 'Lookup failed. Please enter details manually.' })
+        } finally {
+            setLookingUpSKU(false)
+        }
+    }
+
+    const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            handleSKULookup(barcodeInput)
+        }
     }
 
     const stats = {
@@ -87,10 +158,19 @@ export default function ProductsPage() {
                     </h1>
                     <p className="text-stone-400 mt-2">Manage inventory and stock levels</p>
                 </div>
-                <button onClick={() => setShowModal(true)} className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold flex items-center gap-2">
-                    <Plus className="h-5 w-5" />
-                    Add Product
-                </button>
+                <div className="flex items-center gap-3">
+                    <Link
+                        href="/dashboard/ai-insights"
+                        className="px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg font-medium flex items-center gap-2"
+                    >
+                        <Brain className="h-5 w-5" />
+                        AI Insights
+                    </Link>
+                    <button onClick={() => setShowModal(true)} className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold flex items-center gap-2">
+                        <Plus className="h-5 w-5" />
+                        Add Product
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -165,11 +245,124 @@ export default function ProductsPage() {
                     <div className="w-full max-w-2xl bg-stone-900 rounded-2xl border border-stone-800 p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-2xl font-bold text-white">{editingProduct ? 'Edit' : 'Add'} Product</h2>
-                            <button onClick={() => { setShowModal(false); setEditingProduct(null); setFormData({ name: '', sku: '', price: '', stock: '0', description: '' }); }} className="text-stone-400 hover:text-white">
+                            <button onClick={() => { setShowModal(false); setEditingProduct(null); setFormData({ name: '', sku: '', barcode: '', price: '', stock: '0', description: '', category: '', size: '' }); setSKULookupResult(null); setBarcodeInput(''); }} className="text-stone-400 hover:text-white">
                                 <X className="h-6 w-6" />
                             </button>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            {/* AI SKU Lookup Section */}
+                            {!editingProduct && (
+                                <div className="p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-xl border border-purple-500/20 mb-4">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Brain className="w-5 h-5 text-purple-400" />
+                                        <span className="font-semibold text-white">AI SKU Lookup</span>
+                                        <span className="text-xs text-purple-400 bg-purple-500/20 px-2 py-0.5 rounded-full">Auto-fill</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <div className="relative flex-1">
+                                            <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" />
+                                            <input
+                                                ref={barcodeInputRef}
+                                                type="text"
+                                                placeholder="Scan or enter barcode (UPC/EAN)"
+                                                value={barcodeInput}
+                                                onChange={(e) => setBarcodeInput(e.target.value)}
+                                                onKeyDown={handleBarcodeKeyDown}
+                                                className="w-full bg-stone-950 border border-stone-700 rounded-lg pl-10 pr-4 py-3 text-white placeholder:text-stone-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSKULookup(barcodeInput)}
+                                            disabled={lookingUpSKU || barcodeInput.length < 8}
+                                            className="px-4 py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-stone-700 disabled:text-stone-500 text-white rounded-lg font-medium flex items-center gap-2"
+                                        >
+                                            {lookingUpSKU ? (
+                                                <Loader2 className="w-5 h-5 animate-spin" />
+                                            ) : (
+                                                <Sparkles className="w-5 h-5" />
+                                            )}
+                                            Lookup
+                                        </button>
+                                    </div>
+
+                                    {/* SKU Lookup Result */}
+                                    {skuLookupResult && (
+                                        <div className={`mt-3 p-3 rounded-lg ${skuLookupResult.found ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-yellow-500/10 border border-yellow-500/20'}`}>
+                                            {skuLookupResult.found ? (
+                                                <div className="flex items-start gap-3">
+                                                    {skuLookupResult.imageUrl && (
+                                                        <img
+                                                            src={skuLookupResult.imageUrl}
+                                                            alt={skuLookupResult.name}
+                                                            className="w-12 h-12 object-cover rounded bg-white"
+                                                        />
+                                                    )}
+                                                    <div className="flex-1">
+                                                        <div className="font-medium text-emerald-400 flex items-center gap-2">
+                                                            ✓ Found: {skuLookupResult.name}
+                                                            {skuLookupResult.size && (
+                                                                <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">
+                                                                    {skuLookupResult.size}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-stone-400 mt-1">
+                                                            {skuLookupResult.brand && <span className="mr-2">Brand: {skuLookupResult.brand}</span>}
+                                                            {skuLookupResult.category && <span>Category: {skuLookupResult.category}</span>}
+                                                        </div>
+                                                        <div className="text-xs text-purple-400 mt-1">
+                                                            Source: {skuLookupResult.source?.replace(/_/g, ' ')}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-yellow-400 text-sm">
+                                                    {skuLookupResult.message || 'Product not found. Please fill in details manually.'}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Barcode field */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-stone-300 mb-2">Barcode (UPC)</label>
+                                    <input
+                                        type="text"
+                                        value={formData.barcode}
+                                        onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white"
+                                        placeholder="Auto-filled from lookup"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-stone-300 mb-2">Category</label>
+                                    <input
+                                        type="text"
+                                        value={formData.category}
+                                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white"
+                                        placeholder="e.g., Beverages, Snacks"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-stone-300 mb-2">
+                                        Size
+                                        <span className="text-purple-400 text-xs ml-1">(AI)</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.size}
+                                        onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white"
+                                        placeholder="e.g., 12 oz, 2 Liter"
+                                    />
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-stone-300 mb-2">Name</label>
                                 <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white" />

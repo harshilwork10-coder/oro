@@ -1,53 +1,111 @@
 import { PrismaClient } from '@prisma/client'
+import { hash } from 'bcrypt'
 
 const prisma = new PrismaClient()
 
-async function main() {
-    console.log('🧹 Cleaning up Demo Data...')
+async function cleanupForManualTesting() {
+    console.log('🧹 Cleaning database for manual testing...')
+    console.log('⚠️  This will remove ALL data except the PROVIDER account!')
 
-    // Delete Transactions and Line Items
-    const deletedLineItems = await prisma.transactionLineItem.deleteMany({})
-    console.log(`Deleted ${deletedLineItems.count} Line Items`)
+    try {
+        console.log('  Deleting all dependent records...')
 
-    const deletedTx = await prisma.transaction.deleteMany({})
-    console.log(`Deleted ${deletedTx.count} Transactions`)
+        // Use any to bypass TypeScript checking for dynamic model access
+        const db = prisma as any
 
-    // Delete CheckIns
-    const deletedCheckIns = await prisma.checkIn.deleteMany({})
-    console.log(`Deleted ${deletedCheckIns.count} Check-Ins`)
+        // List of models to clear in dependency order
+        const modelsToClear = [
+            'itemLineItem',
+            'transactionLineItem',
+            'transaction',
+            'checkIn',
+            'appointment',
+            'cashDrawerSession',
+            'tagAlongItem',
+            'product',
+            'productCategory',
+            'department',
+            'service',
+            'serviceCategory',
+            'item',
+            'unifiedCategory',
+            'client',
+            'customerPromo',
+            'smsMarketingRule',
+            'promotion',
+            'loyaltyTransaction',
+            'loyaltyAccount',
+            'loyaltyProgram',
+            'review',
+            'station',
+            'paymentTerminal',
+            'location',
+            'franchiseSettings',
+            'franchise',
+            'businessConfig',
+            'franchisor'
+        ]
 
-    // Delete Demo Clients (created by seed)
-    const deletedClients = await prisma.client.deleteMany({
-        where: {
-            email: {
-                contains: '@test.com'
+        // First clear user references
+        console.log('  Clearing user references...')
+        await prisma.user.updateMany({
+            data: { assignedStationId: null, franchiseId: null, locationId: null }
+        })
+
+        // Delete each model
+        for (const model of modelsToClear) {
+            try {
+                if (db[model]) {
+                    await db[model].deleteMany()
+                    console.log(`    ✓ ${model}`)
+                }
+            } catch (e: any) {
+                // Silently skip - table may not exist or have FK issues
             }
         }
-    })
-    console.log(`Deleted ${deletedClients.count} Demo Clients`)
 
-    // Delete Services created by seed (General Category)
-    // Be careful not to delete real services if user added any.
-    // Seed used 'General' category.
-    const generalCategory = await prisma.serviceCategory.findFirst({
-        where: { name: 'General' }
-    })
-
-    if (generalCategory) {
-        const deletedServices = await prisma.service.deleteMany({
-            where: { categoryId: generalCategory.id }
+        // Delete all users except PROVIDER
+        console.log('  Deleting all users except PROVIDER...')
+        await prisma.user.deleteMany({
+            where: {
+                role: { not: 'PROVIDER' }
+            }
         })
-        console.log(`Deleted ${deletedServices.count} Demo Services`)
 
-        await prisma.serviceCategory.delete({
-            where: { id: generalCategory.id }
+        // Verify provider still exists, create if not
+        const hashedPassword = await hash('password123', 10)
+        await prisma.user.upsert({
+            where: { email: 'provider@test.com' },
+            update: {},
+            create: {
+                name: 'System Provider',
+                email: 'provider@test.com',
+                password: hashedPassword,
+                role: 'PROVIDER'
+            }
         })
+
+        console.log('')
+        console.log('✅ Database cleaned successfully!')
+        console.log('')
+        console.log('📋 Only remaining account:')
+        console.log('   Email:    provider@test.com')
+        console.log('   Password: password123')
+        console.log('   Role:     PROVIDER')
+        console.log('')
+        console.log('🚀 You can now test the full onboarding flow:')
+        console.log('   1. Login as provider')
+        console.log('   2. Create a new franchisor (client)')
+        console.log('   3. Set up their franchise, locations, services')
+        console.log('   4. Create employees and test POS')
+
+    } catch (error) {
+        console.error('❌ Error during cleanup:', error)
+        throw error
     }
-
-    console.log('✅ Cleanup Complete. Users and Locations preserved.')
 }
 
-main()
+cleanupForManualTesting()
     .catch((e) => {
         console.error(e)
         process.exit(1)

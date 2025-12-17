@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from "next-auth/react"
-import { redirect } from "next/navigation"
+import { redirect, useRouter } from "next/navigation"
 import {
     FileText,
     BarChart3,
@@ -28,7 +28,7 @@ import {
 } from "lucide-react"
 
 // Report card types
-type ReportType = 'daily-sales' | 'weekly-summary' | 'labor' | 'tips' | 'tax' | 'inventory' | 'customers' | 'gift-cards' | 'refunds' | 'payroll'
+type ReportType = 'daily-sales' | 'weekly-summary' | 'labor' | 'tips' | 'tax' | 'inventory' | 'customers' | 'gift-cards' | 'refunds' | 'payroll' | 'deals'
 
 interface ReportCard {
     id: ReportType
@@ -142,6 +142,16 @@ const REPORT_CARDS: ReportCard[] = [
         quickStat: '$0',
         quickStatLabel: 'Total Payroll',
         period: 'This Pay Period'
+    },
+    {
+        id: 'deals',
+        title: 'Deals & Promotions',
+        description: 'Active deals, performance, customer savings',
+        icon: Gift,
+        color: 'pink',
+        quickStat: '0',
+        quickStatLabel: 'Active Deals',
+        period: 'Current'
     }
 ]
 
@@ -152,6 +162,7 @@ export default function ReportsPage() {
             redirect('/login')
         },
     })
+    const router = useRouter()
 
     const [selectedReport, setSelectedReport] = useState<ReportType | null>(null)
     const [reportData, setReportData] = useState<any>(null)
@@ -225,12 +236,31 @@ export default function ReportsPage() {
                     return card
                 }))
             }
+
+            // Fetch promotions count for deals card
+            const promoRes = await fetch('/api/promotions')
+            if (promoRes.ok) {
+                const promoData = await promoRes.json()
+                const activeCount = promoData.promotions?.length || 0
+                setCards(prev => prev.map(card => {
+                    if (card.id === 'deals') {
+                        return { ...card, quickStat: String(activeCount) }
+                    }
+                    return card
+                }))
+            }
         } catch (error) {
             console.error('Failed to fetch quick stats:', error)
         }
     }
 
     const openReport = async (reportId: ReportType) => {
+        // Navigate to deals report page directly
+        if (reportId === 'deals') {
+            router.push('/dashboard/reports/deals')
+            return
+        }
+
         setSelectedReport(reportId)
         setLoading(true)
 

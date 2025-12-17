@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { name, email, phone, companyName, supportFee, type, businessType, billingMethod, enableCommission } = body
+        const { name, email, phone, companyName, supportFee, type, businessType, industryType, billingMethod, enableCommission } = body
 
         if (!name || !email || !companyName) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -68,6 +68,10 @@ export async function POST(request: NextRequest) {
         if (businessType && !['BRAND_FRANCHISOR', 'MULTI_LOCATION_OWNER'].includes(businessType)) {
             return NextResponse.json({ error: 'Invalid business type' }, { status: 400 })
         }
+
+        // Validate industryType
+        const validIndustryTypes = ['SERVICE', 'RETAIL', 'RESTAURANT']
+        const finalIndustryType = validIndustryTypes.includes(industryType) ? industryType : 'SERVICE'
 
         const sanitizedName = sanitizeInput(name)
         const sanitizedCompanyName = sanitizeInput(companyName)
@@ -106,6 +110,7 @@ export async function POST(request: NextRequest) {
                 name: sanitizedCompanyName,
                 ownerId: user.id,
                 businessType: finalBusinessType,
+                industryType: finalIndustryType,
                 phone: sanitizedPhone,
             }
         })

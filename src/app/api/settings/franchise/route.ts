@@ -44,15 +44,18 @@ export async function GET() {
             })
         }
 
-        // Get tip settings from BusinessConfig
-        let tipSettings = null
+        // Get tip and payment settings from BusinessConfig
+        let configSettings = null
         if (franchise?.franchisorId) {
-            tipSettings = await prisma.businessConfig.findUnique({
+            configSettings = await prisma.businessConfig.findUnique({
                 where: { franchisorId: franchise.franchisorId },
                 select: {
                     tipPromptEnabled: true,
                     tipType: true,
-                    tipSuggestions: true
+                    tipSuggestions: true,
+                    acceptsEbt: true,
+                    acceptsChecks: true,
+                    acceptsOnAccount: true
                 }
             })
         }
@@ -60,9 +63,12 @@ export async function GET() {
         // Merge settings
         return NextResponse.json({
             ...settings,
-            tipPromptEnabled: tipSettings?.tipPromptEnabled ?? true,
-            tipType: tipSettings?.tipType ?? 'PERCENT',
-            tipSuggestions: tipSettings?.tipSuggestions ?? '[15,20,25]'
+            tipPromptEnabled: configSettings?.tipPromptEnabled ?? true,
+            tipType: configSettings?.tipType ?? 'PERCENT',
+            tipSuggestions: configSettings?.tipSuggestions ?? '[15,20,25]',
+            acceptsEbt: configSettings?.acceptsEbt ?? false,
+            acceptsChecks: configSettings?.acceptsChecks ?? false,
+            acceptsOnAccount: configSettings?.acceptsOnAccount ?? false
         })
     } catch (error) {
         console.error('Error fetching franchise settings:', error)
@@ -94,7 +100,10 @@ export async function POST(request: Request) {
             showDualPricing,
             tipPromptEnabled,
             tipType,
-            tipSuggestions
+            tipSuggestions,
+            acceptsEbt,
+            acceptsChecks,
+            acceptsOnAccount
         } = body
 
         const settings = await prisma.franchiseSettings.upsert({
@@ -114,7 +123,7 @@ export async function POST(request: Request) {
             }
         })
 
-        // Also update tip settings in BusinessConfig if user's franchisor has one
+        // Also update tip and payment settings in BusinessConfig if user's franchisor has one
         const franchise = await prisma.franchise.findUnique({
             where: { id: user.franchiseId },
             include: { franchisor: true }
@@ -126,13 +135,19 @@ export async function POST(request: Request) {
                 update: {
                     tipPromptEnabled: tipPromptEnabled ?? true,
                     tipType: tipType || 'PERCENT',
-                    tipSuggestions: tipSuggestions || '[15,20,25]'
+                    tipSuggestions: tipSuggestions || '[15,20,25]',
+                    acceptsEbt: acceptsEbt ?? false,
+                    acceptsChecks: acceptsChecks ?? false,
+                    acceptsOnAccount: acceptsOnAccount ?? false
                 },
                 create: {
                     franchisorId: franchise.franchisorId,
                     tipPromptEnabled: tipPromptEnabled ?? true,
                     tipType: tipType || 'PERCENT',
-                    tipSuggestions: tipSuggestions || '[15,20,25]'
+                    tipSuggestions: tipSuggestions || '[15,20,25]',
+                    acceptsEbt: acceptsEbt ?? false,
+                    acceptsChecks: acceptsChecks ?? false,
+                    acceptsOnAccount: acceptsOnAccount ?? false
                 }
             })
         }

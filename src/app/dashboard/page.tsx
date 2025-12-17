@@ -12,7 +12,9 @@ import {
     AlertCircle,
     Phone,
     CreditCard,
-    Clock
+    Clock,
+    Gift,
+    Ticket
 } from "lucide-react"
 import PredictiveAlerts from "@/components/dashboard/PredictiveAlerts"
 import RequestExpansionModal from "@/components/modals/RequestExpansionModal"
@@ -48,6 +50,9 @@ export default function DashboardPage() {
             redirect('/login')
         },
     })
+
+    // NOTE: Employees CAN access dashboard now - their sidebar is permission-filtered
+    // Previously redirected employees to POS, but now we show permission-based content
 
     const [stats, setStats] = useState<DashboardStats | null>(null)
     const [loading, setLoading] = useState(true)
@@ -414,18 +419,18 @@ export default function DashboardPage() {
                     <p className="text-stone-400 mt-2">Here's what's happening with your business today.</p>
                 </div>
 
-                {/* Statistics Cards - Franchise Scoped */}
+                {/* Statistics Cards - Franchise Brand */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {/* Franchise Name */}
+                    {/* Brand Name */}
                     <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-stone-400">Your Store</p>
+                                <p className="text-sm font-medium text-stone-400">Your Brand</p>
                                 <p className="text-2xl font-bold text-stone-100 mt-2">
-                                    {franchisorStats?.name || 'Your Business'}
+                                    {franchisorStats?.name || 'Your Franchise'}
                                 </p>
                                 <p className="text-sm text-blue-400 mt-2 flex items-center">
-                                    Active since {franchisorStats?.createdAt ? new Date(franchisorStats.createdAt).getFullYear() : '2024'}
+                                    Since {franchisorStats?.createdAt ? new Date(franchisorStats.createdAt).getFullYear() : '2024'}
                                 </p>
                             </div>
                             <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-blue-900/20">
@@ -434,14 +439,30 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                    {/* Your Locations */}
+                    {/* Franchisees */}
                     <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-stone-400">Your Locations</p>
+                                <p className="text-sm font-medium text-stone-400">Franchisees</p>
+                                <p className="text-3xl font-bold text-stone-100 mt-2">{franchisorStats?.totalFranchisees || 0}</p>
+                                <p className="text-sm text-stone-500 mt-2 flex items-center">
+                                    Active partners
+                                </p>
+                            </div>
+                            <div className="h-14 w-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-purple-900/20">
+                                <Users className="h-7 w-7 text-white" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Total Locations */}
+                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-stone-400">Locations</p>
                                 <p className="text-3xl font-bold text-stone-100 mt-2">{franchisorStats?.totalLocations || 0}</p>
                                 <p className="text-sm text-stone-500 mt-2 flex items-center">
-                                    Across all franchises
+                                    Across all franchisees
                                 </p>
                             </div>
                             <div className="h-14 w-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-emerald-900/20">
@@ -450,23 +471,7 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                    {/* Your Employees */}
-                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-stone-400">Your Employees</p>
-                                <p className="text-3xl font-bold text-stone-100 mt-2">{franchisorStats?.totalEmployees || 0}</p>
-                                <p className="text-sm text-stone-500 mt-2 flex items-center">
-                                    Total staff
-                                </p>
-                            </div>
-                            <div className="h-14 w-14 bg-gradient-to-br from-stone-700 to-stone-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-stone-900/20">
-                                <Users className="h-7 w-7 text-white" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Your Revenue */}
+                    {/* Revenue */}
                     <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
                         <div className="flex items-center justify-between">
                             <div>
@@ -536,8 +541,221 @@ export default function DashboardPage() {
         )
     }
 
+    // FRANCHISEE Dashboard - for users who bought a franchise from a brand
+    if (role === 'FRANCHISEE') {
+        const [franchiseeData, setFranchiseeData] = useState<any>(null)
+        const [loadingData, setLoadingData] = useState(true)
+
+        useEffect(() => {
+            async function fetchFranchiseeData() {
+                try {
+                    const res = await fetch('/api/franchisee/my-locations')
+                    if (res.ok) {
+                        const locations = await res.json()
+                        const totalEmployees = locations.reduce((sum: number, loc: any) => sum + (loc._count?.users || 0), 0)
+                        setFranchiseeData({ locations, totalEmployees })
+                    }
+                } catch (error) {
+                    console.error('Error fetching franchisee data:', error)
+                } finally {
+                    setLoadingData(false)
+                }
+            }
+            fetchFranchiseeData()
+        }, [])
+
+        if (loadingData) {
+            return (
+                <div className="flex items-center justify-center min-h-screen bg-stone-950">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+                </div>
+            )
+        }
+
+        return (
+            <div className="p-4 md:p-8 space-y-6 md:space-y-8">
+                {/* Header */}
+                <div>
+                    <h1 className="text-3xl font-bold text-stone-100">
+                        Welcome back, {session?.user?.name?.split(' ')[0] || 'there'}! 👋
+                    </h1>
+                    <p className="text-stone-400 mt-2">Here's your franchise operations overview.</p>
+                </div>
+
+                {/* Statistics Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-stone-400">My Locations</p>
+                                <p className="text-3xl font-bold text-stone-100 mt-2">{franchiseeData?.locations?.length || 0}</p>
+                                <p className="text-sm text-stone-500 mt-2">Active stores</p>
+                            </div>
+                            <div className="h-14 w-14 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-orange-900/20">
+                                <MapPin className="h-7 w-7 text-white" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-stone-400">Employees</p>
+                                <p className="text-3xl font-bold text-stone-100 mt-2">{franchiseeData?.totalEmployees || 0}</p>
+                                <p className="text-sm text-stone-500 mt-2">Across all locations</p>
+                            </div>
+                            <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-blue-900/20">
+                                <Users className="h-7 w-7 text-white" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-stone-400">Status</p>
+                                <p className="text-2xl font-bold text-emerald-400 mt-2">Active</p>
+                                <p className="text-sm text-stone-500 mt-2">Franchise in good standing</p>
+                            </div>
+                            <div className="h-14 w-14 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-emerald-900/20">
+                                <TrendingUp className="h-7 w-7 text-white" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="glass-panel p-6 rounded-2xl">
+                    <h2 className="text-lg font-semibold text-stone-100 mb-4">Quick Actions</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <Link href="/dashboard/my-locations" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                            <MapPin className="h-6 w-6 text-orange-400 mx-auto mb-2" />
+                            <p className="text-sm text-stone-300">My Locations</p>
+                        </Link>
+                        <Link href="/dashboard/employees" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                            <Users className="h-6 w-6 text-blue-400 mx-auto mb-2" />
+                            <p className="text-sm text-stone-300">Employees</p>
+                        </Link>
+                        <Link href="/dashboard/expansion-requests" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                            <Building2 className="h-6 w-6 text-purple-400 mx-auto mb-2" />
+                            <p className="text-sm text-stone-300">Request Expansion</p>
+                        </Link>
+                        <Link href="/dashboard/reports" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                            <TrendingUp className="h-6 w-6 text-emerald-400 mx-auto mb-2" />
+                            <p className="text-sm text-stone-300">Reports</p>
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     // Employee Dashboard
     if (role === 'EMPLOYEE' || role === 'USER') {
+        const industryType = (session?.user as any)?.industryType || 'SERVICE'
+
+        // RETAIL Employee Dashboard
+        if (industryType === 'RETAIL') {
+            return (
+                <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-bold text-stone-100">
+                                Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {session?.user?.name?.split(' ')[0] || 'there'}
+                            </h1>
+                            <p className="text-stone-500 text-sm mt-1">
+                                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                            </p>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <Link href="/dashboard/pos/retail" className="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                <CreditCard className="h-4 w-4" />
+                                Open POS
+                            </Link>
+                        </div>
+                    </div>
+
+                    {/* Stats Row */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="glass-panel p-4 rounded-xl">
+                            <p className="text-xs text-stone-500 uppercase">Today's Sales</p>
+                            <p className="text-2xl font-bold text-stone-100 mt-1">$0.00</p>
+                            <p className="text-xs text-emerald-500 mt-1">↑ Live</p>
+                        </div>
+                        <div className="glass-panel p-4 rounded-xl">
+                            <p className="text-xs text-stone-500 uppercase">Transactions</p>
+                            <p className="text-2xl font-bold text-stone-100 mt-1">0</p>
+                            <p className="text-xs text-stone-500 mt-1">Today</p>
+                        </div>
+                        <div className="glass-panel p-4 rounded-xl">
+                            <p className="text-xs text-stone-500 uppercase">Items Sold</p>
+                            <p className="text-2xl font-bold text-stone-100 mt-1">0</p>
+                            <p className="text-xs text-stone-500 mt-1">Today</p>
+                        </div>
+                        <div className="glass-panel p-4 rounded-xl">
+                            <p className="text-xs text-stone-500 uppercase">Avg Transaction</p>
+                            <p className="text-2xl font-bold text-stone-100 mt-1">$0.00</p>
+                            <p className="text-xs text-stone-500 mt-1">Today</p>
+                        </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <Link href="/dashboard/deals" className="glass-panel p-6 rounded-xl text-center hover:border-pink-500/50 transition-all group">
+                            <div className="h-12 w-12 mx-auto mb-3 rounded-xl bg-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Gift className="h-6 w-6 text-pink-500" />
+                            </div>
+                            <p className="font-medium text-stone-200">Deals</p>
+                            <p className="text-xs text-stone-500 mt-1">Promotions</p>
+                        </Link>
+                        <Link href="/dashboard/inventory/retail" className="glass-panel p-6 rounded-xl text-center hover:border-orange-500/50 transition-all group">
+                            <div className="h-12 w-12 mx-auto mb-3 rounded-xl bg-blue-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Building2 className="h-6 w-6 text-blue-500" />
+                            </div>
+                            <p className="font-medium text-stone-200">Inventory</p>
+                            <p className="text-xs text-stone-500 mt-1">Manage Products</p>
+                        </Link>
+                        <Link href="/dashboard/customers" className="glass-panel p-6 rounded-xl text-center hover:border-orange-500/50 transition-all group">
+                            <div className="h-12 w-12 mx-auto mb-3 rounded-xl bg-emerald-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Users className="h-6 w-6 text-emerald-500" />
+                            </div>
+                            <p className="font-medium text-stone-200">Customers</p>
+                            <p className="text-xs text-stone-500 mt-1">Lookup & Loyalty</p>
+                        </Link>
+                        <Link href="/dashboard/transactions" className="glass-panel p-6 rounded-xl text-center hover:border-orange-500/50 transition-all group">
+                            <div className="h-12 w-12 mx-auto mb-3 rounded-xl bg-purple-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <TrendingUp className="h-6 w-6 text-purple-500" />
+                            </div>
+                            <p className="font-medium text-stone-200">Orders</p>
+                            <p className="text-xs text-stone-500 mt-1">View History</p>
+                        </Link>
+                        <Link href="/dashboard/lottery" className="glass-panel p-6 rounded-xl text-center hover:border-blue-500/50 transition-all group">
+                            <div className="h-12 w-12 mx-auto mb-3 rounded-xl bg-blue-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Ticket className="h-6 w-6 text-blue-500" />
+                            </div>
+                            <p className="font-medium text-stone-200">Lottery</p>
+                            <p className="text-xs text-stone-500 mt-1">Games & Packs</p>
+                        </Link>
+                    </div>
+
+                    {/* Low Stock Alerts */}
+                    <div className="glass-panel p-6 rounded-xl">
+                        <h2 className="text-lg font-semibold text-stone-100 mb-4 flex items-center gap-2">
+                            <AlertCircle className="h-5 w-5 text-amber-500" />
+                            Low Stock Alerts
+                        </h2>
+                        <div className="text-center py-8 text-stone-500">
+                            <p>No low stock alerts</p>
+                            <p className="text-sm mt-1">Products below reorder point will appear here</p>
+                        </div>
+                    </div>
+                </div>
+            )
+        }
+
+        // SERVICE Employee Dashboard (original)
         return (
             <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
                 {/* Clean Header */}

@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
 
 // Webhook handler for Facebook Booking button
 // Facebook will redirect users here when they click "Book Now" on your Facebook page
+// 
+// NOTE: This is a STUB implementation. Full integration requires:
+// 1. Facebook App configuration with valid Page ID
+// 2. Proper franchise/location mapping based on page_id
+// 3. Service selection from booking form
 
 interface FacebookBookingPayload {
-    // Facebook Lead/Booking data
     lead_id?: string
     page_id: string
     form_id?: string
@@ -14,7 +17,6 @@ interface FacebookBookingPayload {
         name: string
         values: string[]
     }[]
-    // Custom fields from booking form
     customer_name?: string
     customer_email?: string
     customer_phone?: string
@@ -28,7 +30,9 @@ export async function POST(request: NextRequest) {
     try {
         const payload: FacebookBookingPayload = await request.json()
 
-        console.log('[Facebook Booking] Received booking from page:', payload.page_id)
+        console.log('[Facebook Booking] Received booking request from page:', payload.page_id)
+        console.log('[Facebook Booking] Lead ID:', payload.lead_id)
+        console.log('[Facebook Booking] Customer:', payload.customer_name || payload.customer_email)
 
         // Extract customer info from field_data or direct fields
         let customerName = payload.customer_name || ''
@@ -54,72 +58,27 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Validate required fields
-        if (!customerEmail && !customerPhone) {
-            return NextResponse.json(
-                { error: 'Customer email or phone is required' },
-                { status: 400 }
-            )
-        }
-
-        // Find or create client
-        let client = await prisma.client.findFirst({
-            where: {
-                OR: [
-                    { email: customerEmail || undefined },
-                    { phone: customerPhone || undefined }
-                ]
-            }
+        // Log the booking request for manual processing
+        console.log('[Facebook Booking] Parsed booking request:', {
+            customerName,
+            customerEmail,
+            customerPhone,
+            preferredDate,
+            preferredTime,
+            service: payload.service,
+            notes: payload.notes
         })
 
-        if (!client) {
-            client = await prisma.client.create({
-                data: {
-                    name: customerName || 'Facebook Customer',
-                    email: customerEmail || '',
-                    phone: customerPhone || '',
-                    source: 'FACEBOOK_BOOKING',
-                }
-            })
-            console.log('[Facebook Booking] Created new client:', client.id)
-        }
-
-        // Parse date/time for appointment
-        let startTime = new Date()
-        let endTime = new Date()
-
-        if (preferredDate && preferredTime) {
-            try {
-                startTime = new Date(`${preferredDate} ${preferredTime}`)
-                endTime = new Date(startTime.getTime() + 60 * 60 * 1000) // 1 hour default
-            } catch {
-                // Keep default times if parsing fails
-            }
-        } else {
-            // Default to next available slot (tomorrow 10am)
-            startTime.setDate(startTime.getDate() + 1)
-            startTime.setHours(10, 0, 0, 0)
-            endTime = new Date(startTime.getTime() + 60 * 60 * 1000)
-        }
-
-        // Create appointment
-        const appointment = await prisma.appointment.create({
-            data: {
-                clientId: client.id,
-                startTime,
-                endTime,
-                status: 'PENDING', // Pending until confirmed by staff
-                notes: `Facebook Booking\nLead ID: ${payload.lead_id || 'N/A'}\n${payload.notes || ''}`,
-                source: 'FACEBOOK',
-            }
-        })
-
-        console.log('[Facebook Booking] Created appointment:', appointment.id)
+        // TODO: Implement full integration:
+        // 1. Map page_id to franchise/location
+        // 2. Create or find client with proper franchiseId
+        // 3. Create appointment with required fields (locationId, serviceId, employeeId)
+        // 4. Send confirmation email/SMS to customer
 
         return NextResponse.json({
             success: true,
-            appointment_id: appointment.id,
-            message: 'Booking request received. Our team will confirm shortly.'
+            message: 'Booking request received. Our team will contact you shortly to confirm.',
+            lead_id: payload.lead_id
         })
 
     } catch (error) {

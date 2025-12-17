@@ -1,0 +1,2320 @@
+'use client'
+
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSession, signOut } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import {
+    Search,
+    Trash2,
+    Tag,
+    DollarSign,
+    Hash,
+    CreditCard,
+    Banknote,
+    User,
+    FileText,
+    History,
+    X,
+    ShoppingCart,
+    Package,
+    AlertTriangle,
+    LogOut,
+    Monitor,
+    Gift,
+    Printer,
+    Phone,
+    Wallet,
+    Clock,
+    PackagePlus,
+    Moon
+} from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
+import { useBusinessConfig } from '@/hooks/useBusinessConfig'
+import Toast from '@/components/ui/Toast'
+import IDCheckModal from '@/components/modals/IDCheckModal'
+import CheckoutModal from '@/components/pos/CheckoutModal'
+import QuickAddModal from '@/components/modals/QuickAddModal'
+import TransactionDiscountModal from '@/components/modals/TransactionDiscountModal'
+import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
+import EndOfDayWizard from '@/components/pos/EndOfDayWizard'
+
+interface CartItem {
+    id: string
+    barcode?: string
+    sku?: string
+    name: string
+    price: number
+    quantity: number
+    discount?: number
+    ageRestricted?: boolean
+    minimumAge?: number
+    isEbtEligible?: boolean
+    taxRate?: number // Override default tax rate for this item
+    category?: string // Category name (e.g., 'QUICK_ADD')
+}
+
+interface TagAlongProduct {
+    id: string
+    name: string
+    price: number
+    barcode?: string
+    sku?: string
+}
+
+interface HeldTransaction {
+    id: string
+    items: CartItem[]
+    customerName?: string
+    timestamp: Date
+}
+
+interface AppliedPromotion {
+    promotionId: string
+    promotionName: string
+    type: string
+    discountAmount: number
+}
+
+export default function RetailPOSPage() {
+    const { data: session } = useSession()
+    const user = session?.user as any
+    const { data: config } = useBusinessConfig()
+
+    // Barcode input
+    const barcodeInputRef = useRef<HTMLInputElement>(null)
+    const [barcodeInput, setBarcodeInput] = useState('')
+    const router = useRouter()
+    const [quantityInput, setQuantityInput] = useState('1')
+
+    // Cart state
+    const [cart, setCart] = useState<CartItem[]>([])
+    const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null)
+
+    // UI state
+    const [isLoading, setIsLoading] = useState(false)
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+    const [showCustomerModal, setShowCustomerModal] = useState(false)
+    const [showDiscountModal, setShowDiscountModal] = useState(false)
+    const [showQuantityModal, setShowQuantityModal] = useState(false)
+    const [showPriceModal, setShowPriceModal] = useState(false)
+    const [showSearchModal, setShowSearchModal] = useState(false)
+    const [showAgeVerification, setShowAgeVerification] = useState(false)
+    const [showPaymentModal, setShowPaymentModal] = useState(false)
+    const [showQuickAddModal, setShowQuickAddModal] = useState(false)
+    const [showTransactionDiscountModal, setShowTransactionDiscountModal] = useState(false)
+    const [transactionDiscount, setTransactionDiscount] = useState<{ type: 'PERCENT' | 'AMOUNT'; value: number } | null>(null)
+    const [showPriceCheckModal, setShowPriceCheckModal] = useState(false)
+    const [priceCheckProduct, setPriceCheckProduct] = useState<any>(null)
+    const [lastTransaction, setLastTransaction] = useState<any>(null)
+    const [showPaxModal, setShowPaxModal] = useState(false)
+    const [pendingCardAmount, setPendingCardAmount] = useState(0)
+
+    // Derived State
+    const selectedItem = selectedItemIndex !== null ? cart[selectedItemIndex] : null
+    const [pendingAgeItem, setPendingAgeItem] = useState<CartItem | null>(null)
+
+    // ID verification caching - once verified, don't ask again during this transaction
+    const [idVerifiedForTransaction, setIdVerifiedForTransaction] = useState(false)
+
+    // Tag-along suggestions (cross-sell)
+    const [tagAlongItems, setTagAlongItems] = useState<TagAlongProduct[]>([])
+
+    // Held transactions
+    const [heldTransactions, setHeldTransactions] = useState<HeldTransaction[]>([])
+
+    // Customer
+    const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
+    const [customerNotes, setCustomerNotes] = useState('')
+
+    // Applied Promotions
+    const [appliedPromotions, setAppliedPromotions] = useState<AppliedPromotion[]>([])
+    const [promoDiscount, setPromoDiscount] = useState(0)
+
+    // Today's Stats (live sales header)
+    const [todayStats, setTodayStats] = useState<{ sales: number; transactions: number; avgTicket: number } | null>(null)
+
+    // Favorites Bar (top sellers quick buttons)
+    const [favorites, setFavorites] = useState<{ id: string; name: string; price: number; barcode?: string }[]>([])
+
+    // Quick Life Features
+    const [showCustomerLookup, setShowCustomerLookup] = useState(false)
+    const [showCashDropModal, setShowCashDropModal] = useState(false)
+    const [showReceiveStockModal, setShowReceiveStockModal] = useState(false)
+    const [showRecentTransactions, setShowRecentTransactions] = useState(false)
+    const [recentTransactions, setRecentTransactions] = useState<any[]>([])
+    const [showEndOfDayWizard, setShowEndOfDayWizard] = useState(false)
+
+    // Case Break (Single vs 6-Pack vs Case) Selection
+    const [showCaseBreakModal, setShowCaseBreakModal] = useState(false)
+    const [pendingCaseBreakProduct, setPendingCaseBreakProduct] = useState<any>(null)
+
+    // Dual Pricing Settings
+    interface PricingSettings {
+        pricingModel: 'STANDARD' | 'DUAL_PRICING'
+        cardSurchargeType: 'PERCENTAGE' | 'FLAT_AMOUNT'
+        cardSurcharge: number
+        showDualPricing: boolean
+    }
+    const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
+
+    // Station selection (multi-register support) with terminal info
+    interface StationInfo {
+        id: string
+        name: string
+        paymentMode: 'DEDICATED' | 'CASH_ONLY'
+        dedicatedTerminal?: {
+            id: string
+            name: string
+            terminalIP: string
+            terminalPort: string
+        } | null
+    }
+    const [stations, setStations] = useState<StationInfo[]>([])
+    const [selectedStation, setSelectedStation] = useState<StationInfo | null>(null)
+    const [isLoadingStation, setIsLoadingStation] = useState(true)
+    const [showStationPairing, setShowStationPairing] = useState(false) // Only for Provider to pair device
+
+    // Load station based on device pairing (set by Provider before shipping)
+    useEffect(() => {
+        const loadDeviceStation = async () => {
+            try {
+                // Check if this device is already paired to a station
+                const pairedStationId = localStorage.getItem('pairedStationId')
+
+                // Fetch all stations for this location
+                const res = await fetch('/api/pos/stations')
+                if (!res.ok) {
+                    setToast({ message: 'Failed to load stations', type: 'error' })
+                    setIsLoadingStation(false)
+                    return
+                }
+
+                const data = await res.json()
+                const stationList = data.stations || []
+                setStations(stationList)
+
+                if (stationList.length === 0) {
+                    // No stations configured - contact provider
+                    setIsLoadingStation(false)
+                    return
+                }
+
+                if (pairedStationId) {
+                    // Device is paired - find the station
+                    const paired = stationList.find((s: StationInfo) => s.id === pairedStationId)
+                    if (paired) {
+                        setSelectedStation(paired)
+                        console.log('[POS] Device paired to station:', paired.name)
+                    } else {
+                        // Paired station no longer exists - clear and show pairing
+                        localStorage.removeItem('pairedStationId')
+                        setShowStationPairing(true)
+                    }
+                } else if (stationList.length === 1) {
+                    // Only one station - auto-pair device to it
+                    localStorage.setItem('pairedStationId', stationList[0].id)
+                    setSelectedStation(stationList[0])
+                    console.log('[POS] Auto-paired device to only station:', stationList[0].name)
+                } else {
+                    // Multiple stations, device not paired - show pairing screen (Provider only)
+                    setShowStationPairing(true)
+                }
+            } catch (error) {
+                console.error('[POS] Failed to load station:', error)
+                setToast({ message: 'Failed to connect to server', type: 'error' })
+            } finally {
+                setIsLoadingStation(false)
+            }
+        }
+        loadDeviceStation()
+    }, [])
+
+    // Fetch franchise pricing settings on mount
+    useEffect(() => {
+        const loadPricingSettings = async () => {
+            try {
+                const res = await fetch('/api/settings/franchise')
+                if (res.ok) {
+                    const data = await res.json()
+                    setPricingSettings({
+                        pricingModel: data.pricingModel || 'STANDARD',
+                        cardSurchargeType: data.cardSurchargeType || 'PERCENTAGE',
+                        cardSurcharge: parseFloat(data.cardSurcharge) || 0,
+                        showDualPricing: data.showDualPricing ?? false
+                    })
+                }
+            } catch (error) {
+                console.error('[POS] Failed to load pricing settings:', error)
+            }
+        }
+        loadPricingSettings()
+    }, [])
+
+    // Fetch today's stats for header (refresh every 60s)
+    useEffect(() => {
+        const fetchTodayStats = async () => {
+            try {
+                const today = new Date().toISOString().split('T')[0]
+                const res = await fetch(`/api/franchise/reports/daily?date=${today}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setTodayStats({
+                        sales: data.summary?.totalSales || 0,
+                        transactions: data.summary?.totalTransactions || 0,
+                        avgTicket: data.summary?.averageTicket || 0
+                    })
+                }
+            } catch (error) {
+                console.error('[POS] Failed to load today stats:', error)
+            }
+        }
+        fetchTodayStats()
+        const interval = setInterval(fetchTodayStats, 60000) // Refresh every minute
+        return () => clearInterval(interval)
+    }, [])
+
+    // Fetch favorites (top sellers) for quick buttons
+    useEffect(() => {
+        const fetchFavorites = async () => {
+            try {
+                const res = await fetch('/api/pos/retail/top-sellers?limit=6')
+                if (res.ok) {
+                    const data = await res.json()
+                    setFavorites(data.products || [])
+                }
+            } catch (error) {
+                console.error('[POS] Failed to load favorites:', error)
+            }
+        }
+        fetchFavorites()
+    }, [])
+
+    // Sync cart to SERVER for customer display (station-isolated)
+    useEffect(() => {
+        if (!selectedStation) return // Wait for station selection
+
+        const { subtotal, tax, total, cashTotal, cardTotal, showDualPricing } = calculateTotals()
+        const displayData = {
+            items: cart.map(item => ({
+                id: item.id,
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity
+            })),
+            subtotal,
+            tax,
+            total,
+            cashTotal,
+            cardTotal,
+            showDualPricing,
+            status: cart.length > 0 ? 'ACTIVE' : 'IDLE',
+            stationId: selectedStation.id
+        }
+
+        // Sync to server
+        fetch('/api/pos/display-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stationId: selectedStation.id, cart: displayData })
+        }).catch(err => console.error('Cart sync failed:', err))
+
+        // Also keep localStorage for same-tab fallback
+        localStorage.setItem('retail_customer_display', JSON.stringify(displayData))
+    }, [cart, selectedStation, pricingSettings])
+
+    // Keep focus on barcode input
+    useEffect(() => {
+        const focusBarcode = () => {
+            if (!showDiscountModal && !showQuantityModal && !showPriceModal && !showSearchModal && !showAgeVerification && !showQuickAddModal) {
+                barcodeInputRef.current?.focus()
+            }
+        }
+        focusBarcode()
+        const interval = setInterval(focusBarcode, 1000)
+        return () => clearInterval(interval)
+    }, [showDiscountModal, showQuantityModal, showPriceModal, showSearchModal, showAgeVerification, showQuickAddModal])
+
+    // Check for applicable promotions when cart changes
+    useEffect(() => {
+        const checkPromotions = async () => {
+            if (cart.length === 0) {
+                setAppliedPromotions([])
+                setPromoDiscount(0)
+                return
+            }
+
+            try {
+                const res = await fetch('/api/promotions/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: cart.map(item => ({
+                            id: item.id,
+                            categoryId: (item as any).categoryId,
+                            name: item.name,
+                            price: item.price,
+                            quantity: item.quantity
+                        }))
+                    })
+                })
+
+                if (res.ok) {
+                    const data = await res.json()
+                    setAppliedPromotions(data.appliedPromotions || [])
+                    setPromoDiscount(data.totalDiscount || 0)
+                }
+            } catch (error) {
+                console.error('Failed to check promotions:', error)
+            }
+        }
+
+        checkPromotions()
+    }, [cart])
+
+
+    // Handle barcode scan (Enter key from scanner)
+    const handleBarcodeScan = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && barcodeInput.trim()) {
+            e.preventDefault()
+            await lookupAndAddProduct(barcodeInput.trim())
+            setBarcodeInput('')
+        }
+    }
+
+    // Lookup product by barcode/SKU
+    const lookupAndAddProduct = async (code: string) => {
+        setIsLoading(true)
+        try {
+            const res = await fetch(`/api/pos/retail/lookup?code=${encodeURIComponent(code)}`)
+            if (res.ok) {
+                const product = await res.json()
+
+                // Check if age restricted
+                if (product.ageRestricted) {
+                    // If ID already verified for this transaction, skip the check
+                    if (idVerifiedForTransaction) {
+                        // Check for case break AFTER age verification
+                        if (product.sellByCase && product.unitsPerCase) {
+                            setPendingCaseBreakProduct(product)
+                            setShowCaseBreakModal(true)
+                        } else {
+                            addToCart(product)
+                        }
+                        setToast({ message: `Added: ${product.name} (ID Already Verified)`, type: 'success' })
+                    } else {
+                        setPendingAgeItem({
+                            id: product.id,
+                            barcode: product.barcode,
+                            sku: product.sku,
+                            name: product.name,
+                            price: parseFloat(product.price),
+                            quantity: parseInt(quantityInput) || 1,
+                            ageRestricted: true,
+                            minimumAge: product.minimumAge || 21,
+                            // Pass case break info for after verification
+                            sellByCase: product.sellByCase,
+                            unitsPerCase: product.unitsPerCase,
+                            casePrice: product.casePrice
+                        })
+                        setShowAgeVerification(true)
+                    }
+                    // Still show tag-along suggestions
+                    if (product.tagAlongItems?.length > 0) {
+                        setTagAlongItems(product.tagAlongItems)
+                    }
+                } else {
+                    // Check for case break - show popup if product supports it
+                    if (product.sellByCase && product.unitsPerCase) {
+                        setPendingCaseBreakProduct(product)
+                        setShowCaseBreakModal(true)
+                    } else {
+                        addToCart(product)
+                    }
+                    // Show tag-along suggestions if any
+                    if (product.tagAlongItems?.length > 0) {
+                        setTagAlongItems(product.tagAlongItems)
+                    } else {
+                        setTagAlongItems([])
+                    }
+                }
+            } else {
+                setToast({ message: `Product not found: ${code}`, type: 'error' })
+            }
+        } catch (error) {
+            console.error('Lookup error:', error)
+            setToast({ message: 'Error looking up product', type: 'error' })
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    // Add product to cart
+    const addToCart = (product: any) => {
+        const qty = parseInt(quantityInput) || 1
+        // Get EBT eligibility from product's category
+        const isEbtEligible = product.productCategory?.isEbtEligible || product.isEbtEligible || false
+
+        setCart(prev => {
+            const existing = prev.find(item => item.id === product.id)
+            if (existing && !product.category?.startsWith('quick-')) { // Don't combine quick add items
+                return prev.map(item =>
+                    item.id === product.id
+                        ? { ...item, quantity: item.quantity + qty }
+                        : item
+                )
+            }
+            return [...prev, {
+                id: product.id,
+                barcode: product.barcode,
+                sku: product.sku,
+                name: product.name,
+                price: parseFloat(product.price),
+                quantity: qty,
+                ageRestricted: product.ageRestricted,
+                isEbtEligible,
+                taxRate: product.taxRate, // Pass through taxRate if provided (e.g., from Quick Add)
+                category: product.category // Pass through category if provided (e.g., from Quick Add)
+            }]
+        })
+        setQuantityInput('1')
+        setToast({ message: `Added: ${product.name}`, type: 'success' })
+    }
+
+    // Confirm age verification (ID was scanned and verified)  
+    const confirmAgeVerification = () => {
+        if (pendingAgeItem) {
+            setCart(prev => [...prev, pendingAgeItem])
+            setToast({ message: `Added: ${pendingAgeItem.name} (ID Verified)`, type: 'success' })
+        }
+        // Mark ID as verified for this transaction - won't ask again
+        setIdVerifiedForTransaction(true)
+        setPendingAgeItem(null)
+        setShowAgeVerification(false)
+        setQuantityInput('1')
+    }
+
+    // Skip age verification (regular customer cashier knows)
+    const skipAgeVerification = () => {
+        if (pendingAgeItem) {
+            setCart(prev => [...prev, pendingAgeItem])
+            setToast({ message: `Added: ${pendingAgeItem.name} (ID Skipped)`, type: 'success' })
+        }
+        // Mark as verified so we don't ask again for this transaction
+        setIdVerifiedForTransaction(true)
+        setPendingAgeItem(null)
+        setShowAgeVerification(false)
+        setQuantityInput('1')
+    }
+
+    // Cancel age verification (remove item from pending)
+    const cancelAgeVerification = () => {
+        setPendingAgeItem(null)
+        setShowAgeVerification(false)
+        setToast({ message: 'Age-restricted item removed', type: 'error' })
+    }
+
+    // Calculate totals (with dual pricing support)
+    const calculateTotals = () => {
+        const subtotal = cart.reduce((sum, item) => {
+            const itemTotal = item.price * item.quantity
+            const discount = item.discount ? itemTotal * (item.discount / 100) : 0
+            return sum + (itemTotal - discount)
+        }, 0)
+
+        // Apply transaction-level discount
+        let transactionDiscountAmount = 0
+        if (transactionDiscount) {
+            if (transactionDiscount.type === 'PERCENT') {
+                transactionDiscountAmount = subtotal * (transactionDiscount.value / 100)
+            } else {
+                transactionDiscountAmount = transactionDiscount.value
+            }
+        }
+
+        const discountedSubtotal = subtotal - transactionDiscountAmount - promoDiscount
+
+        const tax = cart.reduce((sum, item) => {
+            const itemTotal = item.price * item.quantity
+            const itemDiscount = item.discount ? itemTotal * (item.discount / 100) : 0
+            const discountedItemTotal = itemTotal - itemDiscount
+
+            // Apply proportional transaction discount to each item for tax calculation
+            const proportion = subtotal > 0 ? discountedItemTotal / subtotal : 0
+            const itemTransactionDiscount = transactionDiscountAmount * proportion
+            const finalItemTotal = discountedItemTotal - itemTransactionDiscount
+
+            // Use item specific tax rate if set, otherwise use global config rate
+            const itemTaxRate = item.taxRate !== undefined ? item.taxRate : (config?.taxRate || 0)
+
+            return sum + (finalItemTotal * (itemTaxRate / 100))
+        }, 0)
+
+        const cashTotal = discountedSubtotal + tax
+
+        // Calculate card total with surcharge (for dual pricing)
+        let cardTotal = cashTotal
+        if (pricingSettings?.pricingModel === 'DUAL_PRICING' && pricingSettings.cardSurcharge > 0) {
+            if (pricingSettings.cardSurchargeType === 'PERCENTAGE') {
+                cardTotal = cashTotal * (1 + pricingSettings.cardSurcharge / 100)
+            } else {
+                cardTotal = cashTotal + pricingSettings.cardSurcharge
+            }
+        }
+
+        return {
+            subtotal,
+            promoDiscount,
+            transactionDiscountAmount,
+            tax,
+            total: cashTotal,
+            cashTotal,
+            cardTotal,
+            itemCount: cart.reduce((sum, item) => sum + item.quantity, 0),
+            showDualPricing: pricingSettings?.showDualPricing && pricingSettings?.pricingModel === 'DUAL_PRICING'
+        }
+    }
+
+    // Remove item from cart
+    const removeItem = (index: number) => {
+        setCart(prev => prev.filter((_, i) => i !== index))
+        setSelectedItemIndex(null)
+    }
+
+    // Delete selected item
+    const deleteSelectedItem = () => {
+        if (selectedItemIndex !== null) {
+            removeItem(selectedItemIndex)
+        }
+    }
+
+    // Update quantity
+    const updateQuantity = (index: number, newQty: number) => {
+        if (newQty < 1) {
+            removeItem(index)
+            return
+        }
+        setCart(prev => prev.map((item, i) =>
+            i === index ? { ...item, quantity: newQty } : item
+        ))
+    }
+
+    // Apply discount to selected item
+    const applyDiscount = (discountPercent: number) => {
+        if (selectedItemIndex !== null) {
+            setCart(prev => prev.map((item, i) =>
+                i === selectedItemIndex ? { ...item, discount: discountPercent } : item
+            ))
+        }
+        setShowDiscountModal(false)
+    }
+
+    // Change price of selected item
+    const changePrice = (newPrice: number) => {
+        if (selectedItemIndex !== null) {
+            setCart(prev => prev.map((item, i) =>
+                i === selectedItemIndex ? { ...item, price: newPrice } : item
+            ))
+        }
+        setShowPriceModal(false)
+    }
+
+    // Hold current transaction
+    const holdTransaction = () => {
+        if (cart.length === 0) return
+        setHeldTransactions(prev => [...prev, {
+            id: Date.now().toString(),
+            items: [...cart],
+            customerName: selectedCustomer?.firstName,
+            timestamp: new Date()
+        }])
+        setCart([])
+        setSelectedCustomer(null)
+        setToast({ message: 'Transaction held', type: 'success' })
+    }
+
+    // Recall held transaction
+    const recallTransaction = (id: string) => {
+        const held = heldTransactions.find(t => t.id === id)
+        if (held) {
+            setCart(held.items)
+            setHeldTransactions(prev => prev.filter(t => t.id !== id))
+            setToast({ message: 'Transaction recalled', type: 'success' })
+        }
+    }
+
+    // Void entire transaction
+    const voidTransaction = () => {
+        if (cart.length === 0) return
+        if (confirm('Void entire transaction?')) {
+            setCart([])
+            setSelectedCustomer(null)
+            setIdVerifiedForTransaction(false) // Reset ID verification for next transaction
+            setToast({ message: 'Transaction voided', type: 'success' })
+        }
+    }
+
+    // Process payment
+    const processPayment = async (method: string, tipAmount: number = 0, paxResponse?: any) => {
+        if (cart.length === 0) return
+
+        // For card payments, open PAX terminal modal instead of direct processing
+        if ((method === 'CREDIT_CARD' || method === 'DEBIT_CARD') && !paxResponse) {
+            setShowPaymentModal(false)
+            const { total } = calculateTotals()
+            setPendingCardAmount(total + tipAmount)
+            setShowPaxModal(true)
+            return
+        }
+
+        setIsLoading(true)
+        setShowPaymentModal(false) // Close modal if open
+
+        try {
+            const { subtotal, tax, total } = calculateTotals()
+            const totalWithTip = total + tipAmount
+
+            const res = await fetch('/api/pos/transaction', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    items: cart.map(item => ({
+                        type: 'PRODUCT',
+                        productId: item.id,
+                        name: item.name,
+                        quantity: item.quantity,
+                        price: item.price,
+                        discount: item.discount,
+                        taxRate: item.taxRate,
+                        isEbtEligible: item.isEbtEligible,
+                        category: item.category
+                    })),
+                    subtotal,
+                    tax,
+                    total: totalWithTip,
+                    paymentMethod: method,
+                    clientId: selectedCustomer?.id,
+                    tipAmount: tipAmount,
+                    // Include PAX terminal response data if available
+                    ...(paxResponse && {
+                        gatewayTxId: paxResponse.transactionId,
+                        authCode: paxResponse.authCode,
+                        cardLast4: paxResponse.cardLast4,
+                        cardType: paxResponse.cardType
+                    })
+                })
+            })
+
+            if (res.ok) {
+                const transaction = await res.json()
+                setLastTransaction(transaction) // Save for "Last Receipt" button
+                setToast({ message: 'Payment successful!', type: 'success' })
+                setCart([])
+                setSelectedCustomer(null)
+                setIdVerifiedForTransaction(false) // Reset ID verification for next transaction
+                setTransactionDiscount(null) // Reset transaction discount
+            } else {
+                const error = await res.json()
+                setToast({ message: error.error || 'Payment failed', type: 'error' })
+            }
+        } catch (error) {
+            console.error('Payment error:', error)
+            setToast({ message: 'Payment error', type: 'error' })
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    // Handle PAX payment success
+    const handlePaxSuccess = (paxResponse: any) => {
+        setShowPaxModal(false)
+        // Complete the transaction with PAX response data
+        processPayment('CREDIT_CARD', 0, paxResponse)
+    }
+
+    // Print last receipt
+    const printLastReceipt = () => {
+        if (!lastTransaction) {
+            setToast({ message: 'No recent transaction to print', type: 'error' })
+            return
+        }
+
+        // Create printable receipt
+        const receiptWindow = window.open('', '_blank', 'width=400,height=600')
+        if (!receiptWindow) {
+            setToast({ message: 'Please allow popups to print receipt', type: 'error' })
+            return
+        }
+
+        const receiptHTML = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Receipt #${lastTransaction.invoiceNumber || lastTransaction.id?.slice(-8)}</title>
+                <style>
+                    body { font-family: 'Courier New', monospace; padding: 20px; max-width: 300px; margin: 0 auto; }
+                    .header { text-align: center; margin-bottom: 20px; }
+                    .line { border-top: 1px dashed #000; margin: 10px 0; }
+                    .item { display: flex; justify-content: space-between; margin: 5px 0; }
+                    .total { font-weight: bold; font-size: 1.2em; }
+                    .footer { text-align: center; margin-top: 20px; font-size: 0.8em; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h2>RECEIPT</h2>
+                    <p>#${lastTransaction.invoiceNumber || lastTransaction.id?.slice(-8)}</p>
+                    <p>${new Date(lastTransaction.createdAt).toLocaleString()}</p>
+                </div>
+                <div class="line"></div>
+                ${lastTransaction.lineItems?.map((item: any) => `
+                    <div class="item">
+                        <span>${item.quantity}x ${item.name}</span>
+                        <span>$${(item.price * item.quantity).toFixed(2)}</span>
+                    </div>
+                `).join('') || '<p>No items</p>'}
+                <div class="line"></div>
+                <div class="item"><span>Subtotal:</span><span>$${Number(lastTransaction.subtotal).toFixed(2)}</span></div>
+                <div class="item"><span>Tax:</span><span>$${Number(lastTransaction.tax).toFixed(2)}</span></div>
+                ${lastTransaction.tip > 0 ? `<div class="item"><span>Tip:</span><span>$${Number(lastTransaction.tip).toFixed(2)}</span></div>` : ''}
+                <div class="line"></div>
+                <div class="item total"><span>TOTAL:</span><span>$${(Number(lastTransaction.subtotal) + Number(lastTransaction.tax) + Number(lastTransaction.tip || 0)).toFixed(2)}</span></div>
+                <div class="item"><span>Payment:</span><span>${lastTransaction.paymentMethod}</span></div>
+                <div class="footer">
+                    <p>Thank you for your business!</p>
+                </div>
+            </body>
+            </html>
+        `
+
+        receiptWindow.document.write(receiptHTML)
+        receiptWindow.document.close()
+        receiptWindow.print()
+    }
+
+    // Price check - lookup product without adding to cart
+    const handlePriceCheck = async (code: string) => {
+        try {
+            const res = await fetch(`/api/pos/retail/lookup?code=${encodeURIComponent(code)}`)
+            if (res.ok) {
+                const product = await res.json()
+                setPriceCheckProduct(product)
+                setShowPriceCheckModal(true)
+            } else {
+                setToast({ message: 'Product not found', type: 'error' })
+            }
+        } catch (error) {
+            setToast({ message: 'Lookup failed', type: 'error' })
+        }
+    }
+
+    const { subtotal, tax, total, cashTotal, cardTotal, itemCount, showDualPricing } = calculateTotals()
+    const totalWithTip = total // Placeholder for now, tip logic would be in PaymentSelectionModal
+
+    return (
+        <div className="h-screen flex flex-col bg-stone-950 text-stone-100">
+            {/* Toast */}
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
+
+            {/* Device Pairing Screen - Provider pairs device to station before shipping */}
+            {showStationPairing && (
+                <div className="fixed inset-0 bg-stone-950 flex items-center justify-center z-50">
+                    <div className="text-center max-w-lg w-full mx-4">
+                        <div className="h-20 w-20 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <Monitor className="h-10 w-10 text-blue-400" />
+                        </div>
+                        <h2 className="text-3xl font-bold text-white mb-2">Device Setup</h2>
+                        <p className="text-stone-400 mb-8">Select which register this device will be</p>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            {stations.map((station) => (
+                                <button
+                                    key={station.id}
+                                    onClick={() => {
+                                        // Permanently pair this device to the station
+                                        localStorage.setItem('pairedStationId', station.id)
+                                        setSelectedStation(station)
+                                        setShowStationPairing(false)
+                                    }}
+                                    className="p-6 bg-stone-800 hover:bg-blue-600 rounded-2xl border-2 border-stone-700 hover:border-blue-500 transition-all text-center group"
+                                >
+                                    <div className="h-16 w-16 bg-stone-700 group-hover:bg-blue-500/30 rounded-xl flex items-center justify-center mx-auto mb-4 transition-colors">
+                                        <Monitor className="h-8 w-8 text-stone-300 group-hover:text-white" />
+                                    </div>
+                                    <p className="font-bold text-xl text-white">
+                                        {station.name}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+
+                        <p className="text-stone-500 text-sm mt-6">
+                            This only needs to be done once per device
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* No Stations Configured - Contact Provider */}
+            {!isLoadingStation && stations.length === 0 && (
+                <div className="fixed inset-0 bg-stone-950 flex items-center justify-center z-50">
+                    <div className="text-center max-w-md mx-4">
+                        <div className="h-20 w-20 bg-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <AlertTriangle className="h-10 w-10 text-red-400" />
+                        </div>
+                        <h2 className="text-3xl font-bold text-white mb-4">Setup Required</h2>
+                        <p className="text-stone-400 mb-6">
+                            This device needs to be configured before use.
+                        </p>
+                        <p className="text-orange-400 font-semibold">
+                            Please contact Oronex Support
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* ID Check Modal for Age-Restricted Products */}
+            {showAgeVerification && pendingAgeItem && (
+                <IDCheckModal
+                    isOpen={showAgeVerification}
+                    productName={pendingAgeItem.name}
+                    minimumAge={pendingAgeItem.minimumAge || 21}
+                    onVerified={confirmAgeVerification}
+                    onSkip={skipAgeVerification}
+                    onCancel={cancelAgeVerification}
+                />
+            )}
+
+            {/* Today's Stats Header Bar */}
+            {todayStats && (
+                <div className="flex items-center justify-center gap-8 py-2 bg-stone-900/50 border-b border-stone-800 text-sm">
+                    <div className="flex items-center gap-2">
+                        <span className="text-stone-500">Today:</span>
+                        <span className="font-bold text-green-400">${todayStats.sales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-stone-500">Txns:</span>
+                        <span className="font-bold text-blue-400">{todayStats.transactions}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-stone-500">Avg:</span>
+                        <span className="font-bold text-orange-400">${todayStats.avgTicket.toFixed(2)}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Top Bar */}
+            <div className="flex items-center gap-4 p-3 bg-stone-900 border-b border-stone-800">
+                {/* Barcode Input - LEFT side */}
+                <div className="flex items-center gap-2 flex-1">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-stone-500" />
+                        <input
+                            ref={barcodeInputRef}
+                            type="text"
+                            value={barcodeInput}
+                            onChange={(e) => setBarcodeInput(e.target.value)}
+                            onKeyDown={handleBarcodeScan}
+                            placeholder="Scan Barcode Now..."
+                            className="w-full pl-10 pr-4 py-3 bg-stone-800 border border-stone-700 rounded-lg focus:outline-none focus:border-orange-500 text-lg font-mono"
+                            autoFocus
+                        />
+                    </div>
+
+                    {/* Quantity Input */}
+                    <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 rounded-lg px-3 py-2">
+                        <span className="text-stone-400 text-sm">Qty:</span>
+                        <input
+                            type="number"
+                            value={quantityInput}
+                            onChange={(e) => setQuantityInput(e.target.value)}
+                            className="w-16 bg-transparent text-center text-lg font-bold focus:outline-none"
+                            min="1"
+                        />
+                    </div>
+
+                    {/* Item Count */}
+                    <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 rounded-lg px-4 py-2">
+                        <Package className="h-5 w-5 text-orange-500" />
+                        <span className="text-lg font-bold">{itemCount}</span>
+                        <span className="text-stone-400 text-sm">items</span>
+                    </div>
+                </div>
+
+                {/* 1. Search Button */}
+                <button
+                    onClick={() => setShowSearchModal(true)}
+                    className="px-4 py-3 bg-stone-800 hover:bg-stone-700 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                    <Search className="h-5 w-5" />
+                    <span>Search</span>
+                </button>
+
+                {/* 2. Dashboard Button - Using plain anchor for reliable navigation */}
+                <a
+                    href="/dashboard"
+                    target="_self"
+                    className="px-4 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg flex items-center gap-2 transition-colors cursor-pointer no-underline text-white"
+                >
+                    <FileText className="h-5 w-5" />
+                    <span>Dashboard</span>
+                </a>
+
+                <button
+                    onClick={() => {
+                        if (!selectedStation) {
+                            setToast({ message: 'Select a station first', type: 'error' })
+                            return
+                        }
+                        window.open(`/customer-display?stationId=${selectedStation.id}`, 'customer_display', 'popup=true,width=800,height=600')
+                    }}
+                    className="px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                    <Monitor className="h-5 w-5" />
+                    <span>Customer Display</span>
+                </button>
+
+                {/* 5. Logout Button */}
+                <button
+                    onClick={() => signOut({ callbackUrl: '/login' })}
+                    className="px-4 py-3 bg-red-600 hover:bg-red-500 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                    <LogOut className="h-5 w-5" />
+                    <span>Logout</span>
+                </button>
+
+                {/* 4. Station Indicator - FAR RIGHT */}
+                {selectedStation && (
+                    <div className={`flex items-center gap-2 px-3 py-2 border rounded-lg ${selectedStation.paymentMode === 'DEDICATED'
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-amber-500/10 border-amber-500/30'
+                        }`}>
+                        <span className="text-lg">
+                            {selectedStation.paymentMode === 'DEDICATED' ? '💳' : '💵'}
+                        </span>
+                        <div className="text-left">
+                            <span className="text-stone-200 font-medium block">{selectedStation.name}</span>
+                            <span className={`text-xs ${selectedStation.paymentMode === 'DEDICATED' ? 'text-green-400' : 'text-amber-400'
+                                }`}>
+                                {selectedStation.paymentMode === 'DEDICATED'
+                                    ? selectedStation.dedicatedTerminal?.name || 'Terminal'
+                                    : 'Cash Only'
+                                }
+                            </span>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Tag-Along Suggestions Bar (Cross-sell) */}
+            {tagAlongItems.length > 0 && (
+                <div className="px-4 py-2 bg-gradient-to-r from-amber-900/30 to-orange-900/30 border-b border-amber-700/50">
+                    <div className="flex items-center gap-3">
+                        <span className="text-amber-400 text-sm font-medium whitespace-nowrap">
+                            💡 Customers also buy:
+                        </span>
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                            {tagAlongItems.map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => {
+                                        addToCart({
+                                            id: item.id,
+                                            name: item.name,
+                                            price: item.price,
+                                            barcode: item.barcode,
+                                            sku: item.sku
+                                        })
+                                        setToast({ message: `Added: ${item.name}`, type: 'success' })
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-600/50 rounded-full text-sm whitespace-nowrap transition-colors"
+                                >
+                                    <span>{item.name}</span>
+                                    <span className="text-amber-300 font-medium">
+                                        {formatCurrency(Number(item.price))}
+                                    </span>
+                                    <span className="text-xs bg-amber-500/50 px-1.5 py-0.5 rounded">+ADD</span>
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => setTagAlongItems([])}
+                            className="text-stone-500 hover:text-stone-300 ml-auto"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Favorites Bar (Top Sellers Quick Buttons) */}
+            {favorites.length > 0 && (
+                <div className="px-4 py-2 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-b border-purple-700/50">
+                    <div className="flex items-center gap-3">
+                        <span className="text-purple-400 text-sm font-medium whitespace-nowrap">
+                            ⭐ Quick:
+                        </span>
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                            {favorites.map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => {
+                                        addToCart({
+                                            id: item.id,
+                                            name: item.name,
+                                            price: item.price,
+                                            barcode: item.barcode
+                                        })
+                                        setToast({ message: `Added: ${item.name}`, type: 'success' })
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-600/50 rounded-lg text-sm whitespace-nowrap transition-colors"
+                                >
+                                    <span className="font-medium">{item.name}</span>
+                                    <span className="text-purple-300 font-medium">
+                                        {formatCurrency(Number(item.price))}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
+            {/* Main Content */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Left Side - Item List */}
+                <div className="flex-1 flex flex-col border-r border-stone-800">
+                    {/* Table Header */}
+                    <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-stone-900 border-b border-stone-800 text-sm font-medium text-stone-400">
+                        <div className="col-span-1">#</div>
+                        <div className="col-span-6">Item Info</div>
+                        <div className="col-span-2 text-center">Quantity</div>
+                        <div className="col-span-2 text-right">Price</div>
+                        <div className="col-span-1"></div>
+                    </div>
+
+                    {/* Item List */}
+                    <div className="flex-1 overflow-y-auto">
+                        {cart.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-stone-500">
+                                <ShoppingCart className="h-16 w-16 mb-4 opacity-20" />
+                                <p className="text-lg">Scan items to begin</p>
+                            </div>
+                        ) : (
+                            cart.map((item, idx) => (
+                                <div
+                                    key={idx}
+                                    onClick={() => setSelectedItemIndex(idx)}
+                                    className={`grid grid-cols-12 gap-2 px-4 py-3 border-b border-stone-800 cursor-pointer transition-colors ${selectedItemIndex === idx
+                                        ? 'bg-orange-500/20 border-l-4 border-l-orange-500'
+                                        : 'hover:bg-stone-900'
+                                        }`}
+                                >
+                                    <div className="col-span-1 text-stone-500 font-mono">{idx + 1}</div>
+                                    <div className="col-span-6">
+                                        <p className="font-medium">{item.name}</p>
+                                        <div className="flex items-center gap-2 text-xs text-stone-500">
+                                            {item.barcode && <span>BC: {item.barcode}</span>}
+                                            {item.sku && <span>SKU: {item.sku}</span>}
+                                            {item.isEbtEligible && (
+                                                <span className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium">EBT</span>
+                                            )}
+                                            {item.ageRestricted && (
+                                                <span className="text-amber-500">21+</span>
+                                            )}
+                                        </div>
+                                        {item.discount && item.discount > 0 && (
+                                            <span className="text-xs text-orange-400">-{item.discount}% OFF</span>
+                                        )}
+                                    </div>
+                                    <div className="col-span-2 flex items-center justify-center gap-2">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); updateQuantity(idx, item.quantity - 1) }}
+                                            className="w-8 h-8 rounded bg-stone-800 hover:bg-stone-700 flex items-center justify-center"
+                                        >
+                                            -
+                                        </button>
+                                        <span className="w-10 text-center font-bold">{item.quantity}</span>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); updateQuantity(idx, item.quantity + 1) }}
+                                            className="w-8 h-8 rounded bg-stone-800 hover:bg-stone-700 flex items-center justify-center"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                    <div className="col-span-2 text-right font-medium">
+                                        {formatCurrency(item.price * item.quantity)}
+                                    </div>
+                                    <div className="col-span-1 flex justify-end">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); removeItem(idx) }}
+                                            className="w-8 h-8 rounded bg-red-500/20 hover:bg-red-500/40 text-red-400 flex items-center justify-center transition-colors"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* Bottom Action Bar */}
+                    <div className="flex flex-col gap-2 p-3 bg-stone-900 border-t border-stone-800">
+                        {/* Primary Actions */}
+                        <div className="grid grid-cols-6 gap-2">
+                            <button
+                                onClick={voidTransaction}
+                                disabled={cart.length === 0}
+                                className="flex flex-col items-center justify-center gap-1 py-3 bg-red-900/20 hover:bg-red-900/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-red-500 transition-colors"
+                            >
+                                <X className="h-6 w-6" />
+                                <span className="text-xs">VOID</span>
+                            </button>
+                            <button
+                                onClick={deleteSelectedItem}
+                                disabled={selectedItemIndex === null}
+                                className="flex flex-col items-center justify-center gap-1 py-3 bg-red-500/20 hover:bg-red-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-red-400 transition-colors"
+                            >
+                                <Trash2 className="h-6 w-6" />
+                                <span className="text-xs">DELETE</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (selectedItemIndex !== null) {
+                                        setShowDiscountModal(true)
+                                    } else if (cart.length > 0) {
+                                        setShowTransactionDiscountModal(true)
+                                    }
+                                }}
+                                disabled={cart.length === 0}
+                                className="flex flex-col items-center justify-center gap-1 py-3 bg-orange-500/20 hover:bg-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-orange-400 transition-colors"
+                            >
+                                <Tag className="h-6 w-6" />
+                                <span className="text-xs">{selectedItemIndex !== null ? 'ITEM %' : 'INVOICE %'}</span>
+                            </button>
+                            <button
+                                onClick={() => heldTransactions.length > 0 && recallTransaction(heldTransactions[0].id)}
+                                disabled={heldTransactions.length === 0}
+                                className="flex flex-col items-center justify-center gap-1 py-3 bg-purple-500/20 hover:bg-purple-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-purple-400 transition-colors"
+                            >
+                                <History className="h-6 w-6" />
+                                <span className="text-xs">RECALL ({heldTransactions.length})</span>
+                            </button>
+                            <button
+                                onClick={() => selectedItemIndex !== null && setShowQuantityModal(true)}
+                                disabled={selectedItemIndex === null}
+                                className="flex flex-col items-center justify-center gap-1 py-3 bg-emerald-500/20 hover:bg-emerald-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-emerald-400 transition-colors"
+                            >
+                                <Hash className="h-6 w-6" />
+                                <span className="text-xs">QTY</span>
+                            </button>
+                            <button
+                                onClick={() => selectedItemIndex !== null && setShowPriceModal(true)}
+                                disabled={selectedItemIndex === null}
+                                className="flex flex-col items-center justify-center gap-1 py-3 bg-pink-500/20 hover:bg-pink-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-pink-400 transition-colors"
+                            >
+                                <DollarSign className="h-6 w-6" />
+                                <span className="text-xs">PRICE</span>
+                            </button>
+                        </div>
+
+                        {/* Quick Actions Row */}
+                        <div className="grid grid-cols-3 gap-2 mt-1">
+                            <button
+                                onClick={printLastReceipt}
+                                className="flex items-center justify-center gap-2 py-3 bg-cyan-500/20 hover:bg-cyan-500/40 rounded-lg text-cyan-400 transition-colors"
+                            >
+                                <Printer className="h-5 w-5" />
+                                <span className="text-sm font-medium">Last Receipt</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const code = prompt('Enter barcode or SKU to check price:')
+                                    if (code) handlePriceCheck(code)
+                                }}
+                                className="flex items-center justify-center gap-2 py-3 bg-yellow-500/20 hover:bg-yellow-500/40 rounded-lg text-yellow-400 transition-colors"
+                            >
+                                <Search className="h-5 w-5" />
+                                <span className="text-sm font-medium">Price Check</span>
+                            </button>
+                            <button
+                                onClick={() => setShowQuickAddModal(true)}
+                                className="flex items-center justify-center gap-2 py-3 bg-emerald-500/20 hover:bg-emerald-500/40 rounded-lg text-emerald-400 transition-colors"
+                            >
+                                <DollarSign className="h-5 w-5" />
+                                <span className="text-sm font-medium">Quick Add</span>
+                            </button>
+                        </div>
+
+                        {/* Quick Life Row - Super Easy Features */}
+                        <div className="grid grid-cols-5 gap-2 mt-1">
+                            <button
+                                onClick={() => setShowCustomerLookup(true)}
+                                className="flex flex-col items-center justify-center gap-1 py-2 bg-blue-500/20 hover:bg-blue-500/40 rounded-lg text-blue-400 transition-colors"
+                            >
+                                <Phone className="h-5 w-5" />
+                                <span className="text-xs font-medium">Lookup</span>
+                            </button>
+                            <button
+                                onClick={() => setShowCashDropModal(true)}
+                                className="flex flex-col items-center justify-center gap-1 py-2 bg-green-500/20 hover:bg-green-500/40 rounded-lg text-green-400 transition-colors"
+                            >
+                                <Wallet className="h-5 w-5" />
+                                <span className="text-xs font-medium">Cash Drop</span>
+                            </button>
+                            <button
+                                onClick={() => setShowReceiveStockModal(true)}
+                                className="flex flex-col items-center justify-center gap-1 py-2 bg-orange-500/20 hover:bg-orange-500/40 rounded-lg text-orange-400 transition-colors"
+                            >
+                                <PackagePlus className="h-5 w-5" />
+                                <span className="text-xs font-medium">Receive</span>
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const res = await fetch('/api/franchise/transactions?limit=5')
+                                        if (res.ok) {
+                                            const data = await res.json()
+                                            setRecentTransactions(data.transactions || [])
+                                        }
+                                    } catch (e) { console.error(e) }
+                                    setShowRecentTransactions(true)
+                                }}
+                                className="flex flex-col items-center justify-center gap-1 py-2 bg-purple-500/20 hover:bg-purple-500/40 rounded-lg text-purple-400 transition-colors"
+                            >
+                                <Clock className="h-5 w-5" />
+                                <span className="text-xs font-medium">Recent</span>
+                            </button>
+                            <button
+                                onClick={() => setShowEndOfDayWizard(true)}
+                                className="flex flex-col items-center justify-center gap-1 py-2 bg-indigo-500/20 hover:bg-indigo-500/40 rounded-lg text-indigo-400 transition-colors"
+                            >
+                                <Moon className="h-5 w-5" />
+                                <span className="text-xs font-medium">Close</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Side - Totals & Payment */}
+                <div className="w-80 flex flex-col bg-stone-950">
+                    {/* Totals */}
+                    <div className="p-4 space-y-3 bg-stone-900 border-b border-stone-800">
+                        <div className="flex justify-between text-lg">
+                            <span className="text-emerald-400">Sub Total</span>
+                            <span className="font-bold">{formatCurrency(subtotal)}</span>
+                        </div>
+
+                        {/* Promo Discount Display */}
+                        {promoDiscount > 0 && (
+                            <div className="flex justify-between text-lg bg-pink-500/10 -mx-4 px-4 py-2 border-y border-pink-500/20">
+                                <span className="text-pink-400 flex items-center gap-2">
+                                    <Gift className="h-4 w-4" />
+                                    Deals Savings
+                                </span>
+                                <span className="font-bold text-pink-400">-{formatCurrency(promoDiscount)}</span>
+                            </div>
+                        )}
+
+                        {/* Applied Promotions List */}
+                        {appliedPromotions.length > 0 && (
+                            <div className="text-xs space-y-1 text-stone-400">
+                                {appliedPromotions.map((promo, idx) => (
+                                    <div key={idx} className="flex justify-between">
+                                        <span className="truncate">{promo.promotionName}</span>
+                                        <span className="text-pink-400">-{formatCurrency(promo.discountAmount)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="flex justify-between text-lg">
+                            <span className="text-emerald-400">Tax</span>
+                            <span className="font-bold">{formatCurrency(tax)}</span>
+                        </div>
+
+                        {/* Dual Pricing Display */}
+                        {showDualPricing ? (
+                            <div className="border-t border-stone-700 pt-3 space-y-2">
+                                <div className="flex justify-between text-xl">
+                                    <span className="text-green-400 font-bold flex items-center gap-2">
+                                        <Banknote className="h-5 w-5" />
+                                        Cash
+                                    </span>
+                                    <span className="font-bold text-green-400">{formatCurrency(cashTotal)}</span>
+                                </div>
+                                <div className="flex justify-between text-xl">
+                                    <span className="text-blue-400 font-bold flex items-center gap-2">
+                                        <CreditCard className="h-5 w-5" />
+                                        Card
+                                    </span>
+                                    <span className="font-bold text-blue-400">{formatCurrency(cardTotal)}</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex justify-between text-2xl border-t border-stone-700 pt-3">
+                                <span className="text-emerald-400 font-bold">Grand Total</span>
+                                <span className="font-bold text-emerald-400">{formatCurrency(total)}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* PAY Button */}
+                    <button
+                        onClick={() => setShowPaymentModal(true)}
+                        disabled={cart.length === 0 || isLoading}
+                        className="m-4 py-8 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl text-4xl font-bold transition-all shadow-lg shadow-emerald-500/20"
+                    >
+                        PAY {formatCurrency(total)}
+                    </button>
+
+                    {/* Action Buttons */}
+
+
+                    {/* Customer Info */}
+                    <div className="mt-auto p-4 bg-stone-900 border-t border-stone-800">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setShowCustomerModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 rounded-lg text-orange-400 transition-colors"
+                            >
+                                <User className="h-5 w-5" />
+                                <span>Customer Info</span>
+                            </button>
+                            <button className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 rounded-lg transition-colors">
+                                <FileText className="h-5 w-5" />
+                                <span>Notes</span>
+                            </button>
+                        </div>
+                        {selectedCustomer && (
+                            <div className="mt-2 text-sm text-stone-400">
+                                {selectedCustomer.firstName} {selectedCustomer.lastName}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Checkout Modal - Same as Salon POS */}
+            {showPaymentModal && (
+                <CheckoutModal
+                    isOpen={showPaymentModal}
+                    onClose={() => setShowPaymentModal(false)}
+                    cart={cart.map(item => ({
+                        ...item,
+                        type: 'product'
+                    }))}
+                    subtotal={subtotal}
+                    taxRate={config?.taxRate || 0}
+                    customerId={selectedCustomer?.id}
+                    customerName={selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined}
+                    onComplete={(transaction) => {
+                        // Handle card payments via PAX
+                        if (transaction.paymentMethod === 'CREDIT_CARD' || transaction.paymentMethod === 'DEBIT_CARD') {
+                            setPendingCardAmount(transaction.total)
+                            setShowPaymentModal(false)
+                            setShowPaxModal(true)
+                        } else {
+                            // Process cash payment directly
+                            processPayment(transaction.paymentMethod, 0)
+                        }
+                    }}
+                />
+            )}
+
+            {showQuickAddModal && (
+                <QuickAddModal
+                    onAdd={(price, taxType) => {
+                        let taxRate = config?.taxRate || 0
+                        let isEbt = false
+
+                        if (taxType === 'NO_TAX') taxRate = 0
+                        if (taxType === 'HIGH_TAX') taxRate = config?.taxRate || 8.25 // Fallback to 8.25 if null
+                        if (taxType === 'LOW_TAX') taxRate = 2.25 // Grocery rate
+                        if (taxType === 'EBT') {
+                            taxRate = 0
+                            isEbt = true
+                        }
+
+                        addToCart({
+                            id: `quick-${Date.now()}`,
+                            name: 'Quick Add Item',
+                            price: price,
+                            taxRate: taxRate,
+                            isEbtEligible: isEbt,
+                            category: 'QUICK_ADD',
+                            quantity: 1
+                        })
+                        setShowQuickAddModal(false)
+                    }}
+                    onClose={() => setShowQuickAddModal(false)}
+                />
+            )}
+
+            {/* PAX Payment Modal */}
+            {showPaxModal && (
+                <PaxPaymentModal
+                    isOpen={showPaxModal}
+                    onClose={() => setShowPaxModal(false)}
+                    onSuccess={handlePaxSuccess}
+                    amount={pendingCardAmount}
+                    invoiceNumber={String(Math.floor(Date.now() / 1000) % 9999 + 1)}
+                />
+            )}
+
+            {/* Transaction Discount Modal */}
+            {showTransactionDiscountModal && (
+                <TransactionDiscountModal
+                    subtotal={subtotal}
+                    onApply={(type, value) => {
+                        setTransactionDiscount({ type, value })
+                        setShowTransactionDiscountModal(false)
+                        setToast({ message: `Invoice discount applied: ${type === 'PERCENT' ? value + '%' : formatCurrency(value)}`, type: 'success' })
+                    }}
+                    onClose={() => setShowTransactionDiscountModal(false)}
+                />
+            )}
+
+            {/* Age Verification Modal */}
+            {showAgeVerification && pendingAgeItem && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                    <div className="bg-stone-900 rounded-2xl p-8 max-w-md w-full mx-4 border border-stone-700">
+                        <div className="text-center">
+                            <AlertTriangle className="h-16 w-16 text-amber-500 mx-auto mb-4" />
+                            <h2 className="text-2xl font-bold mb-2">Age Verification Required</h2>
+                            <p className="text-stone-400 mb-2">{pendingAgeItem.name}</p>
+                            <p className="text-xl font-bold text-amber-500 mb-6">
+                                Customer must be {pendingAgeItem.minimumAge || 21}+ years old
+                            </p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={() => {
+                                        setPendingAgeItem(null)
+                                        setShowAgeVerification(false)
+                                    }}
+                                    className="py-4 bg-stone-800 hover:bg-stone-700 rounded-xl font-bold transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmAgeVerification}
+                                    className="py-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold transition-colors"
+                                >
+                                    ID Verified ✓
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Discount Modal */}
+            {showDiscountModal && selectedItemIndex !== null && (
+                <DiscountModal
+                    item={cart[selectedItemIndex]}
+                    onApply={applyDiscount}
+                    onClose={() => setShowDiscountModal(false)}
+                />
+            )}
+
+            {/* Quantity Modal */}
+            {showQuantityModal && selectedItemIndex !== null && (
+                <QuantityModal
+                    item={cart[selectedItemIndex]}
+                    onApply={(qty) => {
+                        updateQuantity(selectedItemIndex, qty)
+                        setShowQuantityModal(false)
+                    }}
+                    onClose={() => setShowQuantityModal(false)}
+                />
+            )}
+
+            {/* Price Modal */}
+            {showPriceModal && selectedItemIndex !== null && (
+                <PriceModal
+                    item={cart[selectedItemIndex]}
+                    onApply={changePrice}
+                    onClose={() => setShowPriceModal(false)}
+                />
+            )}
+
+            {/* Search Modal */}
+            {showSearchModal && (
+                <SearchModal
+                    onSelect={(product) => {
+                        addToCart(product)
+                        setShowSearchModal(false)
+                    }}
+                    onClose={() => setShowSearchModal(false)}
+                />
+            )}
+
+            {/* Price Check Modal */}
+            {showPriceCheckModal && priceCheckProduct && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full border border-stone-700">
+                        <div className="text-center">
+                            <h2 className="text-2xl font-bold text-white mb-4">Price Check</h2>
+                            <div className="bg-stone-800 rounded-xl p-6 mb-4">
+                                <p className="text-xl font-bold text-white mb-2">{priceCheckProduct.name}</p>
+                                {priceCheckProduct.barcode && (
+                                    <p className="text-stone-400 text-sm mb-2">UPC: {priceCheckProduct.barcode}</p>
+                                )}
+                                <p className="text-4xl font-bold text-emerald-400">${Number(priceCheckProduct.price).toFixed(2)}</p>
+                                {priceCheckProduct.isEbtEligible && (
+                                    <span className="inline-block mt-2 px-3 py-1 bg-green-600/20 text-green-400 rounded-full text-sm font-medium">
+                                        EBT Eligible
+                                    </span>
+                                )}
+                                {priceCheckProduct.stock !== undefined && (
+                                    <p className={`mt-2 text-sm ${priceCheckProduct.stock > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        {priceCheckProduct.stock > 0 ? `In Stock: ${priceCheckProduct.stock}` : 'Out of Stock'}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowPriceCheckModal(false)
+                                        setPriceCheckProduct(null)
+                                    }}
+                                    className="py-3 bg-stone-800 hover:bg-stone-700 rounded-xl font-bold"
+                                >
+                                    Close
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        addToCart(priceCheckProduct)
+                                        setShowPriceCheckModal(false)
+                                        setPriceCheckProduct(null)
+                                    }}
+                                    className="py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold"
+                                >
+                                    Add to Cart
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Customer Quick Lookup Modal */}
+            {showCustomerLookup && (
+                <CustomerLookupModal
+                    onClose={() => setShowCustomerLookup(false)}
+                    onSelectCustomer={(customer) => {
+                        setSelectedCustomer(customer)
+                        setShowCustomerLookup(false)
+                        setToast({ message: `Selected: ${customer.name}`, type: 'success' })
+                    }}
+                />
+            )}
+
+            {/* Cash Drop Modal */}
+            {showCashDropModal && (
+                <CashDropModal
+                    onClose={() => setShowCashDropModal(false)}
+                    onSuccess={() => {
+                        setShowCashDropModal(false)
+                        setToast({ message: '✓ Cash drop recorded', type: 'success' })
+                    }}
+                />
+            )}
+
+            {/* Receive Stock Modal */}
+            {showReceiveStockModal && (
+                <ReceiveStockModal
+                    onClose={() => setShowReceiveStockModal(false)}
+                    onSuccess={() => {
+                        setShowReceiveStockModal(false)
+                        setToast({ message: '✓ Stock received', type: 'success' })
+                    }}
+                />
+            )}
+
+            {/* Recent Transactions Modal */}
+            {showRecentTransactions && (
+                <RecentTransactionsModal
+                    transactions={recentTransactions}
+                    onClose={() => setShowRecentTransactions(false)}
+                    onSelectTransaction={(tx) => {
+                        // Could implement reprint/refund functionality here
+                        console.log('Selected transaction:', tx.id)
+                    }}
+                />
+            )}
+
+            {/* End of Day Wizard */}
+            {showEndOfDayWizard && (
+                <EndOfDayWizard
+                    onClose={() => setShowEndOfDayWizard(false)}
+                    onComplete={() => {
+                        setShowEndOfDayWizard(false)
+                        setToast({ message: '✓ Day closed successfully!', type: 'success' })
+                    }}
+                />
+            )}
+
+            {/* Case Break Modal - Single vs 6-Pack vs Case */}
+            {showCaseBreakModal && pendingCaseBreakProduct && (
+                <CaseBreakModal
+                    product={pendingCaseBreakProduct}
+                    onSelect={(selectedProduct) => {
+                        addToCart(selectedProduct)
+                        setShowCaseBreakModal(false)
+                        setPendingCaseBreakProduct(null)
+                    }}
+                    onClose={() => {
+                        setShowCaseBreakModal(false)
+                        setPendingCaseBreakProduct(null)
+                    }}
+                />
+            )}
+        </div>
+    )
+}
+
+// Discount Modal Component
+function DiscountModal({ item, onApply, onClose }: { item: CartItem; onApply: (discount: number) => void; onClose: () => void }) {
+    const [discount, setDiscount] = useState(item.discount?.toString() || '')
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full mx-4 border border-stone-700">
+                <h2 className="text-xl font-bold mb-4">Apply Discount</h2>
+                <p className="text-stone-400 mb-4">{item.name}</p>
+                <input
+                    type="number"
+                    value={discount}
+                    onChange={(e) => setDiscount(e.target.value)}
+                    placeholder="Discount %"
+                    className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg mb-4 text-center text-2xl"
+                    autoFocus
+                />
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                    {[5, 10, 15, 20, 25, 30, 50, 100].map(pct => (
+                        <button
+                            key={pct}
+                            onClick={() => setDiscount(pct.toString())}
+                            className="py-2 bg-stone-800 hover:bg-orange-500/30 rounded-lg text-sm"
+                        >
+                            {pct}%
+                        </button>
+                    ))}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={onClose} className="py-3 bg-stone-800 rounded-lg">Cancel</button>
+                    <button onClick={() => onApply(parseFloat(discount) || 0)} className="py-3 bg-orange-500 rounded-lg font-bold">Apply</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Quantity Modal Component
+function QuantityModal({ item, onApply, onClose }: { item: CartItem; onApply: (qty: number) => void; onClose: () => void }) {
+    const [qty, setQty] = useState(item.quantity.toString())
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full mx-4 border border-stone-700">
+                <h2 className="text-xl font-bold mb-4">Change Quantity</h2>
+                <p className="text-stone-400 mb-4">{item.name}</p>
+                <input
+                    type="number"
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value)}
+                    className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg mb-4 text-center text-2xl"
+                    autoFocus
+                    min="1"
+                />
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={onClose} className="py-3 bg-stone-800 rounded-lg">Cancel</button>
+                    <button onClick={() => onApply(parseInt(qty) || 1)} className="py-3 bg-emerald-500 rounded-lg font-bold">Apply</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Price Modal Component
+function PriceModal({ item, onApply, onClose }: { item: CartItem; onApply: (price: number) => void; onClose: () => void }) {
+    const [price, setPrice] = useState(item.price.toString())
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full mx-4 border border-stone-700">
+                <h2 className="text-xl font-bold mb-4">Change Price</h2>
+                <p className="text-stone-400 mb-4">{item.name}</p>
+                <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-stone-400">$</span>
+                    <input
+                        type="number"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-stone-800 border border-stone-700 rounded-lg mb-4 text-center text-2xl"
+                        autoFocus
+                        step="0.01"
+                    />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={onClose} className="py-3 bg-stone-800 rounded-lg">Cancel</button>
+                    <button onClick={() => onApply(parseFloat(price) || 0)} className="py-3 bg-pink-500 rounded-lg font-bold">Apply</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Search Modal Component with auto-suggest
+function SearchModal({ onSelect, onClose }: { onSelect: (product: any) => void; onClose: () => void }) {
+    const [query, setQuery] = useState('')
+    const [results, setResults] = useState<any[]>([])
+    const [isSearching, setIsSearching] = useState(false)
+
+    // Auto-search as user types (debounced)
+    useEffect(() => {
+        if (!query.trim() || query.length < 2) {
+            setResults([])
+            return
+        }
+
+        const debounceTimer = setTimeout(async () => {
+            setIsSearching(true)
+            try {
+                const res = await fetch(`/api/pos/retail/search?q=${encodeURIComponent(query)}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setResults(data)
+                }
+            } catch (error) {
+                console.error('Search error:', error)
+            } finally {
+                setIsSearching(false)
+            }
+        }, 300) // 300ms debounce
+
+        return () => clearTimeout(debounceTimer)
+    }, [query])
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <div className="bg-stone-900 rounded-2xl p-6 max-w-2xl w-full mx-4 border border-stone-700 max-h-[80vh] flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold">Search Products</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-stone-800 rounded-lg">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+                <div className="relative mb-4">
+                    <input
+                        type="text"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Start typing to search..."
+                        className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg pr-12"
+                        autoFocus
+                    />
+                    {isSearching && (
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                            <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    )}
+                </div>
+                <div className="flex-1 overflow-y-auto space-y-2">
+                    {results.map((product) => (
+                        <button
+                            key={product.id}
+                            onClick={() => onSelect(product)}
+                            className="w-full p-4 bg-stone-800 hover:bg-stone-700 rounded-lg text-left flex justify-between items-center"
+                        >
+                            <div>
+                                <p className="font-medium">{product.name}</p>
+                                <p className="text-sm text-stone-400">
+                                    {product.barcode && `BC: ${product.barcode}`}
+                                    {product.sku && ` | SKU: ${product.sku}`}
+                                </p>
+                            </div>
+                            <span className="text-lg font-bold text-emerald-400">
+                                {formatCurrency(parseFloat(product.price))}
+                            </span>
+                        </button>
+                    ))}
+                    {results.length === 0 && query.length >= 2 && !isSearching && (
+                        <p className="text-center text-stone-500 py-8">No products found</p>
+                    )}
+                    {query.length < 2 && (
+                        <p className="text-center text-stone-500 py-8">Type at least 2 characters to search</p>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Station Selection Modal Component
+function StationModal({
+    stations,
+    onSelect,
+    onClose
+}: {
+    stations: any[];
+    onSelect: (station: any) => void;
+    onClose: () => void
+}) {
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <div className="bg-stone-900 rounded-2xl p-6 w-full max-w-lg">
+                <h2 className="text-2xl font-bold mb-2">Select Your Station</h2>
+                <p className="text-stone-400 mb-6">Choose which register you're working at:</p>
+                <div className="space-y-3">
+                    {stations.map((station) => (
+                        <button
+                            key={station.id}
+                            onClick={() => {
+                                onSelect(station)
+                                onClose()
+                            }}
+                            className="w-full p-4 bg-stone-800 hover:bg-stone-700 rounded-xl text-left flex items-center gap-4 transition-colors"
+                        >
+                            <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${station.paymentMode === 'DEDICATED' ? 'bg-green-500/20' : 'bg-amber-500/20'
+                                }`}>
+                                <span className="text-2xl">
+                                    {station.paymentMode === 'DEDICATED' ? '💳' : '💵'}
+                                </span>
+                            </div>
+                            <div className="flex-1">
+                                <p className="font-bold text-lg text-stone-100">{station.name}</p>
+                                <p className="text-sm text-stone-400">
+                                    {station.paymentMode === 'DEDICATED'
+                                        ? `Terminal: ${station.dedicatedTerminal?.name || 'Configured'}`
+                                        : 'Cash Only'
+                                    }
+                                </p>
+                            </div>
+                            <span className={`px-2 py-1 text-xs rounded ${station.paymentMode === 'DEDICATED'
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-amber-500/20 text-amber-400'
+                                }`}>
+                                {station.paymentMode === 'DEDICATED' ? 'Card' : 'Cash'}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Customer Quick Lookup Modal
+function CustomerLookupModal({ onClose, onSelectCustomer }: {
+    onClose: () => void
+    onSelectCustomer: (customer: any) => void
+}) {
+    const [phone, setPhone] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [result, setResult] = useState<any>(null)
+
+    const handleSearch = async () => {
+        if (phone.length < 7) return
+        setLoading(true)
+        try {
+            const res = await fetch(`/api/pos/customer-lookup?phone=${phone}`)
+            const data = await res.json()
+            setResult(data)
+        } catch (e) {
+            console.error(e)
+        }
+        setLoading(false)
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full border border-stone-700">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">Customer Lookup</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-stone-800 rounded-lg">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+                <div className="flex gap-2 mb-4">
+                    <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Enter phone number..."
+                        className="flex-1 px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-lg"
+                        autoFocus
+                    />
+                    <button
+                        onClick={handleSearch}
+                        disabled={phone.length < 7 || loading}
+                        className="px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg font-bold"
+                    >
+                        {loading ? '...' : 'Search'}
+                    </button>
+                </div>
+                {result && (
+                    result.found ? (
+                        <div className="bg-stone-800 rounded-xl p-4 space-y-3">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-lg font-bold text-white">{result.customer.name}</p>
+                                    <p className="text-stone-400 text-sm">{result.customer.phone}</p>
+                                </div>
+                                <button
+                                    onClick={() => onSelectCustomer(result.customer)}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-medium"
+                                >
+                                    Select
+                                </button>
+                            </div>
+                            {result.loyalty && (
+                                <div className="flex items-center gap-3 pt-2 border-t border-stone-700">
+                                    <span className="text-2xl">⭐</span>
+                                    <div>
+                                        <p className="font-bold text-amber-400">{result.loyalty.points} Points</p>
+                                        <p className="text-xs text-stone-500">Lifetime: {result.loyalty.lifetimePoints}</p>
+                                    </div>
+                                </div>
+                            )}
+                            {result.recentPurchases?.length > 0 && (
+                                <div className="pt-2 border-t border-stone-700">
+                                    <p className="text-xs text-stone-500 mb-2">Recent Purchases</p>
+                                    {result.recentPurchases.map((p: any) => (
+                                        <div key={p.id} className="flex justify-between text-sm py-1">
+                                            <span className="text-stone-400">{new Date(p.date).toLocaleDateString()}</span>
+                                            <span className="font-medium">${p.total.toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="text-center py-6 text-stone-400">
+                            <p>No customer found</p>
+                            <p className="text-sm mt-1">for this phone number</p>
+                        </div>
+                    )
+                )}
+            </div>
+        </div>
+    )
+}
+
+// Cash Drop Modal
+function CashDropModal({ onClose, onSuccess }: {
+    onClose: () => void
+    onSuccess: () => void
+}) {
+    const [amount, setAmount] = useState('')
+    const [loading, setLoading] = useState(false)
+
+    const handleDrop = async () => {
+        if (!amount || parseFloat(amount) <= 0) return
+        setLoading(true)
+        try {
+            await fetch('/api/drawer-activity', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'CASH_DROP',
+                    amount: parseFloat(amount),
+                    note: `Cash drop: $${amount}`
+                })
+            })
+            onSuccess()
+        } catch (e) {
+            console.error(e)
+        }
+        setLoading(false)
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full border border-stone-700">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">💵 Cash Drop</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-stone-800 rounded-lg">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+                <p className="text-stone-400 mb-4">Enter amount to drop to safe:</p>
+                <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full px-4 py-4 bg-stone-800 border border-stone-700 rounded-lg text-center text-3xl font-bold mb-4"
+                    autoFocus
+                />
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                    {[20, 50, 100, 200].map(val => (
+                        <button
+                            key={val}
+                            onClick={() => setAmount(val.toString())}
+                            className="py-2 bg-stone-800 hover:bg-stone-700 rounded-lg font-medium"
+                        >
+                            ${val}
+                        </button>
+                    ))}
+                </div>
+                <button
+                    onClick={handleDrop}
+                    disabled={!amount || parseFloat(amount) <= 0 || loading}
+                    className="w-full py-4 bg-green-600 hover:bg-green-500 disabled:opacity-50 rounded-xl font-bold text-lg"
+                >
+                    {loading ? 'Recording...' : `Drop $${amount || '0'}`}
+                </button>
+            </div>
+        </div>
+    )
+}
+
+// Receive Stock Modal
+function ReceiveStockModal({ onClose, onSuccess }: {
+    onClose: () => void
+    onSuccess: () => void
+}) {
+    const [barcode, setBarcode] = useState('')
+    const [quantity, setQuantity] = useState('1')
+    const [loading, setLoading] = useState(false)
+    const [product, setProduct] = useState<any>(null)
+
+    const lookupProduct = async (code: string) => {
+        try {
+            const res = await fetch(`/api/inventory/products?barcode=${code}`)
+            if (res.ok) {
+                const data = await res.json()
+                if (data.products?.[0]) {
+                    setProduct(data.products[0])
+                }
+            }
+        } catch (e) { }
+    }
+
+    const handleReceive = async () => {
+        if (!barcode) return
+        setLoading(true)
+        try {
+            const res = await fetch('/api/inventory/quick-receive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    barcode,
+                    quantity: parseInt(quantity) || 1
+                })
+            })
+            if (res.ok) {
+                onSuccess()
+            }
+        } catch (e) {
+            console.error(e)
+        }
+        setLoading(false)
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full border border-stone-700">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">📦 Receive Stock</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-stone-800 rounded-lg">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+                <input
+                    type="text"
+                    value={barcode}
+                    onChange={(e) => {
+                        setBarcode(e.target.value)
+                        if (e.target.value.length > 5) lookupProduct(e.target.value)
+                    }}
+                    placeholder="Scan or enter barcode..."
+                    className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg mb-3"
+                    autoFocus
+                />
+                {product && (
+                    <div className="bg-stone-800 rounded-lg p-3 mb-3">
+                        <p className="font-bold">{product.name}</p>
+                        <p className="text-sm text-stone-400">Current stock: {product.stock || 0}</p>
+                    </div>
+                )}
+                <div className="flex items-center gap-3 mb-4">
+                    <span className="text-stone-400">Quantity:</span>
+                    <input
+                        type="number"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        className="flex-1 px-4 py-2 bg-stone-800 border border-stone-700 rounded-lg text-center text-xl"
+                    />
+                </div>
+                <button
+                    onClick={handleReceive}
+                    disabled={!barcode || loading}
+                    className="w-full py-4 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 rounded-xl font-bold"
+                >
+                    {loading ? 'Receiving...' : `Receive ${quantity} Units`}
+                </button>
+            </div>
+        </div>
+    )
+}
+
+// Recent Transactions Modal
+function RecentTransactionsModal({ transactions, onClose, onSelectTransaction }: {
+    transactions: any[]
+    onClose: () => void
+    onSelectTransaction: (tx: any) => void
+}) {
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full border border-stone-700 max-h-[80vh] overflow-hidden flex flex-col">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">🕐 Recent Transactions</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-stone-800 rounded-lg">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto space-y-2">
+                    {transactions.length > 0 ? (
+                        transactions.map((tx) => (
+                            <button
+                                key={tx.id}
+                                onClick={() => onSelectTransaction(tx)}
+                                className="w-full p-4 bg-stone-800 hover:bg-stone-700 rounded-xl text-left flex justify-between items-center"
+                            >
+                                <div>
+                                    <p className="font-bold text-white">
+                                        ${Number(tx.total).toFixed(2)}
+                                    </p>
+                                    <p className="text-sm text-stone-400">
+                                        {new Date(tx.createdAt).toLocaleTimeString()} • {tx.paymentMethod || 'N/A'}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs text-stone-500">#{tx.invoiceNumber || tx.id.slice(-6)}</p>
+                                    <span className={`text-xs px-2 py-1 rounded ${tx.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
+                                        tx.status === 'REFUNDED' ? 'bg-red-500/20 text-red-400' :
+                                            'bg-stone-600/20 text-stone-400'
+                                        }`}>
+                                        {tx.status}
+                                    </span>
+                                </div>
+                            </button>
+                        ))
+                    ) : (
+                        <div className="text-center py-8 text-stone-400">
+                            <p>No recent transactions</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Case Break Modal - Single vs 6-Pack vs Case selection
+function CaseBreakModal({ product, onSelect, onClose }: {
+    product: any
+    onSelect: (product: any) => void
+    onClose: () => void
+}) {
+    const singlePrice = parseFloat(product.price)
+    const casePrice = product.casePrice ? parseFloat(product.casePrice) : singlePrice * product.unitsPerCase * 0.9
+    const sixPackPrice = singlePrice * 6 * 0.95 // 5% discount for 6-pack
+    const unitsPerCase = product.unitsPerCase || 12
+
+    const handleSelect = (type: 'single' | 'sixpack' | 'case') => {
+        const selectedProduct = { ...product }
+
+        if (type === 'single') {
+            selectedProduct.name = `${product.name} (Single)`
+            selectedProduct.price = singlePrice
+        } else if (type === 'sixpack') {
+            selectedProduct.name = `${product.name} (6-Pack)`
+            selectedProduct.price = sixPackPrice
+        } else {
+            selectedProduct.name = `${product.name} (Case of ${unitsPerCase})`
+            selectedProduct.price = casePrice
+        }
+
+        onSelect(selectedProduct)
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+            <div className="bg-stone-900 rounded-2xl w-full max-w-md border border-stone-700 overflow-hidden">
+                {/* Header */}
+                <div className="p-4 border-b border-stone-800 bg-gradient-to-r from-amber-600 to-orange-600">
+                    <h2 className="text-xl font-bold">How are you selling this?</h2>
+                    <p className="text-amber-100">{product.name}</p>
+                </div>
+
+                {/* Options */}
+                <div className="p-4 space-y-3">
+                    {/* Single */}
+                    <button
+                        onClick={() => handleSelect('single')}
+                        className="w-full flex items-center justify-between p-4 bg-stone-800 hover:bg-stone-700 rounded-xl transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="text-3xl">🍺</span>
+                            <div className="text-left">
+                                <p className="font-bold text-lg">Single</p>
+                                <p className="text-sm text-stone-400">1 unit</p>
+                            </div>
+                        </div>
+                        <p className="text-2xl font-bold text-emerald-400">${singlePrice.toFixed(2)}</p>
+                    </button>
+
+                    {/* 6-Pack */}
+                    <button
+                        onClick={() => handleSelect('sixpack')}
+                        className="w-full flex items-center justify-between p-4 bg-stone-800 hover:bg-stone-700 rounded-xl transition-colors border-2 border-blue-500/30"
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="text-3xl">🍻</span>
+                            <div className="text-left">
+                                <p className="font-bold text-lg">6-Pack</p>
+                                <p className="text-sm text-blue-400">Save 5%</p>
+                            </div>
+                        </div>
+                        <p className="text-2xl font-bold text-blue-400">${sixPackPrice.toFixed(2)}</p>
+                    </button>
+
+                    {/* Case */}
+                    <button
+                        onClick={() => handleSelect('case')}
+                        className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-purple-600/20 to-indigo-600/20 hover:from-purple-600/30 hover:to-indigo-600/30 rounded-xl transition-colors border-2 border-purple-500/50"
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="text-3xl">📦</span>
+                            <div className="text-left">
+                                <p className="font-bold text-lg">Full Case</p>
+                                <p className="text-sm text-purple-400">{unitsPerCase} units • Best Value!</p>
+                            </div>
+                        </div>
+                        <p className="text-2xl font-bold text-purple-400">${casePrice.toFixed(2)}</p>
+                    </button>
+                </div>
+
+                {/* Cancel */}
+                <div className="p-4 border-t border-stone-800">
+                    <button
+                        onClick={onClose}
+                        className="w-full py-3 bg-stone-800 hover:bg-stone-700 rounded-xl font-medium"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}

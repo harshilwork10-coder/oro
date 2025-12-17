@@ -11,7 +11,10 @@ import { useFullscreen } from '@/hooks/useFullscreen'
 
 function DisplayContent() {
     const searchParams = useSearchParams()
+    // Support both stationId (retail POS) and locationId (salon POS) - prefer stationId
+    const stationId = searchParams.get('stationId')
     const locationId = searchParams.get('locationId')
+    const displayKey = stationId || locationId // Use whichever is provided
 
     const [cart, setCart] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -40,15 +43,17 @@ function DisplayContent() {
 
     // Server polling for location-specific cart (ONLY method - location-isolated)
     useEffect(() => {
-        if (!locationId) {
+        if (!displayKey) {
             setLoading(false)
-            setError('No location ID provided. Open this URL from POS Display button.')
+            setError('No station or location ID provided. Open this URL from POS Display button.')
             return
         }
 
         const pollServer = async () => {
             try {
-                const res = await fetch(`/api/pos/display-sync?locationId=${locationId}`)
+                // Use stationId param if available, else locationId
+                const paramName = stationId ? 'stationId' : 'locationId'
+                const res = await fetch(`/api/pos/display-sync?${paramName}=${displayKey}`)
                 if (res.ok) {
                     const data = await res.json()
                     const cartString = JSON.stringify(data)
@@ -103,7 +108,7 @@ function DisplayContent() {
         pollServer()
         const interval = setInterval(pollServer, 500)
         return () => clearInterval(interval)
-    }, [locationId, isProcessing])
+    }, [displayKey, stationId, isProcessing])
 
     // Processing timeout - exit processing if cashier abandons transaction
     useEffect(() => {
@@ -125,7 +130,7 @@ function DisplayContent() {
 
     // Handle tip selection - send back to POS
     const handleTipSelected = async (tipAmount: number) => {
-        if (!locationId) return
+        if (!displayKey) return
 
         // Save tip amount and enter processing mode with timestamp
         setSavedTipAmount(tipAmount)
@@ -137,7 +142,7 @@ function DisplayContent() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    locationId,
+                    [stationId ? 'stationId' : 'locationId']: displayKey,
                     cart: {
                         ...cart,
                         tipAmount,
@@ -209,7 +214,7 @@ function DisplayContent() {
                 </div>
             )}
 
-            {status === 'REVIEW' && <Review locationId={locationId || undefined} onComplete={() => setCart(null)} />}
+            {status === 'REVIEW' && <Review locationId={displayKey || undefined} onComplete={() => setCart(null)} />}
             {status === 'COMPLETED' && <ThankYou onComplete={() => setCart(null)} />}
 
             {(status === 'ACTIVE' || status === 'AWAITING_TIP') && cart?.items?.length > 0 && (

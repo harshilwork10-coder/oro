@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { CreditCard, DollarSign, Users, Shield, Save, AlertCircle } from 'lucide-react'
+import { CreditCard, DollarSign, Users, Shield, Save, AlertCircle, FileText } from 'lucide-react'
 
 export default function SettingsPage() {
     const { data: session } = useSession()
@@ -19,6 +19,11 @@ export default function SettingsPage() {
     const [tipEnabled, setTipEnabled] = useState(true)
     const [tipType, setTipType] = useState('PERCENT')
     const [tipSuggestions, setTipSuggestions] = useState('15,20,25')
+
+    // Payment Options
+    const [acceptsEbt, setAcceptsEbt] = useState(false)
+    const [acceptsChecks, setAcceptsChecks] = useState(false)
+    const [acceptsOnAccount, setAcceptsOnAccount] = useState(false)
 
     // Employee List
     const [employees, setEmployees] = useState<any[]>([])
@@ -41,6 +46,10 @@ export default function SettingsPage() {
                     setTipEnabled(data.tipPromptEnabled ?? true)
                     setTipType(data.tipType || 'PERCENT')
                     setTipSuggestions(data.tipSuggestions?.replace(/[\[\]]/g, '') || '15,20,25')
+                    // Payment settings
+                    setAcceptsEbt(data.acceptsEbt ?? false)
+                    setAcceptsChecks(data.acceptsChecks ?? false)
+                    setAcceptsOnAccount(data.acceptsOnAccount ?? false)
                 }
             }
         } catch (error) {
@@ -78,7 +87,11 @@ export default function SettingsPage() {
                     // Tip settings
                     tipPromptEnabled: tipEnabled,
                     tipType,
-                    tipSuggestions: `[${tipSuggestions}]`
+                    tipSuggestions: `[${tipSuggestions}]`,
+                    // Payment settings
+                    acceptsEbt,
+                    acceptsChecks,
+                    acceptsOnAccount
                 })
             })
 
@@ -349,6 +362,84 @@ export default function SettingsPage() {
                             </div>
                         </>
                     )}
+                </div>
+            </div>
+
+            {/* Payment Options */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="h-12 w-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+                        <DollarSign className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold">Payment Methods</h2>
+                        <p className="text-gray-600">Enable or disable additional payment types</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                <CreditCard className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div>
+                                <div className="font-bold text-gray-800">Accept EBT</div>
+                                <div className="text-sm text-gray-500">Allow Electronic Benefit Transfer cards</div>
+                            </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={acceptsEbt}
+                                onChange={(e) => setAcceptsEbt(e.target.checked)}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                                <FileText className="h-5 w-5 text-amber-600" />
+                            </div>
+                            <div>
+                                <div className="font-bold text-gray-800">Accept Checks</div>
+                                <div className="text-sm text-gray-500">Allow payment via personal or business checks</div>
+                            </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={acceptsChecks}
+                                onChange={(e) => setAcceptsChecks(e.target.checked)}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <Users className="h-5 w-5 text-purple-600" />
+                            </div>
+                            <div>
+                                <div className="font-bold text-gray-800">On Account / Store Credit</div>
+                                <div className="text-sm text-gray-500">Allow customers to pay using store credit or account balance</div>
+                            </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={acceptsOnAccount}
+                                onChange={(e) => setAcceptsOnAccount(e.target.checked)}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
                 </div>
             </div>
 

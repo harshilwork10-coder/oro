@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 interface GenerateRequest {
     messageType: 'email' | 'sms'
@@ -16,6 +18,12 @@ interface GenerateRequest {
 
 // Generate marketing content using local Ollama
 export async function POST(request: NextRequest) {
+    // SECURITY: Require authentication to prevent abuse
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     try {
         const body: GenerateRequest = await request.json()
         const { messageType, tone, purpose, customPrompt, businessDetails } = body

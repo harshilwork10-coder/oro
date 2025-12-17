@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { hash } from 'bcrypt'
 
 export async function GET(request: NextRequest) {
+    // SECURITY: Only PROVIDER can list agents
+    const session = await getServerSession(authOptions)
+    if (!session?.user || (session.user as any).role !== 'PROVIDER') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
     try {
         // Get all users with role 'AGENT'
         const agents = await prisma.user.findMany({
@@ -14,8 +21,6 @@ export async function GET(request: NextRequest) {
                 name: true,
                 email: true,
                 createdAt: true,
-                // Count clients they referred (will work once schema is updated)
-                // referredClients: { select: { id: true } }
             }
         })
 
@@ -34,6 +39,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+    // SECURITY: Only PROVIDER can create agents
+    const session = await getServerSession(authOptions)
+    if (!session?.user || (session.user as any).role !== 'PROVIDER') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
     try {
         const { name, email } = await request.json()
 

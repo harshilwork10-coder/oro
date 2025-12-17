@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import net from 'net'
 
 export async function POST(request: NextRequest) {
+    // SECURITY: Require authentication - PAX terminal communication is sensitive
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     try {
         const body = await request.json()
         const { ip, port, payload } = body
@@ -13,7 +21,17 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        // SECURITY: Only allow connections to private IP ranges (terminal should be on local network)
+        if (!isPrivateIP(ip)) {
+            console.warn(`[PAX Proxy TCP] BLOCKED: Attempt to connect to non-private IP: ${ip}`)
+            return NextResponse.json(
+                { error: 'Only local network connections allowed' },
+                { status: 403 }
+            )
+        }
+
         console.log('[PAX Proxy TCP] ========== NEW REQUEST ==========')
+        console.log('[PAX Proxy TCP] User:', session.user.email)
         console.log('[PAX Proxy TCP] Target:', `${ip}:${port}`)
         console.log('[PAX Proxy TCP] Payload (Base64):', payload)
 
@@ -43,6 +61,18 @@ export async function POST(request: NextRequest) {
     }
 }
 
+// SECURITY: Check if IP is in private range (local network only)
+function isPrivateIP(ip: string): boolean {
+    // IPv4 private ranges
+    const privateRanges = [
+        /^10\./,                    // 10.0.0.0 - 10.255.255.255
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // 172.16.0.0 - 172.31.255.255
+        /^192\.168\./,              // 192.168.0.0 - 192.168.255.255
+        /^127\./,                   // 127.0.0.0 - 127.255.255.255 (localhost)
+    ]
+    return privateRanges.some(pattern => pattern.test(ip))
+}
+
 function sendTcpRequest(ip: string, port: string, data: Buffer): Promise<Buffer> {
     return new Promise((resolve, reject) => {
         const client = new net.Socket()
@@ -61,13 +91,7 @@ function sendTcpRequest(ip: string, port: string, data: Buffer): Promise<Buffer>
             responseData = Buffer.concat([responseData, chunk])
 
             // Check if we have a complete response (ends with ETX + LRC)
-            // ETX is 0x03
             if (chunk.includes(0x03)) {
-                // Check if this is the FINAL response (T01) or just a status message
-                // A response starts with STX (0x02) + Command + FS
-                // We need to parse the command from the accumulated buffer
-
-                // Find STX
                 const stxIndex = responseData.indexOf(0x02);
                 if (stxIndex !== -1) {
                     const fsIndex = responseData.indexOf(0x1C, stxIndex);
@@ -75,14 +99,11 @@ function sendTcpRequest(ip: string, port: string, data: Buffer): Promise<Buffer>
                         const command = responseData.subarray(stxIndex + 1, fsIndex).toString('ascii');
                         console.log('[PAX Proxy TCP] Command Received:', command);
 
-                        if (command === 'T01' || command === 'A00') { // T01 = Sale Response, A00 = Init Response
+                        if (command === 'T01' || command === 'A00') {
                             console.log('[PAX Proxy TCP] Final response received, closing connection');
                             client.destroy();
                         } else {
                             console.log('[PAX Proxy TCP] Status message received (keeping connection open)...');
-                            // Optional: Clear buffer if we want to only return the final response?
-                            // But the client might want to see the status messages too.
-                            // For now, let's keep accumulating.
                         }
                     }
                 }

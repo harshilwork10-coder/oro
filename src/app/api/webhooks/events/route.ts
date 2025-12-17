@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 
 // Webhook to notify provider when client adds location
+// SECURITY: Requires valid webhook secret to prevent unauthorized calls
+
+const WEBHOOK_SECRET = process.env.INTERNAL_WEBHOOK_SECRET || 'oronex_internal_webhook_secret'
+
 export async function POST(request: NextRequest) {
     try {
+        // SECURITY: Verify webhook secret
+        const authHeader = request.headers.get('x-webhook-secret')
+        if (authHeader !== WEBHOOK_SECRET) {
+            console.warn('[WEBHOOK] Unauthorized webhook attempt')
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const { event, data } = await request.json()
 
         if (event === 'location.created') {

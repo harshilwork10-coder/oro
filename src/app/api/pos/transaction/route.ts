@@ -41,7 +41,7 @@ export async function POST(req: Request) {
             total: total.toString(),
             paymentMethod: paymentMethod,
             cashAmount: (paymentMethod === 'SPLIT' ? cashAmount : (paymentMethod === 'CASH' ? total : 0)).toString(),
-            cardAmount: (paymentMethod === 'SPLIT' ? cardAmount : (paymentMethod !== 'CASH' ? total : 0)).toString(),
+            cardAmount: (paymentMethod === 'SPLIT' ? cardAmount : (['CREDIT_CARD', 'EBT'].includes(paymentMethod) ? total : 0)).toString(),
             gatewayTxId: gatewayTxId || null,
             authCode: authCode || null,
             cardLast4: cardLast4 || null,

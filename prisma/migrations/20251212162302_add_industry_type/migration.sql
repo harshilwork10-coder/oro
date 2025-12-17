@@ -1,0 +1,143 @@
+-- RedefineTables
+PRAGMA defer_foreign_keys=ON;
+PRAGMA foreign_keys=OFF;
+CREATE TABLE "new_BusinessConfig" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "franchisorId" TEXT NOT NULL,
+    "usesCommissions" BOOLEAN NOT NULL DEFAULT true,
+    "usesInventory" BOOLEAN NOT NULL DEFAULT true,
+    "usesAppointments" BOOLEAN NOT NULL DEFAULT true,
+    "usesScheduling" BOOLEAN NOT NULL DEFAULT true,
+    "usesVirtualKeypad" BOOLEAN NOT NULL DEFAULT true,
+    "usesLoyalty" BOOLEAN NOT NULL DEFAULT true,
+    "usesGiftCards" BOOLEAN NOT NULL DEFAULT true,
+    "usesMemberships" BOOLEAN NOT NULL DEFAULT true,
+    "usesReferrals" BOOLEAN NOT NULL DEFAULT true,
+    "usesRoyalties" BOOLEAN NOT NULL DEFAULT false,
+    "usesTipping" BOOLEAN NOT NULL DEFAULT true,
+    "usesDiscounts" BOOLEAN NOT NULL DEFAULT true,
+    "taxRate" REAL NOT NULL DEFAULT 0.08,
+    "taxServices" BOOLEAN NOT NULL DEFAULT true,
+    "taxProducts" BOOLEAN NOT NULL DEFAULT true,
+    "usesRetailProducts" BOOLEAN NOT NULL DEFAULT true,
+    "usesServices" BOOLEAN NOT NULL DEFAULT true,
+    "usesEmailMarketing" BOOLEAN NOT NULL DEFAULT true,
+    "usesSMSMarketing" BOOLEAN NOT NULL DEFAULT true,
+    "usesReviewManagement" BOOLEAN NOT NULL DEFAULT true,
+    "usesMultiLocation" BOOLEAN NOT NULL DEFAULT false,
+    "usesFranchising" BOOLEAN NOT NULL DEFAULT false,
+    "usesTimeTracking" BOOLEAN NOT NULL DEFAULT true,
+    "usesPayroll" BOOLEAN NOT NULL DEFAULT false,
+    "shiftRequirement" TEXT NOT NULL DEFAULT 'BOTH',
+    "reviewRequestTiming" TEXT NOT NULL DEFAULT 'MANUAL',
+    "reviewRequestMethod" TEXT NOT NULL DEFAULT 'SMS',
+    "reviewIncentive" DECIMAL NOT NULL DEFAULT 0,
+    "tipPromptEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "tipPromptTiming" TEXT NOT NULL DEFAULT 'AT_CHECKOUT',
+    "tipSuggestions" TEXT NOT NULL DEFAULT '[15,20,25]',
+    "tipType" TEXT NOT NULL DEFAULT 'PERCENT',
+    "tipPoolingEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "commissionCalculation" TEXT NOT NULL DEFAULT 'AUTOMATIC',
+    "commissionVisibility" TEXT NOT NULL DEFAULT 'ALWAYS',
+    "loyaltyPointsAwarding" TEXT NOT NULL DEFAULT 'AUTOMATIC',
+    "loyaltyPointsRatio" DECIMAL NOT NULL DEFAULT 1,
+    "loyaltyBirthdayBonus" DECIMAL NOT NULL DEFAULT 0,
+    "reminderEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "reminderTiming" TEXT NOT NULL DEFAULT '24_HOURS',
+    "reminderMethod" TEXT NOT NULL DEFAULT 'SMS',
+    "cancellationFeeEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "cancellationFeeAmount" DECIMAL NOT NULL DEFAULT 0,
+    "cancellationWindow" INTEGER NOT NULL DEFAULT 24,
+    "membershipAutoBilling" BOOLEAN NOT NULL DEFAULT true,
+    "membershipFailedPaymentRetry" INTEGER NOT NULL DEFAULT 3,
+    "giftCardAutoEmail" BOOLEAN NOT NULL DEFAULT true,
+    "giftCardPhysical" BOOLEAN NOT NULL DEFAULT true,
+    "discountRequiresApproval" BOOLEAN NOT NULL DEFAULT false,
+    "discountMaxPercent" DECIMAL NOT NULL DEFAULT 50,
+    "lowStockAlertEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "lowStockThreshold" INTEGER NOT NULL DEFAULT 5,
+    "allowMultiProvider" BOOLEAN NOT NULL DEFAULT false,
+    "newClientBonusEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "newClientBonusAmount" DECIMAL NOT NULL DEFAULT 10,
+    "cashDiscountEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "cashDiscountPercent" DECIMAL NOT NULL DEFAULT 3.5,
+    "canExportData" BOOLEAN NOT NULL DEFAULT false,
+    "canExportReports" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "BusinessConfig_franchisorId_fkey" FOREIGN KEY ("franchisorId") REFERENCES "Franchisor" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+INSERT INTO "new_BusinessConfig" ("allowMultiProvider", "cancellationFeeAmount", "cancellationFeeEnabled", "cancellationWindow", "cashDiscountEnabled", "cashDiscountPercent", "commissionCalculation", "commissionVisibility", "createdAt", "discountMaxPercent", "discountRequiresApproval", "franchisorId", "giftCardAutoEmail", "giftCardPhysical", "id", "lowStockAlertEnabled", "lowStockThreshold", "loyaltyBirthdayBonus", "loyaltyPointsAwarding", "loyaltyPointsRatio", "membershipAutoBilling", "membershipFailedPaymentRetry", "newClientBonusAmount", "newClientBonusEnabled", "reminderEnabled", "reminderMethod", "reminderTiming", "reviewIncentive", "reviewRequestMethod", "reviewRequestTiming", "shiftRequirement", "taxProducts", "taxRate", "taxServices", "tipPoolingEnabled", "tipPromptEnabled", "tipPromptTiming", "tipSuggestions", "tipType", "updatedAt", "usesAppointments", "usesCommissions", "usesDiscounts", "usesEmailMarketing", "usesFranchising", "usesGiftCards", "usesInventory", "usesLoyalty", "usesMemberships", "usesMultiLocation", "usesPayroll", "usesReferrals", "usesRetailProducts", "usesReviewManagement", "usesRoyalties", "usesSMSMarketing", "usesScheduling", "usesServices", "usesTimeTracking", "usesTipping", "usesVirtualKeypad") SELECT "allowMultiProvider", "cancellationFeeAmount", "cancellationFeeEnabled", "cancellationWindow", "cashDiscountEnabled", "cashDiscountPercent", "commissionCalculation", "commissionVisibility", "createdAt", "discountMaxPercent", "discountRequiresApproval", "franchisorId", "giftCardAutoEmail", "giftCardPhysical", "id", "lowStockAlertEnabled", "lowStockThreshold", "loyaltyBirthdayBonus", "loyaltyPointsAwarding", "loyaltyPointsRatio", "membershipAutoBilling", "membershipFailedPaymentRetry", "newClientBonusAmount", "newClientBonusEnabled", "reminderEnabled", "reminderMethod", "reminderTiming", "reviewIncentive", "reviewRequestMethod", "reviewRequestTiming", "shiftRequirement", "taxProducts", "taxRate", "taxServices", "tipPoolingEnabled", "tipPromptEnabled", "tipPromptTiming", "tipSuggestions", "tipType", "updatedAt", "usesAppointments", "usesCommissions", "usesDiscounts", "usesEmailMarketing", "usesFranchising", "usesGiftCards", "usesInventory", "usesLoyalty", "usesMemberships", "usesMultiLocation", "usesPayroll", "usesReferrals", "usesRetailProducts", "usesReviewManagement", "usesRoyalties", "usesSMSMarketing", "usesScheduling", "usesServices", "usesTimeTracking", "usesTipping", "usesVirtualKeypad" FROM "BusinessConfig";
+DROP TABLE "BusinessConfig";
+ALTER TABLE "new_BusinessConfig" RENAME TO "BusinessConfig";
+CREATE UNIQUE INDEX "BusinessConfig_franchisorId_key" ON "BusinessConfig"("franchisorId");
+CREATE TABLE "new_Franchisor" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "ownerId" TEXT NOT NULL,
+    "name" TEXT,
+    "approvalStatus" TEXT NOT NULL DEFAULT 'PENDING',
+    "accountStatus" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "suspendedAt" DATETIME,
+    "suspendedReason" TEXT,
+    "businessType" TEXT NOT NULL DEFAULT 'MULTI_LOCATION_OWNER',
+    "industryType" TEXT NOT NULL DEFAULT 'SERVICE',
+    "address" TEXT,
+    "phone" TEXT,
+    "corpName" TEXT,
+    "corpAddress" TEXT,
+    "ssn" TEXT,
+    "fein" TEXT,
+    "ss4" TEXT,
+    "ebt" TEXT,
+    "documents" TEXT,
+    "documentsLater" BOOLEAN,
+    "processingType" TEXT,
+    "needToDiscussProcessing" BOOLEAN NOT NULL DEFAULT false,
+    "routingNumber" TEXT,
+    "accountNumber" TEXT,
+    "voidCheckUrl" TEXT,
+    "driverLicenseUrl" TEXT,
+    "feinLetterUrl" TEXT,
+    "brandColorPrimary" TEXT,
+    "brandColorSecondary" TEXT,
+    "logoUrl" TEXT,
+    "faviconUrl" TEXT,
+    "domain" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "integrations" TEXT,
+    CONSTRAINT "Franchisor_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+INSERT INTO "new_Franchisor" ("accountNumber", "accountStatus", "address", "approvalStatus", "brandColorPrimary", "brandColorSecondary", "businessType", "corpAddress", "corpName", "createdAt", "documents", "documentsLater", "domain", "driverLicenseUrl", "ebt", "faviconUrl", "fein", "feinLetterUrl", "id", "logoUrl", "name", "needToDiscussProcessing", "ownerId", "phone", "processingType", "routingNumber", "ss4", "ssn", "suspendedAt", "suspendedReason", "updatedAt", "voidCheckUrl") SELECT "accountNumber", "accountStatus", "address", "approvalStatus", "brandColorPrimary", "brandColorSecondary", "businessType", "corpAddress", "corpName", "createdAt", "documents", "documentsLater", "domain", "driverLicenseUrl", "ebt", "faviconUrl", "fein", "feinLetterUrl", "id", "logoUrl", "name", "needToDiscussProcessing", "ownerId", "phone", "processingType", "routingNumber", "ss4", "ssn", "suspendedAt", "suspendedReason", "updatedAt", "voidCheckUrl" FROM "Franchisor";
+DROP TABLE "Franchisor";
+ALTER TABLE "new_Franchisor" RENAME TO "Franchisor";
+CREATE UNIQUE INDEX "Franchisor_ownerId_key" ON "Franchisor"("ownerId");
+CREATE TABLE "new_Product" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "franchiseId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "price" DECIMAL NOT NULL,
+    "cost" DECIMAL,
+    "stock" INTEGER NOT NULL DEFAULT 0,
+    "category" TEXT,
+    "sku" TEXT,
+    "barcode" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "reorderPoint" INTEGER,
+    "ageRestricted" BOOLEAN NOT NULL DEFAULT false,
+    "minimumAge" INTEGER,
+    "vendor" TEXT,
+    "globalProductId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Product_franchiseId_fkey" FOREIGN KEY ("franchiseId") REFERENCES "Franchise" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Product_globalProductId_fkey" FOREIGN KEY ("globalProductId") REFERENCES "GlobalProduct" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+INSERT INTO "new_Product" ("category", "cost", "createdAt", "description", "franchiseId", "globalProductId", "id", "isActive", "name", "price", "sku", "stock", "updatedAt") SELECT "category", "cost", "createdAt", "description", "franchiseId", "globalProductId", "id", "isActive", "name", "price", "sku", "stock", "updatedAt" FROM "Product";
+DROP TABLE "Product";
+ALTER TABLE "new_Product" RENAME TO "Product";
+CREATE INDEX "Product_barcode_idx" ON "Product"("barcode");
+CREATE INDEX "Product_sku_idx" ON "Product"("sku");
+PRAGMA foreign_keys=ON;
+PRAGMA defer_foreign_keys=OFF;

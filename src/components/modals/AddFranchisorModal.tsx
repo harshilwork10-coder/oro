@@ -16,7 +16,8 @@ export default function AddFranchisorModal({ isOpen, onClose, onSuccess }: AddFr
         phone: '',
         companyName: '',
         supportFee: '0',
-        businessType: 'MULTI_LOCATION_OWNER'
+        businessType: 'MULTI_LOCATION_OWNER',
+        industryType: 'SERVICE' // SERVICE, RETAIL, RESTAURANT
     })
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
@@ -41,6 +42,7 @@ export default function AddFranchisorModal({ isOpen, onClose, onSuccess }: AddFr
                     ...formData,
                     type: formData.businessType === 'BRAND_FRANCHISOR' ? 'BRAND' : 'INDIVIDUAL',
                     businessType: formData.businessType,
+                    industryType: formData.industryType,
                     billingMethod: 'DIRECT',
                     enableCommission: true,
                 })
@@ -53,7 +55,7 @@ export default function AddFranchisorModal({ isOpen, onClose, onSuccess }: AddFr
             }
 
             setMagicLink(data.magicLink)
-            setFormData({ name: '', email: '', phone: '', companyName: '', supportFee: '0', businessType: 'MULTI_LOCATION_OWNER' })
+            setFormData({ name: '', email: '', phone: '', companyName: '', supportFee: '0', businessType: 'MULTI_LOCATION_OWNER', industryType: 'SERVICE' })
             onSuccess() // Refresh list in background
             // Don't auto-close so user can copy link
 
@@ -192,7 +194,7 @@ export default function AddFranchisorModal({ isOpen, onClose, onSuccess }: AddFr
                         </div>
 
                         <div className="col-span-2">
-                            <label className="block text-xs font-medium text-stone-400 mb-1.5 uppercase tracking-wider">Business Type</label>
+                            <label className="block text-xs font-medium text-stone-400 mb-1.5 uppercase tracking-wider">Owner Type</label>
                             <select
                                 value={formData.businessType}
                                 onChange={(e) => setFormData({ ...formData, businessType: e.target.value as 'MULTI_LOCATION_OWNER' | 'BRAND_FRANCHISOR' })}
@@ -207,6 +209,33 @@ export default function AddFranchisorModal({ isOpen, onClose, onSuccess }: AddFr
                                     ? 'Sells franchise opportunities to others'
                                     : 'Operates own locations directly'}
                             </p>
+                        </div>
+
+                        <div className="col-span-2">
+                            <label className="block text-xs font-medium text-stone-400 mb-1.5 uppercase tracking-wider">Industry Type</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {[
+                                    { value: 'SERVICE', label: '🎨 Service', desc: 'Salon, Spa, Barbershop' },
+                                    { value: 'RETAIL', label: '🏪 Retail', desc: 'Liquor, Convenience, Smoke' },
+                                    { value: 'RESTAURANT', label: '🍽️ Restaurant', desc: 'Coming Soon', disabled: true }
+                                ].map(option => (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        disabled={option.disabled}
+                                        onClick={() => !option.disabled && setFormData({ ...formData, industryType: option.value })}
+                                        className={`p-3 rounded-lg border text-left transition-all ${formData.industryType === option.value
+                                                ? 'border-purple-500 bg-purple-500/20 text-purple-300'
+                                                : option.disabled
+                                                    ? 'border-stone-700 bg-stone-900/30 text-stone-600 cursor-not-allowed'
+                                                    : 'border-stone-700 bg-stone-900/50 text-stone-300 hover:border-stone-600'
+                                            }`}
+                                    >
+                                        <span className="block text-sm font-medium">{option.label}</span>
+                                        <span className="block text-xs text-stone-500">{option.desc}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         <div className="col-span-2">

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { saveToOronexDatabase } from '@/lib/ai/sku-lookup'
 
 export async function GET(request: Request) {
     const session = await getServerSession(authOptions)
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json()
-        const { name, sku, price, stock, description } = body
+        const { name, sku, barcode, price, stock, description, category, size } = body
 
         if (!name || !price) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -58,14 +59,29 @@ export async function POST(request: Request) {
             data: {
                 name,
                 sku,
+                barcode,
                 price: parseFloat(price),
                 stock: parseInt(stock) || 0,
                 description,
-                category: 'RETAIL',
-                // type: 'PRODUCT', // Removed as not in schema
-                franchiseId: user.franchiseId!, // Use franchiseId
+                category: category || 'RETAIL',
+                franchiseId: user.franchiseId!,
             }
         })
+
+        // Contribute to the shared Oronex UPC database (crowdsourcing)
+        // This runs in background and doesn't block the response
+        if (barcode && barcode.length >= 8) {
+            saveToOronexDatabase({
+                barcode,
+                name,
+                category,
+                size,
+                description,
+                price: parseFloat(price),
+                userId: user.id,
+                franchiseId: user.franchiseId!
+            }).catch(err => console.error('[PRODUCTS] Failed to save to shared DB:', err))
+        }
 
         return NextResponse.json(item)
     } catch (error) {

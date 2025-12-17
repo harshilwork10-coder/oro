@@ -56,10 +56,14 @@ export async function GET(request: NextRequest) {
         // Get recent activity (simplified for now)
         const recentActivity: any[] = []
 
+        // Get count of franchisees (each franchise is a franchisee)
+        const totalFranchisees = franchisor.franchises.length
+
         return NextResponse.json({
             approvalStatus: franchisor.approvalStatus,
-            name: franchisor.name || 'Your Business',
+            name: franchisor.name || 'Your Franchise',
             createdAt: franchisor.createdAt,
+            totalFranchisees,
             totalLocations,
             totalEmployees,
             totalTransactions,

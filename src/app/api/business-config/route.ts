@@ -11,31 +11,53 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        // Only FRANCHISOR role can access business config
-        if (session.user.role !== 'FRANCHISOR' && session.user.role !== 'PROVIDER') {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-        }
+        // Allow all authenticated users to READ config (needed for POS tax rate, etc.)
+        // Only FRANCHISOR/PROVIDER can WRITE (handled in PATCH method)
 
-        // Get user's franchisor record
+        // Get user with all possible relationships to find config
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
             include: {
+                // Direct franchisor ownership (for owners)
                 franchisor: {
                     include: {
                         config: true
+                    }
+                },
+                // Franchise relationship (for employees/managers)
+                franchise: {
+                    include: {
+                        franchisor: {
+                            include: {
+                                config: true
+                            }
+                        }
                     }
                 }
             }
         })
 
-        if (!user?.franchisor) {
-            return NextResponse.json({ error: 'No franchisor found' }, { status: 404 })
+        // Try to find config: first check direct franchisor, then via franchise
+        const franchisorConfig = user?.franchisor?.config
+        const franchiseConfig = user?.franchise?.franchisor?.config
+        const targetConfig = franchisorConfig || franchiseConfig
+
+        if (!targetConfig && !user?.franchisor && !user?.franchise?.franchisor) {
+            // Return default config for users without a franchisor/franchise
+            return NextResponse.json({
+                taxRate: 0.08,
+                usesInventory: true,
+                usesServices: true,
+                usesRetailProducts: true,
+                usesAppointments: true,
+                usesTipping: true,
+            })
         }
 
         // Return existing config or default values
-        const config = user.franchisor.config || {
+        const config = targetConfig || {
             id: null,
-            franchisorId: user.franchisor.id,
+            franchisorId: user?.franchisor?.id || user?.franchise?.franchisorId,
             usesCommissions: true,
             usesInventory: true,
             usesAppointments: true,
@@ -53,6 +75,7 @@ export async function GET(req: NextRequest) {
             taxProducts: true,
             usesRetailProducts: true,
             usesServices: true,
+            posMode: 'SALON', // Default POS mode
             usesEmailMarketing: true,
             usesSMSMarketing: true,
             usesReviewManagement: true,

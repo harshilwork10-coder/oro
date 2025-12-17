@@ -30,6 +30,14 @@ import {
 import RoleGuard from '@/components/auth/RoleGuard'
 import { Role } from '@/lib/permissions'
 
+// POS Mode options
+const POS_MODES = [
+    { id: 'SALON', name: 'Salon / Spa', icon: '💇', description: 'Services, appointments, staff booking' },
+    { id: 'RETAIL', name: 'Retail Store', icon: '🏪', description: 'Products, inventory, barcode scanning' },
+    { id: 'RESTAURANT', name: 'Restaurant', icon: '🍽️', description: 'Menu items, tables, kitchen display' },
+    { id: 'HYBRID', name: 'Hybrid', icon: '🔄', description: 'Services + Products (salon with retail)' },
+]
+
 // Only PROVIDER can access
 const ALLOWED_ROLES = [Role.PROVIDER]
 
@@ -61,6 +69,7 @@ interface Client {
     email: string
     businessName: string
     status: string
+    posMode: 'SALON' | 'RETAIL' | 'RESTAURANT' | 'HYBRID'
     features: Record<string, boolean>
     integrations: Record<string, boolean>
 }
@@ -97,6 +106,7 @@ export default function AccountConfigurationsPage() {
                     email: client.owner?.email || '',
                     businessName: client.businessName || client.name,
                     status: client.status || 'ACTIVE',
+                    posMode: client.config?.posMode || 'SALON',
                     features: client.config || {},
                     integrations: client.integrations || {}
                 }))
@@ -106,6 +116,28 @@ export default function AccountConfigurationsPage() {
             console.error('Error fetching clients:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    async function changePosMode(clientId: string, posMode: string) {
+        setSaving(clientId)
+        try {
+            const res = await fetch(`/api/admin/franchisors/${clientId}/config`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ posMode })
+            })
+            if (res.ok) {
+                setClients(prev => prev.map(c =>
+                    c.id === clientId
+                        ? { ...c, posMode: posMode as Client['posMode'] }
+                        : c
+                ))
+            }
+        } catch (error) {
+            console.error('Error changing POS mode:', error)
+        } finally {
+            setSaving(null)
         }
     }
 
@@ -247,6 +279,40 @@ export default function AccountConfigurationsPage() {
                                 {/* Expanded Configuration */}
                                 {expandedClient === client.id && (
                                     <div className="border-t border-white/10 p-6 space-y-6">
+                                        {/* POS Mode Selection */}
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-stone-300 uppercase tracking-wider mb-4">
+                                                Business Type / POS Mode
+                                            </h4>
+                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                                {POS_MODES.map((mode) => {
+                                                    const isSelected = client.posMode === mode.id
+                                                    return (
+                                                        <button
+                                                            key={mode.id}
+                                                            onClick={() => changePosMode(client.id, mode.id)}
+                                                            className={`p-4 rounded-xl border transition-all text-left ${isSelected
+                                                                ? 'bg-orange-500/20 border-orange-500/50 hover:bg-orange-500/30'
+                                                                : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50'
+                                                                }`}
+                                                        >
+                                                            <div className="text-2xl mb-2">{mode.icon}</div>
+                                                            <p className={`font-medium ${isSelected ? 'text-white' : 'text-stone-400'}`}>
+                                                                {mode.name}
+                                                            </p>
+                                                            <p className="text-xs text-stone-500 mt-1">{mode.description}</p>
+                                                            {isSelected && (
+                                                                <div className="mt-2 flex items-center gap-1 text-xs text-orange-400">
+                                                                    <CheckCircle2 className="w-3 h-3" />
+                                                                    Active
+                                                                </div>
+                                                            )}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+
                                         {/* Features */}
                                         <div>
                                             <h4 className="text-sm font-semibold text-stone-300 uppercase tracking-wider mb-4">
@@ -299,8 +365,8 @@ export default function AccountConfigurationsPage() {
                                                         <div
                                                             key={integration.id}
                                                             className={`p-4 rounded-xl border transition-all ${isEnabled
-                                                                    ? 'bg-blue-500/20 border-blue-500/50'
-                                                                    : 'bg-stone-800/50 border-stone-700'
+                                                                ? 'bg-blue-500/20 border-blue-500/50'
+                                                                : 'bg-stone-800/50 border-stone-700'
                                                                 }`}
                                                         >
                                                             <div className="flex items-center justify-between">
@@ -316,8 +382,8 @@ export default function AccountConfigurationsPage() {
                                                                 <button
                                                                     onClick={() => toggleIntegration(client.id, integration.id, !isEnabled)}
                                                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isEnabled
-                                                                            ? 'bg-blue-500 text-white hover:bg-blue-600'
-                                                                            : 'bg-stone-700 text-stone-300 hover:bg-stone-600'
+                                                                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                                                        : 'bg-stone-700 text-stone-300 hover:bg-stone-600'
                                                                         }`}
                                                                 >
                                                                     {isEnabled ? 'Enabled' : 'Enable'}

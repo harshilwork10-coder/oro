@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Monitor, CheckCircle, AlertCircle, Loader2, XCircle } from 'lucide-react'
+import { X, Monitor, CheckCircle, AlertCircle, Loader2, XCircle, Search } from 'lucide-react'
 import { PaxTerminal, PaxResponse } from '@/lib/pax/pax-terminal'
+import TerminalSetupModal from './TerminalSetupModal'
 
 interface PaxPaymentModalProps {
     isOpen: boolean
@@ -16,6 +17,7 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
     const [terminalIp, setTerminalIp] = useState('')
     const [terminalPort, setTerminalPort] = useState('10009')
     const [settingsLoaded, setSettingsLoaded] = useState(false)
+    const [showTerminalSetup, setShowTerminalSetup] = useState(false)
     const abortControllerRef = useRef<AbortController | null>(null)
 
     // Load PAX settings from database when modal opens
@@ -39,7 +41,7 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
                     // Auto-start after settings loaded
                     setTimeout(() => handleProcessPayment(data.paxTerminalIP, data.paxTerminalPort || '10009'), 500)
                 } else {
-                    setMessage('PAX terminal not configured. Please contact your administrator.')
+                    setMessage('Card terminal not found. Click "Find Terminal" to set up.')
                     setStatus('ERROR')
                 }
             } else {
@@ -51,6 +53,18 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
             setMessage('Failed to load terminal settings')
             setStatus('ERROR')
         }
+    }
+
+    // Handle terminal found from setup modal
+    const handleTerminalFound = (ip: string) => {
+        setTerminalIp(ip)
+        setTerminalPort('10009')
+        setSettingsLoaded(true)
+        setShowTerminalSetup(false)
+        setStatus('IDLE')
+        setMessage('Terminal configured! Retrying payment...')
+        // Auto-start payment with new terminal
+        setTimeout(() => handleProcessPayment(ip, '10009'), 500)
     }
 
     // Cleanup on unmount
@@ -95,6 +109,24 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
             if (response.responseCode === '000000') {
                 setStatus('SUCCESS')
                 setMessage('Payment Approved!')
+
+                // Report terminal IP to backend so Provider can see it
+                try {
+                    await fetch('/api/terminals/report', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            terminalIP: useIp,
+                            terminalPort: usePort,
+                            status: 'connected',
+                            mid: response.hostResponse // MID might be in response
+                        })
+                    })
+                } catch (e) {
+                    // Non-critical, don't fail the payment
+                    console.log('Failed to report terminal:', e)
+                }
+
                 setTimeout(() => {
                     onSuccess(response)
                 }, 1500)
@@ -233,8 +265,26 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
                             Process Payment
                         </button>
                     )}
+
+                    {/* Find Terminal Button - When no terminal configured */}
+                    {status === 'ERROR' && !settingsLoaded && (
+                        <button
+                            onClick={() => setShowTerminalSetup(true)}
+                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2"
+                        >
+                            <Search className="h-5 w-5" />
+                            Find Terminal
+                        </button>
+                    )}
                 </div>
             </div>
+
+            {/* Terminal Setup Modal */}
+            <TerminalSetupModal
+                isOpen={showTerminalSetup}
+                onClose={() => setShowTerminalSetup(false)}
+                onSuccess={handleTerminalFound}
+            />
         </div>
     )
 }

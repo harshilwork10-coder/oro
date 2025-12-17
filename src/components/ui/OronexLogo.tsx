@@ -1,7 +1,7 @@
 'use client'
 
 interface OronexLogoProps {
-    size?: 'sm' | 'md' | 'lg' | 'xl'
+    size?: 'sm' | 'md' | 'lg' | 'xl' | number
     showText?: boolean
     className?: string
 }
@@ -14,7 +14,19 @@ export default function OronexLogo({ size = 'md', showText = true, className = '
         xl: { icon: 64, text: 32, gap: 12 }
     }
 
-    const { icon, text, gap } = sizes[size]
+    // Handle numeric size or predefined size
+    let icon: number, text: number, gap: number
+    if (typeof size === 'number') {
+        icon = size
+        text = Math.round(size * 0.375) // Proportional text size
+        gap = Math.round(size * 0.125) // Proportional gap
+    } else {
+        const sizeConfig = sizes[size] || sizes.md
+        icon = sizeConfig.icon
+        text = sizeConfig.text
+        gap = sizeConfig.gap
+    }
+
     const orange = '#F97316'
     const lightGray = '#E5E7EB'
 

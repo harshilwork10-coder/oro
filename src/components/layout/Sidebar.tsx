@@ -42,7 +42,7 @@ import {
 import clsx from 'clsx'
 import { hasPermission, Role } from '@/lib/permissions'
 import { useBusinessConfig } from '@/hooks/useBusinessConfig'
-import { Sparkles, Armchair } from 'lucide-react'
+import { Sparkles, Armchair, Ticket, Cigarette, Store, TrendingUp } from 'lucide-react'
 
 interface SidebarProps {
     isOpen: boolean
@@ -89,27 +89,42 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     // MULTI-LOCATION OWNER: Manages business remotely (no POS - they don't serve customers)
     const { data: config } = useBusinessConfig()
 
+    // Get industry type from session (SERVICE, RETAIL, RESTAURANT)
+    const industryType = (session?.user as any)?.industryType || 'SERVICE'
+
     const multiLocationLinksBase = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, always: true },
         { name: 'My Stores', href: '/dashboard/locations', icon: MapPin, always: true },
         { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
-        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar, always: true },  // Merged Schedule+Appointments
-        { name: 'Services', href: '/dashboard/services', icon: Briefcase, feature: 'usesServices' as const },  // Merged Services+Packages
-        { name: 'Inventory', href: '/dashboard/inventory/products', icon: ShoppingBag, feature: 'usesInventory' as const },
-        { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },  // Merged Customers+Loyalty+GiftCards
+        // SERVICE only - appointments and calendar
+        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar, industry: ['SERVICE'] as const },
+        // SERVICE only - services catalog
+        { name: 'Services', href: '/dashboard/services', icon: Briefcase, feature: 'usesServices' as const, industry: ['SERVICE'] as const },
+        { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag, feature: 'usesInventory' as const },
+        // RETAIL only - Lottery management
+        { name: 'Lottery', href: '/dashboard/lottery', icon: Ticket, feature: 'lotteryEnabled' as const, industry: ['RETAIL'] as const },
+        { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },
-        { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },  // Merged Marketing+SMS
-        { name: 'Resources', href: '/dashboard/resources', icon: Armchair, feature: 'enableResources' as const },
+        // RETAIL only - Multi-Store Dashboard and Competitor Pricing
+        { name: 'Multi-Store', href: '/dashboard/multi-store', icon: Store, industry: ['RETAIL'] as const },
+        { name: 'Competitor Pricing', href: '/dashboard/pricing/competitor', icon: TrendingUp, industry: ['RETAIL'] as const },
+        { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },
+        // SERVICE only - resources (chairs, rooms)
+        { name: 'Resources', href: '/dashboard/resources', icon: Armchair, feature: 'enableResources' as const, industry: ['SERVICE'] as const },
         { name: 'Settings', href: '/dashboard/settings/features', icon: Package, always: true },
     ]
 
-    // Filter based on config
+    // Filter based on config AND industryType
     const multiLocationLinks = multiLocationLinksBase.filter(link => {
+        // Check industry-specific filter
+        if (link.industry && !link.industry.includes(industryType)) {
+            return false
+        }
         if (link.always) return true
         if (!link.feature) return true
         return config?.[link.feature] ?? true // Show by default if config not loaded
-    }).map(({ always, feature, ...link }) => link) // Remove filter props
+    }).map(({ always, feature, industry, ...link }) => link) // Remove filter props
 
 
     // FRANCHISEE: Owner who views reports for their locations (no POS - they don't serve customers)
@@ -127,27 +142,72 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     ]
 
     // MANAGER: Operations manager
-    const managerLinks = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
-        { name: 'Employees', href: '/dashboard/employees', icon: Users },
-        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar },  // Merged Schedule+Appointments
-        { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock },
-        { name: 'Customers', href: '/dashboard/customers', icon: Users },
-        { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
-        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
+    const managerLinksBase = [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, always: true },
+        { name: 'POS', href: industryType === 'RETAIL' ? '/dashboard/pos/retail' : '/dashboard/pos/salon', icon: CreditCard, always: true },
+        { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
+        // SERVICE only - calendar
+        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar, industry: ['SERVICE'] as const },
+        { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock, always: true },
+        { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
+        { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
+        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText, always: true },
     ]
 
-    // EMPLOYEE: Front-line staff
-    const employeeLinks = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'POS', href: '/dashboard/pos', icon: CreditCard },
-        { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock },
-        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar },  // Merged Schedule+Appointments
-        { name: 'My Performance', href: '/dashboard/employee/me', icon: UserCircle },
-        { name: 'Customers', href: '/dashboard/customers', icon: Users },
-        { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones },
+    const managerLinks = managerLinksBase.filter(link => {
+        if (link.industry && !link.industry.includes(industryType)) return false
+        return link.always
+    }).map(({ always, industry, ...link }) => link)
+
+    // EMPLOYEE: Front-line staff - MINIMAL sidebar for security
+    // ONLY "Team" is removed - employees cannot manage other employees
+    // All other items are permission-based
+    const employeeLinksBase = [
+        // Core POS functionality - always visible
+        { name: 'POS', href: industryType === 'RETAIL' ? '/dashboard/pos/retail' : '/dashboard/pos/salon', icon: CreditCard, always: true },
+        { name: 'Time Clock', href: '/dashboard/time-clock', icon: Clock, permission: 'canClockIn' as const },
+        { name: 'My Performance', href: '/dashboard/employee/me', icon: UserCircle, always: true },
+
+        // Permission: canManageInventory - Inventory access
+        { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag, permission: 'canManageInventory' as const },
+
+        // Permission: canViewReports - Reports access
+        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText, permission: 'canViewReports' as const },
+
+        // Permission: canProcessRefunds - Transaction history (for refunds)
+        { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt, permission: 'canProcessRefunds' as const },
+
+        // Permission: canManageSchedule - Schedule management
+        { name: 'Schedules', href: '/dashboard/schedule', icon: Calendar, permission: 'canManageSchedule' as const, industry: ['SERVICE'] as const },
+
+        // NOTE: Team is REMOVED - employees cannot manage other employees (security)
+
+        // Permission: canAddProducts - Product management
+        { name: 'Products', href: '/dashboard/products', icon: Package, permission: 'canAddProducts' as const, industry: ['RETAIL'] as const },
+
+        // Permission: canAddServices - Service management (service businesses)
+        { name: 'Services', href: '/dashboard/services', icon: Briefcase, permission: 'canAddServices' as const, industry: ['SERVICE'] as const },
+
+        // Customer access - if they can view reports (usually means trusted employee)
+        { name: 'Customers', href: '/dashboard/customers', icon: Users, permission: 'canViewReports' as const },
+
+        // Calendar for service industries (view appointments)
+        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar, industry: ['SERVICE'] as const },
+
+        // Always visible
+        { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones, always: true },
     ]
+
+    // Filter employee links based on permissions AND industry type
+    const employeeLinks = employeeLinksBase.filter(link => {
+        // Check industry-specific filter first
+        if (link.industry && !link.industry.includes(industryType)) return false
+        if (link.always) return true
+        if (!link.permission) return true
+        // Check if user has the specific permission
+        const user = session?.user as any
+        return user?.[link.permission] === true
+    }).map(({ always, permission, industry, ...link }) => link)
 
     // SUPPORT_STAFF: Support team members - only see support inbox
     const supportStaffLinks = [

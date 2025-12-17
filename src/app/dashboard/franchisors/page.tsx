@@ -4,10 +4,11 @@ import { useSession } from "next-auth/react"
 import { redirect, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Building2, Plus, Search, MoreVertical, Edit, Trash2, Eye, Download, Settings, AlertTriangle, X, CheckCircle, Clock, XCircle, Key, EyeOff, Pause, Play, Ban } from "lucide-react"
+import { Building2, Plus, Search, MoreVertical, Edit, Trash2, Eye, Download, Settings, AlertTriangle, X, CheckCircle, Clock, XCircle, Key, EyeOff, Pause, Play, Ban, Globe, Facebook } from "lucide-react"
 import AddFranchisorModal from "@/components/modals/AddFranchisorModal"
 import EditClientModal from "@/components/modals/EditClientModal"
 import BusinessConfigModal from "@/components/provider/BusinessConfigModal"
+import IntegrationDataModal from "@/components/modals/IntegrationDataModal"
 import Toast from "@/components/ui/Toast"
 
 type Franchisor = {
@@ -57,6 +58,8 @@ export default function MyClientsPage() {
     const [suspendModal, setSuspendModal] = useState<{ id: string; name: string; action: 'SUSPEND' | 'ACTIVATE' | 'TERMINATE' } | null>(null)
     const [suspendReason, setSuspendReason] = useState('')
     const [suspending, setSuspending] = useState(false)
+    const [integrationModal, setIntegrationModal] = useState<{ id: string; name: string } | null>(null)
+
 
     async function fetchFranchisors() {
         try {
@@ -364,6 +367,18 @@ export default function MyClientsPage() {
                 />
             )}
 
+            {integrationModal && (
+                <IntegrationDataModal
+                    clientId={integrationModal.id}
+                    clientName={integrationModal.name}
+                    onClose={() => setIntegrationModal(null)}
+                    onSave={() => {
+                        setIntegrationModal(null)
+                        fetchFranchisors()
+                    }}
+                />
+            )}
+
             {/* Client Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredClients.map((client) => (
@@ -441,6 +456,19 @@ export default function MyClientsPage() {
                                             >
                                                 <Settings className="h-4 w-4" />
                                                 Configure Settings
+                                            </button>
+                                        )}
+                                        {(session?.user as any)?.role === 'PROVIDER' && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setIntegrationModal({ id: client.id, name: client.name })
+                                                    setActiveMenu(null)
+                                                }}
+                                                className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-blue-400"
+                                            >
+                                                <Globe className="h-4 w-4" />
+                                                Integrations & Data
                                             </button>
                                         )}
                                         <button
@@ -791,7 +819,7 @@ export default function MyClientsPage() {
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
                                 <div className={`p-2 rounded-lg ${suspendModal.action === 'SUSPEND' ? 'bg-orange-500/20' :
-                                        suspendModal.action === 'ACTIVATE' ? 'bg-emerald-500/20' : 'bg-red-500/20'
+                                    suspendModal.action === 'ACTIVATE' ? 'bg-emerald-500/20' : 'bg-red-500/20'
                                     }`}>
                                     {suspendModal.action === 'SUSPEND' && <Pause className="h-6 w-6 text-orange-400" />}
                                     {suspendModal.action === 'ACTIVATE' && <Play className="h-6 w-6 text-emerald-400" />}
@@ -856,7 +884,7 @@ export default function MyClientsPage() {
                                 onClick={handleSuspendAccount}
                                 disabled={suspending}
                                 className={`px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 ${suspendModal.action === 'SUSPEND' ? 'bg-orange-600 hover:bg-orange-500' :
-                                        suspendModal.action === 'ACTIVATE' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'
+                                    suspendModal.action === 'ACTIVATE' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'
                                     }`}
                             >
                                 {suspending ? (

@@ -49,7 +49,7 @@ async function main() {
         }
     })
 
-    // 3. Franchisor Entity
+    // 3. Franchisor Entity (SERVICE industry - default)
     let franchisor = await prisma.franchisor.findUnique({
         where: { ownerId: franchisorOwner.id }
     })
@@ -58,13 +58,222 @@ async function main() {
             data: {
                 name: 'Trinex HQ',
                 ownerId: franchisorOwner.id,
-                approvalStatus: 'APPROVED'
+                approvalStatus: 'APPROVED',
+                industryType: 'SERVICE'
             }
         })
     } else {
         await prisma.franchisor.update({
             where: { id: franchisor.id },
-            data: { approvalStatus: 'APPROVED' }
+            data: { approvalStatus: 'APPROVED', industryType: 'SERVICE' }
+        })
+    }
+
+    // 3B. RETAIL Franchisor Test User
+    const retailOwner = await prisma.user.upsert({
+        where: { email: 'retail@user.com' },
+        update: {},
+        create: {
+            name: 'Retail Store Owner',
+            email: 'retail@user.com',
+            password: hashedPassword,
+            role: 'FRANCHISOR'
+        }
+    })
+
+    let retailFranchisor = await prisma.franchisor.findUnique({
+        where: { ownerId: retailOwner.id }
+    })
+    if (!retailFranchisor) {
+        retailFranchisor = await prisma.franchisor.create({
+            data: {
+                name: 'Quick Stop Liquors',
+                ownerId: retailOwner.id,
+                approvalStatus: 'APPROVED',
+                industryType: 'RETAIL'
+            }
+        })
+
+        // Create franchise for retail owner
+        const retailFranchise = await prisma.franchise.create({
+            data: {
+                name: 'Quick Stop Downtown',
+                slug: 'quick-stop-downtown',
+                franchisorId: retailFranchisor.id,
+                approvalStatus: 'APPROVED'
+            }
+        })
+
+        // Create location for retail
+        const retailLocation = await prisma.location.create({
+            data: {
+                name: 'Quick Stop Main',
+                slug: 'quick-stop-main',
+                address: '456 Commerce St',
+                franchiseId: retailFranchise.id
+            }
+        })
+
+        // Hash PIN for cashier (PIN: 1234)
+        const hashedPin = await hash('1234', 10)
+
+        // Create retail employee for testing POS
+        await prisma.user.upsert({
+            where: { email: 'cashier@retail.com' },
+            update: {
+                franchiseId: retailFranchise.id,
+                locationId: retailLocation.id,
+                canManageInventory: true,
+                pin: hashedPin  // PIN: 1234 for fast login
+            },
+            create: {
+                name: 'Sam Cashier',
+                email: 'cashier@retail.com',
+                password: hashedPassword,
+                pin: hashedPin,  // PIN: 1234 for fast login
+                role: 'EMPLOYEE',
+                franchiseId: retailFranchise.id,
+                locationId: retailLocation.id,
+                canManageInventory: true  // Can access inventory page
+            }
+        })
+
+        // Create payment terminals for the retail location
+        const terminal1 = await prisma.paymentTerminal.create({
+            data: {
+                locationId: retailLocation.id,
+                name: 'Terminal 1',
+                terminalType: 'PAX',
+                terminalIP: '192.168.1.101',
+                terminalPort: '10009'
+            }
+        })
+
+        // Create POS stations (registers) for the retail location
+        // Register 1: Has dedicated terminal, pairing code REG1
+        // Register 2: Cash-only, pairing code REG2
+        const station1 = await prisma.station.create({
+            data: {
+                locationId: retailLocation.id,
+                name: 'Register 1',
+                paymentMode: 'DEDICATED',
+                dedicatedTerminalId: terminal1.id,
+                pairingCode: 'REG1'  // For provider's hardware config
+            }
+        })
+        await prisma.station.create({
+            data: {
+                locationId: retailLocation.id,
+                name: 'Register 2',
+                paymentMode: 'CASH_ONLY',
+                pairingCode: 'REG2'  // For provider's hardware config
+            }
+        })
+        console.log('📟 Created POS stations and terminal for retail location')
+
+        // Assign cashier to Register 1 (Owner assigns employees to stations)
+        await prisma.user.update({
+            where: { email: 'cashier@retail.com' },
+            data: { assignedStationId: station1.id }
+        })
+        console.log('👤 Assigned cashier to Register 1')
+
+        // Create product categories with AGE RESTRICTION at category level
+        const beerCat = await prisma.productCategory.create({
+            data: {
+                name: 'Beer',
+                franchiseId: retailFranchise.id,
+                ageRestricted: true,  // ← ALL beer products auto-require ID!
+                minimumAge: 21,
+                sortOrder: 1
+            }
+        })
+
+        const liquorCat = await prisma.productCategory.create({
+            data: {
+                name: 'Liquor',
+                franchiseId: retailFranchise.id,
+                ageRestricted: true,  // ← ALL liquor products auto-require ID!
+                minimumAge: 21,
+                sortOrder: 2
+            }
+        })
+
+        const tobaccoCat = await prisma.productCategory.create({
+            data: {
+                name: 'Tobacco',
+                franchiseId: retailFranchise.id,
+                ageRestricted: true,  // ← ALL tobacco products auto-require ID!
+                minimumAge: 21,
+                sortOrder: 3
+            }
+        })
+
+        const snacksCat = await prisma.productCategory.create({
+            data: {
+                name: 'Snacks & Drinks',
+                franchiseId: retailFranchise.id,
+                ageRestricted: false,  // No ID needed for this category
+                sortOrder: 4
+            }
+        })
+
+        // Create products linked to categories - NO need to set ageRestricted per product!
+        const products = await prisma.product.createManyAndReturn({
+            data: [
+                // Beer category - auto ID check from category
+                { name: 'Bud Light 6pk', price: 9.99, stock: 50, sku: 'BL6PK', barcode: '028000171957', franchiseId: retailFranchise.id, categoryId: beerCat.id },
+                { name: 'Corona Extra 12pk', price: 16.99, stock: 40, sku: 'CE12', barcode: '028000172000', franchiseId: retailFranchise.id, categoryId: beerCat.id },
+                // Liquor category - auto ID check from category
+                { name: 'Jack Daniels 750ml', price: 29.99, stock: 30, sku: 'JD750', barcode: '082184090466', franchiseId: retailFranchise.id, categoryId: liquorCat.id },
+                { name: 'Hennessy VS 750ml', price: 39.99, stock: 20, sku: 'HVS750', barcode: '082184090500', franchiseId: retailFranchise.id, categoryId: liquorCat.id },
+                // Tobacco category - auto ID check from category
+                { name: 'Marlboro Red', price: 12.99, stock: 100, sku: 'MR1', barcode: '028200006554', franchiseId: retailFranchise.id, categoryId: tobaccoCat.id },
+                // Snacks - NO ID check needed
+                { name: 'Coca Cola 20oz', price: 2.49, stock: 200, sku: 'CC20', barcode: '049000042566', franchiseId: retailFranchise.id, categoryId: snacksCat.id },
+                { name: 'Doritos Nacho', price: 4.99, stock: 75, sku: 'DNAC', barcode: '028400064064', franchiseId: retailFranchise.id, categoryId: snacksCat.id },
+            ]
+        })
+
+        // Create TAG-ALONG items (cross-sell suggestions)
+        // When customer buys beer → suggest snacks
+        const budLight = products.find(p => p.sku === 'BL6PK')
+        const corona = products.find(p => p.sku === 'CE12')
+        const doritos = products.find(p => p.sku === 'DNAC')
+        const coke = products.find(p => p.sku === 'CC20')
+        const jackDaniels = products.find(p => p.sku === 'JD750')
+
+        if (budLight && doritos && coke) {
+            await prisma.tagAlongItem.createMany({
+                data: [
+                    { parentId: budLight.id, childId: doritos.id, sortOrder: 1 }, // Buy beer → suggest chips
+                    { parentId: budLight.id, childId: coke.id, sortOrder: 2 },    // Buy beer → suggest soda
+                ]
+            })
+        }
+
+        if (corona && doritos && coke) {
+            await prisma.tagAlongItem.createMany({
+                data: [
+                    { parentId: corona.id, childId: doritos.id, sortOrder: 1 },
+                    { parentId: corona.id, childId: coke.id, sortOrder: 2 },
+                ]
+            })
+        }
+
+        if (jackDaniels && coke) {
+            await prisma.tagAlongItem.createMany({
+                data: [
+                    { parentId: jackDaniels.id, childId: coke.id, sortOrder: 1 }, // Buy whiskey → suggest mixer
+                ]
+            })
+        }
+
+        console.log('🏷️ Created tag-along items for cross-sell suggestions')
+    } else {
+        await prisma.franchisor.update({
+            where: { id: retailFranchisor.id },
+            data: { approvalStatus: 'APPROVED', industryType: 'RETAIL' }
         })
     }
 

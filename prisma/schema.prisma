@@ -93,6 +93,10 @@ model User {
   franchise   Franchise? @relation(fields: [franchiseId], references: [id])
   locationId  String?
   location    Location?  @relation(fields: [locationId], references: [id])
+  
+  // Assigned POS Station (Provider sets this before shipping)
+  assignedStationId String?
+  assignedStation   Station? @relation("AssignedEmployee", fields: [assignedStationId], references: [id])
 
   franchisor   Franchisor?   @relation("FranchisorOwner")
   magicLinks   MagicLink[]
@@ -110,6 +114,7 @@ model User {
   badges                UserBadge[]
   processedTransactions Transaction[]         @relation("ProcessedTransactions")
   performedServices     TransactionLineItem[] @relation("PerformedServices")
+  performedItemServices ItemLineItem[]        @relation("PerformedItemServices")
   activeCart            ActiveCart?
 
   // New Relations
@@ -168,6 +173,8 @@ model Franchise {
   services          Service[]
   serviceCategories ServiceCategory[]
   products          Product[]
+  productCategories ProductCategory[]  // Retail product categories with age restrictions
+  departments       Department[]       // Top-level departments for large stores
   transactions      Transaction[]
 
   royaltyRecords    RoyaltyRecord[]
@@ -179,6 +186,7 @@ model Franchise {
   loyaltyProgram    LoyaltyProgram?
   giftCards         GiftCard[]
   discounts         Discount[]
+  promotions        Promotion[]    // Advanced promotions (Mix&Match, BOGO, etc.)
   clients           Client[]
   reviews           Review[]
   expansionRequests ExpansionRequest[] // Expansion requests from franchisees
@@ -190,6 +198,20 @@ model Franchise {
   smsMarketingRules SmsMarketingRule[]
   customerPromos    CustomerPromo[]
   servicePackages   ServicePackage[]
+  
+  // Lottery & Tobacco
+  lotteryGames         LotteryGame[]
+  lotteryTransactions  LotteryTransaction[]
+  tobaccoSubmissions   TobaccoScanSubmission[]
+  tobaccoDeals         TobaccoDeal[]
+  manufacturerConfigs  ManufacturerConfig[]
+  
+  // Tax Configuration
+  taxJurisdictions     TaxJurisdiction[]
+  
+  // Unified Item System (new universal models)
+  items                Item[]
+  unifiedCategories    UnifiedCategory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -414,6 +436,8 @@ model Location {
   appointments       Appointment[]
   schedules          Schedule[]
   drawerActivities   DrawerActivity[]    // Fraud prevention audit trail
+  stations           Station[]           // POS stations/registers
+  paymentTerminals   PaymentTerminal[]   // Card terminals at this location
 
   // Payment Processor Configuration
   processorName   String? // e.g., "DATAWIRE", "TSYS", "VANTIV", "WORLDPAY", "FIRST_DATA"
@@ -432,9 +456,69 @@ model Location {
   resources            Resource[]
   recurringAppointments RecurringAppointment[]
   checkIns             CheckIn[]
+  
+  // Lottery & Tobacco
+  lotteryPacks         LotteryPack[]
+  lotteryTransactions  LotteryTransaction[]
+  tobaccoSubmissions   TobaccoScanSubmission[]
+  
+  // Tax Jurisdictions (sales tax + excise taxes applicable to this location)
+  taxJurisdictions     LocationTaxJurisdiction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// POS Station/Register - Each location can have multiple stations
+model Station {
+  id          String   @id @default(cuid())
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  
+  name        String   // "Register 1", "Register 2", etc.
+  isActive    Boolean  @default(true)
+  
+  // Payment capability: DEDICATED (has terminal) or CASH_ONLY
+  paymentMode String  @default("CASH_ONLY") // DEDICATED, CASH_ONLY
+  
+  // Dedicated terminal assignment (1:1 mapping)
+  dedicatedTerminalId String?  @unique
+  dedicatedTerminal   PaymentTerminal? @relation(fields: [dedicatedTerminalId], references: [id])
+  
+  // Pairing code for device-station assignment (e.g., "REG1", "REG2")
+  pairingCode    String?  @unique
+  
+  // Currently logged-in employee (for shift tracking)
+  currentUserId  String?
+  
+  // Employees assigned to this station by Provider
+  assignedEmployees User[] @relation("AssignedEmployee")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([locationId])
+}
+
+// Payment Terminal (PAX, Clover, etc.) - 1 terminal per station (dedicated)
+model PaymentTerminal {
+  id          String   @id @default(cuid())
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  
+  name        String   // "Terminal 1", "Counter Left"
+  terminalType String  @default("PAX") // PAX, CLOVER, STRIPE_READER
+  terminalIP  String   // "192.168.1.101"
+  terminalPort String  @default("10009")
+  isActive    Boolean  @default(true)
+  
+  // Which station owns this terminal
+  assignedStation Station?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([locationId])
 }
 
 // Expansion Request - Franchisee requesting new location from Brand Franchisor
@@ -506,7 +590,174 @@ model GlobalProduct {
   userId    String?
 }
 
-// ============ LOCAL INSTANCES ============
+// ============ SHARED UPC DATABASE (Crowdsourced) ============
+// All Oronex merchants contribute to this shared pool
+// When any merchant adds a product, the UPC data is saved here
+// Future lookups check here FIRST before hitting external APIs
+
+model SharedUPCProduct {
+  id          String @id @default(cuid())
+  barcode     String @unique // UPC/EAN barcode - must be unique
+  
+  // Product Info (crowdsourced from merchants)
+  name        String
+  brand       String?
+  category    String?
+  description String?
+  size        String?  // e.g., "12 oz", "2 Liter"
+  imageUrl    String?
+  
+  // Pricing reference (average suggested price)
+  avgPrice    Decimal?
+  
+  // Trust/quality tracking
+  contributorCount Int @default(1) // How many merchants have confirmed this data
+  lastVerifiedAt   DateTime @default(now())
+  
+  // Source tracking
+  originalSource String? // "open_food_facts", "upc_itemdb", "merchant"
+  
+  // Who contributed (first contributor)
+  contributedByUserId      String?
+  contributedByFranchiseId String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([barcode])
+  @@index([name])
+  @@index([category])
+}
+
+// ============ UNIFIED ITEM SYSTEM ============
+// Universal item model that replaces separate Service/Product tables
+// Works for any business type: salon, retail, restaurant, hybrid
+
+model UnifiedCategory {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  name        String
+  description String?
+  color       String?   // Hex color for POS display
+  icon        String?   // Icon name or emoji
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  
+  // Type for filtering - allows same hierarchy for all business types
+  type        String    @default("GENERAL") // DEPARTMENT, SERVICE, PRODUCT, MENU, GENERAL
+  
+  // Self-referencing for hierarchy (Department > Category > Subcategory)
+  parentId    String?
+  parent      UnifiedCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    UnifiedCategory[] @relation("CategoryHierarchy")
+  
+  // Items in this category
+  items       Item[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([franchiseId])
+  @@index([type])
+  @@index([parentId])
+}
+
+model Item {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  // === UNIVERSAL FIELDS (All item types) ===
+  name        String
+  description String?
+  price       Decimal
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  imageUrl    String?
+  
+  // Type determines which optional fields apply
+  // SERVICE = Salon services, spa treatments
+  // PRODUCT = Retail products, inventory items
+  // MENU_ITEM = Restaurant food/drinks
+  // PACKAGE = Bundle of items/services
+  type        String    @default("PRODUCT") // SERVICE, PRODUCT, MENU_ITEM, PACKAGE
+  
+  // Category (unified)
+  categoryId  String?
+  category    UnifiedCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  // === SERVICE FIELDS (nullable) ===
+  duration        Int?      // Duration in minutes (for appointments)
+  requiresDeposit Boolean   @default(false)
+  depositAmount   Decimal?
+  
+  // === PRODUCT FIELDS (nullable) ===
+  barcode         String?   // UPC/EAN barcode
+  sku             String?   // Internal SKU
+  stock           Int?      // Current stock quantity
+  cost            Decimal?  // Cost price (for profit calculation)
+  reorderPoint    Int?      // Alert when stock <= this
+  brand           String?   // Product brand
+  size            String?   // Size/weight (e.g., "750ml", "12 oz")
+  
+  // === RESTAURANT FIELDS (nullable) ===
+  preparationTime Int?      // Minutes to prepare
+  calories        Int?      // Nutritional info
+  allergens       String?   // JSON array of allergens
+  
+  // === COMPLIANCE & RESTRICTIONS ===
+  ageRestricted  Boolean  @default(false)  // Requires ID check
+  minimumAge     Int?                      // 18, 21, etc.
+  isEbtEligible  Boolean  @default(false)  // SNAP/EBT eligible
+  isTobacco      Boolean  @default(false)  // Tobacco product
+  isAlcohol      Boolean  @default(false)  // Alcohol product
+  
+  // === TAX CONFIGURATION ===
+  taxExempt      Boolean  @default(false)
+  taxRate        Decimal?  // Override tax rate (null = use default)
+  
+  // === TRACKING ===
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Transaction line items (for sales history)
+  lineItems   ItemLineItem[]
+  
+  @@index([franchiseId])
+  @@index([type])
+  @@index([barcode])
+  @@index([sku])
+  @@index([categoryId])
+}
+
+// Line items for unified Item model (separate from legacy TransactionLineItem)
+model ItemLineItem {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  
+  itemId        String
+  item          Item        @relation(fields: [itemId], references: [id])
+  
+  quantity      Int
+  unitPrice     Decimal
+  discount      Decimal     @default(0)
+  tax           Decimal     @default(0)
+  total         Decimal
+  
+  // Optional: who performed the service (for commissions)
+  performedById String?
+  performedBy   User?       @relation("PerformedItemServices", fields: [performedById], references: [id])
+  
+  createdAt DateTime @default(now())
+  
+  @@index([transactionId])
+  @@index([itemId])
+}
+
+// ============ LOCAL INSTANCES (LEGACY - Keep for backwards compatibility) ============
 
 model ServiceCategory {
   id          String    @id @default(cuid())
@@ -586,6 +837,12 @@ model Client {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([franchiseId])
+  @@index([phone])
+  @@index([email])
+  @@index([lastName])
+  @@index([loyaltyJoined])
 }
 
 model Appointment {
@@ -635,6 +892,64 @@ model Schedule {
   updatedAt DateTime @updatedAt
 }
 
+// ============ DEPARTMENT & CATEGORY HIERARCHY ============
+// Department = Top-level grouping (e.g., Beverages, Tobacco, Grocery)
+// Category = Sub-grouping within department (e.g., Beer, Wine, Spirits)
+// Product = Individual items within category
+
+// Department - Top level organization for large stores (50K+ SKUs)
+// NOTE: Age restriction is at CATEGORY level only (more granular)
+model Department {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  name        String    // "Beverages", "Tobacco", "Grocery", "Vape"
+  description String?
+  icon        String?   // Emoji or icon name for UI
+  color       String?   // Hex color for visual distinction
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  
+  categories ProductCategory[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([franchiseId])
+}
+
+// Product Categories (sub-groups within Department)
+model ProductCategory {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  // Parent Department (optional for backwards compatibility)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  
+  name        String    // "Beer", "Wine", "Liquor", "Tobacco", "Snacks"
+  description String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  
+  // Age Restriction at CATEGORY level - overrides or supplements department
+  ageRestricted Boolean @default(false)  // If true, ALL products in this category require ID
+  minimumAge    Int?                      // 18 for tobacco, 21 for alcohol
+  
+  // EBT/SNAP eligibility at CATEGORY level
+  isEbtEligible Boolean @default(false)  // If true, products in this category can be purchased with EBT
+  
+  products Product[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([franchiseId])
+  @@index([departmentId])
+}
+
 // Products for retail sale
 model Product {
   id          String    @id @default(cuid())
@@ -646,9 +961,38 @@ model Product {
   price       Decimal
   cost        Decimal? // Cost to franchise
   stock       Int      @default(0)
-  category    String? // "Hair Care", "Styling Products", etc.
+  category    String? // Legacy - plain text category
+  categoryId  String? // NEW - link to ProductCategory
+  productCategory ProductCategory? @relation(fields: [categoryId], references: [id])
   sku         String?
+  barcode     String?  // UPC/EAN barcode for scanner
   isActive    Boolean  @default(true)
+
+  // Retail-specific fields (can override category-level settings)
+  reorderPoint   Int?     // Alert when stock falls below this
+  minStock       Int?     // Auto-reorder when stock falls below this level
+  maxStock       Int?     // Target stock level when reordering
+  ageRestricted  Boolean  @default(false) // Override: force age check even if category doesn't require
+  minimumAge     Int?     // Override: 18 for tobacco, 21 for alcohol
+  brand          String?  // Manufacturer/Brand (e.g., "Bulleit", "Coca-Cola")
+  vendor         String?  // Supplier/Distributor (e.g., "Southern Glazer's", "McLane")
+  size           String?  // Product size (e.g., "750ml", "12 oz", "6 Pack")
+  productType    String?  // Product type (e.g., "Whiskey", "Lager", "Energy Drink")
+  
+  // Compliance & Tracking
+  isEbtEligible  Boolean  @default(false) // Can be purchased with EBT/SNAP
+  isTobacco      Boolean  @default(false) // Tobacco product (for scan data reporting)
+  
+  // Alcohol Attributes (for excise tax calculation)
+  alcoholType    String?  // NONE, BEER, WINE_LIGHT, WINE_HEAVY, SPIRITS
+  volumeMl       Int?     // Volume in milliliters (e.g., 750 for a wine bottle)
+  abvPercent     Decimal? // Alcohol by volume percentage (e.g., 40 for 40%)
+
+  // Case Break Management
+  unitsPerCase   Int?     // How many bottles/units per case (e.g., 12)
+  casePrice      Decimal? // Price to buy/sell a full case (usually discounted)
+  sellByCase     Boolean  @default(false)  // If true, show case option at POS
+  stockCases     Int      @default(0)       // Track cases separately from units
 
   // Link to Global Catalog
   globalProductId String?
@@ -663,7 +1007,36 @@ model Product {
   suppliers          ProductSupplier[]
   purchaseOrderItems PurchaseOrderItem[]
   stockAdjustments   StockAdjustment[]
+  
+  // Tag-Along Items (cross-sell suggestions)
+  tagAlongParent  TagAlongItem[] @relation("TagAlongParent")
+  tagAlongChild   TagAlongItem[] @relation("TagAlongChild")
+
+  @@index([barcode])
+  @@index([sku])
+  @@index([categoryId])
 }
+
+// Tag-Along Items - Cross-sell suggestions
+// When parent product is scanned, suggest child products
+model TagAlongItem {
+  id        String   @id @default(cuid())
+  
+  parentId  String   // The product being scanned
+  parent    Product  @relation("TagAlongParent", fields: [parentId], references: [id], onDelete: Cascade)
+  
+  childId   String   // The product to suggest
+  child     Product  @relation("TagAlongChild", fields: [childId], references: [id], onDelete: Cascade)
+  
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([parentId, childId])
+  @@index([parentId])
+}
+
 
 // POS Transaction (sale/checkout)
 model Transaction {
@@ -714,10 +1087,19 @@ model Transaction {
   refunds               Transaction[] @relation("RefundRelation")
 
   lineItems        TransactionLineItem[]
+  itemLineItems    ItemLineItem[]       // Unified Item line items (new system)
   drawerActivities DrawerActivity[]      // Drawer opens related to this transaction
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([franchiseId])
+  @@index([clientId])
+  @@index([employeeId])
+  @@index([paymentMethod])
+  @@index([status])
+  @@index([createdAt])
+  @@index([invoiceNumber])
 }
 
 // Line items in a transaction
@@ -916,6 +1298,11 @@ model PurchaseOrder {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([franchiseId])
+  @@index([locationId])
+  @@index([supplierId])
+  @@index([status])
 }
 
 model PurchaseOrderItem {
@@ -943,6 +1330,11 @@ model StockAdjustment {
 
   performedBy String
   createdAt   DateTime @default(now())
+
+  @@index([productId])
+  @@index([locationId])
+  @@index([reason])
+  @@index([createdAt])
 }
 
 // ============ WORKFORCE MANAGEMENT ============
@@ -1039,6 +1431,11 @@ model CashDrawerSession {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([locationId])
+  @@index([employeeId])
+  @@index([status])
+  @@index([startTime])
 }
 
 model CashDrop {
@@ -1074,6 +1471,89 @@ model Discount {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ============ ADVANCED PROMOTIONS SYSTEM ============
+// Supports: Mix & Match, BOGO, Percentage Off, Fixed Amount, Bundles, Threshold Deals
+
+model Promotion {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  name        String    // "Any 6 Beers for $12.99"
+  description String?
+  
+  // Deal Type: MIX_MATCH, BOGO, PERCENTAGE, FIXED, BUNDLE, THRESHOLD
+  type        String    @default("PERCENTAGE")
+  
+  // Discount Configuration
+  // PERCENT = 10 means 10% off
+  // FIXED_AMOUNT = 2 means $2 off per item
+  // FIXED_PRICE = 12.99 means total price is $12.99 for qualifying items
+  // FREE_ITEM = quantity specified in getQty is free
+  discountType  String  @default("PERCENT")  // PERCENT, FIXED_AMOUNT, FIXED_PRICE, FREE_ITEM
+  discountValue Decimal @default(0)
+  
+  // Quantity Requirements
+  requiredQty   Int?    // Buy X items to qualify
+  getQty        Int?    // Get Y items (for BOGO deals)
+  
+  // Tiered Pricing (for TIERED type)
+  // JSON array: [{"qty": 2, "price": 15}, {"qty": 3, "price": 20}, {"qty": 4, "price": 25}]
+  priceTiers    String?
+  
+  // Threshold (for spend-based deals)
+  minSpend      Decimal? // Spend $X to qualify
+  
+  // Time Constraints
+  startDate     DateTime?
+  endDate       DateTime?
+  timeStart     String?   // "16:00" for 4pm (24hr format)
+  timeEnd       String?   // "19:00" for 7pm
+  daysOfWeek    String?   // JSON array: ["MON","TUE","WED","THU","FRI","SAT","SUN"]
+  
+  // Scope - what items qualify
+  // ALL = all products
+  // CATEGORY = specific categories
+  // PRODUCTS = specific products
+  // BRAND = specific brand (matched by vendor field)
+  appliesTo     String    @default("ALL")
+  
+  // Stacking Rules
+  stackable     Boolean   @default(false)  // Can combine with other deals
+  priority      Int       @default(0)      // Higher = applies first
+  maxUsesPerTransaction Int? // Limit uses per checkout
+  
+  // Promo Code (optional)
+  promoCode     String?   // If set, must enter code to activate
+  
+  isActive      Boolean   @default(true)
+  
+  // Relations
+  qualifyingItems  PromotionProduct[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([franchiseId])
+  @@index([isActive])
+}
+
+// Products/Categories that qualify for a promotion
+model PromotionProduct {
+  id          String    @id @default(cuid())
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  
+  // Can link to category OR specific product (one or the other)
+  categoryId  String?   // ProductCategory ID
+  productId   String?   // Product ID
+  
+  // Exclusion flag - if true, this item is EXCLUDED from the deal
+  isExcluded  Boolean   @default(false)
+  
+  @@index([promotionId])
 }
 
 // ============ COMMUNITY & AUTH ============
@@ -1183,8 +1663,11 @@ model Franchisor {
   suspendedAt      DateTime?
   suspendedReason  String?
 
-  // Business Type
+  // Business Type (Owner Type)
   businessType String @default("MULTI_LOCATION_OWNER") // "BRAND_FRANCHISOR" | "MULTI_LOCATION_OWNER"
+
+  // Industry Type (for conditional feature access)
+  industryType String @default("SERVICE") // "SERVICE" | "RETAIL" | "RESTAURANT"
 
   // CRM Relations
   leads       Lead[]
@@ -1274,6 +1757,13 @@ model BusinessConfig {
   usesRetailProducts Boolean @default(true)
   usesServices       Boolean @default(true)
 
+  // POS Mode - Determines which POS interface to show
+  // SALON = Services + Appointments (haircuts, spa, etc.)
+  // RETAIL = Products + Inventory (convenience store, liquor store)
+  // RESTAURANT = Menu Items + Tables (future)
+  // HYBRID = Both Services + Products (salon that sells products)
+  posMode            String  @default("SALON") // SALON, RETAIL, RESTAURANT, HYBRID
+
   // Marketing Features
   usesEmailMarketing  Boolean @default(true)
   usesSMSMarketing    Boolean @default(true)
@@ -1284,6 +1774,11 @@ model BusinessConfig {
   usesFranchising   Boolean @default(false)
   usesTimeTracking  Boolean @default(true)
   usesPayroll       Boolean @default(false)
+
+  // Payment Options
+  acceptsEbt         Boolean @default(false)
+  acceptsChecks      Boolean @default(false)
+  acceptsOnAccount   Boolean @default(false)
   
   // Shift Requirement for POS employees
   // CLOCK_IN_ONLY = Simple clock in, no cash counting
@@ -2130,3 +2625,258 @@ model CheckIn {
   @@index([status])
   @@index([checkedInAt])
 }
+
+// ============ LOTTERY MANAGEMENT ============
+
+model LotteryGame {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  
+  gameName    String
+  gameNumber  String    // State game number
+  ticketPrice Decimal
+  prizePool   Decimal?
+  isActive    Boolean   @default(true)
+  
+  packs       LotteryPack[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([franchiseId])
+}
+
+model LotteryPack {
+  id          String      @id @default(cuid())
+  gameId      String
+  game        LotteryGame @relation(fields: [gameId], references: [id])
+  locationId  String
+  location    Location    @relation(fields: [locationId], references: [id])
+  
+  packNumber  String      // Pack/book number
+  ticketCount Int         // Total tickets in pack
+  soldCount   Int         @default(0)
+  status      String      @default("INVENTORY") // INVENTORY, ACTIVATED, SETTLED
+  
+  activatedAt DateTime?
+  settledAt   DateTime?
+  
+  transactions LotteryTransaction[]
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  @@unique([gameId, packNumber])
+  @@index([locationId])
+  @@index([status])
+}
+
+model LotteryTransaction {
+  id          String      @id @default(cuid())
+  franchiseId String
+  franchise   Franchise   @relation(fields: [franchiseId], references: [id])
+  locationId  String
+  location    Location    @relation(fields: [locationId], references: [id])
+  
+  packId      String?
+  pack        LotteryPack? @relation(fields: [packId], references: [id])
+  
+  type        String      // SALE, PAYOUT, CLAIM
+  amount      Decimal
+  ticketNumber String?    // For payouts/claims
+  
+  employeeId  String
+  
+  // Link to regular POS transaction if applicable
+  transactionId String?
+  
+  createdAt   DateTime    @default(now())
+  
+  @@index([franchiseId])
+  @@index([locationId])
+  @@index([packId])
+  @@index([createdAt])
+}
+
+// ============ TOBACCO SCAN DATA & REBATES ============
+
+model TobaccoScanSubmission {
+  id            String    @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  locationId    String
+  location      Location  @relation(fields: [locationId], references: [id])
+  
+  manufacturer  String    // ALTRIA, RJR, ITG
+  weekStartDate DateTime
+  weekEndDate   DateTime
+  recordCount   Int       // Number of scans in this submission
+  totalAmount   Decimal?  // Total sales amount
+  
+  status        String    @default("PENDING") // PENDING, SUBMITTED, CONFIRMED, REJECTED
+  submittedAt   DateTime?
+  confirmedAt   DateTime?
+  fileUrl       String?   // URL to exported CSV
+  notes         String?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([franchiseId])
+  @@index([locationId])
+  @@index([manufacturer])
+  @@index([weekStartDate])
+}
+
+// ============ TOBACCO MANUFACTURER DEALS & CONFIG ============
+
+// Manufacturer portal configuration (API credentials for auto-submit)
+model ManufacturerConfig {
+  id            String    @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  
+  manufacturer  String    // ALTRIA, RJR, ITG
+  
+  // Store credentials
+  storeId       String?   // Store ID in manufacturer's system
+  accountNumber String?   // Account/License number
+  apiKey        String?   // API key for auto-submit (encrypted)
+  apiSecret     String?   // API secret (encrypted)
+  portalUrl     String?   // Custom portal URL if applicable
+  
+  // Rebate tracking
+  rebatePerPack  Decimal  @default(0.04)  // $/pack rebate rate
+  rebatePerCarton Decimal @default(0.40)  // $/carton rebate rate
+  loyaltyBonus   Decimal  @default(0)     // Extra monthly loyalty bonus
+  
+  isActive      Boolean   @default(true)
+  lastSyncAt    DateTime?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([franchiseId, manufacturer])
+  @@index([franchiseId])
+}
+
+// Tobacco manufacturer deals/promotions
+model TobaccoDeal {
+  id            String    @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  
+  manufacturer  String    // ALTRIA, RJR, ITG, ALL
+  dealName      String    // "Buy 2 Get $0.50 Off", "Loyalty Bonus"
+  dealType      String    // MULTI_BUY, LOYALTY, SCAN_REBATE, PROMO
+  
+  // Deal conditions
+  buyQuantity   Int?      // Buy X packs
+  discountType  String    // FIXED, PERCENT, PER_UNIT
+  discountAmount Decimal  // Amount off (cents or percent)
+  
+  // UPC matching (optional - for specific products)
+  applicableUpcs String?  // Comma-separated UPCs, or null for all
+  
+  // Active period
+  startDate     DateTime
+  endDate       DateTime?
+  isActive      Boolean   @default(true)
+  
+  // Tracking
+  timesApplied  Int       @default(0)
+  totalSavings  Decimal   @default(0)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([franchiseId])
+  @@index([manufacturer])
+  @@index([isActive])
+}
+
+// =====================================
+// TAX JURISDICTION & EXCISE TAX MODELS
+// =====================================
+// For handling location-based sales tax + volume-based excise taxes (like Cook County liquor tax)
+
+model TaxJurisdiction {
+  id            String    @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  name          String    // "Cook County", "City of Chicago", "Illinois State"
+  type          String    // STATE, COUNTY, CITY, DISTRICT
+  code          String?   // FIPS code or jurisdiction identifier
+  
+  // Sales Tax (percentage-based)
+  salesTaxRate  Decimal   @default(0) // e.g., 6.25 for 6.25%
+  
+  // Description for display
+  description   String?
+  
+  isActive      Boolean   @default(true)
+  
+  // Order for tax calculation (lower = calculated first)
+  priority      Int       @default(0)
+  
+  // Excise tax rules for this jurisdiction (per-unit taxes)
+  exciseTaxRules ExciseTaxRule[]
+  
+  // Locations that apply this jurisdiction
+  locations     LocationTaxJurisdiction[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([franchiseId, name])
+  @@index([franchiseId])
+}
+
+// Excise Tax Rules - per-unit taxes based on product type/volume
+model ExciseTaxRule {
+  id              String    @id @default(cuid())
+  jurisdictionId  String
+  jurisdiction    TaxJurisdiction @relation(fields: [jurisdictionId], references: [id], onDelete: Cascade)
+  
+  // Product type this rule applies to
+  productType     String    // BEER, WINE_LIGHT, WINE_HEAVY, SPIRITS, TOBACCO_PACK, TOBACCO_CARTON
+  
+  // Tax calculation
+  ratePerGallon   Decimal?  // For liquids - rate per gallon (will be prorated by ml)
+  ratePerUnit     Decimal?  // For non-liquids - flat rate per unit (e.g., per cigarette pack)
+  ratePerOz       Decimal?  // Alternative - per ounce
+  
+  // ABV thresholds for wine classification
+  minAbv          Decimal?  // Minimum ABV for this rule to apply
+  maxAbv          Decimal?  // Maximum ABV for this rule to apply
+  
+  description     String?   // "Cook County Spirits Tax"
+  isActive        Boolean   @default(true)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([jurisdictionId, productType])
+  @@index([jurisdictionId])
+}
+
+// Many-to-many: Which jurisdictions apply to each location
+model LocationTaxJurisdiction {
+  id              String    @id @default(cuid())
+  locationId      String
+  location        Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  jurisdictionId  String
+  jurisdiction    TaxJurisdiction @relation(fields: [jurisdictionId], references: [id], onDelete: Cascade)
+  
+  // Override: disable this jurisdiction for this specific location
+  isActive        Boolean   @default(true)
+  
+  createdAt       DateTime  @default(now())
+  
+  @@unique([locationId, jurisdictionId])
+  @@index([locationId])
+  @@index([jurisdictionId])
+}
+

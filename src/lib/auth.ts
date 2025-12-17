@@ -28,27 +28,49 @@ export const authOptions: NextAuthOptions = {
                     }
                 })
 
-                if (!user || !user.password) {
+                if (!user) {
                     return null
                 }
 
-                const isPasswordValid = compareSync(credentials.password, user.password)
+                // Check for PIN-verified login (from /employee-login page)
+                const isPinVerified = credentials.password.startsWith('PIN_VERIFIED_')
 
-                if (!isPasswordValid) {
-                    return null
+                if (isPinVerified) {
+                    // PIN was already verified by /api/auth/pin-login
+                    // Just verify the PIN matches
+                    const pin = credentials.password.replace('PIN_VERIFIED_', '')
+                    if (user.pin) {
+                        const isPinValid = compareSync(pin, user.pin)
+                        if (!isPinValid) {
+                            return null
+                        }
+                    } else {
+                        return null // User has no PIN set
+                    }
+                } else {
+                    // Regular password login
+                    if (!user.password) {
+                        return null
+                    }
+                    const isPasswordValid = compareSync(credentials.password, user.password)
+                    if (!isPasswordValid) {
+                        return null
+                    }
                 }
 
                 let approvalStatus = 'PENDING'
                 let accountStatus = 'ACTIVE'
                 let businessType = null
+                let industryType = 'SERVICE' // Default to SERVICE
 
                 // Check franchisor account status for franchisor owners
                 if (user.role === 'FRANCHISOR') {
                     const franchisor = await prisma.franchisor.findUnique({
                         where: { ownerId: user.id },
-                        select: { businessType: true, approvalStatus: true, accountStatus: true }
+                        select: { businessType: true, industryType: true, approvalStatus: true, accountStatus: true }
                     })
                     businessType = franchisor?.businessType || null
+                    industryType = franchisor?.industryType || 'SERVICE'
                     approvalStatus = franchisor?.approvalStatus || 'PENDING'
                     accountStatus = franchisor?.accountStatus || 'ACTIVE'
 
@@ -59,15 +81,16 @@ export const authOptions: NextAuthOptions = {
                 } else if (user.role === 'ADMIN' || user.role === 'PROVIDER') {
                     approvalStatus = 'APPROVED'
                 } else if (user.role === 'EMPLOYEE' || user.role === 'MANAGER') {
-                    // Employees and Managers - check their franchise's franchisor status
+                    // Employees and Managers - check their franchise's franchisor status AND industryType
                     approvalStatus = 'APPROVED'
 
                     if (user.franchiseId) {
                         const franchise = await prisma.franchise.findUnique({
                             where: { id: user.franchiseId },
-                            include: { franchisor: { select: { accountStatus: true } } }
+                            include: { franchisor: { select: { accountStatus: true, industryType: true } } }
                         })
                         accountStatus = franchise?.franchisor?.accountStatus || 'ACTIVE'
+                        industryType = franchise?.franchisor?.industryType || 'SERVICE' // Get industryType from their franchisor!
 
                         // Block employee login if their franchisor is suspended
                         if (accountStatus === 'SUSPENDED' || accountStatus === 'TERMINATED') {
@@ -98,9 +121,19 @@ export const authOptions: NextAuthOptions = {
                     role: user.role,
                     franchiseId: user.franchiseId,
                     locationId: user.locationId,
+                    // All Permission Fields
+                    canAddServices: user.canAddServices,
+                    canAddProducts: user.canAddProducts,
+                    canManageInventory: user.canManageInventory,
+                    canViewReports: user.canViewReports,
                     canProcessRefunds: user.canProcessRefunds,
+                    canManageSchedule: user.canManageSchedule,
+                    canManageEmployees: user.canManageEmployees,
                     canManageShifts: user.canManageShifts,
+                    canClockIn: user.canClockIn,
+                    canClockOut: user.canClockOut,
                     businessType,
+                    industryType,
                     approvalStatus,
                     accountStatus,
                 }
@@ -117,9 +150,19 @@ export const authOptions: NextAuthOptions = {
                     role: token.role,
                     franchiseId: token.franchiseId,
                     locationId: token.locationId,
+                    // All Permission Fields
+                    canAddServices: token.canAddServices,
+                    canAddProducts: token.canAddProducts,
+                    canManageInventory: token.canManageInventory,
+                    canViewReports: token.canViewReports,
                     canProcessRefunds: token.canProcessRefunds,
+                    canManageSchedule: token.canManageSchedule,
+                    canManageEmployees: token.canManageEmployees,
                     canManageShifts: token.canManageShifts,
+                    canClockIn: token.canClockIn,
+                    canClockOut: token.canClockOut,
                     businessType: token.businessType,
+                    industryType: token.industryType,
                     approvalStatus: token.approvalStatus,
                     accountStatus: token.accountStatus,
                 }
@@ -134,9 +177,19 @@ export const authOptions: NextAuthOptions = {
                     role: (user as any).role,
                     franchiseId: (user as any).franchiseId,
                     locationId: (user as any).locationId,
+                    // All Permission Fields
+                    canAddServices: (user as any).canAddServices,
+                    canAddProducts: (user as any).canAddProducts,
+                    canManageInventory: (user as any).canManageInventory,
+                    canViewReports: (user as any).canViewReports,
                     canProcessRefunds: (user as any).canProcessRefunds,
+                    canManageSchedule: (user as any).canManageSchedule,
+                    canManageEmployees: (user as any).canManageEmployees,
                     canManageShifts: (user as any).canManageShifts,
+                    canClockIn: (user as any).canClockIn,
+                    canClockOut: (user as any).canClockOut,
                     businessType: (user as any).businessType,
+                    industryType: (user as any).industryType,
                     approvalStatus: (user as any).approvalStatus,
                     accountStatus: (user as any).accountStatus,
                 }

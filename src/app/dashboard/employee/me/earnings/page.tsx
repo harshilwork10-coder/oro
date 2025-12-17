@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
     DollarSign,
     TrendingUp,
@@ -8,8 +9,10 @@ import {
     Zap,
     Target,
     Award,
-    RefreshCw
+    RefreshCw,
+    ArrowLeft
 } from 'lucide-react'
+
 
 interface EarningsData {
     employeeName: string
@@ -101,15 +104,20 @@ export default function RealTimeEarningsPreview() {
         <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-stone-100">
-                        💰 Your Earnings Today
-                    </h1>
-                    <p className="text-stone-400 mt-1">
-                        {earnings.isActiveShift ? 'Active Shift' : 'Today'} •
-                        Started at {formatTime(earnings.shiftStart)} •
-                        {earnings.shiftDuration} hours
-                    </p>
+                <div className="flex items-center gap-4">
+                    <Link href="/dashboard/employee" className="p-2 hover:bg-stone-800 rounded-lg transition-colors">
+                        <ArrowLeft className="h-5 w-5 text-stone-400" />
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-bold text-stone-100">
+                            💰 Your Earnings Today
+                        </h1>
+                        <p className="text-stone-400 mt-1">
+                            {earnings.isActiveShift ? 'Active Shift' : 'Today'} •
+                            Started at {formatTime(earnings.shiftStart)} •
+                            {earnings.shiftDuration} hours
+                        </p>
+                    </div>
                 </div>
                 <button
                     onClick={fetchEarnings}
