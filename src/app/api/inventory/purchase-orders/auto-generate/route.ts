@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import prisma from "@/lib/prisma"
+import { prisma } from "@/lib/prisma"
 
 // POST /api/inventory/purchase-orders/auto-generate
 // Automatically creates purchase orders for products below minStock level

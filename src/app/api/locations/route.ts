@@ -139,11 +139,30 @@ export async function POST(request: Request) {
         if (session.user.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({
                 where: { ownerId: session.user.id },
-                include: { franchises: true }
+                include: {
+                    franchises: true,
+                    config: { select: { maxLocations: true, subscriptionTier: true } }
+                }
             })
 
             if (!franchisor) {
                 return NextResponse.json({ error: 'Franchisor profile not found' }, { status: 403 })
+            }
+
+            // Check location limit based on subscription
+            const currentLocationCount = await prisma.location.count({
+                where: { franchise: { franchisorId: franchisor.id } }
+            })
+            const maxLocations = franchisor.config?.maxLocations || 1
+
+            if (currentLocationCount >= maxLocations) {
+                return NextResponse.json({
+                    error: 'Location limit reached',
+                    message: `Your ${franchisor.config?.subscriptionTier || 'STARTER'} plan allows ${maxLocations} store(s). Upgrade to add more.`,
+                    code: 'LIMIT_REACHED',
+                    current: currentLocationCount,
+                    limit: maxLocations
+                }, { status: 403 })
             }
 
             if (franchiseId) {

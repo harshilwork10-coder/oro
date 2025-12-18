@@ -114,7 +114,7 @@ function CustomerDisplayContent() {
 
                 {/* Company branding at bottom */}
                 <div className="absolute bottom-8 text-stone-600 text-sm">
-                    Powered by Oronex
+                    Powered by Oro
                 </div>
             </div>
         )
@@ -219,7 +219,7 @@ function CustomerDisplayContent() {
 
             {/* Branding */}
             <div className="mt-8 text-center text-stone-600 text-sm">
-                Powered by Oronex
+                Powered by Oro
             </div>
         </div>
     )

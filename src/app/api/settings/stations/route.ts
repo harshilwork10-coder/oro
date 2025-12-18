@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { generateStationCode } from '@/lib/codeGenerator'
 
 // Helper to get user's locationId (direct or via franchise)
 async function getUserLocationId(user: any): Promise<string | null> {
@@ -63,15 +64,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { locationId, name, pairingCode } = await request.json()
+    const { locationId, name, pairingCode: providedCode } = await request.json()
 
-    if (!locationId || !name || !pairingCode) {
-        return NextResponse.json({ error: 'Location, name and pairing code required' }, { status: 400 })
+    if (!locationId || !name) {
+        return NextResponse.json({ error: 'Location and name required' }, { status: 400 })
     }
+
+    // Get existing station count for numbering
+    const existingStations = await prisma.station.findMany({
+        where: { locationId },
+        select: { pairingCode: true }
+    })
+
+    // Auto-generate pairing code if not provided
+    const existingCodes = existingStations.map(s => s.pairingCode).filter(Boolean) as string[]
+    const stationNumber = existingStations.length + 1
+    const pairingCode = (providedCode?.toUpperCase()) || generateStationCode(stationNumber, existingCodes)
 
     // Check for duplicate pairing code
     const existing = await prisma.station.findFirst({
-        where: { pairingCode: pairingCode.toUpperCase() }
+        where: { pairingCode }
     })
     if (existing) {
         return NextResponse.json({ error: 'Pairing code already exists' }, { status: 400 })
@@ -81,7 +93,7 @@ export async function POST(request: NextRequest) {
         data: {
             locationId,
             name,
-            pairingCode: pairingCode.toUpperCase(),
+            pairingCode,
             paymentMode: 'CASH_ONLY'
         }
     })

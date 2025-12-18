@@ -26,23 +26,14 @@ export async function GET(request: NextRequest) {
             },
             orderBy: { sortOrder: 'asc' },
             include: {
-                child: {
-                    select: {
-                        id: true,
-                        name: true,
-                        price: true,
-                        barcode: true,
-                        sku: true,
-                        stock: true
-                    }
-                }
+                child: true
             }
         })
 
         return NextResponse.json({
             items: tagAlongItems.map(t => ({
-                id: t.id,
-                ...t.child
+                ...t.child,
+                tagAlongId: t.id
             }))
         })
     } catch (error) {

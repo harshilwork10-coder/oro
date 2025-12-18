@@ -249,7 +249,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <div className="flex h-20 xl:h-28 items-center justify-center border-b border-stone-800/50 px-4 bg-gradient-to-r from-stone-900/50 to-transparent">
                     <div className="flex items-center justify-center group">
                         <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
-                            <img src="/Oronex-logo.png" alt="Oronex" className="h-12 xl:h-16 object-contain" />
+                            <img src="/oro-logo.png" alt="Oro" className="h-12 xl:h-16 object-contain" />
                         </div>
                     </div>
                     <button

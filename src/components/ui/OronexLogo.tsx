@@ -1,12 +1,12 @@
 'use client'
 
-interface OronexLogoProps {
+interface OroLogoProps {
     size?: 'sm' | 'md' | 'lg' | 'xl' | number
     showText?: boolean
     className?: string
 }
 
-export default function OronexLogo({ size = 'md', showText = true, className = '' }: OronexLogoProps) {
+export default function OroLogo({ size = 'md', showText = true, className = '' }: OroLogoProps) {
     const sizes = {
         sm: { icon: 24, text: 14, gap: 6 },
         md: { icon: 32, text: 18, gap: 8 },
@@ -18,8 +18,8 @@ export default function OronexLogo({ size = 'md', showText = true, className = '
     let icon: number, text: number, gap: number
     if (typeof size === 'number') {
         icon = size
-        text = Math.round(size * 0.375) // Proportional text size
-        gap = Math.round(size * 0.125) // Proportional gap
+        text = Math.round(size * 0.5) // Slightly larger text for shorter word
+        gap = Math.round(size * 0.125)
     } else {
         const sizeConfig = sizes[size] || sizes.md
         icon = sizeConfig.icon
@@ -32,7 +32,7 @@ export default function OronexLogo({ size = 'md', showText = true, className = '
 
     return (
         <div className={`flex items-center ${className}`} style={{ gap }}>
-            {/* Icon - Ring with 3 connected circles */}
+            {/* Icon - Ring with 2 orbiting circles */}
             <svg
                 width={icon}
                 height={icon}
@@ -49,15 +49,13 @@ export default function OronexLogo({ size = 'md', showText = true, className = '
                     strokeWidth="10"
                     fill="none"
                 />
-                {/* Circle 1 - Top center */}
-                <circle cx="50" cy="14" r="14" fill={orange} />
+                {/* Circle 1 - Top left */}
+                <circle cx="22" cy="30" r="10" fill={orange} />
                 {/* Circle 2 - Bottom left */}
-                <circle cx="19" cy="68" r="14" fill={orange} />
-                {/* Circle 3 - Bottom right */}
-                <circle cx="81" cy="68" r="14" fill={orange} />
+                <circle cx="22" cy="70" r="10" fill={orange} />
             </svg>
 
-            {/* Wordmark */}
+            {/* Wordmark - "Oro" */}
             {showText && (
                 <span
                     style={{
@@ -67,10 +65,13 @@ export default function OronexLogo({ size = 'md', showText = true, className = '
                         letterSpacing: '-0.02em'
                     }}
                 >
-                    <span style={{ color: orange }}>o</span>
-                    <span style={{ color: lightGray }}>ronex</span>
+                    <span style={{ color: orange }}>O</span>
+                    <span style={{ color: lightGray }}>ro</span>
                 </span>
             )}
         </div>
     )
 }
+
+// Keep backward compatibility - export with old name too
+export { OroLogo as OronexLogo }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { generateStoreCode } from '@/lib/codeGenerator'
 
 // Get all locations for a client
 export async function GET(request: NextRequest) {
@@ -103,14 +104,26 @@ export async function POST(request: NextRequest) {
             })
         }
 
-        // Create the location
+        // Get existing store codes to ensure uniqueness
+        const existingLocations = await prisma.location.findMany({
+            select: { pulseStoreCode: true }
+        })
+        const existingCodes = existingLocations
+            .map(l => (l as any).pulseStoreCode)
+            .filter(Boolean) as string[]
+
+        // Auto-generate Pulse Store Code
+        const pulseStoreCode = generateStoreCode(name, existingCodes)
+
+        // Create the location with auto-generated code
         const location = await prisma.location.create({
             data: {
                 name,
                 slug: uniqueSlug,
                 address: `${address}, ${city || ''}, ${state || ''} ${zip || ''}`.trim(),
-                franchiseId: franchise.id
-            }
+                franchiseId: franchise.id,
+                pulseStoreCode
+            } as any
         })
 
         return NextResponse.json({
@@ -123,3 +136,4 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to create location' }, { status: 500 })
     }
 }
+

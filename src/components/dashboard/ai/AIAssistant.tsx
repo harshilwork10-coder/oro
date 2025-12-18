@@ -18,7 +18,7 @@ export default function AIAssistant() {
         {
             id: '1',
             role: 'assistant',
-            content: "Hi! I'm Oronex. Ask me about your revenue, staff performance, or daily stats.",
+            content: "Hi! I'm Oro. Ask me about your revenue, staff performance, or daily stats.",
             timestamp: new Date()
         }
     ])
@@ -85,7 +85,7 @@ export default function AIAssistant() {
                 >
                     <Sparkles className="h-6 w-6 text-white animate-pulse" />
                     <span className="absolute -top-10 right-0 bg-stone-900 text-xs px-2 py-1 rounded border border-stone-800 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                        Ask Oronex
+                        Ask Oro
                     </span>
                 </button>
             )}
@@ -101,7 +101,7 @@ export default function AIAssistant() {
                                 <Sparkles className="h-4 w-4 text-orange-400" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-sm text-white">Oronex</h3>
+                                <h3 className="font-bold text-sm text-white">Oro</h3>
                                 <p className="text-[10px] text-green-400 flex items-center gap-1">
                                     <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
                                     Online
@@ -132,8 +132,8 @@ export default function AIAssistant() {
                                     )}
                                 </div>
                                 <div className={`max-w-[75%] rounded-2xl p-3 text-sm ${msg.role === 'user'
-                                        ? 'bg-stone-800 text-stone-100 rounded-tr-none'
-                                        : 'bg-white/5 text-stone-200 rounded-tl-none border border-white/5'
+                                    ? 'bg-stone-800 text-stone-100 rounded-tr-none'
+                                    : 'bg-white/5 text-stone-200 rounded-tl-none border border-white/5'
                                     }`}>
                                     {msg.content}
                                 </div>

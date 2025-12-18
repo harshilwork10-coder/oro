@@ -118,6 +118,35 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'User already exists' }, { status: 400 })
     }
 
+    // Check user limit based on subscription
+    if (user.role === 'FRANCHISOR') {
+        const franchisor = await prisma.franchisor.findUnique({
+            where: { ownerId: user.id },
+            include: {
+                config: { select: { maxUsers: true, subscriptionTier: true } },
+                franchises: { select: { id: true } }
+            }
+        })
+
+        if (franchisor) {
+            const franchiseIds = franchisor.franchises.map(f => f.id)
+            const currentUserCount = await prisma.user.count({
+                where: { franchiseId: { in: franchiseIds } }
+            })
+            const maxUsers = franchisor.config?.maxUsers || 1
+
+            if (currentUserCount >= maxUsers) {
+                return NextResponse.json({
+                    error: 'User limit reached',
+                    message: `Your ${franchisor.config?.subscriptionTier || 'STARTER'} plan allows ${maxUsers} user(s). Upgrade to add more.`,
+                    code: 'LIMIT_REACHED',
+                    current: currentUserCount,
+                    limit: maxUsers
+                }, { status: 403 })
+            }
+        }
+    }
+
     const hashedPassword = await hash(password, 10)
     const hashedPin = body.pin ? await hash(body.pin, 10) : undefined
 

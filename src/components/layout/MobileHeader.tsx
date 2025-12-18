@@ -23,7 +23,7 @@ export default function MobileHeader({ onMenuClick, forceShow }: MobileHeaderPro
                     <Menu className="h-6 w-6" aria-hidden="true" />
                 </button>
                 <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-stone-100">Oronex</span>
+                    <span className="text-lg font-bold text-stone-100">Oro</span>
                 </div>
             </div>
 

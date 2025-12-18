@@ -22,32 +22,52 @@ export async function PATCH(
         const { id } = await params
         const updates = await request.json()
 
-        // Get current franchisor
+        // Verify franchisor exists
         const franchisor = await prisma.franchisor.findUnique({
-            where: { id }
+            where: { id },
+            include: { config: true }
         })
 
         if (!franchisor) {
             return NextResponse.json({ error: 'Client not found' }, { status: 404 })
         }
 
-        // Merge new config with existing
-        const currentConfig = (franchisor as any).config || {}
-        const newConfig = { ...currentConfig, ...updates }
+        // Filter to only valid BusinessConfig fields
+        const validFields = [
+            'usesCommissions', 'usesInventory', 'usesAppointments', 'usesScheduling',
+            'usesVirtualKeypad', 'usesLoyalty', 'usesGiftCards', 'usesMemberships',
+            'usesReferrals', 'usesRoyalties', 'usesTipping', 'usesDiscounts',
+            'taxRate', 'taxServices', 'taxProducts', 'usesRetailProducts', 'usesServices',
+            'posMode', 'usesEmailMarketing', 'usesSMSMarketing', 'usesReviewManagement',
+            'usesMultiLocation', 'usesFranchising', 'usesTimeTracking', 'usesPayroll',
+            'usesMobilePulse', 'pulseSeatCount', 'subscriptionTier', 'maxLocations',
+            'maxUsers', 'acceptsEbt', 'acceptsChecks', 'acceptsOnAccount', 'shiftRequirement',
+            'enableResources'
+        ]
 
-        // Update the config
-        const updated = await prisma.franchisor.update({
-            where: { id },
-            data: {
-                config: newConfig
-            } as any
+        // Only include valid fields in the update
+        const filteredUpdates: Record<string, any> = {}
+        for (const key of Object.keys(updates)) {
+            if (validFields.includes(key)) {
+                filteredUpdates[key] = updates[key]
+            }
+        }
+
+        // Upsert the BusinessConfig
+        const updatedConfig = await prisma.businessConfig.upsert({
+            where: { franchisorId: id },
+            create: {
+                franchisorId: id,
+                ...filteredUpdates
+            },
+            update: filteredUpdates
         })
 
-        console.log(`[CONFIG] Provider ${session.user.email} updated config for client ${id}:`, updates)
+        console.log(`[CONFIG] Provider ${session.user.email} updated config for client ${id}:`, filteredUpdates)
 
         return NextResponse.json({
             success: true,
-            config: newConfig
+            config: updatedConfig
         })
     } catch (error) {
         console.error('Error updating client config:', error)
@@ -91,7 +111,7 @@ export async function GET(
         return NextResponse.json({
             id: franchisor.id,
             businessName: franchisor.name || '',
-            config: (franchisor as any).config || {}
+            config: franchisor.config || {}
         })
     } catch (error) {
         console.error('Error fetching client config:', error)

@@ -249,6 +249,34 @@ export async function DELETE(
         console.log('   ✓ Deleted inventory & supply chain data')
 
         // 4. Delete Customer Data
+        // First, delete all Client-related tables that reference Client
+        await prisma.chatConversation.deleteMany({
+            where: { franchiseId: { in: franchiseIds } }
+        })
+        await prisma.customerPromo.deleteMany({
+            where: { franchiseId: { in: franchiseIds } }
+        })
+        await prisma.clientPhoto.deleteMany({
+            where: { client: { franchiseId: { in: franchiseIds } } }
+        })
+        await prisma.clientNote.deleteMany({
+            where: { client: { franchiseId: { in: franchiseIds } } }
+        })
+        // Delete PackageUsage before PackagePurchase
+        await prisma.packageUsage.deleteMany({
+            where: { purchase: { client: { franchiseId: { in: franchiseIds } } } }
+        })
+        await prisma.packagePurchase.deleteMany({
+            where: { client: { franchiseId: { in: franchiseIds } } }
+        })
+        await prisma.recurringAppointment.deleteMany({
+            where: { client: { franchiseId: { in: franchiseIds } } }
+        })
+        await prisma.checkIn.deleteMany({
+            where: { client: { franchiseId: { in: franchiseIds } } }
+        })
+
+        // Now delete memberships and loyalty
         await prisma.clientMembership.deleteMany({
             where: { client: { franchiseId: { in: franchiseIds } } }
         })
@@ -258,7 +286,7 @@ export async function DELETE(
         await prisma.review.deleteMany({
             where: { franchiseId: { in: franchiseIds } }
         })
-        // Clients will be deleted via cascade from Franchise, but we can delete explicitly to be safe
+        // Now safe to delete Clients
         await prisma.client.deleteMany({
             where: { franchiseId: { in: franchiseIds } }
         })
