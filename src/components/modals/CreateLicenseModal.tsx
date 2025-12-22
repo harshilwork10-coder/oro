@@ -11,10 +11,11 @@ interface CreateLicenseModalProps {
 
 export default function CreateLicenseModal({ isOpen, onClose, onSuccess }: CreateLicenseModalProps) {
     const [isLoading, setIsLoading] = useState(false)
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const [formData, setFormData] = useState({
         customerName: '',
         customerEmail: '',
-        maxTerminals: '3', // Default to 3
+        maxTerminals: '3',
         expiresAt: '',
         notes: ''
     })
@@ -45,11 +46,11 @@ export default function CreateLicenseModal({ isOpen, onClose, onSuccess }: Creat
                 setCreatedLicense(data.license)
                 onSuccess() // Refresh list in parent
             } else {
-                alert(data.error || 'Failed to create license')
+                setToast({ message: data.error || 'Failed to create license', type: 'error' })
             }
         } catch (error) {
             console.error('Create license error:', error)
-            alert('Failed to create license')
+            setToast({ message: 'Failed to create license', type: 'error' })
         } finally {
             setIsLoading(false)
         }
@@ -57,7 +58,7 @@ export default function CreateLicenseModal({ isOpen, onClose, onSuccess }: Creat
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text)
-        alert('License key copied to clipboard!')
+        setToast({ message: 'License key copied to clipboard!', type: 'success' })
     }
 
     return (
@@ -172,6 +173,12 @@ export default function CreateLicenseModal({ isOpen, onClose, onSuccess }: Creat
                     )}
                 </div>
             </div>
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
+                </div>
+            )}
         </div>
     )
 }

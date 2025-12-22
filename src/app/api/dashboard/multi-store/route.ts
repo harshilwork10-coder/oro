@@ -19,8 +19,7 @@ export async function GET(request: NextRequest) {
             select: {
                 id: true,
                 name: true,
-                address: true,
-                phone: true
+                address: true
             }
         })
 

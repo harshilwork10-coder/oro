@@ -12,6 +12,7 @@ interface ShiftModalProps {
 
 export default function ShiftModal({ isOpen, onClose, onSave, selectedDate }: ShiftModalProps) {
     const [loading, setLoading] = useState(false)
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const [employees, setEmployees] = useState<any[]>([])
     const [formData, setFormData] = useState({
         employeeId: '',
@@ -65,7 +66,7 @@ export default function ShiftModal({ isOpen, onClose, onSave, selectedDate }: Sh
             onClose()
         } catch (error: any) {
             console.error('Error creating shift:', error)
-            alert(error.message)
+            setToast({ message: error.message || 'Failed to create shift', type: 'error' })
         } finally {
             setLoading(false)
         }
@@ -175,6 +176,12 @@ export default function ShiftModal({ isOpen, onClose, onSave, selectedDate }: Sh
                     </div>
                 </form>
             </div>
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
+                </div>
+            )}
         </div>
     )
 }

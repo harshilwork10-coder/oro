@@ -90,7 +90,13 @@ export async function GET() {
             })),
             config: f.config || {},
             integrations: parseIntegrations(f.integrations),
-            createdAt: f.createdAt
+            createdAt: f.createdAt,
+            // Document verification status
+            documents: {
+                voidCheck: !!(f as any).voidCheckUrl,
+                driverLicense: !!(f as any).driverLicenseUrl,
+                feinLetter: !!(f as any).feinLetterUrl,
+            }
         }))
 
         return NextResponse.json(result)

@@ -73,7 +73,7 @@ export default function ContractPage() {
 
                     <div className="prose prose-invert prose-sm max-h-[400px] overflow-y-auto pr-4 custom-scrollbar">
                         <p><strong>SOFTWARE LICENSE AND HARDWARE AGREEMENT</strong></p>
-                        <p>This Agreement is entered into between Oronex POS ("Licensor") and the Customer ("Licensee").</p>
+                        <p>This Agreement is entered into between Oro POS ("Licensor") and the Customer ("Licensee").</p>
 
                         <h4>1. GRANT OF LICENSE</h4>
                         <p>Licensor grants Licensee a non-exclusive, non-transferable license to use the Oronex POS software for the number of stations specified in the Order.</p>

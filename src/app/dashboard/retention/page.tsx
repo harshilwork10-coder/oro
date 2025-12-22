@@ -95,6 +95,7 @@ export default function RetentionDashboardPage() {
     const [activeTab, setActiveTab] = useState<'rules' | 'vip' | 'packages' | 'streaks' | 'birthday' | 'referral' | 'lapsing' | 'prebook'>('rules')
     const [saving, setSaving] = useState(false)
     const [loading, setLoading] = useState(true)
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
     // FAIR DISCOUNT SYSTEM - Best Offer + Credit Banking
     const [fairDiscountSystem, setFairDiscountSystem] = useState({
@@ -210,7 +211,7 @@ export default function RetentionDashboardPage() {
             day90Discount: recommendations.winbackDiscounts.day90
         })
         setFairDiscountSystem({ ...fairDiscountSystem, maxDiscountPercent: recommendations.maxDiscountPercent })
-        alert('✅ Smart recommendations applied based on $' + avgServicePrice + ' average service price!')
+        setToast({ message: 'Smart recommendations applied based on $' + avgServicePrice + ' average service price!', type: 'success' })
     }
 
     const handleSave = async () => {
@@ -230,10 +231,10 @@ export default function RetentionDashboardPage() {
             console.log('Saving retention settings:', settings)
             // TODO: Save to API
             await new Promise(r => setTimeout(r, 1000))
-            alert('Settings saved successfully!')
+            setToast({ message: 'Settings saved successfully!', type: 'success' })
         } catch (error) {
             console.error('Error saving:', error)
-            alert('Failed to save settings')
+            setToast({ message: 'Failed to save settings', type: 'error' })
         } finally {
             setSaving(false)
         }
@@ -1055,6 +1056,14 @@ export default function RetentionDashboardPage() {
                     </div>
                 )}
             </div>
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
+                </div>
+            )}
         </div>
     )
 }

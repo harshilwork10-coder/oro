@@ -63,6 +63,25 @@ export async function PATCH(
             update: filteredUpdates
         })
 
+        // Log the change to audit trail
+        const user = session.user as any
+        await prisma.auditLog.create({
+            data: {
+                userId: user.id,
+                userEmail: user.email,
+                userRole: user.role,
+                entityType: 'FRANCHISOR_CONFIG',
+                entityId: id,
+                action: 'UPDATED',
+                changes: JSON.stringify({
+                    oldValues: franchisor.config || {},
+                    newValues: filteredUpdates,
+                    fields: Object.keys(filteredUpdates)
+                }),
+                status: 'SUCCESS'
+            }
+        })
+
         console.log(`[CONFIG] Provider ${session.user.email} updated config for client ${id}:`, filteredUpdates)
 
         return NextResponse.json({

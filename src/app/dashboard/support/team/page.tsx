@@ -44,6 +44,7 @@ export default function SupportTeamPage() {
         password: ''
     })
     const [isSaving, setIsSaving] = useState(false)
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
     useEffect(() => {
         fetchTeamMembers()
@@ -65,7 +66,7 @@ export default function SupportTeamPage() {
 
     const addTeamMember = async () => {
         if (!formData.name || !formData.email || !formData.password) {
-            alert('Please fill in all required fields')
+            setToast({ message: 'Please fill in all required fields', type: 'error' })
             return
         }
 
@@ -83,11 +84,11 @@ export default function SupportTeamPage() {
                 fetchTeamMembers()
             } else {
                 const data = await res.json()
-                alert(data.error || 'Failed to add team member')
+                setToast({ message: data.error || 'Failed to add team member', type: 'error' })
             }
         } catch (error) {
             console.error('Failed to add team member:', error)
-            alert('Failed to add team member')
+            setToast({ message: 'Failed to add team member', type: 'error' })
         } finally {
             setIsSaving(false)
         }
@@ -311,6 +312,14 @@ export default function SupportTeamPage() {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
                 </div>
             )}
         </div>

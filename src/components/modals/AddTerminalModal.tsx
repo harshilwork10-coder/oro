@@ -12,6 +12,7 @@ interface AddTerminalModalProps {
 
 export default function AddTerminalModal({ isOpen, onClose, onSuccess, locations }: AddTerminalModalProps) {
     const [isLoading, setIsLoading] = useState(false)
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const [formData, setFormData] = useState({
         serialNumber: '',
         model: 'PAX A920',
@@ -36,11 +37,11 @@ export default function AddTerminalModal({ isOpen, onClose, onSuccess, locations
                 onClose()
                 setFormData({ serialNumber: '', model: 'PAX A920', locationId: '' })
             } else {
-                alert('Failed to add terminal')
+                setToast({ message: 'Failed to add terminal', type: 'error' })
             }
         } catch (error) {
             console.error(error)
-            alert('Error adding terminal')
+            setToast({ message: 'Error adding terminal', type: 'error' })
         } finally {
             setIsLoading(false)
         }
@@ -131,6 +132,12 @@ export default function AddTerminalModal({ isOpen, onClose, onSuccess, locations
                     </div>
                 </form>
             </div>
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
+                </div>
+            )}
         </div>
     )
 }

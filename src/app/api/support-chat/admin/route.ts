@@ -8,7 +8,7 @@ const CANNED_RESPONSES = [
     {
         id: 'greeting',
         title: 'Greeting',
-        content: "Hi! Thank you for reaching out to Oronex Support. I'm here to help you today. How can I assist you?"
+        content: "Hi! Thank you for reaching out to Oro Support. I'm here to help you today. How can I assist you?"
     },
     {
         id: 'processing',

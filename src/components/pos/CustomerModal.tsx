@@ -31,6 +31,7 @@ export default function CustomerModal({ isOpen, onClose, onSelectCustomer }: Cus
         notes: ''
     })
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
     // Debounced search
     useEffect(() => {
@@ -74,11 +75,11 @@ export default function CustomerModal({ isOpen, onClose, onSelectCustomer }: Cus
                 setNewCustomer({ name: '', email: '', phone: '', notes: '' })
                 setActiveTab('search')
             } else {
-                alert('Failed to create customer')
+                setToast({ message: 'Failed to create customer', type: 'error' })
             }
         } catch (error) {
             console.error('Error creating customer:', error)
-            alert('Error creating customer')
+            setToast({ message: 'Error creating customer', type: 'error' })
         } finally {
             setIsSubmitting(false)
         }
@@ -108,8 +109,8 @@ export default function CustomerModal({ isOpen, onClose, onSelectCustomer }: Cus
                     <button
                         onClick={() => setActiveTab('search')}
                         className={`flex-1 py-4 font-medium text-sm transition-colors relative ${activeTab === 'search'
-                                ? 'text-blue-600 bg-blue-50'
-                                : 'text-gray-600 hover:bg-gray-50'
+                            ? 'text-blue-600 bg-blue-50'
+                            : 'text-gray-600 hover:bg-gray-50'
                             }`}
                     >
                         <div className="flex items-center justify-center gap-2">
@@ -123,8 +124,8 @@ export default function CustomerModal({ isOpen, onClose, onSelectCustomer }: Cus
                     <button
                         onClick={() => setActiveTab('add')}
                         className={`flex-1 py-4 font-medium text-sm transition-colors relative ${activeTab === 'add'
-                                ? 'text-blue-600 bg-blue-50'
-                                : 'text-gray-600 hover:bg-gray-50'
+                            ? 'text-blue-600 bg-blue-50'
+                            : 'text-gray-600 hover:bg-gray-50'
                             }`}
                     >
                         <div className="flex items-center justify-center gap-2">
@@ -299,6 +300,14 @@ export default function CustomerModal({ isOpen, onClose, onSelectCustomer }: Cus
                     )}
                 </div>
             </div>
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
+                </div>
+            )}
         </div>
     )
 }

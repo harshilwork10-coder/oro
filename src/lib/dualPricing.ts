@@ -11,8 +11,8 @@ export interface ProviderSettings {
 export function getProviderSettings(): ProviderSettings {
     return {
         cashDiscountPercent: 3.5, // YOU set this percentage for ALL clients
-        platformName: 'Oronex POS',
-        supportEmail: 'support@oronexpos.com'
+        platformName: 'Oro POS',
+        supportEmail: 'support@Oropos.com'
     }
 }
 

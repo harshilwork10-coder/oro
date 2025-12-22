@@ -1,0 +1,440 @@
+﻿   Γû▓ Next.js 16.0.8 (Turbopack)
+   - Environments: .env
+
+node.exe :  ΓÜá The "middleware" file convention is 
+deprecated. Please use "proxy" instead. Learn more: 
+https://nextjs.org/docs/messages/middleware-to-proxy
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( ΓÜá The "middl 
+   ...leware-to-proxy:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 8 errors:
+./src/app/dashboard/pulse/page.tsx:18:1
+Module not found: Can't resolve '@/components/ui/OroLogo'
+[0m [90m 16 |[39m     [33mAlertCircle[39m
+ [90m 17 |[39m } [36mfrom[39m [32m'lucide-react'[39m
+[31m[1m>[22m[39m[90m 18 |[39m [36mimport[39m 
+[33mOroLogo[39m [36mfrom[39m 
+[32m'@/components/ui/OroLogo'[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31
+m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[
+1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1
+m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m
+^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[
+22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[2
+2m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22
+m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[
+39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[3
+9m
+ [90m 19 |[39m
+ [90m 20 |[39m [36minterface[39m [33mLiveStats[39m {
+ [90m 21 |[39m     todaySales[33m:[39m number[0m
+
+Import map: aliased to relative 
+'./src/components/ui/OroLogo' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/pulse/page.tsx [Client Component 
+Browser]
+    ./src/app/dashboard/pulse/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/pulse/page.tsx [Client Component SSR]
+    ./src/app/dashboard/pulse/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/app/dashboard/pulse/upgrade/page.tsx:6:1
+Module not found: Can't resolve '@/components/ui/OroLogo'
+[0m [90m 4 |[39m [36mimport[39m { useRouter } 
+[36mfrom[39m [32m'next/navigation'[39m
+ [90m 5 |[39m [36mimport[39m { 
+[33mLoader2[39m[33m,[39m [33mLock[39m[33m,[39m 
+[33mZap[39m[33m,[39m [33mCheckCircle[39m[33m,[39m 
+[33mPhone[39m[33m,[39m [33mMail[39m } [36mfrom[39m 
+[32m'lucide-react'[39m
+[31m[1m>[22m[39m[90m 6 |[39m [36mimport[39m 
+[33mOroLogo[39m [36mfrom[39m 
+[32m'@/components/ui/OroLogo'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[
+1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1
+m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m
+^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[
+22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[2
+2m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22
+m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[
+39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[3
+9m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39
+m
+ [90m 7 |[39m
+ [90m 8 |[39m [36mexport[39m [36mdefault[39m 
+[36mfunction[39m [33mPulseUpgradePage[39m() {
+ [90m 9 |[39m     [36mconst[39m router [33m=[39m 
+useRouter()[0m
+
+Import map: aliased to relative 
+'./src/components/ui/OroLogo' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/pulse/upgrade/page.tsx [Client 
+Component Browser]
+    ./src/app/dashboard/pulse/upgrade/page.tsx [Server 
+Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/pulse/upgrade/page.tsx [Client 
+Component SSR]
+    ./src/app/dashboard/pulse/upgrade/page.tsx [Server 
+Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/app/employee-login/page.tsx:6:1
+Module not found: Can't resolve '@/components/ui/OroLogo'
+[0m [90m 4 |[39m [36mimport[39m { signIn } 
+[36mfrom[39m [32m'next-auth/react'[39m
+ [90m 5 |[39m [36mimport[39m { useRouter } 
+[36mfrom[39m [32m'next/navigation'[39m
+[31m[1m>[22m[39m[90m 6 |[39m [36mimport[39m 
+[33mOroLogo[39m [36mfrom[39m 
+[32m'@/components/ui/OroLogo'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[
+1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1
+m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m
+^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[
+22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[2
+2m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22
+m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[
+39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[3
+9m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39
+m
+ [90m 7 |[39m [36mimport[39m { 
+[33mBuilding2[39m[33m,[39m [33mStore[39m[33m,[39m 
+[33mChevronRight[39m[33m,[39m [33mLoader2[39m } 
+[36mfrom[39m [32m'lucide-react'[39m
+ [90m 8 |[39m
+ [90m 9 |[39m [36minterface[39m [33mBusiness[39m {[0m
+
+Import map: aliased to relative 
+'./src/components/ui/OroLogo' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/employee-login/page.tsx [Client Component 
+Browser]
+    ./src/app/employee-login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/employee-login/page.tsx [Client Component SSR]
+    ./src/app/employee-login/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/app/kiosk/check-in/page.tsx:6:1
+Module not found: Can't resolve '@/components/ui/OroLogo'
+[0m [90m 4 |[39m [36mimport[39m { useRouter } 
+[36mfrom[39m [32m'next/navigation'[39m
+ [90m 5 |[39m [36mimport[39m { [33mUser[39m[33m,[39m 
+[33mCheck[39m[33m,[39m [33mChevronRight[39m } 
+[36mfrom[39m [32m'lucide-react'[39m
+[31m[1m>[22m[39m[90m 6 |[39m [36mimport[39m 
+[33mOroLogo[39m [36mfrom[39m 
+[32m'@/components/ui/OroLogo'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[
+1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1
+m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m
+^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[
+22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[2
+2m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22
+m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[
+39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[3
+9m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39
+m
+ [90m 7 |[39m
+ [90m 8 |[39m [36mexport[39m [36mdefault[39m 
+[36mfunction[39m [33mKioskCheckInPage[39m() {
+ [90m 9 |[39m     [36mconst[39m router [33m=[39m 
+useRouter()[0m
+
+Import map: aliased to relative 
+'./src/components/ui/OroLogo' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/kiosk/check-in/page.tsx [Client Component 
+Browser]
+    ./src/app/kiosk/check-in/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/kiosk/check-in/page.tsx [Client Component SSR]
+    ./src/app/kiosk/check-in/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/app/kiosk/review/page.tsx:5:1
+Module not found: Can't resolve '@/components/ui/OroLogo'
+[0m [90m 3 |[39m [36mimport[39m { useState } 
+[36mfrom[39m [32m'react'[39m
+ [90m 4 |[39m [36mimport[39m { [33mStar[39m[33m,[39m 
+[33mCheck[39m[33m,[39m [33mChevronRight[39m[33m,[39m 
+[33mThumbsUp[39m[33m,[39m 
+[33mMessageSquare[39m[33m,[39m [33mShieldCheck[39m } 
+[36mfrom[39m [32m'lucide-react'[39m
+[31m[1m>[22m[39m[90m 5 |[39m [36mimport[39m 
+[33mOroLogo[39m [36mfrom[39m 
+[32m'@/components/ui/OroLogo'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[
+1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1
+m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m
+^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[
+22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[2
+2m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22
+m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[
+39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[3
+9m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39
+m
+ [90m 6 |[39m [36mimport[39m clsx [36mfrom[39m 
+[32m'clsx'[39m
+ [90m 7 |[39m
+ [90m 8 |[39m [36mexport[39m [36mdefault[39m 
+[36mfunction[39m [33mKioskReviewPage[39m() {[0m
+
+Import map: aliased to relative 
+'./src/components/ui/OroLogo' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/kiosk/review/page.tsx [Client Component 
+Browser]
+    ./src/app/kiosk/review/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/kiosk/review/page.tsx [Client Component SSR]
+    ./src/app/kiosk/review/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/app/pulse/page.tsx:24:1
+Module not found: Can't resolve '@/components/ui/OroLogo'
+[0m [90m 22 |[39m     [33mCheck[39m
+ [90m 23 |[39m } [36mfrom[39m [32m'lucide-react'[39m
+[31m[1m>[22m[39m[90m 24 |[39m [36mimport[39m 
+[33mOroLogo[39m [36mfrom[39m 
+[32m'@/components/ui/OroLogo'[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31
+m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[
+1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1
+m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m
+^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[
+22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[2
+2m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22
+m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[
+39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[3
+9m
+ [90m 25 |[39m [36mimport[39m dynamic [36mfrom[39m 
+[32m'next/dynamic'[39m
+ [90m 26 |[39m
+ [90m 27 |[39m [90m// Dynamic import to avoid SSR issues 
+with camera[39m[0m
+
+Import map: aliased to relative 
+'./src/components/ui/OroLogo' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/pulse/page.tsx [Client Component Browser]
+    ./src/app/pulse/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/pulse/page.tsx [Client Component SSR]
+    ./src/app/pulse/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/app/pulse/upgrade/page.tsx:6:1
+Module not found: Can't resolve '@/components/ui/OroLogo'
+[0m [90m 4 |[39m [36mimport[39m { useRouter } 
+[36mfrom[39m [32m'next/navigation'[39m
+ [90m 5 |[39m [36mimport[39m { 
+[33mLoader2[39m[33m,[39m [33mLock[39m[33m,[39m 
+[33mZap[39m[33m,[39m [33mCheckCircle[39m[33m,[39m 
+[33mPhone[39m[33m,[39m [33mMail[39m } [36mfrom[39m 
+[32m'lucide-react'[39m
+[31m[1m>[22m[39m[90m 6 |[39m [36mimport[39m 
+[33mOroLogo[39m [36mfrom[39m 
+[32m'@/components/ui/OroLogo'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[
+1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1
+m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m
+^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[
+22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[2
+2m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22
+m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[
+39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[3
+9m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39
+m
+ [90m 7 |[39m
+ [90m 8 |[39m [36mexport[39m [36mdefault[39m 
+[36mfunction[39m [33mPulseUpgradePage[39m() {
+ [90m 9 |[39m     [36mconst[39m router [33m=[39m 
+useRouter()[0m
+
+Import map: aliased to relative 
+'./src/components/ui/OroLogo' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/pulse/upgrade/page.tsx [Client Component 
+Browser]
+    ./src/app/pulse/upgrade/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/pulse/upgrade/page.tsx [Client Component SSR]
+    ./src/app/pulse/upgrade/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/kiosk/Review.tsx:5:1
+Module not found: Can't resolve '@/components/ui/OroLogo'
+[0m [90m 3 |[39m [36mimport[39m { useState[33m,[39m 
+useEffect } [36mfrom[39m [32m'react'[39m
+ [90m 4 |[39m [36mimport[39m { [33mStar[39m[33m,[39m 
+[33mCheck[39m[33m,[39m [33mChevronRight[39m[33m,[39m 
+[33mThumbsUp[39m[33m,[39m 
+[33mShieldCheck[39m[33m,[39m [33mAlertTriangle[39m } 
+[36mfrom[39m [32m'lucide-react'[39m
+[31m[1m>[22m[39m[90m 5 |[39m [36mimport[39m 
+[33mOroLogo[39m [36mfrom[39m 
+[32m'@/components/ui/OroLogo'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m
+[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[
+1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1
+m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m
+^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^
+[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[
+22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[2
+2m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22
+m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m
+[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[
+39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[3
+9m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39
+m
+ [90m 6 |[39m [36mimport[39m clsx [36mfrom[39m 
+[32m'clsx'[39m
+ [90m 7 |[39m
+ [90m 8 |[39m [36minterface[39m [33mReviewProps[39m 
+{[0m
+
+Import map: aliased to relative 
+'./src/components/ui/OroLogo' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/kiosk/Review.tsx [Client Component 
+Browser]
+    ./src/app/kiosk/page.tsx [Client Component Browser]
+    ./src/app/kiosk/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/kiosk/Review.tsx [Client Component SSR]
+    ./src/app/kiosk/page.tsx [Client Component SSR]
+    ./src/app/kiosk/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (./src/app/dashboard/pulse/page.tsx:18:1)
+    at <unknown> 
+(https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> 
+(./src/app/dashboard/pulse/upgrade/page.tsx:6:1)
+    at <unknown> 
+(https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/app/employee-login/page.tsx:6:1)
+    at <unknown> 
+(https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/app/kiosk/check-in/page.tsx:6:1)
+    at <unknown> 
+(https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/app/kiosk/review/page.tsx:5:1)
+    at <unknown> 
+(https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/app/pulse/page.tsx:24:1)
+    at <unknown> 
+(https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/app/pulse/upgrade/page.tsx:6:1)
+    at <unknown> 
+(https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/kiosk/Review.tsx:5:1)
+    at <unknown> 
+(https://nextjs.org/docs/messages/module-not-found)

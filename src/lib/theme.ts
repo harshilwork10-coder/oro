@@ -1,5 +1,5 @@
 /**
- * Oronex POS - Eye-Friendly Color System
+ * Oro POS - Eye-Friendly Color System
  * Optimized for 8+ hour daily use with reduced eye strain
  */
 

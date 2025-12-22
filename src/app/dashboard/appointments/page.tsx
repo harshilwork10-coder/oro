@@ -44,6 +44,7 @@ export default function AppointmentsPage() {
     const [view, setView] = useState<'day' | 'week'>('day')
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
     useEffect(() => {
         if (status === 'authenticated') {
@@ -84,10 +85,10 @@ export default function AppointmentsPage() {
                 fetchAppointments()
                 setSelectedAppointment(null)
             } else {
-                alert('Failed to update appointment')
+                setToast({ message: 'Failed to update appointment', type: 'error' })
             }
         } catch (error) {
-            alert('Something went wrong')
+            setToast({ message: 'Something went wrong', type: 'error' })
         } finally {
             setActionLoading(null)
         }
@@ -457,6 +458,14 @@ export default function AppointmentsPage() {
                     selectedDate={currentDate}
                     selectedTime={selectedTime}
                 />
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
+                </div>
             )}
         </div>
     )

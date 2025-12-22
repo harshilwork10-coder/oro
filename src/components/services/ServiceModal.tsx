@@ -12,6 +12,7 @@ interface ServiceModalProps {
 
 export default function ServiceModal({ isOpen, onClose, onSave, service }: ServiceModalProps) {
     const [loading, setLoading] = useState(false)
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -65,7 +66,7 @@ export default function ServiceModal({ isOpen, onClose, onSave, service }: Servi
             onClose()
         } catch (error) {
             console.error('Error saving service:', error)
-            alert('Failed to save service. Please try again.')
+            setToast({ message: 'Failed to save service. Please try again.', type: 'error' })
         } finally {
             setLoading(false)
         }
@@ -165,6 +166,12 @@ export default function ServiceModal({ isOpen, onClose, onSave, service }: Servi
                     </div>
                 </form>
             </div>
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
+                </div>
+            )}
         </div>
     )
 }

@@ -57,11 +57,11 @@ export async function POST(req: NextRequest) {
         // Send reminder email
         await sendEmail({
             to: franchisor.owner.email,
-            subject: 'Reminder: Complete Your Oronex Account Setup',
+            subject: 'Reminder: Complete Your Oro Account Setup',
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                     <h1>Hi ${franchisor.owner.name || 'there'}!</h1>
-                    <p>We noticed your Oronex account setup is not yet complete.</p>
+                    <p>We noticed your Oro account setup is not yet complete.</p>
                     <p>Please complete your onboarding to activate your account. You may need to upload the following documents:</p>
                     <ul>
                         <li>Driver's License</li>

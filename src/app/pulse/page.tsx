@@ -21,7 +21,7 @@ import {
     Edit3,
     Check
 } from 'lucide-react'
-import OroLogo from '@/components/ui/OronexLogo'
+import OroLogo from '@/components/ui/OroLogo'
 import dynamic from 'next/dynamic'
 
 // Dynamic import to avoid SSR issues with camera

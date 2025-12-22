@@ -36,7 +36,7 @@ export default function AccountSuspendedPage() {
                         </h3>
 
                         <a
-                            href="mailto:support@oronexpos.com"
+                            href="mailto:support@Oropos.com"
                             className="flex items-center gap-3 p-3 bg-stone-900/50 rounded-lg hover:bg-stone-700/50 transition-colors group"
                         >
                             <div className="p-2 bg-purple-500/20 rounded-lg">
@@ -45,7 +45,7 @@ export default function AccountSuspendedPage() {
                             <div>
                                 <p className="text-sm text-stone-400">Email</p>
                                 <p className="text-stone-200 group-hover:text-purple-400 transition-colors">
-                                    support@oronexpos.com
+                                    support@Oropos.com
                                 </p>
                             </div>
                         </a>

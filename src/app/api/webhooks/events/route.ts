@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // Webhook to notify provider when client adds location
 // SECURITY: Requires valid webhook secret to prevent unauthorized calls
 
-const WEBHOOK_SECRET = process.env.INTERNAL_WEBHOOK_SECRET || 'oronex_internal_webhook_secret'
+const WEBHOOK_SECRET = process.env.INTERNAL_WEBHOOK_SECRET || 'Oro_internal_webhook_secret'
 
 export async function POST(request: NextRequest) {
     try {

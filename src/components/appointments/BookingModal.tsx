@@ -29,6 +29,9 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
         email: ''
     })
 
+    // Toast notification
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
     // Format time from selectedTime or default to 09:00
     const getInitialTime = () => {
         if (selectedTime) {
@@ -120,7 +123,7 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
             // Create new customer if not found
             if (searchStatus === 'not_found') {
                 if (!newCustomer.firstName) {
-                    alert('Please enter customer name')
+                    setToast({ message: 'Please enter customer name', type: 'error' })
                     setLoading(false)
                     return
                 }
@@ -138,7 +141,7 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                     const customer = await customerRes.json()
                     clientId = customer.id
                 } else {
-                    alert('Failed to create customer')
+                    setToast({ message: 'Failed to create customer', type: 'error' })
                     setLoading(false)
                     return
                 }
@@ -163,11 +166,11 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
             if (res.ok) {
                 onSuccess()
             } else {
-                alert('Failed to book appointment')
+                setToast({ message: 'Failed to book appointment', type: 'error' })
             }
         } catch (error) {
             console.error('Error booking:', error)
-            alert('Error booking appointment')
+            setToast({ message: 'Error booking appointment', type: 'error' })
         } finally {
             setLoading(false)
         }
@@ -366,8 +369,8 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                                             type="button"
                                             onClick={() => setTimePeriod(period)}
                                             className={`px-4 py-2 text-sm rounded-xl font-medium transition-all min-h-[40px] active:scale-95 ${timePeriod === period
-                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
-                                                    : 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                                                : 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
                                                 }`}
                                         >
                                             {period}
@@ -391,8 +394,8 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                                             type="button"
                                             onClick={() => setFormData({ ...formData, time })}
                                             className={`py-3 rounded-xl text-sm font-semibold transition-all min-h-[52px] active:scale-95 ${formData.time === time
-                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
-                                                    : 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                                                : 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
                                                 }`}
                                         >
                                             {displayTime}
@@ -432,6 +435,17 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                     </button>
                 </div>
             </div>
+
+            {/* Toast Notification */}
+            {toast && (
+                <div
+                    className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+                        }`}
+                >
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
+                </div>
+            )}
         </div>
     )
 }

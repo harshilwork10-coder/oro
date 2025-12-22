@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { saveToOronexDatabase } from '@/lib/ai/sku-lookup'
+import { saveToOroDatabase } from '@/lib/ai/sku-lookup'
 
 export async function GET(request: Request) {
     const session = await getServerSession(authOptions)
@@ -68,10 +68,10 @@ export async function POST(request: Request) {
             }
         })
 
-        // Contribute to the shared Oronex UPC database (crowdsourcing)
+        // Contribute to the shared Oro UPC database (crowdsourcing)
         // This runs in background and doesn't block the response
         if (barcode && barcode.length >= 8) {
-            saveToOronexDatabase({
+            saveToOroDatabase({
                 barcode,
                 name,
                 category,

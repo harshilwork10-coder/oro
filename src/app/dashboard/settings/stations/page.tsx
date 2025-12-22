@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Plus, Trash2, Save, Monitor, CreditCard, DollarSign, Edit2, User, Users } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import { Settings, Plus, Trash2, Save, Monitor, CreditCard, DollarSign, Edit2, User, Users, MapPin, ShieldCheck } from 'lucide-react'
 
 interface Terminal {
     id: string
@@ -26,10 +28,47 @@ interface Station {
     assignedEmployees?: Employee[]
 }
 
+interface Location {
+    id: string
+    name: string
+    franchise?: { name: string } | null
+}
+
 export default function StationsPage() {
+    const { data: session, status } = useSession()
+    const router = useRouter()
+    const user = session?.user as any
+    const isProvider = user?.role === 'PROVIDER'
+
+    // Non-providers don't need to see this - stations are set up by Oro
+    if (status === 'authenticated' && !isProvider) {
+        return (
+            <div className="min-h-screen bg-stone-950 text-white flex items-center justify-center">
+                <div className="text-center max-w-md mx-4">
+                    <div className="h-20 w-20 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <ShieldCheck className="h-10 w-10 text-emerald-400" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-4">All Set Up!</h2>
+                    <p className="text-stone-400 mb-6">
+                        Your POS stations and terminals are managed by Oro Support.
+                        Just use the POS - everything is already configured for you.
+                    </p>
+                    <button
+                        onClick={() => router.push('/dashboard/pos')}
+                        className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-colors"
+                    >
+                        Go to POS
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     const [stations, setStations] = useState<Station[]>([])
     const [terminals, setTerminals] = useState<Terminal[]>([])
     const [employees, setEmployees] = useState<Employee[]>([])
+    const [locations, setLocations] = useState<Location[]>([])
+    const [selectedLocationId, setSelectedLocationId] = useState<string>('')
     const [loading, setLoading] = useState(true)
     const [editingStation, setEditingStation] = useState<Station | null>(null)
     const [showAddTerminal, setShowAddTerminal] = useState(false)
@@ -51,16 +90,34 @@ export default function StationsPage() {
         terminalType: 'PAX'
     })
 
+    // Fetch locations for PROVIDER
+    useEffect(() => {
+        if (isProvider) {
+            fetch('/api/locations')
+                .then(res => res.json())
+                .then(data => {
+                    const locs = Array.isArray(data) ? data : []
+                    setLocations(locs)
+                    if (locs.length > 0 && !selectedLocationId) {
+                        setSelectedLocationId(locs[0].id)
+                    }
+                })
+                .catch(console.error)
+        }
+    }, [isProvider])
+
     useEffect(() => {
         fetchData()
-    }, [])
+    }, [selectedLocationId])
 
     const fetchData = async () => {
         try {
+            // For PROVIDER, pass selected locationId to APIs
+            const locationParam = isProvider && selectedLocationId ? `?locationId=${selectedLocationId}` : ''
             const [stationsRes, terminalsRes, employeesRes] = await Promise.all([
-                fetch('/api/settings/stations'),
-                fetch('/api/settings/terminals'),
-                fetch('/api/employees')
+                fetch(`/api/settings/stations${locationParam}`),
+                fetch(`/api/settings/terminals${locationParam}`),
+                fetch(`/api/employees${locationParam}`)
             ])
 
             if (stationsRes.ok) {
@@ -83,16 +140,23 @@ export default function StationsPage() {
     }
 
     const handleAddStation = async () => {
-        if (!newStation.name || !newStation.pairingCode) {
-            setToast({ message: 'Name and pairing code required', type: 'error' })
+        if (!newStation.name) {
+            setToast({ message: 'Station name required', type: 'error' })
             return
         }
 
+        // Auto-generate pairing code from name (uppercase, no spaces)
+        const autoPairingCode = newStation.name.toUpperCase().replace(/\s+/g, '')
+
         try {
+            // Include locationId for PROVIDER
+            const payload = isProvider && selectedLocationId
+                ? { ...newStation, pairingCode: autoPairingCode, locationId: selectedLocationId }
+                : { ...newStation, pairingCode: autoPairingCode }
             const res = await fetch('/api/settings/stations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newStation)
+                body: JSON.stringify(payload)
             })
 
             if (res.ok) {
@@ -232,6 +296,27 @@ export default function StationsPage() {
                     </div>
                 </div>
 
+                {/* Location Selector for PROVIDER */}
+                {isProvider && locations.length > 0 && (
+                    <div className="bg-violet-500/10 border border-violet-500/30 rounded-xl p-4 flex items-center gap-4">
+                        <MapPin className="w-5 h-5 text-violet-400" />
+                        <div className="flex-1">
+                            <label className="text-sm text-violet-300 block mb-1">Select Client Location</label>
+                            <select
+                                value={selectedLocationId}
+                                onChange={(e) => setSelectedLocationId(e.target.value)}
+                                className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-white"
+                            >
+                                {locations.map(loc => (
+                                    <option key={loc.id} value={loc.id}>
+                                        {loc.name} {loc.franchise ? `(${loc.franchise.name})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                )}
+
                 {/* Terminals Section */}
                 <div className="bg-stone-900 rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-4">
@@ -327,18 +412,16 @@ export default function StationsPage() {
                         <div className="grid grid-cols-2 gap-4 mb-4">
                             <input
                                 type="text"
-                                placeholder="Station Name (e.g., Register 1)"
+                                placeholder="Station Name (e.g., REG1)"
                                 value={newStation.name}
                                 onChange={(e) => setNewStation({ ...newStation, name: e.target.value })}
                                 className="px-3 py-2 bg-stone-700 rounded-lg"
                             />
-                            <input
-                                type="text"
-                                placeholder="Pairing Code (e.g., REG1)"
-                                value={newStation.pairingCode}
-                                onChange={(e) => setNewStation({ ...newStation, pairingCode: e.target.value.toUpperCase() })}
-                                className="px-3 py-2 bg-stone-700 rounded-lg font-mono"
-                            />
+                            {/* Auto-generated pairing code preview */}
+                            <div className="px-3 py-2 bg-stone-600/50 rounded-lg font-mono text-stone-400 flex items-center gap-2">
+                                <span className="text-xs text-stone-500">Code:</span>
+                                <span className="text-emerald-400">{newStation.name ? newStation.name.toUpperCase().replace(/\s+/g, '') : '—'}</span>
+                            </div>
                             <select
                                 value={newStation.paymentMode}
                                 onChange={(e) => setNewStation({ ...newStation, paymentMode: e.target.value as 'DEDICATED' | 'CASH_ONLY' })}

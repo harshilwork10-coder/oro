@@ -32,11 +32,23 @@ export async function GET(request: NextRequest) {
             locationId = userData?.locationId || userData?.franchise?.locations?.[0]?.id
         }
 
+        // For PROVIDER role - allow accessing any location (for testing/support)
+        if (!locationId && user.role === 'PROVIDER') {
+            // Get first available location from any franchise
+            const anyLocation = await prisma.location.findFirst({
+                orderBy: { createdAt: 'desc' }
+            })
+            if (anyLocation) {
+                locationId = anyLocation.id
+                console.log('[STATIONS_GET] PROVIDER accessing location:', anyLocation.name)
+            }
+        }
+
         if (!locationId) {
             return NextResponse.json({ error: 'No location assigned', stations: [] }, { status: 200 })
         }
 
-        const stations = await prisma.station.findMany({
+        let stations = await prisma.station.findMany({
             where: {
                 locationId: locationId,
                 isActive: true
@@ -47,6 +59,30 @@ export async function GET(request: NextRequest) {
             },
             orderBy: { name: 'asc' }
         })
+
+        // Auto-create default station if none exist (for easier onboarding)
+        if (stations.length === 0) {
+            console.log('[STATIONS_GET] No stations found, auto-creating Register 1')
+            try {
+                const newStation = await prisma.station.create({
+                    data: {
+                        locationId: locationId,
+                        name: 'Register 1',
+                        pairingCode: `S1-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+                        paymentMode: 'CASH_ONLY',
+                        isActive: true
+                    },
+                    include: {
+                        dedicatedTerminal: true,
+                        location: true
+                    }
+                })
+                stations = [newStation]
+            } catch (e) {
+                console.error('[STATIONS_GET] Failed to auto-create station:', e)
+                // Proceed with empty list if auto-create fails
+            }
+        }
 
         // Map to expected format
         const formattedStations = stations.map(s => ({

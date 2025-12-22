@@ -41,6 +41,7 @@ export default function ConsultationsPage() {
     const [requests, setRequests] = useState<ConsultationRequest[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'CONTACTED' | 'RESOLVED'>('ALL')
+    const [resolutionModal, setResolutionModal] = useState<{ open: boolean; requestId: string | null; value: string }>({ open: false, requestId: null, value: '' })
 
     async function fetchRequests() {
         try {
@@ -197,10 +198,7 @@ export default function ConsultationsPage() {
                                             </button>
                                         )}
                                         <button
-                                            onClick={() => {
-                                                const resolution = prompt('Enter resolution notes:')
-                                                if (resolution) handleStatusUpdate(request.id, 'RESOLVED', resolution)
-                                            }}
+                                            onClick={() => setResolutionModal({ open: true, requestId: request.id, value: '' })}
                                             className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium flex items-center justify-center gap-2 whitespace-nowrap"
                                         >
                                             <Check className="h-4 w-4" />
@@ -213,6 +211,43 @@ export default function ConsultationsPage() {
                     ))
                 )}
             </div>
+
+            {/* Resolution Input Modal */}
+            {resolutionModal.open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="bg-stone-900 rounded-2xl border border-stone-700 w-full max-w-md p-6">
+                        <h3 className="text-xl font-bold text-white mb-4">Resolution Notes</h3>
+                        <textarea
+                            value={resolutionModal.value}
+                            onChange={(e) => setResolutionModal({ ...resolutionModal, value: e.target.value })}
+                            placeholder="Enter resolution notes..."
+                            rows={4}
+                            className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-white placeholder-stone-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                            autoFocus
+                        />
+                        <div className="flex gap-3 mt-4">
+                            <button
+                                onClick={() => setResolutionModal({ open: false, requestId: null, value: '' })}
+                                className="flex-1 px-4 py-3 bg-stone-700 hover:bg-stone-600 text-white rounded-lg font-medium transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (resolutionModal.value.trim() && resolutionModal.requestId) {
+                                        handleStatusUpdate(resolutionModal.requestId, 'RESOLVED', resolutionModal.value)
+                                        setResolutionModal({ open: false, requestId: null, value: '' })
+                                    }
+                                }}
+                                disabled={!resolutionModal.value.trim()}
+                                className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Mark Resolved
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

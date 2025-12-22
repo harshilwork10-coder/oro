@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { Briefcase, Plus, Edit, Trash2, X, Settings, Lock, Building2 } from 'lucide-react'
@@ -14,6 +14,7 @@ export default function ServicesPage() {
     const [loading, setLoading] = useState(true)
     const [categoryName, setCategoryName] = useState('')
     const [formData, setFormData] = useState({ name: '', categoryId: '', price: '', duration: '30', description: '' })
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
     // Franchise detection - if user belongs to a franchisee, they can only view
     const [isFranchise, setIsFranchise] = useState(false)
@@ -120,11 +121,11 @@ export default function ServicesPage() {
                 setEditingCategory(null)
             } else {
                 const data = await res.json()
-                alert(data.error || 'Failed to save category')
+                setToast({ message: data.error || 'Failed to save category', type: 'error' })
             }
         } catch (error) {
             console.error('Failed to save category:', error)
-            alert('Failed to save category')
+            setToast({ message: 'Failed to save category', type: 'error' })
         }
     }
 
@@ -140,7 +141,7 @@ export default function ServicesPage() {
                 await fetchCategories()
             } else {
                 const data = await res.json()
-                alert(data.error || 'Failed to delete category')
+                setToast({ message: data.error || 'Failed to delete category', type: 'error' })
             }
         } catch (error) {
             console.error('Failed to delete category:', error)
@@ -228,7 +229,7 @@ export default function ServicesPage() {
                     <div className="flex items-start justify-between mb-4">
                         <div>
                             <h3 className="text-lg font-bold text-purple-300 flex items-center gap-2">
-                                💰 Open Item
+                                ?? Open Item
                             </h3>
                             <p className="text-xs text-purple-400/70 uppercase">CUSTOM PRICE</p>
                         </div>
@@ -369,6 +370,14 @@ export default function ServicesPage() {
                             )}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">?</button>
                 </div>
             )}
         </div>

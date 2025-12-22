@@ -126,3 +126,36 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
 }
+
+// PATCH - Update station name (PROVIDER only)
+export async function PATCH(request: NextRequest) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const user = session.user as any
+    // ONLY PROVIDER can edit
+    if (user.role !== 'PROVIDER') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+        return NextResponse.json({ error: 'Station ID required' }, { status: 400 })
+    }
+
+    const { name } = await request.json()
+
+    if (!name?.trim()) {
+        return NextResponse.json({ error: 'Name required' }, { status: 400 })
+    }
+
+    const station = await prisma.station.update({
+        where: { id },
+        data: { name: name.trim() }
+    })
+
+    return NextResponse.json({ station })
+}

@@ -4,12 +4,27 @@ import { useSession } from "next-auth/react"
 import { redirect, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Building2, Plus, Search, MoreVertical, Edit, Trash2, Eye, Download, Settings, AlertTriangle, X, CheckCircle, Clock, XCircle, Key, EyeOff, Pause, Play, Ban, Globe, Facebook } from "lucide-react"
+import { Building2, Plus, Search, MoreVertical, Eye, Trash2, Download, Settings, AlertTriangle, X, CheckCircle, Clock, XCircle, Key, EyeOff, Pause, Play, Ban, ChevronDown, ChevronUp, MapPin, FileCheck, FileX } from "lucide-react"
 import AddFranchisorModal from "@/components/modals/AddFranchisorModal"
-import EditClientModal from "@/components/modals/EditClientModal"
-import BusinessConfigModal from "@/components/provider/BusinessConfigModal"
-import IntegrationDataModal from "@/components/modals/IntegrationDataModal"
+import AddLocationModal from "@/components/modals/AddLocationModal"
 import Toast from "@/components/ui/Toast"
+
+type Location = {
+    id: string
+    name: string
+    address: string | null
+    slug: string
+    voidCheckUrl?: string | null  // Per-location document status
+    _count: {
+        stations: number
+    }
+}
+
+type Franchise = {
+    id: string
+    name: string
+    locations: Location[]
+}
 
 type Franchisor = {
     id: string
@@ -17,11 +32,16 @@ type Franchisor = {
     approvalStatus?: string
     accountStatus?: string  // ACTIVE, SUSPENDED, TERMINATED
     suspendedReason?: string
+    // Document status
+    voidCheckUrl?: string | null
+    driverLicenseUrl?: string | null
+    feinLetterUrl?: string | null
     owner: {
         name: string
         email: string
         magicLinks?: Array<{ token: string }>
     }
+    franchises?: Franchise[]
     _count: {
         franchises: number
     }
@@ -41,8 +61,6 @@ export default function MyClientsPage() {
     const [filteredClients, setFilteredClients] = useState<Franchisor[]>([])
     const [loading, setLoading] = useState(true)
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-    const [editingClient, setEditingClient] = useState<Franchisor | null>(null)
-    const [configuringClient, setConfiguringClient] = useState<{ id: string; name: string } | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
     const [sortBy, setSortBy] = useState('newest')
     const [activeMenu, setActiveMenu] = useState<string | null>(null)
@@ -58,7 +76,8 @@ export default function MyClientsPage() {
     const [suspendModal, setSuspendModal] = useState<{ id: string; name: string; action: 'SUSPEND' | 'ACTIVATE' | 'TERMINATE' } | null>(null)
     const [suspendReason, setSuspendReason] = useState('')
     const [suspending, setSuspending] = useState(false)
-    const [integrationModal, setIntegrationModal] = useState<{ id: string; name: string } | null>(null)
+    const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set())
+    const [addLocationModal, setAddLocationModal] = useState<{ id: string; name: string } | null>(null)
 
 
     async function fetchFranchisors() {
@@ -237,6 +256,24 @@ export default function MyClientsPage() {
         }
     }
 
+    // Toggle expand/collapse for client cards
+    function toggleExpand(clientId: string) {
+        setExpandedClients(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(clientId)) {
+                newSet.delete(clientId)
+            } else {
+                newSet.add(clientId)
+            }
+            return newSet
+        })
+    }
+
+    // Get all locations for a client
+    function getClientLocations(client: Franchisor): Location[] {
+        return client.franchises?.flatMap(f => f.locations) || []
+    }
+
     // Filter and search logic
     useEffect(() => {
         let result = [...franchisors]
@@ -347,38 +384,6 @@ export default function MyClientsPage() {
                 }}
             />
 
-            {editingClient && (
-                <EditClientModal
-                    client={editingClient}
-                    isOpen={!!editingClient}
-                    onClose={() => setEditingClient(null)}
-                    onSuccess={() => {
-                        fetchFranchisors()
-                        setEditingClient(null)
-                    }}
-                />
-            )}
-
-            {configuringClient && (
-                <BusinessConfigModal
-                    franchisorId={configuringClient.id}
-                    franchisorName={configuringClient.name}
-                    onClose={() => setConfiguringClient(null)}
-                />
-            )}
-
-            {integrationModal && (
-                <IntegrationDataModal
-                    clientId={integrationModal.id}
-                    clientName={integrationModal.name}
-                    onClose={() => setIntegrationModal(null)}
-                    onSave={() => {
-                        setIntegrationModal(null)
-                        fetchFranchisors()
-                    }}
-                />
-            )}
-
             {/* Client Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredClients.map((client) => (
@@ -410,67 +415,34 @@ export default function MyClientsPage() {
 
                                 {activeMenu === client.id && (
                                     <div className="absolute right-0 mt-2 w-48 glass-panel rounded-lg shadow-lg border border-stone-700 overflow-hidden z-50 bg-stone-900/95 backdrop-blur-xl">
-                                        {/* Approve/Reject for pending clients */}
+                                        {/* Approve for pending clients */}
                                         {(!client.approvalStatus || client.approvalStatus === 'PENDING') && (
-                                            <>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleApprove(client.id, client.name, 'APPROVE')
-                                                    }}
-                                                    className="w-full px-4 py-2 text-left hover:bg-emerald-900/20 transition-colors flex items-center gap-2 text-emerald-400 border-b border-stone-700"
-                                                >
-                                                    <CheckCircle className="h-4 w-4" />
-                                                    Approve Client
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleApprove(client.id, client.name, 'REJECT')
-                                                    }}
-                                                    className="w-full px-4 py-2 text-left hover:bg-red-900/20 transition-colors flex items-center gap-2 text-red-400 border-b border-stone-700"
-                                                >
-                                                    <XCircle className="h-4 w-4" />
-                                                    Reject Client
-                                                </button>
-                                            </>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleApprove(client.id, client.name, 'APPROVE')
+                                                }}
+                                                className="w-full px-4 py-2 text-left hover:bg-emerald-900/20 transition-colors flex items-center gap-2 text-emerald-400"
+                                            >
+                                                <CheckCircle className="h-4 w-4" />
+                                                Approve
+                                            </button>
                                         )}
+
+                                        {/* Manage - Main Action */}
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
-                                                router.push(`/dashboard/franchisors/${client.id}`)
+                                                router.push(`/dashboard/account-configs?client=${client.id}`)
+                                                setActiveMenu(null)
                                             }}
-                                            className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-stone-300"
+                                            className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-orange-400"
                                         >
-                                            <Eye className="h-4 w-4" />
-                                            View Details
+                                            <Settings className="h-4 w-4" />
+                                            Manage
                                         </button>
-                                        {(session?.user as any)?.role === 'PROVIDER' && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    setConfiguringClient({ id: client.id, name: client.name })
-                                                    setActiveMenu(null)
-                                                }}
-                                                className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-orange-400"
-                                            >
-                                                <Settings className="h-4 w-4" />
-                                                Configure Settings
-                                            </button>
-                                        )}
-                                        {(session?.user as any)?.role === 'PROVIDER' && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    setIntegrationModal({ id: client.id, name: client.name })
-                                                    setActiveMenu(null)
-                                                }}
-                                                className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-blue-400"
-                                            >
-                                                <Globe className="h-4 w-4" />
-                                                Integrations & Data
-                                            </button>
-                                        )}
+
+                                        {/* Reset Password */}
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
@@ -481,35 +453,13 @@ export default function MyClientsPage() {
                                                 })
                                                 setActiveMenu(null)
                                             }}
-                                            className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-amber-400"
+                                            className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-stone-300"
                                         >
                                             <Key className="h-4 w-4" />
                                             Reset Password
                                         </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                setEditingClient(client)
-                                                setActiveMenu(null)
-                                            }}
-                                            className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-stone-300"
-                                        >
-                                            <Edit className="h-4 w-4" />
-                                            Edit Client
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleDelete(client.id, client.name)
-                                                setActiveMenu(null)
-                                            }}
-                                            className="w-full px-4 py-2 text-left hover:bg-red-900/20 transition-colors flex items-center gap-2 text-red-400"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                            Delete Client
-                                        </button>
 
-                                        {/* Account Status Management */}
+                                        {/* Suspend / Activate */}
                                         {client.accountStatus !== 'SUSPENDED' && client.accountStatus !== 'TERMINATED' && (
                                             <button
                                                 onClick={(e) => {
@@ -517,10 +467,10 @@ export default function MyClientsPage() {
                                                     setSuspendModal({ id: client.id, name: client.name || 'Unknown', action: 'SUSPEND' })
                                                     setActiveMenu(null)
                                                 }}
-                                                className="w-full px-4 py-2 text-left hover:bg-orange-900/20 transition-colors flex items-center gap-2 text-orange-400 border-t border-stone-700"
+                                                className="w-full px-4 py-2 text-left hover:bg-orange-900/20 transition-colors flex items-center gap-2 text-orange-400"
                                             >
                                                 <Pause className="h-4 w-4" />
-                                                Suspend Account
+                                                Suspend
                                             </button>
                                         )}
                                         {client.accountStatus === 'SUSPENDED' && (
@@ -530,42 +480,25 @@ export default function MyClientsPage() {
                                                     setSuspendModal({ id: client.id, name: client.name || 'Unknown', action: 'ACTIVATE' })
                                                     setActiveMenu(null)
                                                 }}
-                                                className="w-full px-4 py-2 text-left hover:bg-emerald-900/20 transition-colors flex items-center gap-2 text-emerald-400 border-t border-stone-700"
+                                                className="w-full px-4 py-2 text-left hover:bg-emerald-900/20 transition-colors flex items-center gap-2 text-emerald-400"
                                             >
                                                 <Play className="h-4 w-4" />
-                                                Reactivate Account
-                                            </button>
-                                        )}
-                                        {client.accountStatus !== 'TERMINATED' && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    setSuspendModal({ id: client.id, name: client.name || 'Unknown', action: 'TERMINATE' })
-                                                    setActiveMenu(null)
-                                                }}
-                                                className="w-full px-4 py-2 text-left hover:bg-red-900/20 transition-colors flex items-center gap-2 text-red-500"
-                                            >
-                                                <Ban className="h-4 w-4" />
-                                                Terminate Account
+                                                Reactivate
                                             </button>
                                         )}
 
-                                        {/* Magic Link Helper */}
-                                        {client.owner?.magicLinks?.[0]?.token && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    const link = `${window.location.origin}/auth/magic-link/${client.owner?.magicLinks?.[0]?.token}`
-                                                    navigator.clipboard.writeText(link)
-                                                    setToast({ message: 'Magic Link copied to clipboard!', type: 'success' })
-                                                    setActiveMenu(null)
-                                                }}
-                                                className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-emerald-400 border-t border-stone-700"
-                                            >
-                                                <span className="text-lg">🔗</span>
-                                                Copy Login Link
-                                            </button>
-                                        )}
+                                        {/* Delete - Red/Dangerous */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleDelete(client.id, client.name)
+                                                setActiveMenu(null)
+                                            }}
+                                            className="w-full px-4 py-2 text-left hover:bg-red-900/20 transition-colors flex items-center gap-2 text-red-400 border-t border-stone-700"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            Delete
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -573,7 +506,7 @@ export default function MyClientsPage() {
 
                         <div className="block relative z-10">
                             <div className="flex items-center gap-2 mb-1">
-                                <h3 className="text-xl font-bold text-stone-100">{client.name}</h3>
+                                <h3 className="text-xl font-bold text-stone-100">{client.owner?.name || 'Unknown Owner'}</h3>
                                 {/* Status Badge */}
                                 {(!client.approvalStatus || client.approvalStatus === 'PENDING') && (
                                     <span className="px-2 py-0.5 text-xs font-medium bg-amber-500/20 text-amber-400 rounded-full flex items-center gap-1">
@@ -601,7 +534,7 @@ export default function MyClientsPage() {
                                     </span>
                                 )}
                             </div>
-                            <p className="text-sm text-stone-400 mb-6">Owner: {client.owner?.name}</p>
+                            <p className="text-sm text-stone-400 mb-4">🏢 {client.name}</p>
 
                             <div className="space-y-3 mb-6">
                                 <div className="flex items-center text-sm">
@@ -620,17 +553,133 @@ export default function MyClientsPage() {
                                 </div>
                             </div>
 
+                            {/* Expand/Collapse Button */}
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation()
-                                    router.push(`/dashboard/franchisors/${client.id}`)
+                                    toggleExpand(client.id)
                                 }}
-                                disabled={activeMenu === client.id}
-                                className={`w-full py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg transition-colors flex items-center justify-center gap-2 ${activeMenu === client.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className="w-full py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg transition-colors flex items-center justify-center gap-2"
                             >
-                                <Eye className="h-4 w-4" />
-                                View Profile
+                                {expandedClients.has(client.id) ? (
+                                    <>
+                                        <ChevronUp className="h-4 w-4" />
+                                        Hide Locations
+                                    </>
+                                ) : (
+                                    <>
+                                        <ChevronDown className="h-4 w-4" />
+                                        Show {getClientLocations(client).length} Location{getClientLocations(client).length !== 1 ? 's' : ''}
+                                    </>
+                                )}
                             </button>
+
+                            {/* Expanded Locations Panel */}
+                            {expandedClients.has(client.id) && (
+                                <div className="mt-4 pt-4 border-t border-stone-700 space-y-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-sm font-semibold text-stone-300">Documents</h4>
+                                    </div>
+
+                                    {/* Document Status Grid */}
+                                    <div className="grid grid-cols-3 gap-2 mb-4 p-2 bg-stone-800/50 rounded-lg">
+                                        <div className="text-center">
+                                            <div className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center ${client.voidCheckUrl ? 'bg-emerald-500/20' : 'bg-orange-500/20'}`}>
+                                                {client.voidCheckUrl ? (
+                                                    <FileCheck className="h-4 w-4 text-emerald-400" />
+                                                ) : (
+                                                    <FileX className="h-4 w-4 text-orange-400" />
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-stone-400 mt-1">Void Check</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center ${client.driverLicenseUrl ? 'bg-emerald-500/20' : 'bg-stone-700'}`}>
+                                                {client.driverLicenseUrl ? (
+                                                    <FileCheck className="h-4 w-4 text-emerald-400" />
+                                                ) : (
+                                                    <FileX className="h-4 w-4 text-stone-500" />
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-stone-400 mt-1">License</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center ${client.feinLetterUrl ? 'bg-emerald-500/20' : 'bg-stone-700'}`}>
+                                                {client.feinLetterUrl ? (
+                                                    <FileCheck className="h-4 w-4 text-emerald-400" />
+                                                ) : (
+                                                    <FileX className="h-4 w-4 text-stone-500" />
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-stone-400 mt-1">FEIN</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-sm font-semibold text-stone-300">Locations</h4>
+                                    </div>
+
+                                    {getClientLocations(client).length === 0 ? (
+                                        <p className="text-sm text-stone-500 py-2">No locations yet</p>
+                                    ) : (
+                                        getClientLocations(client).map(location => (
+                                            <div
+                                                key={location.id}
+                                                className="p-3 bg-stone-800/50 rounded-lg border border-stone-700/50 hover:border-purple-500/30 transition-colors"
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <MapPin className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                                                            <span className="font-medium text-stone-200 truncate">{location.name}</span>
+                                                        </div>
+                                                        {location.address && (
+                                                            <p className="text-xs text-stone-500 mt-1 ml-6 truncate">{location.address}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                                        {/* Per-location document status */}
+                                                        {location.voidCheckUrl ? (
+                                                            <span className="flex items-center gap-0.5 text-xs text-emerald-400" title="Void Check Uploaded">
+                                                                <FileCheck className="h-3 w-3" />
+                                                            </span>
+                                                        ) : (
+                                                            <span className="flex items-center gap-0.5 text-xs text-orange-400" title="Missing Void Check">
+                                                                <FileX className="h-3 w-3" />
+                                                            </span>
+                                                        )}
+                                                        <span className="text-xs text-stone-500">
+                                                            {location._count.stations} station{location._count.stations !== 1 ? 's' : ''}
+                                                        </span>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                router.push(`/dashboard/account-configs?client=${client.id}&location=${location.id}`)
+                                                            }}
+                                                            className="p-1.5 hover:bg-stone-700 rounded-lg transition-colors"
+                                                            title="Configure Location"
+                                                        >
+                                                            <Settings className="h-3.5 w-3.5 text-stone-400" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+
+                                    {/* Add Location Button */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setAddLocationModal({ id: client.id, name: client.name })
+                                        }}
+                                        className="w-full py-2 mt-2 border border-dashed border-stone-600 hover:border-purple-500 text-stone-400 hover:text-purple-400 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                        Add New Location
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -903,6 +952,20 @@ export default function MyClientsPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Add Location Modal */}
+            {addLocationModal && (
+                <AddLocationModal
+                    isOpen={!!addLocationModal}
+                    onClose={() => setAddLocationModal(null)}
+                    onSuccess={() => {
+                        setToast({ message: 'Location added successfully!', type: 'success' })
+                        fetchFranchisors()
+                    }}
+                    franchisorId={addLocationModal.id}
+                    franchisorName={addLocationModal.name}
+                />
             )}
 
             {/* Toast Notification */}

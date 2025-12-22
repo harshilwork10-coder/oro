@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import OronexLogo from '@/components/ui/OronexLogo'
+import OroLogo from '@/components/ui/OroLogo'
 import { Building2, Store, ChevronRight, Loader2 } from 'lucide-react'
 
 interface Business {
@@ -159,7 +159,7 @@ export default function EmployeeLoginPage() {
             <div className="min-h-screen bg-stone-950 flex items-center justify-center p-4">
                 <div className="w-full max-w-lg">
                     <div className="flex justify-center mb-8">
-                        <OronexLogo className="h-12 w-auto" />
+                        <OroLogo className="h-12 w-auto" />
                     </div>
 
                     <div className="bg-stone-900 rounded-2xl p-6">
@@ -249,7 +249,7 @@ export default function EmployeeLoginPage() {
         <div className="min-h-screen bg-stone-950 flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
                 <div className="flex justify-center mb-8">
-                    <OronexLogo className="h-12 w-auto" />
+                    <OroLogo className="h-12 w-auto" />
                 </div>
 
                 {/* Terminal Info */}

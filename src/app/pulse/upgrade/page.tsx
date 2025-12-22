@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Lock, Zap, CheckCircle, Phone, Mail } from 'lucide-react'
-import OroLogo from '@/components/ui/OronexLogo'
+import OroLogo from '@/components/ui/OroLogo'
 
 export default function PulseUpgradePage() {
     const router = useRouter()

@@ -16,7 +16,6 @@ import {
     Gift,
     Ticket
 } from "lucide-react"
-import PredictiveAlerts from "@/components/dashboard/PredictiveAlerts"
 import RequestExpansionModal from "@/components/modals/RequestExpansionModal"
 import ConsultationRequestModal from "@/components/modals/ConsultationRequestModal"
 import MerchantApplicationModal from "@/components/modals/MerchantApplicationModal"
@@ -98,9 +97,6 @@ export default function DashboardPage() {
                     </h1>
                     <p className="text-stone-400 mt-2">Here's what's happening with your business today.</p>
                 </div>
-
-                {/* AI Alerts */}
-                <PredictiveAlerts />
 
                 {/* Statistics Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

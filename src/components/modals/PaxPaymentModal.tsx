@@ -119,7 +119,7 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
                             terminalIP: useIp,
                             terminalPort: usePort,
                             status: 'connected',
-                            mid: response.hostResponse // MID might be in response
+                            mid: response.hostInformation // MID might be in response
                         })
                     })
                 } catch (e) {

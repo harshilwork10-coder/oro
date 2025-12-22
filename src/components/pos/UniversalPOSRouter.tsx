@@ -37,7 +37,6 @@ export default function UniversalPOSRouter() {
                 // Redirect to hybrid POS (shows both)
                 router.replace('/dashboard/pos/hybrid')
                 break
-            case 'SERVICE':
             case 'SALON':
             default:
                 // Redirect to salon/service POS

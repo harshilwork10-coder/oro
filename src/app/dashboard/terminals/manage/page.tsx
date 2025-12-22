@@ -39,6 +39,7 @@ export default function TerminalManagePage() {
         paxTerminalPort: '10009',
         processorMID: ''
     })
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
     useEffect(() => {
         if (status === 'authenticated' && session?.user?.role === 'PROVIDER') {
@@ -78,11 +79,11 @@ export default function TerminalManagePage() {
                     processorMID: ''
                 })
             } else {
-                alert('Failed to update terminal configuration')
+                setToast({ message: 'Failed to update terminal configuration', type: 'error' })
             }
         } catch (error) {
             console.error('Error updating terminal:', error)
-            alert('Error updating terminal configuration')
+            setToast({ message: 'Error updating terminal configuration', type: 'error' })
         } finally {
             setSaving(false)
         }
@@ -281,6 +282,14 @@ export default function TerminalManagePage() {
                             )}
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
                 </div>
             )}
         </div>

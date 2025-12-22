@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateInvoiceNumber } from '@/lib/invoice'
+import { logActivity, ActionTypes } from '@/lib/auditLog'
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
@@ -79,6 +80,30 @@ export async function POST(req: Request) {
                 client: true
             }
         })
+
+        // ===== AUDIT LOG - Record this sale for legal protection =====
+        const user = session.user as any
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            franchiseId: session.user.franchiseId,
+            action: ActionTypes.SALE_COMPLETED,
+            entityType: 'TRANSACTION',
+            entityId: transaction.id,
+            details: {
+                invoiceNumber: transaction.invoiceNumber,
+                total: parseFloat(total),
+                paymentMethod,
+                itemCount: items?.length || 0,
+                tip: tip || 0,
+                clientId: clientId || null,
+                cashAmount: cashAmount || 0,
+                cardAmount: cardAmount || 0,
+                cardLast4: cardLast4 || null
+            }
+        })
+        // =============================================================
 
         return NextResponse.json(transaction)
     } catch (error: any) {

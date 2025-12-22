@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         // Get all Products
         const products = await prisma.product.findMany({
             include: {
-                category: true
+                productCategory: true
             }
         })
 
@@ -81,10 +81,6 @@ export async function POST(req: NextRequest) {
                         minimumAge: product.minimumAge,
                         isEbtEligible: product.isEbtEligible ?? false,
                         isTobacco: product.isTobacco ?? false,
-                        isAlcohol: product.isAlcohol ?? false,
-
-                        // Tax
-                        taxExempt: product.taxExempt ?? false,
                     }
                 })
                 results.productsMigrated++
@@ -125,8 +121,8 @@ export async function POST(req: NextRequest) {
                         description: service.description,
                         price: service.price,
                         type: 'SERVICE',
-                        isActive: service.isActive ?? true,
-                        sortOrder: service.sortOrder ?? 0,
+                        isActive: true,
+                        sortOrder: 0,
 
                         // Service-specific fields
                         duration: service.duration,

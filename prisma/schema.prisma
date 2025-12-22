@@ -429,6 +429,9 @@ model Location {
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
+  // Location-specific documents (bank verification per location)
+  voidCheckUrl String?   // Each location may have different bank account
+
   // Franchisee who owns/operates this location (for BRAND_FRANCHISOR model)
   ownerId     String?
   owner       User?     @relation("LocationOwner", fields: [ownerId], references: [id])

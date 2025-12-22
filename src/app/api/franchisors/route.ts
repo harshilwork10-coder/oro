@@ -74,6 +74,27 @@ export async function GET(request: NextRequest) {
                         }
                     }
                 },
+                // Include franchises with locations for expandable cards
+                franchises: {
+                    select: {
+                        id: true,
+                        name: true,
+                        locations: {
+                            select: {
+                                id: true,
+                                name: true,
+                                address: true,
+                                slug: true,
+                                voidCheckUrl: true, // Per-location document status
+                                _count: {
+                                    select: {
+                                        stations: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
                 _count: {
                     select: {
                         franchises: true

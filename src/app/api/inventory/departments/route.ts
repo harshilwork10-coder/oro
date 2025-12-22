@@ -81,8 +81,6 @@ export async function POST(request: NextRequest) {
                 description: description?.trim() || null,
                 icon: icon || null,
                 color: color || null,
-                ageRestricted: ageRestricted || false,
-                minimumAge: ageRestricted ? (minimumAge || 21) : null,
                 sortOrder: (maxSort._max.sortOrder || 0) + 1,
                 franchiseId: user.franchiseId
             },

@@ -48,6 +48,7 @@ export default function BusinessConfigModal({ franchisorId, franchisorName, onCl
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
     useEffect(() => {
         fetchConfig()
@@ -84,14 +85,14 @@ export default function BusinessConfigModal({ franchisorId, franchisorName, onCl
             })
 
             if (response.ok) {
-                alert('Settings saved successfully!')
+                setToast({ message: 'Settings saved successfully!', type: 'success' })
                 onClose()
             } else {
-                alert('Failed to save settings')
+                setToast({ message: 'Failed to save settings', type: 'error' })
             }
         } catch (error) {
             console.error('Error saving:', error)
-            alert('Error saving settings')
+            setToast({ message: 'Error saving settings', type: 'error' })
         } finally {
             setSaving(false)
         }
@@ -306,6 +307,12 @@ export default function BusinessConfigModal({ franchisorId, franchisorName, onCl
                     </button>
                 </div>
             </div>
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
+                </div>
+            )}
         </div>
     )
 }

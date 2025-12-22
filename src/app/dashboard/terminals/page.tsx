@@ -48,6 +48,7 @@ export default function TerminalsPage() {
     const [paxEditingId, setPaxEditingId] = useState<string | null>(null)
     const [paxSaving, setPaxSaving] = useState(false)
     const [paxEditForm, setPaxEditForm] = useState({ paxTerminalIP: '', paxTerminalPort: '10009', processorMID: '' })
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
     // POS Stations State (per-location)
     type Station = {
@@ -169,6 +170,11 @@ export default function TerminalsPage() {
         finally { setPaxLoading(false) }
     }
 
+    // Fetch all stations for all locations (Provider view)
+    const fetchStations = async () => {
+        // Stations are fetched per-location when expanded, nothing needed here
+    }
+
     const startPaxEdit = (terminal: PaxTerminal) => {
         setPaxEditingId(terminal.locationId)
         setPaxEditForm({
@@ -190,8 +196,8 @@ export default function TerminalsPage() {
                 await fetchPaxTerminals()
                 setPaxEditingId(null)
                 setPaxEditForm({ paxTerminalIP: '', paxTerminalPort: '10009', processorMID: '' })
-            } else { alert('Failed to save') }
-        } catch (e) { console.error(e); alert('Error') }
+            } else { setToast({ message: 'Failed to save', type: 'error' }) }
+        } catch (e) { console.error(e); setToast({ message: 'Error saving terminal', type: 'error' }) }
         finally { setPaxSaving(false) }
     }
 
@@ -675,6 +681,14 @@ export default function TerminalsPage() {
                 }}
                 locations={locations}
             />
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
+                </div>
+            )}
         </div>
     )
 }

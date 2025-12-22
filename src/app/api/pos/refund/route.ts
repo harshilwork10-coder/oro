@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { logActivity, ActionTypes } from '@/lib/auditLog'
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
@@ -113,6 +114,26 @@ export async function POST(req: Request) {
                 })
             }
         }
+
+        // ===== AUDIT LOG - Record this refund for legal protection =====
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            franchiseId: user.franchiseId,
+            action: ActionTypes.REFUND_PROCESSED,
+            entityType: 'REFUND',
+            entityId: refundTx.id,
+            details: {
+                originalTransactionId,
+                refundType,
+                refundTotal,
+                refundMethod: refundMethod || originalTx.paymentMethod,
+                reason: reason || 'No reason provided',
+                itemsRefunded: items.length
+            }
+        })
+        // =============================================================
 
         return NextResponse.json(refundTx)
     } catch (error) {

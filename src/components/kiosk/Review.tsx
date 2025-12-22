@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Star, Check, ChevronRight, ThumbsUp, ShieldCheck, AlertTriangle } from 'lucide-react'
-import OronexLogo from '@/components/ui/OronexLogo'
+import OroLogo from '@/components/ui/OroLogo'
 import clsx from 'clsx'
 
 interface ReviewProps {
@@ -208,7 +208,7 @@ export default function Review({ onComplete, locationId, transactionId, clientId
             <div className="bg-white p-6 shadow-sm flex items-center justify-center">
                 <div className="flex items-center gap-3">
                     <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white">
-                        <OronexLogo size={24} />
+                        <OroLogo size={24} />
                     </div>
                     <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                         Rate Your Visit

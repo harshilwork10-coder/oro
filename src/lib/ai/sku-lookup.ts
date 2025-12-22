@@ -2,7 +2,7 @@
  * AI SKU Database - UPC/Barcode Lookup Service
  * 
  * Priority Order:
- * 1) Oronex shared database (crowdsourced from all merchants - fastest)
+ * 1) Oro shared database (crowdsourced from all merchants - fastest)
  * 2) Open Food Facts API (free, no API key)
  * 3) UPC ItemDB API (general products)
  */
@@ -19,7 +19,7 @@ export interface SKULookupResult {
     imageUrl?: string
     suggestedPrice?: number
     size?: string  // e.g., "12 oz", "2 Liter", "6 Pack"
-    source?: 'oronex_database' | 'barcode_spider' | 'open_food_facts' | 'upc_database' | 'upc_itemdb'
+    source?: 'Oro_database' | 'barcode_spider' | 'open_food_facts' | 'upc_database' | 'upc_itemdb'
 }
 
 interface OpenFoodFactsProduct {
@@ -83,10 +83,10 @@ function extractSize(text: string): string | undefined {
 }
 
 /**
- * Oronex Shared Database Lookup - Crowdsourced from all merchants
+ * Oro Shared Database Lookup - Crowdsourced from all merchants
  * This is checked FIRST because it's the fastest and gets more accurate over time
  */
-async function lookupOronexDatabase(barcode: string): Promise<SKULookupResult> {
+async function lookupOroDatabase(barcode: string): Promise<SKULookupResult> {
     const product = await prisma.sharedUPCProduct.findUnique({
         where: { barcode }
     })
@@ -105,15 +105,15 @@ async function lookupOronexDatabase(barcode: string): Promise<SKULookupResult> {
         imageUrl: product.imageUrl || undefined,
         suggestedPrice: product.avgPrice ? Number(product.avgPrice) : undefined,
         size: product.size || undefined,
-        source: 'oronex_database'
+        source: 'Oro_database'
     }
 }
 
 /**
- * Save product data to the Oronex shared database
+ * Save product data to the Oro shared database
  * Called when a merchant adds a new product to contribute to the crowdsourced pool
  */
-export async function saveToOronexDatabase(data: {
+export async function saveToOroDatabase(data: {
     barcode: string
     name: string
     brand?: string
@@ -166,14 +166,14 @@ export async function saveToOronexDatabase(data: {
             })
         }
     } catch (error) {
-        console.error('[ORONEX_DB] Failed to save product:', error)
+        console.error('[Oro_DB] Failed to save product:', error)
         // Don't throw - this is a background enhancement, not critical path
     }
 }
 
 /**
  * Main lookup function - tries multiple sources
- * Priority: 1) Oronex shared database (fastest, crowdsourced)
+ * Priority: 1) Oro shared database (fastest, crowdsourced)
  *           2) Barcode Spider (500M-1.5B products, good for alcohol)
  *           3) Open Food Facts (free API)
  *           4) UPC ItemDB (general products)
@@ -188,12 +188,12 @@ export async function lookupBarcode(barcode: string): Promise<SKULookupResult> {
 
     let result: SKULookupResult = { found: false, barcode: cleanBarcode }
 
-    // Try Oronex shared database first (fastest, crowdsourced data)
+    // Try Oro shared database first (fastest, crowdsourced data)
     try {
-        const oronexResult = await lookupOronexDatabase(cleanBarcode)
-        if (oronexResult.found) result = oronexResult
+        const OroResult = await lookupOroDatabase(cleanBarcode)
+        if (OroResult.found) result = OroResult
     } catch (error) {
-        console.log('[SKU_LOOKUP] Oronex database check failed:', error)
+        console.log('[SKU_LOOKUP] Oro database check failed:', error)
     }
 
     // Try Barcode Spider (500M-1.5B products, good coverage)
@@ -346,7 +346,7 @@ async function lookupOpenFoodFacts(barcode: string): Promise<SKULookupResult> {
 
     const response = await fetch(url, {
         headers: {
-            'User-Agent': 'OronexPOS/1.0 (contact@oronex.com)'
+            'User-Agent': 'OroPOS/1.0 (contact@Oro.com)'
         }
     })
 

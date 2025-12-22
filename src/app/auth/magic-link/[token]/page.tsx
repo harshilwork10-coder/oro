@@ -8,7 +8,7 @@ import {
     Building2, User, FileText, Upload, CreditCard, ChevronRight, ChevronLeft,
     Quote, Star, ShieldCheck, Zap, Globe, Eye, EyeOff, Palette, Phone
 } from 'lucide-react'
-import OronexLogo from '@/components/ui/OronexLogo'
+import OroLogo from '@/components/ui/OronexLogo'
 
 export default function MagicLinkPage({ params }: { params: Promise<{ token: string }> }) {
     const router = useRouter()

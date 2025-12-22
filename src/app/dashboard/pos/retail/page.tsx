@@ -51,6 +51,9 @@ interface CartItem {
     isEbtEligible?: boolean
     taxRate?: number // Override default tax rate for this item
     category?: string // Category name (e.g., 'QUICK_ADD')
+    sellByCase?: boolean // For case break products
+    unitsPerCase?: number // Units per case for case break
+    casePrice?: number // Case price for case break
 }
 
 interface TagAlongProduct {
@@ -143,6 +146,8 @@ export default function RetailPOSPage() {
     const [showRecentTransactions, setShowRecentTransactions] = useState(false)
     const [recentTransactions, setRecentTransactions] = useState<any[]>([])
     const [showEndOfDayWizard, setShowEndOfDayWizard] = useState(false)
+    const [showPriceCheckInputModal, setShowPriceCheckInputModal] = useState(false)
+    const [priceCheckInput, setPriceCheckInput] = useState('')
 
     // Case Break (Single vs 6-Pack vs Case) Selection
     const [showCaseBreakModal, setShowCaseBreakModal] = useState(false)
@@ -860,20 +865,37 @@ export default function RetailPOSPage() {
                 </div>
             )}
 
-            {/* No Stations Configured - Contact Provider */}
+            {/* No Stations Configured - Allow Setup */}
             {!isLoadingStation && stations.length === 0 && (
                 <div className="fixed inset-0 bg-stone-950 flex items-center justify-center z-50">
                     <div className="text-center max-w-md mx-4">
-                        <div className="h-20 w-20 bg-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                            <AlertTriangle className="h-10 w-10 text-red-400" />
+                        <div className="h-20 w-20 bg-orange-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <AlertTriangle className="h-10 w-10 text-orange-400" />
                         </div>
-                        <h2 className="text-3xl font-bold text-white mb-4">Setup Required</h2>
+                        <h2 className="text-3xl font-bold text-white mb-4">Station Setup Required</h2>
                         <p className="text-stone-400 mb-6">
-                            This device needs to be configured before use.
+                            No POS stations configured for this location yet.
                         </p>
-                        <p className="text-orange-400 font-semibold">
-                            Please contact Oronex Support
-                        </p>
+                        {(user?.role === 'PROVIDER' || user?.role === 'FRANCHISOR' || user?.role === 'MANAGER') ? (
+                            <div className="space-y-3">
+                                <button
+                                    onClick={() => router.push('/dashboard/settings/stations')}
+                                    className="w-full px-6 py-4 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-colors"
+                                >
+                                    Create First Station
+                                </button>
+                                <button
+                                    onClick={() => router.push('/dashboard')}
+                                    className="w-full px-6 py-3 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl transition-colors"
+                                >
+                                    Go to Dashboard
+                                </button>
+                            </div>
+                        ) : (
+                            <p className="text-orange-400 font-semibold">
+                                Please ask your manager to configure POS stations
+                            </p>
+                        )}
                     </div>
                 </div>
             )}
@@ -1234,10 +1256,7 @@ export default function RetailPOSPage() {
                                 <span className="text-sm font-medium">Last Receipt</span>
                             </button>
                             <button
-                                onClick={() => {
-                                    const code = prompt('Enter barcode or SKU to check price:')
-                                    if (code) handlePriceCheck(code)
-                                }}
+                                onClick={() => setShowPriceCheckInputModal(true)}
                                 className="flex items-center justify-center gap-2 py-3 bg-yellow-500/20 hover:bg-yellow-500/40 rounded-lg text-yellow-400 transition-colors"
                             >
                                 <Search className="h-5 w-5" />
@@ -1553,6 +1572,54 @@ export default function RetailPOSPage() {
                     }}
                     onClose={() => setShowSearchModal(false)}
                 />
+            )}
+
+            {/* Price Check Input Modal */}
+            {showPriceCheckInputModal && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full border border-stone-700">
+                        <h2 className="text-xl font-bold text-white mb-4">Price Check</h2>
+                        <input
+                            type="text"
+                            value={priceCheckInput}
+                            onChange={(e) => setPriceCheckInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && priceCheckInput.trim()) {
+                                    handlePriceCheck(priceCheckInput.trim())
+                                    setPriceCheckInput('')
+                                    setShowPriceCheckInputModal(false)
+                                }
+                            }}
+                            placeholder="Enter barcode or SKU..."
+                            className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-white placeholder-stone-500 focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-lg"
+                            autoFocus
+                        />
+                        <div className="flex gap-3 mt-4">
+                            <button
+                                onClick={() => {
+                                    setPriceCheckInput('')
+                                    setShowPriceCheckInputModal(false)
+                                }}
+                                className="flex-1 py-3 bg-stone-800 hover:bg-stone-700 rounded-xl font-medium text-white"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (priceCheckInput.trim()) {
+                                        handlePriceCheck(priceCheckInput.trim())
+                                        setPriceCheckInput('')
+                                        setShowPriceCheckInputModal(false)
+                                    }
+                                }}
+                                disabled={!priceCheckInput.trim()}
+                                className="flex-1 py-3 bg-yellow-600 hover:bg-yellow-500 rounded-xl font-bold text-white disabled:opacity-50"
+                            >
+                                Lookup
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Price Check Modal */}

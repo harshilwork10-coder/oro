@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { Loader2, CheckCircle, Clock, AlertCircle, Upload, FileText, RefreshCw } from 'lucide-react'
-import OronexLogo from '@/components/ui/OronexLogo'
+import OroLogo from '@/components/ui/OroLogo'
 
 export default function PendingApprovalPage() {
     const router = useRouter()
@@ -92,7 +92,7 @@ export default function PendingApprovalPage() {
     return (
         <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-4">
             <div className="mb-8">
-                <img src="/Oronex-logo.png" alt="Oronex" className="h-24 object-contain" />
+                <img src="/Oro-logo.png" alt="Oro" className="h-24 object-contain" />
             </div>
 
             <div className="bg-white rounded-2xl shadow-xl border border-stone-200 max-w-lg w-full overflow-hidden">

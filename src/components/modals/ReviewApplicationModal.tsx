@@ -29,6 +29,7 @@ export default function ReviewApplicationModal({
     const [uploading, setUploading] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
     const [errors, setErrors] = useState<Record<string, string>>({})
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
     const handleReject = () => {
         onReject()
@@ -114,11 +115,11 @@ export default function ReviewApplicationModal({
                 const result = await res.json()
                 setFormData((prev: any) => ({ ...prev, [fieldName]: result.s3Key }))
             } else {
-                alert('Upload failed')
+                setToast({ message: 'Upload failed', type: 'error' })
             }
         } catch (error) {
             console.error('Upload error:', error)
-            alert('Upload error')
+            setToast({ message: 'Upload error', type: 'error' })
         } finally {
             setUploading(null)
         }
@@ -169,16 +170,16 @@ export default function ReviewApplicationModal({
 
             if (res.ok) {
                 setIsEditing(false)
-                alert('Changes saved successfully')
+                setToast({ message: 'Changes saved successfully', type: 'success' })
             } else {
                 const errorData = await res.json().catch(() => ({}))
                 const errorMsg = errorData.error || `Failed to save changes (${res.status})`
                 console.error('Save failed:', errorMsg, errorData)
-                alert(errorMsg)
+                setToast({ message: errorMsg, type: 'error' })
             }
         } catch (error) {
             console.error('Save error:', error)
-            alert('Error saving changes: ' + (error instanceof Error ? error.message : 'Unknown error'))
+            setToast({ message: 'Error saving changes: ' + (error instanceof Error ? error.message : 'Unknown error'), type: 'error' })
         } finally {
             setSaving(false)
         }
@@ -375,6 +376,12 @@ export default function ReviewApplicationModal({
                     )}
                 </div>
             </div>
+            {toast && (
+                <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
+                </div>
+            )}
         </div>
     )
 }

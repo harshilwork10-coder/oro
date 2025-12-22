@@ -23,8 +23,8 @@ export async function GET(request: NextRequest) {
 
         // Get franchise ID from session
         const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true, franchisorId: true }
+            where: { id: session.user.id as string },
+            select: { franchiseId: true, franchisor: true }
         })
 
         const franchiseId = user?.franchiseId

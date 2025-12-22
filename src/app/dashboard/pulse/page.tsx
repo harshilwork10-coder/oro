@@ -15,7 +15,7 @@ import {
     Wallet,
     AlertCircle
 } from 'lucide-react'
-import OroLogo from '@/components/ui/OronexLogo'
+import OroLogo from '@/components/ui/OroLogo'
 
 interface LiveStats {
     todaySales: number

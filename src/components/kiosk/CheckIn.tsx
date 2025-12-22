@@ -15,6 +15,7 @@ export default function CheckIn() {
     const [showNameKeyboard, setShowNameKeyboard] = useState<'first' | 'last' | null>(null)
     const [liabilitySigned, setLiabilitySigned] = useState(false)
     const [loyaltyJoined, setLoyaltyJoined] = useState(false)
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
     const handlePhoneSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -60,7 +61,7 @@ export default function CheckIn() {
         } else {
             // Can't proceed without liability? Or maybe just skip to loyalty?
             // Assuming mandatory for now based on "checked and accept" requirement
-            alert('You must accept the liability waiver to proceed.')
+            setToast({ message: 'You must accept the liability waiver to proceed.', type: 'error' })
         }
     }
 
@@ -85,11 +86,11 @@ export default function CheckIn() {
             } else {
                 const error = await res.json()
                 console.error('Error during check-in:', error)
-                alert('There was an error completing your check-in. Please ask for assistance.')
+                setToast({ message: 'There was an error completing your check-in. Please ask for assistance.', type: 'error' })
             }
         } catch (error) {
             console.error('Error creating/updating customer:', error)
-            alert('There was an error completing your check-in. Please ask for assistance.')
+            setToast({ message: 'There was an error completing your check-in. Please ask for assistance.', type: 'error' })
         } finally {
             setLoading(false)
         }
@@ -144,7 +145,7 @@ export default function CheckIn() {
 
             <div className="p-6 flex items-center justify-center relative z-10">
                 <div className="h-24 w-24 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20 p-2">
-                    <img src="/Oronex-logo.png" alt="Oronex Logo" className="w-full h-full object-contain rounded-xl" />
+                    <img src="/Oro-logo.png" alt="Oro Logo" className="w-full h-full object-contain rounded-xl" />
                 </div>
             </div>
 
@@ -281,10 +282,10 @@ export default function CheckIn() {
                                     <strong>LIABILITY WAIVER AND RELEASE FORM</strong>
                                 </p>
                                 <p className="mb-4">
-                                    I hereby acknowledge that I am voluntarily participating in services provided by Oronex. I understand that these services may involve risks, including but not limited to allergic reactions to products, minor cuts, or other injuries.
+                                    I hereby acknowledge that I am voluntarily participating in services provided by Oro. I understand that these services may involve risks, including but not limited to allergic reactions to products, minor cuts, or other injuries.
                                 </p>
                                 <p className="mb-4">
-                                    I agree to release and hold harmless Oronex, its employees, and agents from any and all liability, claims, or causes of action arising out of my participation in these services.
+                                    I agree to release and hold harmless Oro, its employees, and agents from any and all liability, claims, or causes of action arising out of my participation in these services.
                                 </p>
                                 <p>
                                     By clicking "Accept", I acknowledge that I have read and understood this waiver and agree to its terms.
@@ -307,7 +308,7 @@ export default function CheckIn() {
                                 <div className="mx-auto w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-purple-500/20">
                                     <span className="text-4xl">🎁</span>
                                 </div>
-                                <h2 className="text-3xl font-bold text-stone-100 mb-2">Join Oronex Rewards?</h2>
+                                <h2 className="text-3xl font-bold text-stone-100 mb-2">Join Oro Rewards?</h2>
                                 <p className="text-stone-400 text-lg">Earn points on every visit and get exclusive offers!</p>
                             </div>
 
@@ -330,6 +331,14 @@ export default function CheckIn() {
                     )}
                 </div>
             </div>
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-4 rounded-2xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                    <span className="text-white text-lg font-medium">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white text-xl">✕</button>
+                </div>
+            )}
         </div>
     )
 }
