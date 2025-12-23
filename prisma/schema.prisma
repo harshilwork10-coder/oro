@@ -775,6 +775,9 @@ model Item {
   // Transaction line items (for sales history)
   lineItems   ItemLineItem[]
   
+  // Manufacturer penny program deals linked to this item
+  tobaccoDeals TobaccoDeal[]
+  
   @@index([franchiseId])
   @@index([type])
   @@index([barcode])
@@ -2865,10 +2868,23 @@ model TobaccoDeal {
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  // Manufacturer Penny Program Fields
+  manufacturerPLU       String?   // 77282 - deal PLU from manufacturer
+  manufacturerName      String?   // Molson Coors, Altria, etc.
+  redemptionProgram     String?   // Affiliated-Molson Coors
+  name                  String?   // Product name from deal sheet
+  brand                 String?   // Brand name
+  description           String?   // Full deal description
+  
+  // Link to inventory item
+  itemId                String?
+  item                  Item?     @relation(fields: [itemId], references: [id])
   
   @@index([franchiseId])
   @@index([manufacturer])
   @@index([isActive])
+  @@index([manufacturerPLU])
 }
 
 // =====================================
