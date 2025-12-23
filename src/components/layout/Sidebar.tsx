@@ -122,6 +122,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 { name: 'Shipping', href: '/dashboard/shipping', icon: Truck },
             ]
         },
+        {
+            name: 'Onboarding Tools',
+            icon: Package,
+            items: [
+                { name: 'Import Inventory', href: '/dashboard/inventory/import', icon: ShoppingBag },
+                { name: 'Manufacturer Deals', href: '/dashboard/deals/manufacturer', icon: Percent },
+            ]
+        },
     ]
 
     // Legacy flat list for compatibility (used by non-Provider roles)
