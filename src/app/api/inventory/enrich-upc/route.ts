@@ -12,6 +12,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        // Only PROVIDER can use enrichment
+        if (user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+        }
+
         const { items } = await request.json()
 
         if (!items || !Array.isArray(items)) {

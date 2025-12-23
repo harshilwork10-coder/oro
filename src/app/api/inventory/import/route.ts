@@ -12,6 +12,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        // Only PROVIDER can import inventory (for client onboarding)
+        if (user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Permission denied. Only providers can import inventory.' }, { status: 403 })
+        }
+
         const formData = await request.formData()
         const file = formData.get('file') as File
 
