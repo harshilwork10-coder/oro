@@ -17,8 +17,7 @@ export async function GET(request: NextRequest) {
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
         const manufacturer = searchParams.get('manufacturer')
-        const dealPlu = searchParams.get('dealPlu')
-        const format = searchParams.get('format') || 'json' // json or csv
+        const format = searchParams.get('format') || 'json'
 
         if (!startDate || !endDate) {
             return NextResponse.json({ error: 'startDate and endDate required' }, { status: 400 })
@@ -29,7 +28,7 @@ export async function GET(request: NextRequest) {
         const end = new Date(endDate)
         end.setHours(23, 59, 59, 999)
 
-        // Get location info for report header
+        // Get franchise info for report header
         const franchise = await prisma.franchise.findUnique({
             where: { id: user.franchiseId },
             include: { locations: { take: 1 } }
@@ -49,17 +48,11 @@ export async function GET(request: NextRequest) {
         }
 
         if (manufacturer) {
-            dealWhere.manufacturerName = manufacturer
-        }
-        if (dealPlu) {
-            dealWhere.manufacturerPLU = dealPlu
+            dealWhere.manufacturer = manufacturer
         }
 
         const deals = await prisma.tobaccoDeal.findMany({
-            where: dealWhere,
-            include: {
-                item: true
-            }
+            where: dealWhere
         })
 
         if (deals.length === 0) {
@@ -69,17 +62,14 @@ export async function GET(request: NextRequest) {
             })
         }
 
-        // Get sales of items with deals in the date range
-        const itemIds = deals.map(d => d.itemId).filter(Boolean) as string[]
-
+        // Get sales in the date range that might match deals
         const sales = await prisma.itemLineItem.findMany({
             where: {
                 transaction: {
                     franchiseId: user.franchiseId,
                     createdAt: { gte: start, lte: end },
                     status: 'COMPLETED'
-                },
-                itemId: { in: itemIds }
+                }
             },
             include: {
                 transaction: true,
@@ -87,27 +77,45 @@ export async function GET(request: NextRequest) {
             }
         })
 
-        // Build report data matching Pridom format
+        // Build report data - match sales to deals by name/brand AND check deal validity dates
         const reportRows = sales.map(sale => {
-            const deal = deals.find(d => d.itemId === sale.itemId)
             const item = sale.item
+            const saleDate = sale.transaction.createdAt
+
+            // Find matching deal by item name or brand
+            const deal = deals.find(d => {
+                const nameMatch = d.dealName?.toLowerCase().includes(item?.name?.toLowerCase() || '') ||
+                    item?.name?.toLowerCase().includes(d.dealName?.toLowerCase() || '')
+
+                if (!nameMatch) return false
+
+                // CRITICAL: Check if sale date is within deal validity period
+                const dealStart = new Date(d.startDate)
+                const dealEnd = d.endDate ? new Date(d.endDate) : new Date('2099-12-31')
+
+                return saleDate >= dealStart && saleDate <= dealEnd
+            })
+
+            if (!deal) return null // Skip if no valid deal or sale outside deal period
 
             return {
-                date: sale.transaction.createdAt.toISOString().split('T')[0],
-                upc: item?.barcode || '',
+                date: saleDate.toISOString().split('T')[0],
+                upc: item?.barcode || item?.sku || '',
                 itemName: item?.name || 'Unknown',
                 unitSize: item?.size || '',
-                unitPrice: Number(sale.unitPrice || item?.price || 0).toFixed(2),
-                salePrice: Number(sale.totalPrice || 0).toFixed(2),
+                unitPrice: Number(item?.price || 0).toFixed(2),
+                salePrice: Number(sale.unitPrice || item?.price || 0).toFixed(2),
                 itemSold: sale.quantity,
-                saleAmount: (Number(sale.totalPrice || 0) * sale.quantity).toFixed(2),
-                mfgDiscount: deal ? Number(deal.discountAmount).toFixed(2) : '0.00',
-                outletDeal: deal?.manufacturerPLU || ''
+                saleAmount: (Number(sale.unitPrice || item?.price || 0) * sale.quantity).toFixed(2),
+                mfgDiscount: Number(deal.discountAmount).toFixed(2),
+                outletDeal: deal.dealName?.match(/PLU\s*(\d+)/)?.[1] || '',
+                dealValidFrom: deal.startDate.toISOString().split('T')[0],
+                dealValidTo: deal.endDate?.toISOString().split('T')[0] || 'Ongoing'
             }
-        })
+        }).filter(Boolean)
 
         // Aggregate by date + item
-        const aggregated = reportRows.reduce((acc: any, row) => {
+        const aggregated = reportRows.reduce((acc: any, row: any) => {
             const key = `${row.date}_${row.upc}`
             if (!acc[key]) {
                 acc[key] = { ...row }
@@ -128,14 +136,13 @@ export async function GET(request: NextRequest) {
         }
 
         if (format === 'csv') {
-            // Generate CSV
+            const storeName = franchise?.name || 'Store'
             const headers = ['Date', 'UPC', 'ItemName', 'Unit Size', 'Unit Price', 'Sale Price', 'Item Sold', 'Sale Amount', 'MFG Discount', 'Outlet Deal']
             const csvRows = [
-                // Header info
-                `Pridom Mix and Match Report`,
+                `${storeName} Mix and Match Report`,
                 `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`,
-                `${location?.address || ''}, ${location?.city || ''} ${location?.state || ''} ${location?.zip || ''}`,
-                `MFG Deal: ${dealPlu || 'All'}`,
+                `${location?.address || ''} ${location?.name || ''}`,
+                `Manufacturer: ${manufacturer || 'All'}`,
                 '',
                 headers.join(','),
                 ...finalRows.map((r: any) =>
@@ -155,13 +162,12 @@ export async function GET(request: NextRequest) {
             })
         }
 
-        // Return JSON
         return NextResponse.json({
             report: {
-                title: 'Pridom Mix and Match Report',
+                title: `${franchise?.name || 'Store'} Mix and Match Report`,
                 dateRange: `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`,
-                location: location ? `${location.address}, ${location.city} ${location.state} ${location.zip}` : '',
-                mfgDeal: dealPlu || 'All'
+                location: location?.name || '',
+                manufacturer: manufacturer || 'All'
             },
             data: finalRows,
             totals

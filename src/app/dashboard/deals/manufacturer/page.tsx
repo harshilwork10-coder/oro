@@ -6,7 +6,6 @@ import { Upload, FileSpreadsheet, Download, Loader2, CheckCircle, AlertCircle, C
 export default function ManufacturerDealsPage() {
     const [uploading, setUploading] = useState(false)
     const [uploadResult, setUploadResult] = useState<any>(null)
-    const [manufacturer, setManufacturer] = useState('Molson Coors')
     const [reportStartDate, setReportStartDate] = useState('')
     const [reportEndDate, setReportEndDate] = useState('')
     const [generating, setGenerating] = useState(false)
@@ -20,7 +19,7 @@ export default function ManufacturerDealsPage() {
 
         const formData = new FormData()
         formData.append('file', file)
-        formData.append('manufacturer', manufacturer)
+        // Manufacturer is auto-detected from PDF
 
         try {
             const res = await fetch('/api/tobacco-scan/import-deals', {
@@ -38,7 +37,7 @@ export default function ManufacturerDealsPage() {
 
     const generateReport = async (format: 'json' | 'csv') => {
         if (!reportStartDate || !reportEndDate) {
-            alert('Please select date range')
+            alert('Please select the sales period date range')
             return
         }
 
@@ -48,7 +47,6 @@ export default function ManufacturerDealsPage() {
             const params = new URLSearchParams({
                 startDate: reportStartDate,
                 endDate: reportEndDate,
-                manufacturer: manufacturer,
                 format
             })
 
@@ -82,23 +80,6 @@ export default function ManufacturerDealsPage() {
                     <p className="text-stone-400 mt-1">Import deals from PDF and generate rebate reports</p>
                 </div>
 
-                {/* Manufacturer Select */}
-                <div className="bg-stone-900 rounded-xl p-6 border border-stone-800">
-                    <label className="block text-sm font-medium text-stone-400 mb-2">Manufacturer</label>
-                    <select
-                        value={manufacturer}
-                        onChange={(e) => setManufacturer(e.target.value)}
-                        className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-white"
-                    >
-                        <option>Molson Coors</option>
-                        <option>Altria</option>
-                        <option>RJ Reynolds</option>
-                        <option>Anheuser-Busch</option>
-                        <option>ITG Brands</option>
-                        <option>Other</option>
-                    </select>
-                </div>
-
                 {/* Upload Section */}
                 <div className="bg-stone-900 rounded-xl p-6 border border-stone-800">
                     <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
@@ -106,7 +87,7 @@ export default function ManufacturerDealsPage() {
                         Import Deals from PDF
                     </h2>
                     <p className="text-stone-400 text-sm mb-4">
-                        Upload manufacturer deal sheet PDF. The system will extract deals and match them to your inventory.
+                        Upload manufacturer deal sheet PDF. Manufacturer, deals, and dates are auto-detected.
                     </p>
 
                     <label className="block">
@@ -147,6 +128,11 @@ export default function ManufacturerDealsPage() {
                                         <CheckCircle className="h-5 w-5" />
                                         {uploadResult.message}
                                     </div>
+                                    {uploadResult.manufacturer && (
+                                        <div className="text-stone-400 text-sm mb-2">
+                                            Manufacturer: <span className="text-white">{uploadResult.manufacturer}</span>
+                                        </div>
+                                    )}
                                     {uploadResult.deals?.length > 0 && (
                                         <div className="mt-2 space-y-1 text-sm">
                                             {uploadResult.deals.map((d: any, i: number) => (
@@ -169,12 +155,12 @@ export default function ManufacturerDealsPage() {
                         Generate Rebate Report
                     </h2>
                     <p className="text-stone-400 text-sm mb-4">
-                        Generate Pridom Mix and Match report format for manufacturer rebate claims.
+                        Select the <strong>sales period</strong> to generate a CSV report for manufacturer rebate claims.
                     </p>
 
                     <div className="grid grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label className="block text-sm text-stone-400 mb-1">Start Date</label>
+                            <label className="block text-sm text-stone-400 mb-1">Sales Period Start</label>
                             <div className="relative">
                                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
                                 <input
@@ -186,7 +172,7 @@ export default function ManufacturerDealsPage() {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm text-stone-400 mb-1">End Date</label>
+                            <label className="block text-sm text-stone-400 mb-1">Sales Period End</label>
                             <div className="relative">
                                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
                                 <input
