@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
         const session = await getServerSession(authOptions)
         const user = session?.user as any
 
-        if (!user?.id || !user?.franchiseId) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -18,7 +18,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Permission denied. Only providers can import inventory.' }, { status: 403 })
         }
 
-        const { items, updateExisting } = await request.json()
+        const { items, updateExisting, franchiseId } = await request.json()
+
+        // PROVIDER must specify which franchise to import to
+        if (!franchiseId) {
+            return NextResponse.json({ error: 'franchiseId is required. Please select a store first.' }, { status: 400 })
+        }
 
         if (!items || !Array.isArray(items) || items.length === 0) {
             return NextResponse.json({ error: 'Items array required' }, { status: 400 })
@@ -33,7 +38,7 @@ export async function POST(request: NextRequest) {
 
         // Get existing categories for mapping
         const categories = await prisma.unifiedCategory.findMany({
-            where: { franchiseId: user.franchiseId }
+            where: { franchiseId }
         })
 
         for (const item of items) {
@@ -41,7 +46,7 @@ export async function POST(request: NextRequest) {
                 // Check if item already exists by barcode
                 const existing = item.upc ? await prisma.item.findFirst({
                     where: {
-                        franchiseId: user.franchiseId,
+                        franchiseId,
                         barcode: item.upc
                     }
                 }) : null
@@ -58,7 +63,7 @@ export async function POST(request: NextRequest) {
                         // Create new category
                         const newCat = await prisma.unifiedCategory.create({
                             data: {
-                                franchiseId: user.franchiseId,
+                                franchiseId,
                                 name: item.department,
                                 type: 'PRODUCT'
                             }
@@ -92,7 +97,7 @@ export async function POST(request: NextRequest) {
                     // Create new item
                     await prisma.item.create({
                         data: {
-                            franchiseId: user.franchiseId,
+                            franchiseId,
                             barcode: item.upc || null,
                             name: item.enrichedName || item.originalName || 'Unknown Item',
                             brand: item.brand,

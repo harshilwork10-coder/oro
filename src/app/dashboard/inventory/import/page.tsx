@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { Upload, Loader2, CheckCircle, AlertCircle, Sparkles, Save, ArrowRight, Edit2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Upload, Loader2, CheckCircle, AlertCircle, Sparkles, Save, ArrowRight, Edit2, Building2, ArrowLeft } from 'lucide-react'
 
 interface ImportItem {
     rowNum: number
@@ -19,6 +20,9 @@ interface ImportItem {
 }
 
 export default function InventoryImportPage() {
+    const searchParams = useSearchParams()
+    const franchiseId = searchParams.get('franchiseId')
+
     const [step, setStep] = useState<'upload' | 'preview' | 'enriching' | 'review' | 'importing'>('upload')
     const [items, setItems] = useState<ImportItem[]>([])
     const [columnMappings, setColumnMappings] = useState<any>(null)
@@ -28,6 +32,17 @@ export default function InventoryImportPage() {
     const [updateExisting, setUpdateExisting] = useState(false)
     const [result, setResult] = useState<any>(null)
     const [editingRow, setEditingRow] = useState<number | null>(null)
+    const [storeName, setStoreName] = useState<string>('')
+
+    // Fetch store info if franchiseId provided
+    useEffect(() => {
+        if (franchiseId) {
+            fetch(`/api/franchisors/${franchiseId}`)
+                .then(res => res.json())
+                .then(data => setStoreName(data.name || 'Unknown Store'))
+                .catch(() => setStoreName('Unknown Store'))
+        }
+    }, [franchiseId])
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -36,6 +51,7 @@ export default function InventoryImportPage() {
         setUploading(true)
         const formData = new FormData()
         formData.append('file', file)
+        if (franchiseId) formData.append('franchiseId', franchiseId)
 
         try {
             const res = await fetch('/api/inventory/import', {
@@ -91,7 +107,7 @@ export default function InventoryImportPage() {
             const res = await fetch('/api/inventory/import-confirm', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items, updateExisting })
+                body: JSON.stringify({ items, updateExisting, franchiseId })
             })
             const data = await res.json()
             setResult(data)
@@ -110,9 +126,24 @@ export default function InventoryImportPage() {
     return (
         <div className="min-h-screen bg-stone-950 text-white p-6">
             <div className="max-w-6xl mx-auto">
-                {/* Header */}
+                {/* Header with store context */}
                 <div className="mb-8">
+                    {franchiseId && (
+                        <a
+                            href={`/dashboard/franchisors/${franchiseId}`}
+                            className="inline-flex items-center gap-2 text-stone-400 hover:text-white mb-4 transition-colors"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to Store
+                        </a>
+                    )}
                     <h1 className="text-3xl font-bold">Import Inventory</h1>
+                    {storeName && (
+                        <div className="flex items-center gap-2 mt-2">
+                            <Building2 className="h-4 w-4 text-emerald-400" />
+                            <span className="text-emerald-400 font-medium">{storeName}</span>
+                        </div>
+                    )}
                     <p className="text-stone-400 mt-1">Upload CSV/Excel with auto product enrichment</p>
                 </div>
 

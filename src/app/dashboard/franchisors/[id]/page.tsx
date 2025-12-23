@@ -292,23 +292,53 @@ export default function ClientDetailsPage() {
 
             {/* Locations List */}
             <div className="glass-panel p-6 rounded-2xl">
-                <h2 className="text-xl font-bold text-stone-100 mb-6">Locations ({client._count.franchises})</h2>
+                <h2 className="text-xl font-bold text-stone-100 mb-6">Stores ({client._count.franchises})</h2>
                 <div className="space-y-4">
                     {client.franchises.map((location) => (
                         <div key={location.id} className="p-4 bg-stone-800/30 rounded-xl border border-stone-700 hover:border-purple-500/30 transition-all">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-4">
                                     <div className="h-10 w-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
                                         <MapPin className="h-5 w-5 text-purple-400" />
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-stone-100">{location.name}</h3>
+                                        <span className="text-xs text-stone-500">ID: {location.id.slice(0, 8)}...</span>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-stone-400">
                                     <Users className="h-4 w-4" />
                                     <span>{location._count.users} users</span>
                                 </div>
+                            </div>
+
+                            {/* Store Actions */}
+                            <div className="flex flex-wrap gap-2 pt-3 border-t border-stone-700/50">
+                                <a
+                                    href={`/dashboard/inventory/import?franchiseId=${location.id}`}
+                                    className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-sm transition-colors"
+                                >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    </svg>
+                                    Import Inventory
+                                </a>
+                                <a
+                                    href={`/dashboard/deals/manufacturer?franchiseId=${location.id}`}
+                                    className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-sm transition-colors"
+                                >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Manufacturer Deals
+                                </a>
+                                <a
+                                    href={`/dashboard/reports?franchiseId=${location.id}`}
+                                    className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-lg text-sm transition-colors"
+                                >
+                                    <FileText className="h-4 w-4" />
+                                    Reports
+                                </a>
                             </div>
                         </div>
                     ))}
