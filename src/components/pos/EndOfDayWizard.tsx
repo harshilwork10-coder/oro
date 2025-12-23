@@ -21,9 +21,18 @@ interface ZReportData {
     cashReconciliation: {
         opening: number
         sales: number
+        lotterySales?: number
+        lotteryPayouts?: number
         expected: number
         actual: number | null
         variance: number
+    }
+    lottery?: {
+        sales: number
+        salesCount: number
+        payouts: number
+        payoutsCount: number
+        net: number
     }
     topItems: { name: string; quantity: number; sales: number }[]
     taxSummary: {
@@ -313,6 +322,18 @@ export default function EndOfDayWizard({ onClose, onComplete }: EndOfDayWizardPr
                                             <span className="text-stone-400">+ Cash Sales</span>
                                             <span>{formatCurrency(zReport.cashReconciliation.sales)}</span>
                                         </div>
+                                        {(zReport.cashReconciliation.lotterySales ?? 0) > 0 && (
+                                            <div className="flex justify-between text-purple-400">
+                                                <span>+ Lottery Ticket Sales</span>
+                                                <span>{formatCurrency(zReport.cashReconciliation.lotterySales ?? 0)}</span>
+                                            </div>
+                                        )}
+                                        {(zReport.cashReconciliation.lotteryPayouts ?? 0) > 0 && (
+                                            <div className="flex justify-between text-orange-400">
+                                                <span>- Lottery Payouts</span>
+                                                <span>-{formatCurrency(zReport.cashReconciliation.lotteryPayouts ?? 0)}</span>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between font-bold border-t border-stone-700 pt-2">
                                             <span>Expected Cash</span>
                                             <span>{formatCurrency(zReport.cashReconciliation.expected)}</span>
@@ -335,6 +356,32 @@ export default function EndOfDayWizard({ onClose, onComplete }: EndOfDayWizardPr
                                     <p className="text-3xl font-bold">{zReport.summary.totalTransactions}</p>
                                     <p className="text-sm text-stone-400">Total Transactions Today</p>
                                 </div>
+
+                                {/* Lottery Summary */}
+                                {zReport.lottery && (zReport.lottery.sales > 0 || zReport.lottery.payouts > 0) && (
+                                    <div className="bg-gradient-to-r from-purple-900/30 to-indigo-900/30 rounded-xl p-4 border border-purple-500/30">
+                                        <h4 className="text-sm font-medium text-purple-300 mb-3 flex items-center gap-2">
+                                            🎰 Lottery Summary (Separate Accounting)
+                                        </h4>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div className="text-center">
+                                                <p className="text-xl font-bold text-green-400">+{formatCurrency(zReport.lottery.sales)}</p>
+                                                <p className="text-xs text-stone-400">{zReport.lottery.salesCount} Tickets Sold</p>
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="text-xl font-bold text-red-400">-{formatCurrency(zReport.lottery.payouts)}</p>
+                                                <p className="text-xs text-stone-400">{zReport.lottery.payoutsCount} Payouts</p>
+                                            </div>
+                                            <div className="text-center">
+                                                <p className={`text-xl font-bold ${zReport.lottery.net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                    {zReport.lottery.net >= 0 ? '+' : ''}{formatCurrency(zReport.lottery.net)}
+                                                </p>
+                                                <p className="text-xs text-stone-400">Net Lottery</p>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-purple-400/70 mt-3 text-center">Not included in Total Sales (pass-through, non-taxable)</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

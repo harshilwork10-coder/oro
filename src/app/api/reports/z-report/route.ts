@@ -80,6 +80,29 @@ export async function GET(request: NextRequest) {
         const cashSales = cashTransactions.reduce((sum, tx) => sum + Number(tx.total), 0)
         const cardSales = cardTransactions.reduce((sum, tx) => sum + Number(tx.total), 0)
 
+        // ============ LOTTERY SUMMARY ============
+        // Query lottery transactions for the day
+        const lotteryTransactions = user.franchiseId ? await prisma.lotteryTransaction.findMany({
+            where: {
+                franchiseId: user.franchiseId,
+                createdAt: {
+                    gte: startOfDay,
+                    lte: endOfDay
+                }
+            }
+        }) : []
+
+        // Calculate lottery totals
+        const lotterySales = lotteryTransactions
+            .filter(lt => lt.type === 'SALE')
+            .reduce((sum, lt) => sum + Number(lt.amount), 0)
+
+        const lotteryPayouts = lotteryTransactions
+            .filter(lt => lt.type === 'PAYOUT')
+            .reduce((sum, lt) => sum + Number(lt.amount), 0)
+
+        const lotteryNetCash = lotterySales - lotteryPayouts
+
         // Get cash drawer info for the day
         const cashDrawerSessions = await prisma.cashDrawerSession.findMany({
             where: {
@@ -117,6 +140,10 @@ export async function GET(request: NextRequest) {
         const subtotal = transactions.reduce((sum, tx) => sum + Number(tx.subtotal), 0)
         const tax = transactions.reduce((sum, tx) => sum + Number(tx.tax), 0)
 
+        // Cash reconciliation includes lottery flows
+        // Expected = Opening + Cash Sales + Lottery Sales (in) - Lottery Payouts (out)
+        const expectedCash = openingCash + cashSales + lotterySales - lotteryPayouts
+
         const reportData = {
             summary: {
                 totalSales,
@@ -129,9 +156,18 @@ export async function GET(request: NextRequest) {
             cashReconciliation: {
                 opening: openingCash,
                 sales: cashSales,
-                expected: openingCash + cashSales,
+                lotterySales: lotterySales,
+                lotteryPayouts: lotteryPayouts,
+                expected: expectedCash,
                 actual: closingCash,
-                variance: closingCash !== null ? closingCash - (openingCash + cashSales) : 0
+                variance: closingCash !== null ? closingCash - expectedCash : 0
+            },
+            lottery: {
+                sales: lotterySales,
+                salesCount: lotteryTransactions.filter(lt => lt.type === 'SALE').length,
+                payouts: lotteryPayouts,
+                payoutsCount: lotteryTransactions.filter(lt => lt.type === 'PAYOUT').length,
+                net: lotteryNetCash
             },
             topItems,
             taxSummary: {
@@ -147,3 +183,4 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 })
     }
 }
+

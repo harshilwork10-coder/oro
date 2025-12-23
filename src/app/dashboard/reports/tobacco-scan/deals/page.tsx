@@ -27,6 +27,7 @@ interface TobaccoDeal {
     dealName: string
     dealType: string
     buyQuantity?: number
+    getFreeQuantity?: number  // For penny deals: number of items you get for $0.01
     discountType: string
     discountAmount: string
     startDate: string
@@ -75,6 +76,7 @@ export default function TobaccoDealsPage() {
         dealName: '',
         dealType: 'MULTI_BUY',
         buyQuantity: 2,
+        getFreeQuantity: 1,  // For penny deals
         discountType: 'FIXED',
         discountAmount: '0.50',
         startDate: new Date().toISOString().split('T')[0],
@@ -97,6 +99,7 @@ export default function TobaccoDealsPage() {
     const manufacturers = ['ALTRIA', 'RJR', 'ITG']
     const dealTypes = [
         { value: 'MULTI_BUY', label: 'Multi-Buy (Buy X Get Off)' },
+        { value: 'PENNY_DEAL', label: 'Penny Deal (Buy X Get Y for $0.01)' },
         { value: 'LOYALTY', label: 'Loyalty Bonus' },
         { value: 'SCAN_REBATE', label: 'Scan Rebate' },
         { value: 'PROMO', label: 'Promotional Offer' }
@@ -138,6 +141,7 @@ export default function TobaccoDealsPage() {
             dealName: '',
             dealType: 'MULTI_BUY',
             buyQuantity: 2,
+            getFreeQuantity: 1,
             discountType: 'FIXED',
             discountAmount: '0.50',
             startDate: new Date().toISOString().split('T')[0],
@@ -189,6 +193,7 @@ export default function TobaccoDealsPage() {
                     dealName: '',
                     dealType: 'MULTI_BUY',
                     buyQuantity: 2,
+                    getFreeQuantity: 1,
                     discountType: 'FIXED',
                     discountAmount: '0.50',
                     startDate: new Date().toISOString().split('T')[0],
@@ -369,6 +374,7 @@ export default function TobaccoDealsPage() {
                                             <h4 className="font-medium text-stone-200">{deal.dealName}</h4>
                                             <p className="text-sm text-stone-500">
                                                 {deal.dealType === 'MULTI_BUY' && `Buy ${deal.buyQuantity}, Save ${formatCurrency(deal.discountAmount)}`}
+                                                {deal.dealType === 'PENNY_DEAL' && `Buy ${deal.buyQuantity}, Get ${deal.getFreeQuantity || 1} for $0.01`}
                                                 {deal.dealType === 'LOYALTY' && `Loyalty: ${formatCurrency(deal.discountAmount)}/month`}
                                                 {deal.dealType === 'SCAN_REBATE' && `${formatCurrency(deal.discountAmount)} per scan`}
                                                 {deal.dealType === 'PROMO' && `Promo: ${formatCurrency(deal.discountAmount)} off`}
@@ -432,29 +438,53 @@ export default function TobaccoDealsPage() {
                                 </select>
                             </div>
 
-                            {newDeal.dealType === 'MULTI_BUY' && (
-                                <div>
-                                    <label className="block text-sm text-stone-400 mb-1">Buy Quantity</label>
-                                    <input
-                                        type="number"
-                                        value={newDeal.buyQuantity}
-                                        onChange={(e) => setNewDeal({ ...newDeal, buyQuantity: parseInt(e.target.value) || 2 })}
-                                        className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100"
-                                        min="1"
-                                    />
+                            {(newDeal.dealType === 'MULTI_BUY' || newDeal.dealType === 'PENNY_DEAL') && (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm text-stone-400 mb-1">Buy Quantity</label>
+                                        <input
+                                            type="number"
+                                            value={newDeal.buyQuantity}
+                                            onChange={(e) => setNewDeal({ ...newDeal, buyQuantity: parseInt(e.target.value) || 2 })}
+                                            className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100"
+                                            min="1"
+                                        />
+                                    </div>
+                                    {newDeal.dealType === 'PENNY_DEAL' && (
+                                        <div>
+                                            <label className="block text-sm text-stone-400 mb-1">Get for $0.01</label>
+                                            <input
+                                                type="number"
+                                                value={newDeal.getFreeQuantity}
+                                                onChange={(e) => setNewDeal({ ...newDeal, getFreeQuantity: parseInt(e.target.value) || 1 })}
+                                                className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100"
+                                                min="1"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
-                            <div>
-                                <label className="block text-sm text-stone-400 mb-1">Discount Amount ($)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={newDeal.discountAmount}
-                                    onChange={(e) => setNewDeal({ ...newDeal, discountAmount: e.target.value })}
-                                    className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100"
-                                />
-                            </div>
+                            {newDeal.dealType === 'PENNY_DEAL' && (
+                                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                                    <p className="text-sm text-amber-300 font-medium">
+                                        💰 Buy {newDeal.buyQuantity} → Get {newDeal.getFreeQuantity} for just $0.01 each!
+                                    </p>
+                                </div>
+                            )}
+
+                            {newDeal.dealType !== 'PENNY_DEAL' && (
+                                <div>
+                                    <label className="block text-sm text-stone-400 mb-1">Discount Amount ($)</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={newDeal.discountAmount}
+                                        onChange={(e) => setNewDeal({ ...newDeal, discountAmount: e.target.value })}
+                                        className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100"
+                                    />
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>

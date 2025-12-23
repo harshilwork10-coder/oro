@@ -37,6 +37,7 @@ export async function POST(request: Request) {
             dealName,
             dealType,
             buyQuantity,
+            getFreeQuantity,
             discountType,
             discountAmount,
             applicableUpcs,
@@ -44,9 +45,12 @@ export async function POST(request: Request) {
             endDate
         } = body
 
-        if (!dealName || !dealType || !discountType || discountAmount === undefined) {
+        if (!dealName || !dealType || !discountType) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
+
+        // For penny deals, set discount to 0.01 (item price - 0.01 is the discount)
+        const finalDiscountAmount = dealType === 'PENNY_DEAL' ? 0.01 : (discountAmount || 0)
 
         const deal = await prisma.tobaccoDeal.create({
             data: {
@@ -55,8 +59,9 @@ export async function POST(request: Request) {
                 dealName,
                 dealType,
                 buyQuantity: buyQuantity || null,
-                discountType,
-                discountAmount,
+                getFreeQuantity: getFreeQuantity || null,
+                discountType: dealType === 'PENNY_DEAL' ? 'PENNY' : discountType,
+                discountAmount: finalDiscountAmount,
                 applicableUpcs: applicableUpcs || null,
                 startDate: startDate ? new Date(startDate) : new Date(),
                 endDate: endDate ? new Date(endDate) : null,

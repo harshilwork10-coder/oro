@@ -8,10 +8,10 @@ interface OroLogoProps {
 
 export default function OroLogo({ size = 'md', showText = true, className = '' }: OroLogoProps) {
     const sizes = {
-        sm: { icon: 24, text: 14, gap: 6 },
-        md: { icon: 32, text: 18, gap: 8 },
-        lg: { icon: 48, text: 24, gap: 10 },
-        xl: { icon: 64, text: 32, gap: 12 }
+        sm: { icon: 32, text: 18, gap: 8 },
+        md: { icon: 48, text: 26, gap: 10 },
+        lg: { icon: 64, text: 34, gap: 12 },
+        xl: { icon: 80, text: 42, gap: 14 }
     }
 
     // Handle numeric size or predefined size

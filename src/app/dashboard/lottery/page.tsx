@@ -16,7 +16,8 @@ import {
     X,
     Gift,
     Banknote,
-    ArrowLeft
+    ArrowLeft,
+    Lock
 } from "lucide-react"
 import Link from 'next/link'
 
@@ -136,6 +137,24 @@ export default function LotteryPage() {
             fetchData()
         } catch (error) {
             console.error('Failed to activate pack:', error)
+        }
+    }
+
+    const settlePack = async (packId: string) => {
+        if (!confirm('Are you sure you want to close this pack? This action cannot be undone.')) {
+            return
+        }
+        try {
+            const res = await fetch(`/api/lottery/packs/${packId}/settle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+            if (res.ok) {
+                fetchData()
+            }
+        } catch (error) {
+            console.error('Failed to settle pack:', error)
         }
     }
 
@@ -263,8 +282,8 @@ export default function LotteryPage() {
                                         <p className="text-sm text-stone-500">Game #{game.gameNumber}</p>
                                     </div>
                                     <span className={`px-2 py-1 rounded text-xs ${game.isActive
-                                            ? 'bg-emerald-500/20 text-emerald-400'
-                                            : 'bg-stone-500/20 text-stone-400'
+                                        ? 'bg-emerald-500/20 text-emerald-400'
+                                        : 'bg-stone-500/20 text-stone-400'
                                         }`}>
                                         {game.isActive ? 'Active' : 'Inactive'}
                                     </span>
@@ -299,6 +318,7 @@ export default function LotteryPage() {
                                     <th className="text-left px-4 py-3 text-xs text-stone-400 uppercase">Sold</th>
                                     <th className="text-left px-4 py-3 text-xs text-stone-400 uppercase">Remaining</th>
                                     <th className="text-left px-4 py-3 text-xs text-stone-400 uppercase">Revenue</th>
+                                    <th className="text-left px-4 py-3 text-xs text-stone-400 uppercase">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-stone-800">
@@ -326,6 +346,15 @@ export default function LotteryPage() {
                                             </td>
                                             <td className="px-4 py-3 text-stone-400">{remaining}</td>
                                             <td className="px-4 py-3 font-medium text-emerald-400">{formatCurrency(revenue)}</td>
+                                            <td className="px-4 py-3">
+                                                <button
+                                                    onClick={() => settlePack(pack.id)}
+                                                    className="flex items-center gap-1 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm font-medium transition-colors"
+                                                >
+                                                    <Lock className="h-3.5 w-3.5" />
+                                                    Close
+                                                </button>
+                                            </td>
                                         </tr>
                                     )
                                 })}

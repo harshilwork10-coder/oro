@@ -243,6 +243,10 @@ model FranchiseSettings {
   enableClientPhotos     Boolean @default(false)  // Before/after photos (off - privacy concern)
   enableRecurringBooking Boolean @default(true)   // Recurring appointments
 
+  // Promotion Stacking Rules
+  promoStackingMode     String  @default("BEST_ONLY") // BEST_ONLY, STACK_ALL, STACK_WITH_CAP
+  maxDiscountPercent    Decimal @default(50) // Max discount cap (50% default)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -862,6 +866,11 @@ model Client {
   // Photo Consent
   photoConsent     Boolean   @default(false)
   photoConsentDate DateTime?
+
+  // Tax Exemption (for resellers, wholesale, non-profit)
+  taxExempt              Boolean   @default(false)
+  exemptCertificateNumber String?   // Tax exempt certificate ID
+  exemptCertificateExpiry DateTime? // Expiration of certificate
 
   // Store Account (A/R) - Customer can buy on credit
   hasStoreAccount     Boolean   @default(false)
@@ -2837,9 +2846,10 @@ model TobaccoDeal {
   dealType      String    // MULTI_BUY, LOYALTY, SCAN_REBATE, PROMO
   
   // Deal conditions
-  buyQuantity   Int?      // Buy X packs
-  discountType  String    // FIXED, PERCENT, PER_UNIT
-  discountAmount Decimal  // Amount off (cents or percent)
+  buyQuantity    Int?      // Buy X packs
+  getFreeQuantity Int?     // For penny deals: get Y for $0.01
+  discountType   String    // FIXED, PERCENT, PER_UNIT
+  discountAmount Decimal   // Amount off (cents or percent)
   
   // UPC matching (optional - for specific products)
   applicableUpcs String?  // Comma-separated UPCs, or null for all

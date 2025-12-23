@@ -73,20 +73,26 @@ const POS_MODES = [
     { id: 'HYBRID', name: 'Hybrid', icon: '🔄', description: 'Services + Products' },
 ]
 
-// Features
+// Features - filtered by business type (posMode)
 const AVAILABLE_FEATURES = [
-    { id: 'usesServices', name: 'Services', icon: Calendar },
-    { id: 'usesAppointments', name: 'Appointments', icon: Calendar },
-    { id: 'usesScheduling', name: 'Staff Scheduling', icon: Users },
-    { id: 'usesInventory', name: 'Inventory', icon: ShoppingBag },
-    { id: 'usesLoyalty', name: 'Loyalty Program', icon: Heart },
-    { id: 'usesGiftCards', name: 'Gift Cards', icon: Gift },
-    { id: 'usesMemberships', name: 'Memberships', icon: Users },
-    { id: 'usesEmailMarketing', name: 'Email Marketing', icon: Mail },
-    { id: 'usesSmsMarketing', name: 'SMS Marketing', icon: MessageSquare },
-    { id: 'usesReviewManagement', name: 'Reviews', icon: BarChart3 },
-    { id: 'usesCommissions', name: 'Commissions', icon: CreditCard },
-    { id: 'enableResources', name: 'Resources', icon: Building2 },
+    // SALON-only features
+    { id: 'usesServices', name: 'Services', icon: Calendar, forTypes: ['SALON', 'HYBRID'] },
+    { id: 'usesAppointments', name: 'Appointments', icon: Calendar, forTypes: ['SALON', 'HYBRID'] },
+    { id: 'enableResources', name: 'Resources', icon: Building2, forTypes: ['SALON', 'HYBRID'] },
+    // RETAIL-specific features
+    { id: 'usesInventory', name: 'Inventory', icon: ShoppingBag, forTypes: ['RETAIL', 'RESTAURANT', 'HYBRID'] },
+    { id: 'usesAgeVerification', name: 'Age Verification', icon: Users, forTypes: ['RETAIL'] },
+    { id: 'usesLottery', name: 'Lottery', icon: Gift, forTypes: ['RETAIL'] },
+    { id: 'usesTobaccoScan', name: 'Tobacco Scan', icon: ShoppingBag, forTypes: ['RETAIL'] },
+    // Shared features (apply to both SALON and RETAIL)
+    { id: 'usesScheduling', name: 'Staff Scheduling', icon: Users, forTypes: ['SALON', 'RETAIL', 'RESTAURANT', 'HYBRID'] },
+    { id: 'usesMemberships', name: 'Memberships', icon: Users, forTypes: ['SALON', 'RETAIL', 'RESTAURANT', 'HYBRID'] },
+    { id: 'usesCommissions', name: 'Commissions', icon: CreditCard, forTypes: ['SALON', 'RETAIL', 'RESTAURANT', 'HYBRID'] },
+    { id: 'usesReviewManagement', name: 'Reviews', icon: BarChart3, forTypes: ['SALON', 'RETAIL', 'RESTAURANT', 'HYBRID'] },
+    { id: 'usesLoyalty', name: 'Loyalty Program', icon: Heart, forTypes: ['SALON', 'RETAIL', 'RESTAURANT', 'HYBRID'] },
+    { id: 'usesGiftCards', name: 'Gift Cards', icon: Gift, forTypes: ['SALON', 'RETAIL', 'RESTAURANT', 'HYBRID'] },
+    { id: 'usesEmailMarketing', name: 'Email Marketing', icon: Mail, forTypes: ['SALON', 'RETAIL', 'RESTAURANT', 'HYBRID'] },
+    { id: 'usesSmsMarketing', name: 'SMS Marketing', icon: MessageSquare, forTypes: ['SALON', 'RETAIL', 'RESTAURANT', 'HYBRID'] },
 ]
 
 // Integrations
@@ -801,7 +807,8 @@ export default function AccountConfigurationsPage() {
         if (!selectedClient) return null
 
         const statusConfig = getStatusConfig(selectedClient.accountStatus)
-        const enabledFeatures = Object.entries(selectedClient.features).filter(([k, v]) => v && AVAILABLE_FEATURES.find(f => f.id === k)).length
+        const applicableFeatures = AVAILABLE_FEATURES.filter(f => f.forTypes.includes(selectedClient.posMode))
+        const enabledFeatures = Object.entries(selectedClient.features).filter(([k, v]) => v && applicableFeatures.find(f => f.id === k)).length
         const enabledIntegrations = Object.entries(selectedClient.integrations).filter(([k, v]) => v).length
 
         // Sub-views for categories
@@ -1052,33 +1059,35 @@ export default function AccountConfigurationsPage() {
                         </h3>
 
                         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                            {AVAILABLE_FEATURES.map(feature => {
-                                const isEnabled = selectedClient.features[feature.id] ?? false
-                                const Icon = feature.icon
-                                return (
-                                    <button
-                                        key={feature.id}
-                                        onClick={() => updateConfig(selectedClient.id, { [feature.id]: !isEnabled })}
-                                        disabled={saving}
-                                        className={`p-4 rounded-xl border transition-all text-left ${isEnabled
-                                            ? 'bg-emerald-500/20 border-emerald-500/50'
-                                            : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50'
-                                            }`}
-                                    >
-                                        <div className="flex items-center justify-between mb-2">
-                                            <Icon className={`w-5 h-5 ${isEnabled ? 'text-emerald-400' : 'text-stone-500'}`} />
-                                            {isEnabled ? (
-                                                <Check className="w-5 h-5 text-emerald-400" />
-                                            ) : (
-                                                <X className="w-5 h-5 text-stone-600" />
-                                            )}
-                                        </div>
-                                        <p className={`font-medium ${isEnabled ? 'text-white' : 'text-stone-400'}`}>
-                                            {feature.name}
-                                        </p>
-                                    </button>
-                                )
-                            })}
+                            {AVAILABLE_FEATURES
+                                .filter(f => f.forTypes.includes(selectedClient.posMode))
+                                .map(feature => {
+                                    const isEnabled = selectedClient.features[feature.id] ?? false
+                                    const Icon = feature.icon
+                                    return (
+                                        <button
+                                            key={feature.id}
+                                            onClick={() => updateConfig(selectedClient.id, { [feature.id]: !isEnabled })}
+                                            disabled={saving}
+                                            className={`p-4 rounded-xl border transition-all text-left ${isEnabled
+                                                ? 'bg-emerald-500/20 border-emerald-500/50'
+                                                : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50'
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <Icon className={`w-5 h-5 ${isEnabled ? 'text-emerald-400' : 'text-stone-500'}`} />
+                                                {isEnabled ? (
+                                                    <Check className="w-5 h-5 text-emerald-400" />
+                                                ) : (
+                                                    <X className="w-5 h-5 text-stone-600" />
+                                                )}
+                                            </div>
+                                            <p className={`font-medium ${isEnabled ? 'text-white' : 'text-stone-400'}`}>
+                                                {feature.name}
+                                            </p>
+                                        </button>
+                                    )
+                                })}
                         </div>
                     </div>
                 </div>

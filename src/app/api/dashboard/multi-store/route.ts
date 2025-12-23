@@ -9,17 +9,41 @@ export async function GET(request: NextRequest) {
         const session = await getServerSession(authOptions)
         const user = session?.user as any
 
-        if (!user?.franchiseId) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        // PROVIDER can see all locations, others need franchiseId
+        let locationFilter: any = {}
+
+        if (user.role === 'PROVIDER') {
+            // Provider sees ALL locations across all franchises
+            locationFilter = {}
+        } else if (user.franchiseId) {
+            locationFilter = { franchiseId: user.franchiseId }
+        } else {
+            // No franchise and not provider - return empty
+            return NextResponse.json({
+                locations: [],
+                summary: {
+                    totalLocations: 0,
+                    todaySales: 0,
+                    todayTransactions: 0,
+                    mtdSales: 0,
+                    lowStockTotal: 0,
+                    topLocation: null
+                }
+            })
         }
 
         // Get all locations for this franchise
         const locations = await prisma.location.findMany({
-            where: { franchiseId: user.franchiseId },
+            where: locationFilter,
             select: {
                 id: true,
                 name: true,
-                address: true
+                address: true,
+                franchiseId: true
             }
         })
 
@@ -59,18 +83,18 @@ export async function GET(request: NextRequest) {
                 })
 
                 // Product count for this location's franchise
-                const productCount = await prisma.product.count({
-                    where: { franchiseId: user.franchiseId, isActive: true }
-                })
+                const productCount = location.franchiseId ? await prisma.product.count({
+                    where: { franchiseId: location.franchiseId, isActive: true }
+                }) : 0
 
                 // Low stock items
-                const lowStockItems = await prisma.product.count({
+                const lowStockItems = location.franchiseId ? await prisma.product.count({
                     where: {
-                        franchiseId: user.franchiseId,
+                        franchiseId: location.franchiseId,
                         isActive: true,
                         stock: { lte: 5 }
                     }
-                })
+                }) : 0
 
                 // Active employees at this location
                 const employeeCount = await prisma.user.count({

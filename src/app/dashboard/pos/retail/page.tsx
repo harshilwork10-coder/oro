@@ -26,7 +26,9 @@ import {
     Wallet,
     Clock,
     PackagePlus,
-    Moon
+    Moon,
+    Ticket,
+    Trophy
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useBusinessConfig } from '@/hooks/useBusinessConfig'
@@ -37,6 +39,8 @@ import QuickAddModal from '@/components/modals/QuickAddModal'
 import TransactionDiscountModal from '@/components/modals/TransactionDiscountModal'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 import EndOfDayWizard from '@/components/pos/EndOfDayWizard'
+import LotteryModal from '@/components/pos/LotteryModal'
+import LotteryPayoutModal from '@/components/pos/LotteryPayoutModal'
 
 interface CartItem {
     id: string
@@ -148,6 +152,10 @@ export default function RetailPOSPage() {
     const [showEndOfDayWizard, setShowEndOfDayWizard] = useState(false)
     const [showPriceCheckInputModal, setShowPriceCheckInputModal] = useState(false)
     const [priceCheckInput, setPriceCheckInput] = useState('')
+
+    // Lottery
+    const [showLotteryModal, setShowLotteryModal] = useState(false)
+    const [showLotteryPayoutModal, setShowLotteryPayoutModal] = useState(false)
 
     // Case Break (Single vs 6-Pack vs Case) Selection
     const [showCaseBreakModal, setShowCaseBreakModal] = useState(false)
@@ -1318,6 +1326,23 @@ export default function RetailPOSPage() {
                                 <span className="text-xs font-medium">Close</span>
                             </button>
                         </div>
+                        {/* Lottery Row */}
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                            <button
+                                onClick={() => setShowLotteryModal(true)}
+                                className="flex items-center justify-center gap-2 py-3 bg-amber-500/20 hover:bg-amber-500/40 rounded-lg text-amber-400 transition-colors"
+                            >
+                                <Ticket className="h-5 w-5" />
+                                <span className="text-sm font-medium">Lottery</span>
+                            </button>
+                            <button
+                                onClick={() => setShowLotteryPayoutModal(true)}
+                                className="flex items-center justify-center gap-2 py-3 bg-teal-500/20 hover:bg-teal-500/40 rounded-lg text-teal-400 transition-colors"
+                            >
+                                <Trophy className="h-5 w-5" />
+                                <span className="text-sm font-medium">Payout</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1727,6 +1752,32 @@ export default function RetailPOSPage() {
                     }}
                 />
             )}
+
+            {/* Lottery Modal */}
+            <LotteryModal
+                isOpen={showLotteryModal}
+                onClose={() => setShowLotteryModal(false)}
+                onAddToCart={(item) => {
+                    setCart([...cart, {
+                        id: `lottery-${Date.now()}`,
+                        name: item.name,
+                        price: item.price,
+                        quantity: item.quantity,
+                        category: item.category
+                    }])
+                    setToast({ message: `Added ${item.name} to cart`, type: 'success' })
+                }}
+            />
+
+            {/* Lottery Payout Modal */}
+            <LotteryPayoutModal
+                isOpen={showLotteryPayoutModal}
+                onClose={() => setShowLotteryPayoutModal(false)}
+                onPayout={(amount) => {
+                    // Payout is recorded, show confirmation
+                    setToast({ message: `✓ Paid out $${amount.toFixed(2)} to customer`, type: 'success' })
+                }}
+            />
 
             {/* Case Break Modal - Single vs 6-Pack vs Case */}
             {showCaseBreakModal && pendingCaseBreakProduct && (

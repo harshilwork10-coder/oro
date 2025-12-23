@@ -40,7 +40,12 @@ export async function POST(
             }
         })
 
-        return NextResponse.json({ success: true, token })
+        // Get origin from request
+        const origin = request.headers.get('origin') || request.headers.get('host') || 'http://localhost:3000'
+        const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
+        const url = `${baseUrl}/auth/magic-link/${token}`
+
+        return NextResponse.json({ success: true, token, url })
 
     } catch (error) {
         console.error('Error generating magic link:', error)

@@ -459,6 +459,38 @@ export default function MyClientsPage() {
                                             Reset Password
                                         </button>
 
+                                        {/* Copy Magic Link */}
+                                        <button
+                                            onClick={async (e) => {
+                                                e.stopPropagation()
+                                                const magicToken = client.owner?.magicLinks?.[0]?.token
+                                                if (magicToken) {
+                                                    const url = `${window.location.origin}/auth/magic-link/${magicToken}`
+                                                    await navigator.clipboard.writeText(url)
+                                                    setToast({ message: 'Magic link copied!', type: 'success' })
+                                                } else {
+                                                    // Generate new magic link
+                                                    try {
+                                                        const res = await fetch(`/api/admin/franchisors/${client.id}/magic-link`, { method: 'POST' })
+                                                        const data = await res.json()
+                                                        if (data.url) {
+                                                            await navigator.clipboard.writeText(data.url)
+                                                            setToast({ message: 'Magic link generated and copied!', type: 'success' })
+                                                        } else {
+                                                            setToast({ message: 'Failed to generate magic link', type: 'error' })
+                                                        }
+                                                    } catch {
+                                                        setToast({ message: 'Failed to generate magic link', type: 'error' })
+                                                    }
+                                                }
+                                                setActiveMenu(null)
+                                            }}
+                                            className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-blue-400"
+                                        >
+                                            <Download className="h-4 w-4" />
+                                            Copy Magic Link
+                                        </button>
+
                                         {/* Suspend / Activate */}
                                         {client.accountStatus !== 'SUSPENDED' && client.accountStatus !== 'TERMINATED' && (
                                             <button
