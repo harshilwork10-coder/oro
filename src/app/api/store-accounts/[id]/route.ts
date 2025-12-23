@@ -14,6 +14,16 @@ export async function GET(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        // SECURITY: Get user's franchiseId
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { franchiseId: true }
+        })
+
+        if (!user?.franchiseId) {
+            return NextResponse.json({ error: 'No franchise assigned' }, { status: 403 })
+        }
+
         const client = await prisma.client.findUnique({
             where: { id: params.id },
             select: {
@@ -22,6 +32,7 @@ export async function GET(
                 lastName: true,
                 phone: true,
                 email: true,
+                franchiseId: true,
                 hasStoreAccount: true,
                 storeAccountBalance: true,
                 storeAccountLimit: true,
@@ -35,6 +46,12 @@ export async function GET(
 
         if (!client) {
             return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+        }
+
+        // SECURITY: Verify client belongs to user's franchise
+        if (client.franchiseId !== user.franchiseId) {
+            console.warn(`[SECURITY] IDOR attempt: User ${session.user.id} tried to access client ${params.id}`)
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         return NextResponse.json({
@@ -76,6 +93,16 @@ export async function POST(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        // SECURITY: Get user's franchiseId
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { franchiseId: true }
+        })
+
+        if (!user?.franchiseId) {
+            return NextResponse.json({ error: 'No franchise assigned' }, { status: 403 })
+        }
+
         const body = await request.json()
         const { type, amount, transactionId, invoiceNumber, paymentMethod, checkNumber, note } = body
 
@@ -99,6 +126,12 @@ export async function POST(
 
         if (!client || !client.hasStoreAccount) {
             return NextResponse.json({ error: 'Store account not found' }, { status: 404 })
+        }
+
+        // SECURITY: Verify client belongs to user's franchise
+        if (client.franchiseId !== user.franchiseId) {
+            console.warn(`[SECURITY] IDOR attempt: User ${session.user.id} tried to modify client ${params.id}`)
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         const currentBalance = Number(client.storeAccountBalance)

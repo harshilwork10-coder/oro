@@ -84,11 +84,36 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        // SECURITY: Get user's franchiseId
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { franchiseId: true }
+        })
+
+        if (!user?.franchiseId) {
+            return NextResponse.json({ error: 'No franchise assigned' }, { status: 403 })
+        }
+
         const body = await request.json()
         const { clientId, creditLimit } = body
 
         if (!clientId) {
             return NextResponse.json({ error: 'Client ID required' }, { status: 400 })
+        }
+
+        // SECURITY: Verify client belongs to user's franchise before modifying
+        const existingClient = await prisma.client.findUnique({
+            where: { id: clientId },
+            select: { franchiseId: true }
+        })
+
+        if (!existingClient) {
+            return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+        }
+
+        if (existingClient.franchiseId !== user.franchiseId) {
+            console.warn(`[SECURITY] IDOR attempt: User ${session.user.id} tried to modify client ${clientId}`)
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         const client = await prisma.client.update({
