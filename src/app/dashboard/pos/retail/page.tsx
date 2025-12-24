@@ -41,6 +41,7 @@ import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 import EndOfDayWizard from '@/components/pos/EndOfDayWizard'
 import LotteryModal from '@/components/pos/LotteryModal'
 import LotteryPayoutModal from '@/components/pos/LotteryPayoutModal'
+import ReceiptModal from '@/components/pos/ReceiptModal'
 
 interface CartItem {
     id: string
@@ -156,6 +157,10 @@ export default function RetailPOSPage() {
     // Lottery
     const [showLotteryModal, setShowLotteryModal] = useState(false)
     const [showLotteryPayoutModal, setShowLotteryPayoutModal] = useState(false)
+
+    // SMS Receipt Modal
+    const [showReceiptModal, setShowReceiptModal] = useState(false)
+    const [pendingReceiptData, setPendingReceiptData] = useState<any>(null)
 
     // Case Break (Single vs 6-Pack vs Case) Selection
     const [showCaseBreakModal, setShowCaseBreakModal] = useState(false)
@@ -720,7 +725,29 @@ export default function RetailPOSPage() {
             if (res.ok) {
                 const transaction = await res.json()
                 setLastTransaction(transaction) // Save for "Last Receipt" button
-                setToast({ message: 'Payment successful!', type: 'success' })
+
+                // Build receipt data for SMS (includes dual pricing info)
+                const totals = calculateTotals()
+                const cardFee = totals.cardTotal - totals.cashTotal // Card fee is the difference
+                const receiptData = {
+                    transactionId: transaction.id,
+                    items: cart.map(item => ({
+                        name: item.name,
+                        quantity: item.quantity,
+                        subtotal: item.price * item.quantity
+                    })),
+                    subtotal,
+                    tax,
+                    cardFee: method.includes('CARD') || method === 'CREDIT_CARD' || method === 'DEBIT_CARD' ? cardFee : 0,
+                    tipAmount,
+                    paymentMethod: method,
+                    total: total + tipAmount
+                }
+
+                // Show receipt modal instead of just toast
+                setPendingReceiptData(receiptData)
+                setShowReceiptModal(true)
+
                 setCart([])
                 setSelectedCustomer(null)
                 setIdVerifiedForTransaction(false) // Reset ID verification for next transaction
@@ -1794,6 +1821,18 @@ export default function RetailPOSPage() {
                     }}
                 />
             )}
+
+            {/* SMS Receipt Modal */}
+            <ReceiptModal
+                isOpen={showReceiptModal}
+                onClose={() => setShowReceiptModal(false)}
+                transactionData={pendingReceiptData}
+                onComplete={() => {
+                    setShowReceiptModal(false)
+                    setPendingReceiptData(null)
+                    setToast({ message: 'Payment successful!', type: 'success' })
+                }}
+            />
         </div>
     )
 }

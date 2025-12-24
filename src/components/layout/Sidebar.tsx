@@ -150,11 +150,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     // BRAND FRANCHISOR: Sells franchises
     const brandFranchisorLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'CRM', href: '/dashboard/crm', icon: Users },
-        { name: 'Leads', href: '/dashboard/crm/leads', icon: Users },
-        { name: 'Pipeline', href: '/dashboard/crm/pipeline', icon: BarChart3 },
         { name: 'Franchisees', href: '/dashboard/franchisees', icon: Building2 },
-        { name: 'Territories', href: '/dashboard/territories', icon: MapPin },
         { name: 'Services Catalog', href: '/dashboard/services/catalog', icon: Briefcase },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText },
         { name: 'Compliance', href: '/dashboard/compliance', icon: Shield },

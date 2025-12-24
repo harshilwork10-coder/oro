@@ -80,6 +80,18 @@
     ],
     "shortcuts": [
         {
+            "name": "Oro Pulse",
+            "short_name": "Pulse",
+            "description": "Mobile owner dashboard",
+            "url": "/pulse",
+            "icons": [
+                {
+                    "src": "/icons/icon-96x96.png",
+                    "sizes": "96x96"
+                }
+            ]
+        },
+        {
             "name": "Dashboard",
             "short_name": "Dashboard",
             "description": "View live business stats",

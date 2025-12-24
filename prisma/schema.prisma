@@ -480,6 +480,15 @@ model Location {
   
   // Pulse Quick Login Store Code (e.g., "DOWNTOWN", "MAIN")
   pulseStoreCode       String?   @unique
+  
+  // Multi-Store Operations
+  transfersFrom        InventoryTransfer[]  @relation("TransfersFrom")
+  transfersTo          InventoryTransfer[]  @relation("TransfersTo")
+  cashCounts           CashCount[]
+  safeDrops            SafeDrop[]
+  depositLogs          DepositLog[]
+  auditEvents          AuditEvent[]
+  storeExceptions      StoreException[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -777,6 +786,9 @@ model Item {
   
   // Manufacturer penny program deals linked to this item
   tobaccoDeals TobaccoDeal[]
+  
+  // Inventory transfers
+  transferItems TransferItem[]
   
   @@index([franchiseId])
   @@index([type])
@@ -1737,9 +1749,6 @@ model Franchisor {
   // Industry Type (for conditional feature access)
   industryType String @default("SERVICE") // "SERVICE" | "RETAIL" | "RESTAURANT"
 
-  // CRM Relations
-  leads       Lead[]
-  territories Territory[]
 
   // Existing Relations
   franchises     Franchise[]
@@ -1931,111 +1940,6 @@ model BusinessConfig {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-
-model Lead {
-  id           String     @id @default(cuid())
-  franchisorId String
-  franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
-
-  // Lead info
-  name    String
-  email   String
-  phone   String?
-  company String?
-  city    String?
-  state   String?
-
-  // Pipeline
-  status     String  @default("NEW") // NEW, CONTACTED, QUALIFIED, PROPOSAL, NEGOTIATION, CLOSED_WON, CLOSED_LOST
-  source     String? // WEBSITE, REFERRAL, EVENT, COLD_CALL
-  assignedTo String? // Agent ID
-
-  // Financial
-  estimatedValue Float?
-  proposedFee    Float?
-
-  // Lead Scoring & Intelligence (NEW)
-  score           Int?      // 0-100 lead score
-  rating          String?   // HOT, WARM, COLD
-  probability     Float?    // 0-100% chance to close
-  expectedClose   DateTime? // Expected close date
-  competitors     String?   // JSON array of competitor names
-  painPoints      String?   // JSON array of pain points
-  decisionMakers  String?   // JSON array of key stakeholders
-
-  // Activity Tracking (NEW)
-  lastActivityAt  DateTime? // Last interaction timestamp
-  emailOpens      Int       @default(0) // Email open count
-  emailClicks     Int       @default(0) // Email click count
-  callCount       Int       @default(0) // Total calls made
-  meetingCount    Int       @default(0) // Total meetings
-
-  // Tracking
-  lastContact  DateTime?
-  nextFollowUp DateTime?
-  notes        Note[]
-  activities   Activity[]
-  tasks        Task[] // NEW relation
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Note {
-  id        String   @id @default(cuid())
-  leadId    String
-  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  content   String
-  category  String?  @default("GENERAL") // GENERAL, FOLLOW_UP, DECISION, RED_FLAG
-  isPinned  Boolean  @default(false)
-  createdBy String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Activity {
-  id        String   @id @default(cuid())
-  leadId    String
-  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  type      String   // CALL, EMAIL, MEETING, NOTE, PROPOSAL_SENT, TASK
-  subject   String
-  notes     String?
-  duration  Int?     // Duration in minutes (for calls/meetings)
-  outcome   String?  // POSITIVE, NEUTRAL, NEGATIVE, NO_ANSWER
-  createdBy String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Territory {
-  id           String     @id @default(cuid())
-  franchisorId String
-  franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
-  name         String
-  states       String // JSON array of state codes
-  isAvailable  Boolean    @default(true)
-  price        Decimal?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Task {
-  id          String   @id @default(cuid())
-  leadId      String
-  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  dueDate     DateTime
-  priority    String   @default("MEDIUM") // HIGH, MEDIUM, LOW
-  status      String   @default("PENDING") // PENDING, COMPLETED, CANCELLED
-  assignedTo  String
-  completedAt DateTime?
-  createdBy   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 }
 
 model EmailTemplate {
@@ -3007,5 +2911,271 @@ model StoreAccountTransaction {
   @@index([clientId])
   @@index([franchiseId])
   @@index([type])
+  @@index([createdAt])
+}
+
+// ============ MULTI-STORE OPERATIONS ============
+
+// Inventory Transfer between stores
+model InventoryTransfer {
+  id              String    @id @default(cuid())
+  transferNumber  String    @unique // TR-001, TR-002, etc.
+  
+  // From/To Locations
+  fromLocationId  String
+  fromLocation    Location  @relation("TransfersFrom", fields: [fromLocationId], references: [id])
+  toLocationId    String
+  toLocation      Location  @relation("TransfersTo", fields: [toLocationId], references: [id])
+  
+  // Status: PENDING, APPROVED, IN_TRANSIT, RECEIVED, DISCREPANCY, CANCELLED
+  status          String    @default("PENDING")
+  
+  // Reason/Notes
+  reason          String?   // "Stock Balance", "Emergency Request", etc.
+  notes           String?
+  
+  // Workflow tracking
+  requestedById   String
+  requestedByName String?
+  approvedById    String?
+  approvedByName  String?
+  shippedById     String?
+  shippedByName   String?
+  receivedById    String?
+  receivedByName  String?
+  
+  // Timestamps
+  requestedAt     DateTime  @default(now())
+  approvedAt      DateTime?
+  shippedAt       DateTime?
+  receivedAt      DateTime?
+  
+  // Value tracking
+  totalItems      Int       @default(0)
+  totalValue      Decimal   @default(0)
+  
+  // Items
+  items           TransferItem[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([fromLocationId])
+  @@index([toLocationId])
+  @@index([status])
+}
+
+model TransferItem {
+  id              String    @id @default(cuid())
+  transferId      String
+  transfer        InventoryTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  
+  // Product reference
+  itemId          String
+  item            Item      @relation(fields: [itemId], references: [id])
+  itemName        String    // Snapshot for history
+  itemSku         String?
+  itemBarcode     String?
+  
+  // Quantities
+  quantitySent    Int
+  quantityReceived Int?     // Null until received
+  
+  // Cost tracking
+  unitCost        Decimal   @default(0)
+  
+  // Discrepancy
+  discrepancyNote String?
+  
+  @@index([transferId])
+  @@index([itemId])
+}
+
+// Cash Drawer Count (shift open/close or mid-shift)
+model CashCount {
+  id              String    @id @default(cuid())
+  locationId      String
+  location        Location  @relation(fields: [locationId], references: [id])
+  
+  // Type: OPEN, MID_SHIFT, CLOSE
+  type            String
+  
+  // Employee
+  employeeId      String
+  employeeName    String?
+  
+  // Amounts
+  expectedCash    Decimal   @default(0)
+  countedCash     Decimal
+  variance        Decimal   @default(0) // countedCash - expectedCash
+  
+  // Denomination breakdown (JSON)
+  denominations   String?   // JSON: {"100": 2, "50": 1, "20": 5, ...}
+  
+  // Notes
+  note            String?
+  
+  // Approval (if variance is high)
+  approvedById    String?
+  approvedByName  String?
+  approvedAt      DateTime?
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([locationId])
+  @@index([employeeId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// Safe Drop (drawer to safe)
+model SafeDrop {
+  id              String    @id @default(cuid())
+  locationId      String
+  location        Location  @relation(fields: [locationId], references: [id])
+  
+  // Employee
+  employeeId      String
+  employeeName    String?
+  
+  // Amount
+  amount          Decimal
+  
+  // Verification (witnessed by manager)
+  witnessedById   String?
+  witnessedByName String?
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([locationId])
+  @@index([createdAt])
+}
+
+// Bank Deposit Log
+model DepositLog {
+  id              String    @id @default(cuid())
+  locationId      String
+  location        Location  @relation(fields: [locationId], references: [id])
+  
+  // Expected vs Actual
+  expectedAmount  Decimal
+  depositedAmount Decimal
+  variance        Decimal   @default(0)
+  
+  // Bank details
+  bankDate        DateTime
+  slipNumber      String?
+  slipImageUrl    String?
+  
+  // Status: PENDING, DEPOSITED, RECONCILED, DISCREPANCY
+  status          String    @default("PENDING")
+  
+  // Who logged/reconciled
+  loggedById      String?
+  loggedByName    String?
+  reconciledById  String?
+  reconciledByName String?
+  reconciledAt    DateTime?
+  
+  note            String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([locationId])
+  @@index([status])
+  @@index([bankDate])
+}
+
+// Audit Events (for Loss Prevention)
+model AuditEvent {
+  id              String    @id @default(cuid())
+  
+  // Where
+  locationId      String
+  location        Location  @relation(fields: [locationId], references: [id])
+  franchiseId     String
+  
+  // Who
+  employeeId      String?
+  employeeName    String?
+  
+  // What type: VOID, REFUND, PRICE_OVERRIDE, NO_SALE, LINE_DELETE, 
+  //            ID_OVERRIDE, RETURN_NO_RECEIPT, MANUAL_DISCOUNT, 
+  //            PRICE_CHANGE, COST_CHANGE, DRAWER_OPEN
+  eventType       String
+  
+  // Severity: LOW, MEDIUM, HIGH
+  severity        String    @default("LOW")
+  
+  // Details (JSON)
+  details         String?   // JSON with event-specific data
+  
+  // Financial impact
+  amount          Decimal?
+  
+  // Related transaction
+  transactionId   String?
+  
+  // Reviewed/Acknowledged
+  reviewedById    String?
+  reviewedByName  String?
+  reviewedAt      DateTime?
+  reviewNote      String?
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([locationId])
+  @@index([franchiseId])
+  @@index([employeeId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+// Store Exceptions (Aggregated alerts for owner dashboard)
+model StoreException {
+  id              String    @id @default(cuid())
+  
+  // Where
+  locationId      String
+  location        Location  @relation(fields: [locationId], references: [id])
+  franchiseId     String
+  
+  // Type: LOW_STOCK, CASH_VARIANCE, VOID_SPIKE, REFUND_SPIKE, 
+  //       DEPOSIT_OVERDUE, TRANSFER_DISCREPANCY, OFFLINE, DEVICE_ERROR
+  exceptionType   String
+  
+  // Severity: INFO, WARNING, CRITICAL
+  severity        String    @default("WARNING")
+  
+  // Title and details
+  title           String
+  description     String?
+  
+  // Status: ACTIVE, ACKNOWLEDGED, RESOLVED
+  status          String    @default("ACTIVE")
+  
+  // Actions taken
+  acknowledgedById String?
+  acknowledgedByName String?
+  acknowledgedAt  DateTime?
+  resolvedById    String?
+  resolvedByName  String?
+  resolvedAt      DateTime?
+  resolutionNote  String?
+  
+  // Related entity
+  relatedEntityType String?  // TRANSFER, DEPOSIT, EMPLOYEE, PRODUCT
+  relatedEntityId   String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([locationId])
+  @@index([franchiseId])
+  @@index([exceptionType])
+  @@index([severity])
+  @@index([status])
   @@index([createdAt])
 }
