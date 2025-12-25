@@ -311,6 +311,9 @@ model Franchise {
   onboardingLocations OnboardingRequestLocation[] @relation("OnboardingLocations")
   shipments           Shipment[]                  @relation("Shipments")
 
+  // Smart Ordering
+  orderTemplates OrderTemplate[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -1217,6 +1220,9 @@ model Product {
   // Location-specific overrides
   locationOverrides LocationItemOverride[]
 
+  // Order templates
+  orderTemplateItems OrderTemplateItem[]
+
   @@index([barcode])
   @@index([sku])
   @@index([categoryId])
@@ -1475,6 +1481,7 @@ model Supplier {
 
   products       ProductSupplier[]
   purchaseOrders PurchaseOrder[]
+  orderTemplates OrderTemplate[]
 
   createdAt DateTime @default(now())
 }
@@ -3785,3 +3792,41 @@ model OnboardingRequestEvent {
 
   @@index([onboardingRequestId, createdAt])
 }
+
+// ============ ORDER TEMPLATES (SMART ORDERING) ============
+// Saved order templates for one-click reordering
+
+model OrderTemplate {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+
+  name        String              // "Weekly Beverage Order", "Monthly Tobacco"
+  supplierId  String?
+  supplier    Supplier?           @relation(fields: [supplierId], references: [id])
+  isDefault   Boolean             @default(false)
+  
+  // Usage tracking
+  usageCount  Int                 @default(0)
+  lastUsedAt  DateTime?
+
+  items       OrderTemplateItem[]
+
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([franchiseId])
+}
+
+model OrderTemplateItem {
+  id         String        @id @default(cuid())
+  templateId String
+  template   OrderTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  productId  String
+  product    Product       @relation(fields: [productId], references: [id])
+  defaultQty Int           @default(1)
+
+  @@index([templateId])
+}
+
