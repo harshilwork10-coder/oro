@@ -7,7 +7,7 @@ import Link from 'next/link'
 import {
     Gift, Plus, Trash2, Tag, Percent, DollarSign,
     Calendar, Clock, ShoppingBag, ChevronDown, ChevronUp,
-    Zap, ArrowLeft, Edit
+    Zap, ArrowLeft, Edit, FileUp
 } from 'lucide-react'
 import PromotionManagerModal from '@/components/modals/PromotionManagerModal'
 
@@ -143,13 +143,22 @@ export default function DealsPage() {
                                 </p>
                             </div>
                         </div>
-                        <button
-                            onClick={() => setShowModal(true)}
-                            className="px-6 py-3 bg-pink-600 hover:bg-pink-500 rounded-xl flex items-center gap-2 font-medium shadow-lg shadow-pink-600/20"
-                        >
-                            <Plus className="h-5 w-5" />
-                            Create Deal
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <Link
+                                href="/dashboard/deals/manufacturer"
+                                className="px-4 py-2.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-400 rounded-xl flex items-center gap-2 font-medium"
+                            >
+                                <FileUp className="h-4 w-4" />
+                                Import Buydowns
+                            </Link>
+                            <button
+                                onClick={() => setShowModal(true)}
+                                className="px-6 py-3 bg-pink-600 hover:bg-pink-500 rounded-xl flex items-center gap-2 font-medium shadow-lg shadow-pink-600/20"
+                            >
+                                <Plus className="h-5 w-5" />
+                                Create Deal
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -199,8 +208,8 @@ export default function DealsPage() {
                             key={f}
                             onClick={() => setFilter(f as any)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
-                                    ? 'bg-pink-600 text-white'
-                                    : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                ? 'bg-pink-600 text-white'
+                                : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
                                 }`}
                         >
                             {f.charAt(0).toUpperCase() + f.slice(1)}
