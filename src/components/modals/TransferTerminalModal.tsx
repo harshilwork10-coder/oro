@@ -106,7 +106,7 @@ export default function TransferTerminalModal({ isOpen, onClose, onSuccess, term
                                     setNewLicenseKey(e.target.value)
                                     setConfirmUnassign(false)
                                 }}
-                                placeholder="Enter license key (e.g. AURA-XXXX...)"
+                                placeholder="Enter license key (e.g. ORO-XXXX...)"
                                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                             />
                             <p className="text-xs text-stone-500 mt-1">Leave empty to unassign from current license.</p>

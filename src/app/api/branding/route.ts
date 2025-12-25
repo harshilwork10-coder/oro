@@ -11,7 +11,7 @@ export async function GET(req: Request) {
         const defaultBranding = {
             primary: '#9D7DD9',
             secondary: '#5B9FE3',
-            logoUrl: '/aura-logo-v2.png'
+            logoUrl: '/Oro-logo.png'
         }
 
         if (!session?.user) {
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
         return NextResponse.json({
             primary: '#9D7DD9',
             secondary: '#5B9FE3',
-            logoUrl: '/aura-logo-v2.png'
+            logoUrl: '/Oro-logo.png'
         })
     }
 }

@@ -759,7 +759,7 @@ function POSContent() {
                     </head>
                     <body>
                         <div class="header">
-                            <h2>AURA</h2>
+                            <h2>ORONEXT</h2>
                             <p>${new Date(transaction.createdAt).toLocaleString()}</p>
                             <p>Tx: ${transaction.id}</p>
                         </div>

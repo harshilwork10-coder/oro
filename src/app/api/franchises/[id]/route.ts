@@ -2,6 +2,52 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { encryptField, decryptField } from '@/lib/security'
+
+// Sensitive fields that need encryption
+const SENSITIVE_FIELDS = ['ssn', 'fein', 'routingNumber', 'accountNumber'] as const
+
+// Mask sensitive data for API responses
+function maskSensitiveField(value: string | null): string | null {
+    if (!value) return null
+    if (value.length <= 4) return '****'
+    return '****' + value.slice(-4)
+}
+
+// Decrypt and mask sensitive fields for safe API response
+function prepareFranchiseResponse(franchise: any) {
+    const result = { ...franchise }
+
+    for (const field of SENSITIVE_FIELDS) {
+        if (result[field]) {
+            try {
+                const decrypted = decryptField(result[field])
+                result[field] = maskSensitiveField(decrypted)
+            } catch {
+                // If decryption fails, it's probably unencrypted legacy data
+                result[field] = maskSensitiveField(result[field])
+            }
+        }
+    }
+
+    return result
+}
+
+// Encrypt sensitive fields before saving
+function encryptSensitiveFields(data: any) {
+    const result = { ...data }
+
+    for (const field of SENSITIVE_FIELDS) {
+        if (result[field] && !result[field].startsWith('****')) {
+            result[field] = encryptField(result[field])
+        } else if (result[field]?.startsWith('****')) {
+            // User didn't change this field, remove it from update
+            delete result[field]
+        }
+    }
+
+    return result
+}
 
 export async function GET(
     request: Request,
@@ -27,7 +73,8 @@ export async function GET(
             return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
         }
 
-        return NextResponse.json(franchise)
+        // Return with masked sensitive fields
+        return NextResponse.json(prepareFranchiseResponse(franchise))
     } catch (error) {
         console.error('Error fetching franchise:', error)
         return NextResponse.json({ error: 'Failed to fetch franchise' }, { status: 500 })
@@ -54,7 +101,7 @@ export async function PUT(
             data: { name }
         })
 
-        return NextResponse.json(franchise)
+        return NextResponse.json(prepareFranchiseResponse(franchise))
     } catch (error) {
         console.error('Error updating franchise:', error)
         return NextResponse.json({ error: 'Failed to update franchise' }, { status: 500 })
@@ -98,17 +145,20 @@ export async function PATCH(
         const { id } = await context.params
         const body = await request.json()
 
+        // Encrypt sensitive fields before saving
+        const encryptedData = encryptSensitiveFields({
+            ssn: body.ssn,
+            fein: body.fein,
+            routingNumber: body.routingNumber,
+            accountNumber: body.accountNumber,
+        })
+
         // Update allowed fields
         const updatedFranchise = await prisma.franchise.update({
             where: { id },
             data: {
                 name: body.name,
-                // businessType doesn't exist on Franchise, it's inferred or not used
-                // address is on Location usually, but Franchise has processing details
-                ssn: body.ssn,
-                fein: body.fein,
-                routingNumber: body.routingNumber,
-                accountNumber: body.accountNumber,
+                ...encryptedData,
                 voidCheckUrl: body.voidCheckUrl,
                 driverLicenseUrl: body.driverLicenseUrl,
                 feinLetterUrl: body.feinLetterUrl,
@@ -116,10 +166,11 @@ export async function PATCH(
             }
         })
 
-        return NextResponse.json(updatedFranchise)
+        return NextResponse.json(prepareFranchiseResponse(updatedFranchise))
 
     } catch (error) {
         console.error('Error updating franchise:', error)
         return NextResponse.json({ error: 'Failed to update franchise' }, { status: 500 })
     }
 }
+

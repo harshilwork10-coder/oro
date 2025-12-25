@@ -95,11 +95,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     const providerGroups: SidebarGroup[] = [
         {
-            name: 'Clients',
+            name: 'Accounts',
             icon: Building2,
             items: [
                 { name: 'My Clients', href: '/dashboard/franchisors', icon: Building2 },
                 { name: 'Merchant Applications', href: '/dashboard/merchant-applications', icon: FileText },
+                { name: 'Manufacturer Deals', href: '/dashboard/deals/manufacturer', icon: Percent },
+                { name: 'Import Inventory', href: '/dashboard/inventory/import', icon: ShoppingBag },
                 { name: 'Documents', href: '/dashboard/documents', icon: FileText },
                 { name: 'Feature Requests', href: '/dashboard/feature-requests', icon: Package },
             ]
@@ -117,17 +119,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             name: 'Settings',
             icon: Settings,
             items: [
+                { name: 'Security', href: '/dashboard/settings/security', icon: Shield },
                 { name: 'SMS Management', href: '/dashboard/provider/sms', icon: MessageSquare },
                 { name: 'Terminal Management', href: '/dashboard/terminals', icon: Monitor },
                 { name: 'Shipping', href: '/dashboard/shipping', icon: Truck },
-            ]
-        },
-        {
-            name: 'Onboarding Tools',
-            icon: Package,
-            items: [
-                { name: 'Import Inventory', href: '/dashboard/inventory/import', icon: ShoppingBag },
-                { name: 'Manufacturer Deals', href: '/dashboard/deals/manufacturer', icon: Percent },
             ]
         },
     ]
@@ -185,6 +180,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         // SERVICE only - resources (chairs, rooms)
         { name: 'Resources', href: '/dashboard/resources', icon: Armchair, feature: 'enableResources' as const, industry: ['SERVICE'] as const },
         { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones, always: true },
+        { name: 'Security', href: '/dashboard/settings/security', icon: Shield, always: true },
     ]
 
     // Filter based on config AND industryType
@@ -211,6 +207,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
         { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
         { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones },
+        { name: 'Security', href: '/dashboard/settings/security', icon: Shield },
     ]
 
     // MANAGER: Operations manager
@@ -224,6 +221,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
         { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText, always: true },
+        { name: 'Security', href: '/dashboard/settings/security', icon: Shield, always: true },
     ]
 
     const managerLinks = managerLinksBase.filter(link => {

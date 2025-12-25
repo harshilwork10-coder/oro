@@ -48,6 +48,8 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
     })
 
     const [showPassword, setShowPassword] = useState(false)
+    const [showSSN, setShowSSN] = useState(false)
+    const [showFEIN, setShowFEIN] = useState(false)
     const [acceptedTerms, setAcceptedTerms] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const validated = useRef(false)
@@ -240,7 +242,7 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
             <div className="w-full lg:w-1/2 flex flex-col justify-center p-6 lg:p-12 overflow-y-auto">
                 <div className="max-w-xl mx-auto w-full">
                     <div className="mb-8">
-                        <img src="/Oronex-logo.png" alt="Oronex" className="h-24 object-contain" />
+                        <img src="/Oro-logo.png" alt="OroNext" className="h-24 object-contain" />
                     </div>
 
                     <div className="mb-8">
@@ -359,11 +361,49 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">SSN</label>
-                                                <input name="ssn" value={formData.ssn} onChange={handleInputChange} className="w-full p-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-stone-900" placeholder="XXX-XX-XXXX" maxLength={9} />
+                                                <div className="relative">
+                                                    <input
+                                                        type={showSSN ? 'text' : 'password'}
+                                                        name="ssn"
+                                                        value={formData.ssn}
+                                                        onChange={handleInputChange}
+                                                        className="w-full p-3 pr-10 border border-stone-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-stone-900 font-mono"
+                                                        placeholder="•••••••••"
+                                                        maxLength={9}
+                                                        autoComplete="off"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowSSN(!showSSN)}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                                                    >
+                                                        {showSSN ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                    </button>
+                                                </div>
+                                                <p className="text-xs text-stone-400 mt-1">🔒 Encrypted</p>
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">FEIN</label>
-                                                <input name="fein" value={formData.fein} onChange={handleInputChange} className="w-full p-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-stone-900" placeholder="XX-XXXXXXX" maxLength={10} />
+                                                <div className="relative">
+                                                    <input
+                                                        type={showFEIN ? 'text' : 'password'}
+                                                        name="fein"
+                                                        value={formData.fein}
+                                                        onChange={handleInputChange}
+                                                        className="w-full p-3 pr-10 border border-stone-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-stone-900 font-mono"
+                                                        placeholder="••-•••••••"
+                                                        maxLength={10}
+                                                        autoComplete="off"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowFEIN(!showFEIN)}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                                                    >
+                                                        {showFEIN ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                    </button>
+                                                </div>
+                                                <p className="text-xs text-stone-400 mt-1">🔒 Encrypted</p>
                                             </div>
                                         </div>
 
@@ -385,9 +425,10 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
                                                             {formData[doc.id]?.uploaded && <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Uploaded</p>}
                                                         </div>
                                                     </div>
-                                                    <label className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 rounded-lg text-xs font-medium cursor-pointer transition-colors">
-                                                        Choose
-                                                        <input type="file" className="hidden" onChange={(e) => handleFileChange(e, doc.id)} />
+                                                    <label className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium cursor-pointer transition-colors flex items-center gap-2">
+                                                        <Upload className="h-4 w-4" />
+                                                        Upload
+                                                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleFileChange(e, doc.id)} />
                                                     </label>
                                                 </div>
                                             ))}

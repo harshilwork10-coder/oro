@@ -401,8 +401,7 @@ export async function DELETE(
         console.log('   ✓ Deleted locations and franchises')
 
         // 8. Delete Franchisor Level Data
-        await prisma.lead.deleteMany({ where: { franchisorId: id } })
-        await prisma.territory.deleteMany({ where: { franchisorId: id } })
+        // Lead and Territory models were removed from schema
         await prisma.globalService.deleteMany({ where: { franchisorId: id } })
         await prisma.globalProduct.deleteMany({ where: { franchisorId: id } })
         await prisma.royaltyConfig.deleteMany({ where: { franchisorId: id } })

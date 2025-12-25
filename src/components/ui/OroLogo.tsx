@@ -8,70 +8,46 @@ interface OroLogoProps {
 
 export default function OroLogo({ size = 'md', showText = true, className = '' }: OroLogoProps) {
     const sizes = {
-        sm: { icon: 32, text: 18, gap: 8 },
-        md: { icon: 48, text: 26, gap: 10 },
-        lg: { icon: 64, text: 34, gap: 12 },
-        xl: { icon: 80, text: 42, gap: 14 }
+        sm: { scale: 0.7 },
+        md: { scale: 0.9 },
+        lg: { scale: 1.2 },
+        xl: { scale: 1.6 }
     }
 
-    // Handle numeric size or predefined size
-    let icon: number, text: number, gap: number
-    if (typeof size === 'number') {
-        icon = size
-        text = Math.round(size * 0.5) // Slightly larger text for shorter word
-        gap = Math.round(size * 0.125)
-    } else {
-        const sizeConfig = sizes[size] || sizes.md
-        icon = sizeConfig.icon
-        text = sizeConfig.text
-        gap = sizeConfig.gap
-    }
-
-    const orange = '#F97316'
-    const lightGray = '#E5E7EB'
+    const scale = typeof size === 'number' ? size / 40 : sizes[size]?.scale || 0.9
 
     return (
-        <div className={`flex items-center ${className}`} style={{ gap }}>
-            {/* Icon - Ring with 2 orbiting circles */}
-            <svg
-                width={icon}
-                height={icon}
-                viewBox="0 0 100 100"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-            >
-                {/* Main thick ring */}
-                <circle
-                    cx="50"
-                    cy="50"
-                    r="32"
-                    stroke={orange}
-                    strokeWidth="10"
-                    fill="none"
-                />
-                {/* Circle 1 - Top left */}
-                <circle cx="22" cy="30" r="10" fill={orange} />
-                {/* Circle 2 - Bottom left */}
-                <circle cx="22" cy="70" r="10" fill={orange} />
-            </svg>
+        <div className={className} style={{ transform: `scale(${scale})`, transformOrigin: 'left center' }}>
+            <svg width="95" height="45" viewBox="0 0 95 45" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Gradients */}
+                <defs>
+                    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#FCD34D" />
+                        <stop offset="50%" stopColor="#F59E0B" />
+                        <stop offset="100%" stopColor="#EA580C" />
+                    </linearGradient>
+                    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#4ADE80" />
+                        <stop offset="100%" stopColor="#22C55E" />
+                    </linearGradient>
+                </defs>
 
-            {/* Wordmark - "Oro" */}
-            {showText && (
-                <span
-                    style={{
-                        fontSize: text,
-                        fontWeight: 600,
-                        fontFamily: "'Inter', 'Segoe UI', sans-serif",
-                        letterSpacing: '-0.02em'
-                    }}
-                >
-                    <span style={{ color: orange }}>O</span>
-                    <span style={{ color: lightGray }}>ro</span>
-                </span>
-            )}
+                {/* O - Orange ring */}
+                <circle cx="14" cy="16" r="11" stroke="url(#orangeGrad)" strokeWidth="5" fill="none" />
+
+                {/* R - White */}
+                <text x="28" y="27" fill="#FFFFFF" fontFamily="Arial Black, sans-serif" fontSize="28" fontWeight="900">R</text>
+
+                {/* O - Green ring */}
+                <circle cx="66" cy="16" r="11" stroke="url(#greenGrad)" strokeWidth="5" fill="none" />
+
+                {/* NEXT - Gray below, centered under the letters */}
+                {showText && (
+                    <text x="36" y="42" fill="#9CA3AF" fontFamily="Arial, sans-serif" fontSize="12" fontWeight="600" letterSpacing="2">NEXT</text>
+                )}
+            </svg>
         </div>
     )
 }
 
-// Keep backward compatibility - export with old name too
 export { OroLogo as OroLogo }

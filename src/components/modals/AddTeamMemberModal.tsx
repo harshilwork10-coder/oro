@@ -93,8 +93,8 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }: AddTe
                                 type="button"
                                 onClick={() => setFormData({ ...formData, role: role.id })}
                                 className={`w-full relative p-4 rounded-xl border-2 text-left transition-all duration-200 group ${formData.role === role.id
-                                        ? `border-${role.color}-500 bg-${role.color}-500/10`
-                                        : 'border-stone-800 bg-stone-900/30 hover:border-stone-700'
+                                    ? `border-${role.color}-500 bg-${role.color}-500/10`
+                                    : 'border-stone-800 bg-stone-900/30 hover:border-stone-700'
                                     }`}
                             >
                                 {formData.role === role.id && (
@@ -154,7 +154,7 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }: AddTe
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                     className="w-full pl-9 pr-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 placeholder-stone-600 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                                    placeholder="john@aura.com"
+                                    placeholder="john@oronex.com"
                                     required
                                 />
                             </div>

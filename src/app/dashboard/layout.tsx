@@ -7,6 +7,7 @@ import { Menu } from 'lucide-react'
 import Sidebar from "@/components/layout/Sidebar"
 import MobileHeader from "@/components/layout/MobileHeader"
 import SessionGuard from "@/components/security/SessionGuard"
+import AccountSelector from "@/components/layout/AccountSelector"
 
 export default function DashboardLayout({
     children,
@@ -28,6 +29,9 @@ export default function DashboardLayout({
     // Hide sidebar completely for: POS pages OR retail employees
     const hideSidebar = isPOS || isRetailEmployee
 
+    // Show account selector for Provider and Support Staff
+    const showAccountSelector = user?.role === 'PROVIDER' || user?.role === 'SUPPORT_STAFF'
+
     return (
         <SessionGuard>
             <div className="flex h-screen bg-stone-950 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-900/20 via-stone-950 to-stone-950 text-stone-100">
@@ -42,6 +46,13 @@ export default function DashboardLayout({
 
                     {/* MobileHeader - hide for POS pages and retail employees */}
                     {!hideSidebar && <MobileHeader onMenuClick={() => setSidebarOpen(true)} />}
+
+                    {/* Account Selector Bar - For Provider/Support to select which account to work on */}
+                    {showAccountSelector && !isPOS && (
+                        <div className="relative z-20 px-4 py-3 border-b border-stone-800/50 bg-stone-900/50 backdrop-blur-sm">
+                            <AccountSelector />
+                        </div>
+                    )}
 
                     {/* Floating Menu Button for Salon POS only - opens sidebar overlay */}
                     {pathname.startsWith('/dashboard/pos/salon') && (

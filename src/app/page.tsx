@@ -10,7 +10,7 @@ export default function Home() {
             <div className="h-8 w-8 rounded-lg bg-orange-600 flex items-center justify-center text-white">
               T
             </div>
-            <span>Oro</span>
+            <span>OroNext</span>
           </div>
           <nav className="flex gap-4 sm:gap-6">
             <Link className="text-sm font-medium hover:underline underline-offset-4" href="/login">
@@ -25,7 +25,7 @@ export default function Home() {
             <div className="flex flex-col items-center space-y-4 text-center">
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
-                  Manage Your Franchise Empire with <span className="text-orange-600">Oro</span>
+                  Manage Your Franchise Empire with <span className="text-orange-600">OroNext</span>
                 </h1>
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
                   The all-in-one POS and management solution for modern franchises.

@@ -693,7 +693,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
                 {/* Footer */}
                 <footer className="fixed bottom-0 left-0 right-0 py-4 text-center text-violet-400/40 text-xs bg-gradient-to-t from-[#0a0a0f] to-transparent">
-                    Powered by <span className="text-violet-400/60 font-medium">Oro</span>
+                    Powered by <span className="text-violet-400/60 font-medium">OroNext</span>
                 </footer>
             </div>
 

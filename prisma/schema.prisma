@@ -16,17 +16,65 @@ datasource db {
 // PaymentMethod: CASH, CREDIT_CARD, DEBIT_CARD, SPLIT, GIFT_CARD
 // AppointmentStatus: SCHEDULED, CONFIRMED, CHECKED_IN, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW
 
+// ============ PROVIDER (TOP-LEVEL TENANT) ============
+// This is THE single Oronex provider - the root of all hierarchy
+
+model Provider {
+  id       String  @id @default(cuid())
+  publicId String  @unique @default(cuid()) // External reference ID
+  name     String
+  isActive Boolean @default(true)
+
+  // Relations
+  users       User[]
+  franchisors Franchisor[]
+  smsConfig   ProviderSmsConfig? @relation(fields: [providerSmsConfigId], references: [id])
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  providerSmsConfigId String?
+  UserRoleAssignment  UserRoleAssignment[]
+}
+
+// ============ SCOPED ROLE ASSIGNMENT (NEW RBAC) ============
+// Exactly one scope must be set (provider, franchisor, franchise, or location)
+
+model UserRoleAssignment {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   String // UserRole enum value
+
+  // Exactly ONE of these must be set (checked at application level for SQLite)
+  providerId   String?
+  provider     Provider?   @relation(fields: [providerId], references: [id])
+  franchisorId String?
+  franchisor   Franchisor? @relation("RoleAssignments", fields: [franchisorId], references: [id])
+  franchiseId  String?
+  franchise    Franchise?  @relation("RoleAssignments", fields: [franchiseId], references: [id])
+  locationId   String?
+  location     Location?   @relation("RoleAssignments", fields: [locationId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([providerId])
+  @@index([franchisorId])
+  @@index([franchiseId])
+  @@index([locationId])
+}
+
 // ============ NORMALIZED PERMISSIONS (Replaces boolean columns) ============
 
 model Permission {
-  id          String @id @default(cuid())
-  name        String @unique // e.g., "ADD_SERVICES", "PROCESS_REFUNDS"
+  id          String  @id @default(cuid())
+  name        String  @unique // e.g., "ADD_SERVICES", "PROCESS_REFUNDS"
   description String?
   category    String? // "INVENTORY", "SALES", "EMPLOYEES", etc.
-  
+
   userPermissions UserPermission[]
   roleDefaults    RoleDefaultPermission[]
-  
+
   createdAt DateTime @default(now())
 }
 
@@ -37,31 +85,40 @@ model UserPermission {
   permissionId String
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   granted      Boolean    @default(true) // false = explicitly denied
-  
+
   @@unique([userId, permissionId])
 }
 
 model RoleDefaultPermission {
   id           String     @id @default(cuid())
-  role         String     // UserRole enum value as string for SQLite compatibility
+  role         String // UserRole enum value as string for SQLite compatibility
   permissionId String
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  
+
   @@unique([role, permissionId])
 }
 
 model User {
-  id       String  @id @default(cuid())
-  name     String?
-  email    String  @unique
-  password String? // Optional for passwordless/PIN users
-  pin      String? // Hashed 4-digit PIN for quick login
-  image    String?
-  dailyGoal Float @default(500)
-  role     String  @default("EMPLOYEE") // Will migrate to Enum in next step, keeping string for now to avoid breaking existing data immediately, but logic will use Enum values: FRANCHISOR, FRANCHISEE, MANAGER, SHIFT_SUPERVISOR, EMPLOYEE
+  id        String  @id @default(cuid())
+  name      String?
+  email     String  @unique
+  phone     String? // Mobile phone for SMS verification
+  password  String? // Optional for passwordless/PIN users
+  pin       String? // Hashed 4-digit PIN for quick login
+  image     String?
+  dailyGoal Float   @default(500)
+  role      String  @default("EMPLOYEE") // Legacy - use UserRoleAssignment for new RBAC
+  isActive  Boolean @default(true)
+
+  // Provider (Top-level tenant)
+  providerId String?
+  provider   Provider? @relation(fields: [providerId], references: [id])
+
+  // Scoped Role Assignments (New RBAC system)
+  roleAssignments UserRoleAssignment[]
 
   // Permissions - Now role-based with overrides
-  customPermissions String? // Stored as JSON string for SQLite compatibility if needed, or use Json type if supported. Prisma SQLite supports Json.
+  customPermissions String? // Stored as JSON string for SQLite compatibility
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -73,6 +130,12 @@ model User {
   // Security: Account Lockout
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
+
+  // Security: Multi-Factor Authentication (MFA)
+  mfaEnabled     Boolean   @default(false)
+  mfaSecret      String? // Encrypted TOTP secret
+  mfaBackupCodes String? // Encrypted backup codes JSON
+  mfaSetupAt     DateTime? // When MFA was enabled
 
   // Employee Permissions (configurable by franchise owner)
   canAddServices     Boolean @default(false) // Can create/edit services
@@ -87,16 +150,16 @@ model User {
   canManageShifts Boolean @default(false) // Can open/close cash drawer shifts
   canClockIn      Boolean @default(true) // Can clock in for work
   canClockOut     Boolean @default(true) // Can clock out from work
-  
+
   // Mobile Features (Paid Per-Seat Licenses)
-  hasPulseAccess  Boolean @default(false) // Oro Pulse mobile dashboard access
+  hasPulseAccess Boolean @default(false) // Oro Pulse mobile dashboard access
 
   // Relations
   franchiseId String?
   franchise   Franchise? @relation(fields: [franchiseId], references: [id])
   locationId  String?
   location    Location?  @relation(fields: [locationId], references: [id])
-  
+
   // Assigned POS Station (Provider sets this before shipping)
   assignedStationId String?
   assignedStation   Station? @relation("AssignedEmployee", fields: [assignedStationId], references: [id])
@@ -107,8 +170,8 @@ model User {
   schedules    Schedule[]
 
   // Franchisee Ownership - locations this user owns/operates as a franchisee
-  ownedLocations     Location[]         @relation("LocationOwner")
-  expansionRequests  ExpansionRequest[] @relation("FranchiseeRequests")
+  ownedLocations    Location[]         @relation("LocationOwner")
+  expansionRequests ExpansionRequest[] @relation("FranchiseeRequests")
 
   // Community
   posts                 Post[]
@@ -125,37 +188,50 @@ model User {
   commissionRuleId   String?
   commissionRule     CommissionRule?     @relation(fields: [commissionRuleId], references: [id])
   cashDrawerSessions CashDrawerSession[]
-  drawerActivities   DrawerActivity[]    // Fraud prevention - all drawer opens logged
+  drawerActivities   DrawerActivity[] // Fraud prevention - all drawer opens logged
   // Global Catalog (Centralized Management)
   globalServices     GlobalService[]
   globalProducts     GlobalProduct[]
-  
+
   // Advanced Commission System Relations (Optional - backward compatible)
-  paymentConfig      EmployeePaymentConfig? @relation("EmployeePaymentConfig")
-  commissionTiers    CommissionTier[]       @relation("EmployeeCommissionTiers")
-  serviceOverrides   ServiceCommissionOverride[] @relation("EmployeeServiceOverrides")
-  payrollEntries     PayrollEntry[]         @relation("EmployeePayrollEntries")
-  
+  paymentConfig    EmployeePaymentConfig?      @relation("EmployeePaymentConfig")
+  commissionTiers  CommissionTier[]            @relation("EmployeeCommissionTiers")
+  serviceOverrides ServiceCommissionOverride[] @relation("EmployeeServiceOverrides")
+  payrollEntries   PayrollEntry[]              @relation("EmployeePayrollEntries")
+
   // Chat Support Relations
-  assignedChats      ChatConversation[]     @relation("AssignedChats")
-  sentChatMessages   ChatMessage[]          @relation("SentChatMessages")
-  
+  assignedChats    ChatConversation[] @relation("AssignedChats")
+  sentChatMessages ChatMessage[]      @relation("SentChatMessages")
+
   // Live Support Chats
-  supportChats       SupportChat[]
+  supportChats         SupportChat[]
   assignedSupportChats SupportChat[] @relation("AssignedChats")
-  
+
   // Normalized Permissions (new system - replaces boolean columns)
-  permissions        UserPermission[]
-  
+  permissions UserPermission[]
+
   // Pulse Device Tokens (for quick mobile login)
-  pulseDeviceTokens  PulseDeviceToken[]
+  pulseDeviceTokens PulseDeviceToken[]
+
+  // OPS: Ticket System
+  createdTickets  Ticket[]        @relation("TicketCreator")
+  assignedTickets Ticket[]        @relation("TicketAssignee")
+  ticketMessages  TicketMessage[] @relation("TicketMessageAuthor")
+
+  // Onboarding/Shipping Relations
+  createdOnboardingRequests  OnboardingRequest[]         @relation("CreatedOnboardingRequests")
+  assignedOnboardingRequests OnboardingRequest[]         @relation("AssignedOnboardingRequests")
+  uploadedOnboardingDocs     OnboardingRequestDocument[] @relation("UploadedOnboardingDocs")
+  verifiedOnboardingDocs     OnboardingRequestDocument[] @relation("VerifiedOnboardingDocs")
+  createdShipments           Shipment[]                  @relation("CreatedShipments")
+  onboardingEventActors      OnboardingRequestEvent[]    @relation("OnboardingEventActor")
 }
 
 model Franchise {
-  id           String     @id @default(cuid())
-  name         String
-  slug         String     @unique // e.g. "aura-salon"
-  
+  id   String @id @default(cuid())
+  name String
+  slug String @unique // e.g. "aura-salon"
+
   approvalStatus String @default("PENDING") // PENDING, APPROVED, REJECTED
 
   // Processing Details
@@ -163,7 +239,7 @@ model Franchise {
   fein          String?
   routingNumber String?
   accountNumber String?
-  
+
   // Documents
   voidCheckUrl     String?
   driverLicenseUrl String?
@@ -179,8 +255,8 @@ model Franchise {
   services          Service[]
   serviceCategories ServiceCategory[]
   products          Product[]
-  productCategories ProductCategory[]  // Retail product categories with age restrictions
-  departments       Department[]       // Top-level departments for large stores
+  productCategories ProductCategory[] // Retail product categories with age restrictions
+  departments       Department[] // Top-level departments for large stores
   transactions      Transaction[]
 
   royaltyRecords    RoyaltyRecord[]
@@ -192,32 +268,48 @@ model Franchise {
   loyaltyProgram    LoyaltyProgram?
   giftCards         GiftCard[]
   discounts         Discount[]
-  promotions        Promotion[]    // Advanced promotions (Mix&Match, BOGO, etc.)
+  promotions        Promotion[] // Advanced promotions (Mix&Match, BOGO, etc.)
   clients           Client[]
   reviews           Review[]
   expansionRequests ExpansionRequest[] // Expansion requests from franchisees
   chatConversations ChatConversation[] // Customer support chats
 
-  settings FranchiseSettings?
-  reminderSettings ReminderSettings?
-  smsCredits       SmsCredits?
+  settings          FranchiseSettings?
+  reminderSettings  ReminderSettings?
+  smsCredits        SmsCredits?
   smsMarketingRules SmsMarketingRule[]
   customerPromos    CustomerPromo[]
   servicePackages   ServicePackage[]
-  
+
   // Lottery & Tobacco
-  lotteryGames         LotteryGame[]
-  lotteryTransactions  LotteryTransaction[]
-  tobaccoSubmissions   TobaccoScanSubmission[]
-  tobaccoDeals         TobaccoDeal[]
-  manufacturerConfigs  ManufacturerConfig[]
-  
+  lotteryGames        LotteryGame[]
+  lotteryTransactions LotteryTransaction[]
+  tobaccoSubmissions  TobaccoScanSubmission[]
+  tobaccoDeals        TobaccoDeal[]
+  manufacturerConfigs ManufacturerConfig[]
+
   // Tax Configuration
-  taxJurisdictions     TaxJurisdiction[]
-  
+  taxJurisdictions TaxJurisdiction[]
+
   // Unified Item System (new universal models)
-  items                Item[]
-  unifiedCategories    UnifiedCategory[]
+  items             Item[]
+  unifiedCategories UnifiedCategory[]
+
+  // Scoped Role Assignments
+  roleAssignments UserRoleAssignment[] @relation("RoleAssignments")
+
+  // Documents (Onboarding)
+  documents Document[]
+
+  // Location-specific data (back-relations)
+  locationItemOverrides LocationItemOverride[]
+  stockOnHand           StockOnHand[]
+  tickets               Ticket[]
+
+  // Onboarding/Shipping Relations
+  onboardingRequests  OnboardingRequest[]         @relation("OnboardingRequests")
+  onboardingLocations OnboardingRequestLocation[] @relation("OnboardingLocations")
+  shipments           Shipment[]                  @relation("Shipments")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -238,14 +330,14 @@ model FranchiseSettings {
   showDualPricing Boolean @default(true) // Show both cash/card prices
 
   // Service Industry Feature Toggles
-  enablePackages         Boolean @default(true)   // Service packages/bundles
-  enableResources        Boolean @default(false)  // Rooms/chairs scheduling (off by default for simpler operations)
-  enableClientPhotos     Boolean @default(false)  // Before/after photos (off - privacy concern)
-  enableRecurringBooking Boolean @default(true)   // Recurring appointments
+  enablePackages         Boolean @default(true) // Service packages/bundles
+  enableResources        Boolean @default(false) // Rooms/chairs scheduling (off by default for simpler operations)
+  enableClientPhotos     Boolean @default(false) // Before/after photos (off - privacy concern)
+  enableRecurringBooking Boolean @default(true) // Recurring appointments
 
   // Promotion Stacking Rules
-  promoStackingMode     String  @default("BEST_ONLY") // BEST_ONLY, STACK_ALL, STACK_WITH_CAP
-  maxDiscountPercent    Decimal @default(50) // Max discount cap (50% default)
+  promoStackingMode  String  @default("BEST_ONLY") // BEST_ONLY, STACK_ALL, STACK_WITH_CAP
+  maxDiscountPercent Decimal @default(50) // Max discount cap (50% default)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -253,36 +345,36 @@ model FranchiseSettings {
 
 // Reminder settings for automated appointment notifications
 model ReminderSettings {
-  id              String    @id @default(cuid())
-  franchiseId     String    @unique
-  franchise       Franchise @relation(fields: [franchiseId], references: [id])
+  id          String    @id @default(cuid())
+  franchiseId String    @unique
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
 
   // Email Settings
-  emailEnabled         Boolean @default(true)
-  confirmationEmail    Boolean @default(true)  // Send confirmation on booking
-  reminder24hEmail     Boolean @default(true)  // 24 hour reminder
-  reminder2hEmail      Boolean @default(true)  // 2 hour reminder
+  emailEnabled      Boolean @default(true)
+  confirmationEmail Boolean @default(true) // Send confirmation on booking
+  reminder24hEmail  Boolean @default(true) // 24 hour reminder
+  reminder2hEmail   Boolean @default(true) // 2 hour reminder
 
   // SMS Settings - franchise-level toggles (uses provider's Twilio)
-  smsEnabled           Boolean @default(false)
-  smsApproved          Boolean @default(false) // Provider must approve SMS access
-  smsRequestedAt       DateTime?               // When franchise requested SMS access
-  confirmationSms      Boolean @default(false)
-  reminder24hSms       Boolean @default(false)
-  reminder2hSms        Boolean @default(false)
-  approvalSms          Boolean @default(true)  // Send SMS when booking approved
-  cancellationSms      Boolean @default(true)  // Send SMS when booking cancelled
-  waitlistSms          Boolean @default(true)  // Send SMS when waitlist turn
+  smsEnabled      Boolean   @default(false)
+  smsApproved     Boolean   @default(false) // Provider must approve SMS access
+  smsRequestedAt  DateTime? // When franchise requested SMS access
+  confirmationSms Boolean   @default(false)
+  reminder24hSms  Boolean   @default(false)
+  reminder2hSms   Boolean   @default(false)
+  approvalSms     Boolean   @default(true) // Send SMS when booking approved
+  cancellationSms Boolean   @default(true) // Send SMS when booking cancelled
+  waitlistSms     Boolean   @default(true) // Send SMS when waitlist turn
 
   // Legacy franchise-level Twilio (deprecated - use provider-level)
-  twilioAccountSid     String?
-  twilioAuthToken      String?
-  twilioPhoneNumber    String?
+  twilioAccountSid  String?
+  twilioAuthToken   String?
+  twilioPhoneNumber String?
 
   // Custom Message Templates
-  emailSubject         String  @default("Appointment Reminder")
-  emailTemplate        String? // Custom HTML template
-  smsTemplate          String? // Custom SMS text
+  emailSubject  String  @default("Appointment Reminder")
+  emailTemplate String? // Custom HTML template
+  smsTemplate   String? // Custom SMS text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -291,31 +383,32 @@ model ReminderSettings {
 // Provider-level SMS/Twilio configuration
 // Set once by provider, used by all franchises with approved SMS access
 model ProviderSmsConfig {
-  id                   String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // SMS Packages pricing (what you sell to franchises)
   // Package 1
-  package1Name         String   @default("Starter")
-  package1Credits      Int      @default(100)
-  package1Price        Decimal  @default(4.99)
-  
+  package1Name    String  @default("Starter")
+  package1Credits Int     @default(100)
+  package1Price   Decimal @default(4.99)
+
   // Package 2
-  package2Name         String   @default("Growth")
-  package2Credits      Int      @default(200)
-  package2Price        Decimal  @default(8.99)
-  
+  package2Name    String  @default("Growth")
+  package2Credits Int     @default(200)
+  package2Price   Decimal @default(8.99)
+
   // Package 3
-  package3Name         String   @default("Business")
-  package3Credits      Int      @default(500)
-  package3Price        Decimal  @default(19.99)
-  
+  package3Name    String  @default("Business")
+  package3Credits Int     @default(500)
+  package3Price   Decimal @default(19.99)
+
   // Package 4
-  package4Name         String   @default("Enterprise")
-  package4Credits      Int      @default(1000)
-  package4Price        Decimal  @default(34.99)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  package4Name    String  @default("Enterprise")
+  package4Credits Int     @default(1000)
+  package4Price   Decimal @default(34.99)
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  Provider  Provider[]
 }
 
 // Track SMS credits and usage per franchise
@@ -323,27 +416,27 @@ model SmsCredits {
   id          String    @id @default(cuid())
   franchiseId String    @unique
   franchise   Franchise @relation(fields: [franchiseId], references: [id])
-  
-  creditsRemaining Int      @default(0)  // Current SMS credits
-  creditsUsed      Int      @default(0)  // Total SMS sent
-  lastTopupAt      DateTime?             // Last time credits were added
-  lastPackage      String?               // Last package purchased
-  
+
+  creditsRemaining Int       @default(0) // Current SMS credits
+  creditsUsed      Int       @default(0) // Total SMS sent
+  lastTopupAt      DateTime? // Last time credits were added
+  lastPackage      String? // Last package purchased
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 // Log each SMS sent for tracking
 model SmsLog {
-  id          String   @id @default(cuid())
+  id          String @id @default(cuid())
   franchiseId String
-  
-  toPhone     String
-  message     String
-  status      String   @default("sent") // sent, failed, pending
-  twilioSid   String?  // Twilio message SID
-  errorMsg    String?
-  
+
+  toPhone   String
+  message   String
+  status    String  @default("sent") // sent, failed, pending
+  twilioSid String? // Twilio message SID
+  errorMsg  String?
+
   createdAt DateTime @default(now())
 }
 
@@ -352,49 +445,49 @@ model SmsMarketingRule {
   id          String    @id @default(cuid())
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id])
-  
-  name        String               // "Win-Back", "Birthday", "VIP Reward"
-  ruleType    String               // WIN_BACK, BIRTHDAY, VIP, REVIEW_REQUEST, CUSTOM
-  isActive    Boolean   @default(true)
-  
+
+  name     String // "Win-Back", "Birthday", "VIP Reward"
+  ruleType String // WIN_BACK, BIRTHDAY, VIP, REVIEW_REQUEST, CUSTOM
+  isActive Boolean @default(true)
+
   // ===== CUSTOMER FILTERS =====
   // Time-based filters
-  daysInactive    Int?      @default(28)  // Days since last visit
-  daysInactiveMax Int?                     // Max days inactive (e.g., 28-60 days only)
-  
+  daysInactive    Int? @default(28) // Days since last visit
+  daysInactiveMax Int? // Max days inactive (e.g., 28-60 days only)
+
   // Spending filters
-  minSpendTotal   Decimal?               // Minimum lifetime spend
-  maxSpendTotal   Decimal?               // Maximum lifetime spend
-  minSpendPerVisit Decimal?              // Avg spend per visit minimum
-  
+  minSpendTotal    Decimal? // Minimum lifetime spend
+  maxSpendTotal    Decimal? // Maximum lifetime spend
+  minSpendPerVisit Decimal? // Avg spend per visit minimum
+
   // Visit count filters
-  minVisitCount   Int?                   // Min number of visits
-  maxVisitCount   Int?                   // Max visits (target new customers)
-  
+  minVisitCount Int? // Min number of visits
+  maxVisitCount Int? // Max visits (target new customers)
+
   // Service filters
-  lastServiceId   String?               // Only customers who got this service last
-  anyServiceId    String?               // Customers who ever got this service
-  
+  lastServiceId String? // Only customers who got this service last
+  anyServiceId  String? // Customers who ever got this service
+
   // Contact filters
-  hasPhone        Boolean  @default(true)  // Must have phone (required for SMS)
-  hasEmail        Boolean  @default(false) // Must have email
-  
+  hasPhone Boolean @default(true) // Must have phone (required for SMS)
+  hasEmail Boolean @default(false) // Must have email
+
   // ===== REWARD SETTINGS =====
-  discountType    String    @default("PERCENTAGE") // PERCENTAGE, FIXED_AMOUNT
-  discountValue   Decimal   @default(10)           // 10 = 10% or $10
-  validityDays    Int       @default(7)            // Promo expires after X days
-  
+  discountType  String  @default("PERCENTAGE") // PERCENTAGE, FIXED_AMOUNT
+  discountValue Decimal @default(10) // 10 = 10% or $10
+  validityDays  Int     @default(7) // Promo expires after X days
+
   // Message template
-  messageTemplate String?   // Custom SMS template, uses {firstName}, {discount}, {expiry}
-  
+  messageTemplate String? // Custom SMS template, uses {firstName}, {discount}, {expiry}
+
   // ===== LIMITS =====
-  maxSendsPerDay  Int?                   // Limit daily sends (cost control)
-  maxSendsTotal   Int?                   // Total limit for this rule
-  
+  maxSendsPerDay Int? // Limit daily sends (cost control)
+  maxSendsTotal  Int? // Total limit for this rule
+
   // Stats
-  sentCount       Int       @default(0)
-  redeemedCount   Int       @default(0)
-  
+  sentCount     Int @default(0)
+  redeemedCount Int @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -406,22 +499,22 @@ model CustomerPromo {
   franchise   Franchise @relation(fields: [franchiseId], references: [id])
   clientId    String
   client      Client    @relation(fields: [clientId], references: [id])
-  
-  ruleType    String               // What triggered this: WIN_BACK, BIRTHDAY, etc.
-  ruleName    String               // Display name: "Win-Back 10% Off"
-  
+
+  ruleType String // What triggered this: WIN_BACK, BIRTHDAY, etc.
+  ruleName String // Display name: "Win-Back 10% Off"
+
   // Discount details
-  discountType    String           // PERCENTAGE, FIXED_AMOUNT
-  discountValue   Decimal          // 10 = 10% or $10
-  
+  discountType  String // PERCENTAGE, FIXED_AMOUNT
+  discountValue Decimal // 10 = 10% or $10
+
   // Status
-  status      String    @default("ACTIVE") // ACTIVE, REDEEMED, EXPIRED
-  expiresAt   DateTime
-  redeemedAt  DateTime?
-  
+  status     String    @default("ACTIVE") // ACTIVE, REDEEMED, EXPIRED
+  expiresAt  DateTime
+  redeemedAt DateTime?
+
   // Exclusions
   excludeFromLoyalty Boolean @default(true) // Discounted portion doesn't earn points
-  
+
   createdAt DateTime @default(now())
 }
 
@@ -434,11 +527,11 @@ model Location {
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   // Location-specific documents (bank verification per location)
-  voidCheckUrl String?   // Each location may have different bank account
+  voidCheckUrl String? // Each location may have different bank account
 
   // Franchisee who owns/operates this location (for BRAND_FRANCHISOR model)
-  ownerId     String?
-  owner       User?     @relation("LocationOwner", fields: [ownerId], references: [id])
+  ownerId String?
+  owner   User?   @relation("LocationOwner", fields: [ownerId], references: [id])
 
   users              User[]
   terminals          Terminal[]
@@ -448,9 +541,9 @@ model Location {
   cashDrawerSessions CashDrawerSession[]
   appointments       Appointment[]
   schedules          Schedule[]
-  drawerActivities   DrawerActivity[]    // Fraud prevention audit trail
-  stations           Station[]           // POS stations/registers
-  paymentTerminals   PaymentTerminal[]   // Card terminals at this location
+  drawerActivities   DrawerActivity[] // Fraud prevention audit trail
+  stations           Station[] // POS stations/registers
+  paymentTerminals   PaymentTerminal[] // Card terminals at this location
 
   // Payment Processor Configuration
   processorName   String? // e.g., "DATAWIRE", "TSYS", "VANTIV", "WORLDPAY", "FIRST_DATA"
@@ -463,32 +556,55 @@ model Location {
   waitlistEntries WaitlistEntry[] // Walk-in queue
 
   // Google Reviews Integration
-  googlePlaceId     String? // Google Place ID for review links
+  googlePlaceId String? // Google Place ID for review links
 
   // New Relations
-  resources            Resource[]
+  resources             Resource[]
   recurringAppointments RecurringAppointment[]
-  checkIns             CheckIn[]
-  
+  checkIns              CheckIn[]
+
   // Lottery & Tobacco
-  lotteryPacks         LotteryPack[]
-  lotteryTransactions  LotteryTransaction[]
-  tobaccoSubmissions   TobaccoScanSubmission[]
-  
+  lotteryPacks        LotteryPack[]
+  lotteryTransactions LotteryTransaction[]
+  tobaccoSubmissions  TobaccoScanSubmission[]
+
   // Tax Jurisdictions (sales tax + excise taxes applicable to this location)
-  taxJurisdictions     LocationTaxJurisdiction[]
-  
+  taxJurisdictions LocationTaxJurisdiction[]
+
   // Pulse Quick Login Store Code (e.g., "DOWNTOWN", "MAIN")
-  pulseStoreCode       String?   @unique
-  
+  pulseStoreCode String? @unique
+
   // Multi-Store Operations
-  transfersFrom        InventoryTransfer[]  @relation("TransfersFrom")
-  transfersTo          InventoryTransfer[]  @relation("TransfersTo")
-  cashCounts           CashCount[]
-  safeDrops            SafeDrop[]
-  depositLogs          DepositLog[]
-  auditEvents          AuditEvent[]
-  storeExceptions      StoreException[]
+  transfersFrom   InventoryTransfer[] @relation("TransfersFrom")
+  transfersTo     InventoryTransfer[] @relation("TransfersTo")
+  cashCounts      CashCount[]
+  safeDrops       SafeDrop[]
+  depositLogs     DepositLog[]
+  auditEvents     AuditEvent[]
+  storeExceptions StoreException[]
+
+  // Scoped Role Assignments
+  roleAssignments UserRoleAssignment[] @relation("RoleAssignments")
+
+  // Location Payment Profile (MID/TID per location) - NEW
+  paymentProfiles LocationPaymentProfile[]
+
+  // Location Item Overrides (price/availability per store) - CRITICAL NEW
+  itemOverrides LocationItemOverride[]
+
+  // Stock On Hand (inventory per location) - CRITICAL NEW
+  stockOnHand StockOnHand[]
+
+  // OPS Support System - NEW
+  clientCard      ClientCard?
+  tickets         Ticket[]
+  incidentImpacts IncidentImpact[]
+  documents       Document[]
+
+  // Onboarding/Shipping Relations
+  onboardingLocations OnboardingRequestLocation[] @relation("OnboardingLocations")
+  onboardingDevices   OnboardingRequestDevice[]   @relation("OnboardingDevices")
+  shipments           Shipment[]                  @relation("Shipments")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -498,31 +614,31 @@ model Location {
 
 // Pulse Device Token - Links a mobile device to a user for quick login
 model PulseDeviceToken {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Device identification
-  deviceId    String    // UUID generated by the device
-  deviceName  String?   // "iPhone 15", "Galaxy S24" (optional, for display)
-  platform    String?   // "ios", "android", "web"
-  
+  deviceId   String // UUID generated by the device
+  deviceName String? // "iPhone 15", "Galaxy S24" (optional, for display)
+  platform   String? // "ios", "android", "web"
+
   // Security
-  tokenHash   String    // Hashed token stored for verification
-  lastUsed    DateTime  @default(now())
-  lastIP      String?   // Last IP address used
-  
+  tokenHash String // Hashed token stored for verification
+  lastUsed  DateTime @default(now())
+  lastIP    String? // Last IP address used
+
   // Status
-  isRevoked   Boolean   @default(false)
-  revokedAt   DateTime?
+  isRevoked     Boolean   @default(false)
+  revokedAt     DateTime?
   revokedReason String?
-  
+
   // Failed attempts (lockout protection)
-  failedAttempts Int    @default(0)
+  failedAttempts Int       @default(0)
   lockedUntil    DateTime?
-  
-  createdAt   DateTime  @default(now())
-  
+
+  createdAt DateTime @default(now())
+
   @@unique([userId, deviceId])
   @@index([deviceId])
   @@index([userId])
@@ -530,77 +646,77 @@ model PulseDeviceToken {
 
 // POS Station/Register - Each location can have multiple stations
 model Station {
-  id          String   @id @default(cuid())
-  locationId  String
-  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  
-  name        String   // "Register 1", "Register 2", etc.
-  isActive    Boolean  @default(true)
-  
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  name     String // "Register 1", "Register 2", etc.
+  isActive Boolean @default(true)
+
   // Payment capability: DEDICATED (has terminal) or CASH_ONLY
-  paymentMode String  @default("CASH_ONLY") // DEDICATED, CASH_ONLY
-  
+  paymentMode String @default("CASH_ONLY") // DEDICATED, CASH_ONLY
+
   // Dedicated terminal assignment (1:1 mapping)
-  dedicatedTerminalId String?  @unique
+  dedicatedTerminalId String?          @unique
   dedicatedTerminal   PaymentTerminal? @relation(fields: [dedicatedTerminalId], references: [id])
-  
+
   // Pairing code for device-station assignment (e.g., "REG1", "REG2")
-  pairingCode    String?  @unique
-  
+  pairingCode String? @unique
+
   // Currently logged-in employee (for shift tracking)
-  currentUserId  String?
-  
+  currentUserId String?
+
   // Employees assigned to this station by Provider
   assignedEmployees User[] @relation("AssignedEmployee")
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([locationId])
 }
 
 // Payment Terminal (PAX, Clover, etc.) - 1 terminal per station (dedicated)
 model PaymentTerminal {
-  id          String   @id @default(cuid())
-  locationId  String
-  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  
-  name        String   // "Terminal 1", "Counter Left"
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  name         String // "Terminal 1", "Counter Left"
   terminalType String  @default("PAX") // PAX, CLOVER, STRIPE_READER
-  terminalIP  String   // "192.168.1.101"
+  terminalIP   String // "192.168.1.101"
   terminalPort String  @default("10009")
-  isActive    Boolean  @default(true)
-  
+  isActive     Boolean @default(true)
+
   // Which station owns this terminal
   assignedStation Station?
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([locationId])
 }
 
 // Expansion Request - Franchisee requesting new location from Brand Franchisor
 model ExpansionRequest {
-  id            String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // The franchisee making the request
-  franchiseeId  String
-  franchisee    User     @relation("FranchiseeRequests", fields: [franchiseeId], references: [id])
-  
+  franchiseeId String
+  franchisee   User   @relation("FranchiseeRequests", fields: [franchiseeId], references: [id])
+
   // The franchise brand they want to expand (which Brand Franchisor owns)
-  franchiseId   String
-  franchise     Franchise @relation(fields: [franchiseId], references: [id])
-  
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+
   // Request details
-  proposedName     String   // e.g., "McDonald's Austin"
-  proposedAddress  String
-  notes            String?  // Additional info from franchisee
-  
+  proposedName    String // e.g., "McDonald's Austin"
+  proposedAddress String
+  notes           String? // Additional info from franchisee
+
   // Status
-  status           String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  responseNotes    String?  // Franchisor's response
-  
+  status        String  @default("PENDING") // PENDING, APPROVED, REJECTED
+  responseNotes String? // Franchisor's response
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -655,34 +771,34 @@ model GlobalProduct {
 // Future lookups check here FIRST before hitting external APIs
 
 model SharedUPCProduct {
-  id          String @id @default(cuid())
-  barcode     String @unique // UPC/EAN barcode - must be unique
-  
+  id      String @id @default(cuid())
+  barcode String @unique // UPC/EAN barcode - must be unique
+
   // Product Info (crowdsourced from merchants)
   name        String
   brand       String?
   category    String?
   description String?
-  size        String?  // e.g., "12 oz", "2 Liter"
+  size        String? // e.g., "12 oz", "2 Liter"
   imageUrl    String?
-  
+
   // Pricing reference (average suggested price)
-  avgPrice    Decimal?
-  
+  avgPrice Decimal?
+
   // Trust/quality tracking
-  contributorCount Int @default(1) // How many merchants have confirmed this data
+  contributorCount Int      @default(1) // How many merchants have confirmed this data
   lastVerifiedAt   DateTime @default(now())
-  
+
   // Source tracking
   originalSource String? // "open_food_facts", "upc_itemdb", "merchant"
-  
+
   // Who contributed (first contributor)
   contributedByUserId      String?
   contributedByFranchiseId String?
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([barcode])
   @@index([name])
   @@index([category])
@@ -696,28 +812,28 @@ model UnifiedCategory {
   id          String    @id @default(cuid())
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
-  
+
   name        String
   description String?
-  color       String?   // Hex color for POS display
-  icon        String?   // Icon name or emoji
-  sortOrder   Int       @default(0)
-  isActive    Boolean   @default(true)
-  
+  color       String? // Hex color for POS display
+  icon        String? // Icon name or emoji
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
+
   // Type for filtering - allows same hierarchy for all business types
-  type        String    @default("GENERAL") // DEPARTMENT, SERVICE, PRODUCT, MENU, GENERAL
-  
+  type String @default("GENERAL") // DEPARTMENT, SERVICE, PRODUCT, MENU, GENERAL
+
   // Self-referencing for hierarchy (Department > Category > Subcategory)
-  parentId    String?
-  parent      UnifiedCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children    UnifiedCategory[] @relation("CategoryHierarchy")
-  
+  parentId String?
+  parent   UnifiedCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children UnifiedCategory[] @relation("CategoryHierarchy")
+
   // Items in this category
-  items       Item[]
-  
+  items Item[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([franchiseId])
   @@index([type])
   @@index([parentId])
@@ -727,69 +843,73 @@ model Item {
   id          String    @id @default(cuid())
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
-  
+
   // === UNIVERSAL FIELDS (All item types) ===
   name        String
   description String?
   price       Decimal
-  isActive    Boolean   @default(true)
-  sortOrder   Int       @default(0)
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
   imageUrl    String?
-  
+
   // Type determines which optional fields apply
   // SERVICE = Salon services, spa treatments
   // PRODUCT = Retail products, inventory items
   // MENU_ITEM = Restaurant food/drinks
   // PACKAGE = Bundle of items/services
-  type        String    @default("PRODUCT") // SERVICE, PRODUCT, MENU_ITEM, PACKAGE
-  
+  type String @default("PRODUCT") // SERVICE, PRODUCT, MENU_ITEM, PACKAGE
+
   // Category (unified)
-  categoryId  String?
-  category    UnifiedCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  
+  categoryId String?
+  category   UnifiedCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
   // === SERVICE FIELDS (nullable) ===
-  duration        Int?      // Duration in minutes (for appointments)
-  requiresDeposit Boolean   @default(false)
+  duration        Int? // Duration in minutes (for appointments)
+  requiresDeposit Boolean  @default(false)
   depositAmount   Decimal?
-  
+
   // === PRODUCT FIELDS (nullable) ===
-  barcode         String?   // UPC/EAN barcode
-  sku             String?   // Internal SKU
-  stock           Int?      // Current stock quantity
-  cost            Decimal?  // Cost price (for profit calculation)
-  reorderPoint    Int?      // Alert when stock <= this
-  brand           String?   // Product brand
-  size            String?   // Size/weight (e.g., "750ml", "12 oz")
-  
+  barcode      String? // UPC/EAN barcode
+  sku          String? // Internal SKU
+  stock        Int? // Current stock quantity
+  cost         Decimal? // Cost price (for profit calculation)
+  reorderPoint Int? // Alert when stock <= this
+  brand        String? // Product brand
+  size         String? // Size/weight (e.g., "750ml", "12 oz")
+
   // === RESTAURANT FIELDS (nullable) ===
-  preparationTime Int?      // Minutes to prepare
-  calories        Int?      // Nutritional info
-  allergens       String?   // JSON array of allergens
-  
+  preparationTime Int? // Minutes to prepare
+  calories        Int? // Nutritional info
+  allergens       String? // JSON array of allergens
+
   // === COMPLIANCE & RESTRICTIONS ===
-  ageRestricted  Boolean  @default(false)  // Requires ID check
-  minimumAge     Int?                      // 18, 21, etc.
-  isEbtEligible  Boolean  @default(false)  // SNAP/EBT eligible
-  isTobacco      Boolean  @default(false)  // Tobacco product
-  isAlcohol      Boolean  @default(false)  // Alcohol product
-  
+  ageRestricted Boolean @default(false) // Requires ID check
+  minimumAge    Int? // 18, 21, etc.
+  isEbtEligible Boolean @default(false) // SNAP/EBT eligible
+  isTobacco     Boolean @default(false) // Tobacco product
+  isAlcohol     Boolean @default(false) // Alcohol product
+
   // === TAX CONFIGURATION ===
-  taxExempt      Boolean  @default(false)
-  taxRate        Decimal?  // Override tax rate (null = use default)
-  
+  taxExempt Boolean  @default(false)
+  taxRate   Decimal? // Override tax rate (null = use default)
+
   // === TRACKING ===
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Transaction line items (for sales history)
-  lineItems   ItemLineItem[]
-  
+  lineItems ItemLineItem[]
+
   // Manufacturer penny program deals linked to this item
   tobaccoDeals TobaccoDeal[]
-  
+
   // Inventory transfers
   transferItems TransferItem[]
-  
+
+  // Location-specific overrides and stock
+  locationOverrides LocationItemOverride[]
+  stockOnHand       StockOnHand[]
+
   @@index([franchiseId])
   @@index([type])
   @@index([barcode])
@@ -802,22 +922,22 @@ model ItemLineItem {
   id            String      @id @default(cuid())
   transactionId String
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  
-  itemId        String
-  item          Item        @relation(fields: [itemId], references: [id])
-  
-  quantity      Int
-  unitPrice     Decimal
-  discount      Decimal     @default(0)
-  tax           Decimal     @default(0)
-  total         Decimal
-  
+
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id])
+
+  quantity  Int
+  unitPrice Decimal
+  discount  Decimal @default(0)
+  tax       Decimal @default(0)
+  total     Decimal
+
   // Optional: who performed the service (for commissions)
   performedById String?
-  performedBy   User?       @relation("PerformedItemServices", fields: [performedById], references: [id])
-  
+  performedBy   User?   @relation("PerformedItemServices", fields: [performedById], references: [id])
+
   createdAt DateTime @default(now())
-  
+
   @@index([transactionId])
   @@index([itemId])
 }
@@ -856,10 +976,13 @@ model Service {
   appointments         Appointment[]
   transactionLineItems TransactionLineItem[]
   waitlistEntries      WaitlistEntry[]
-  
+
   // New Relations
-  packages             ServicePackage[]
+  packages              ServicePackage[]
   recurringAppointments RecurringAppointment[]
+
+  // Location-specific overrides
+  locationOverrides LocationItemOverride[]
 }
 
 model Client {
@@ -873,44 +996,44 @@ model Client {
   loyaltyJoined   Boolean @default(false)
 
   // Client Notes & Preferences
-  allergies        String?   // "Latex, essential oils, etc."
-  preferences      String?   // "Light pressure, prefers silence"
-  internalNotes    String?   // Staff-only notes
-  vipStatus        Boolean   @default(false)
+  allergies     String? // "Latex, essential oils, etc."
+  preferences   String? // "Light pressure, prefers silence"
+  internalNotes String? // Staff-only notes
+  vipStatus     Boolean @default(false)
 
   // Photo Consent
   photoConsent     Boolean   @default(false)
   photoConsentDate DateTime?
 
   // Tax Exemption (for resellers, wholesale, non-profit)
-  taxExempt              Boolean   @default(false)
-  exemptCertificateNumber String?   // Tax exempt certificate ID
+  taxExempt               Boolean   @default(false)
+  exemptCertificateNumber String? // Tax exempt certificate ID
   exemptCertificateExpiry DateTime? // Expiration of certificate
 
   // Store Account (A/R) - Customer can buy on credit
-  hasStoreAccount     Boolean   @default(false)
-  storeAccountBalance Decimal   @default(0)  // Amount owed by customer
-  storeAccountLimit   Decimal   @default(500) // Credit limit
+  hasStoreAccount        Boolean   @default(false)
+  storeAccountBalance    Decimal   @default(0) // Amount owed by customer
+  storeAccountLimit      Decimal   @default(500) // Credit limit
   storeAccountApprovedBy String? // Employee who approved account
   storeAccountApprovedAt DateTime?
 
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
-  appointments Appointment[]
-  memberships  ClientMembership[]
-  loyalty      ClientLoyalty?
-  transactions Transaction[]
-  reviews      Review[]
+  appointments      Appointment[]
+  memberships       ClientMembership[]
+  loyalty           ClientLoyalty?
+  transactions      Transaction[]
+  reviews           Review[]
   chatConversations ChatConversation[] // Support chat conversations
-  customerPromos    CustomerPromo[]    // Auto-applied promotions
-  
+  customerPromos    CustomerPromo[] // Auto-applied promotions
+
   // New Relations
-  photos           ClientPhoto[]
-  notes            ClientNote[]
-  packagePurchases PackagePurchase[]
-  recurringAppointments RecurringAppointment[]
-  checkIns             CheckIn[]
+  photos                   ClientPhoto[]
+  notes                    ClientNote[]
+  packagePurchases         PackagePurchase[]
+  recurringAppointments    RecurringAppointment[]
+  checkIns                 CheckIn[]
   storeAccountTransactions StoreAccountTransaction[] // A/R history
 
   createdAt DateTime @default(now())
@@ -923,7 +1046,6 @@ model Client {
   @@index([loyaltyJoined])
   @@index([hasStoreAccount])
 }
-
 
 model Appointment {
   id         String   @id @default(cuid())
@@ -983,19 +1105,19 @@ model Department {
   id          String    @id @default(cuid())
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
-  
-  name        String    // "Beverages", "Tobacco", "Grocery", "Vape"
+
+  name        String // "Beverages", "Tobacco", "Grocery", "Vape"
   description String?
-  icon        String?   // Emoji or icon name for UI
-  color       String?   // Hex color for visual distinction
-  sortOrder   Int       @default(0)
-  isActive    Boolean   @default(true)
-  
+  icon        String? // Emoji or icon name for UI
+  color       String? // Hex color for visual distinction
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
+
   categories ProductCategory[]
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([franchiseId])
 }
 
@@ -1004,28 +1126,28 @@ model ProductCategory {
   id          String    @id @default(cuid())
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
-  
+
   // Parent Department (optional for backwards compatibility)
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  
-  name        String    // "Beer", "Wine", "Liquor", "Tobacco", "Snacks"
+
+  name        String // "Beer", "Wine", "Liquor", "Tobacco", "Snacks"
   description String?
-  sortOrder   Int       @default(0)
-  isActive    Boolean   @default(true)
-  
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
+
   // Age Restriction at CATEGORY level - overrides or supplements department
-  ageRestricted Boolean @default(false)  // If true, ALL products in this category require ID
-  minimumAge    Int?                      // 18 for tobacco, 21 for alcohol
-  
+  ageRestricted Boolean @default(false) // If true, ALL products in this category require ID
+  minimumAge    Int? // 18 for tobacco, 21 for alcohol
+
   // EBT/SNAP eligibility at CATEGORY level
-  isEbtEligible Boolean @default(false)  // If true, products in this category can be purchased with EBT
-  
+  isEbtEligible Boolean @default(false) // If true, products in this category can be purchased with EBT
+
   products Product[]
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([franchiseId])
   @@index([departmentId])
 }
@@ -1036,43 +1158,43 @@ model Product {
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id])
 
-  name        String
-  description String?
-  price       Decimal
-  cost        Decimal? // Cost to franchise
-  stock       Int      @default(0)
-  category    String? // Legacy - plain text category
-  categoryId  String? // NEW - link to ProductCategory
+  name            String
+  description     String?
+  price           Decimal
+  cost            Decimal? // Cost to franchise
+  stock           Int              @default(0)
+  category        String? // Legacy - plain text category
+  categoryId      String? // NEW - link to ProductCategory
   productCategory ProductCategory? @relation(fields: [categoryId], references: [id])
-  sku         String?
-  barcode     String?  // UPC/EAN barcode for scanner
-  isActive    Boolean  @default(true)
+  sku             String?
+  barcode         String? // UPC/EAN barcode for scanner
+  isActive        Boolean          @default(true)
 
   // Retail-specific fields (can override category-level settings)
-  reorderPoint   Int?     // Alert when stock falls below this
-  minStock       Int?     // Auto-reorder when stock falls below this level
-  maxStock       Int?     // Target stock level when reordering
-  ageRestricted  Boolean  @default(false) // Override: force age check even if category doesn't require
-  minimumAge     Int?     // Override: 18 for tobacco, 21 for alcohol
-  brand          String?  // Manufacturer/Brand (e.g., "Bulleit", "Coca-Cola")
-  vendor         String?  // Supplier/Distributor (e.g., "Southern Glazer's", "McLane")
-  size           String?  // Product size (e.g., "750ml", "12 oz", "6 Pack")
-  productType    String?  // Product type (e.g., "Whiskey", "Lager", "Energy Drink")
-  
+  reorderPoint  Int? // Alert when stock falls below this
+  minStock      Int? // Auto-reorder when stock falls below this level
+  maxStock      Int? // Target stock level when reordering
+  ageRestricted Boolean @default(false) // Override: force age check even if category doesn't require
+  minimumAge    Int? // Override: 18 for tobacco, 21 for alcohol
+  brand         String? // Manufacturer/Brand (e.g., "Bulleit", "Coca-Cola")
+  vendor        String? // Supplier/Distributor (e.g., "Southern Glazer's", "McLane")
+  size          String? // Product size (e.g., "750ml", "12 oz", "6 Pack")
+  productType   String? // Product type (e.g., "Whiskey", "Lager", "Energy Drink")
+
   // Compliance & Tracking
-  isEbtEligible  Boolean  @default(false) // Can be purchased with EBT/SNAP
-  isTobacco      Boolean  @default(false) // Tobacco product (for scan data reporting)
-  
+  isEbtEligible Boolean @default(false) // Can be purchased with EBT/SNAP
+  isTobacco     Boolean @default(false) // Tobacco product (for scan data reporting)
+
   // Alcohol Attributes (for excise tax calculation)
-  alcoholType    String?  // NONE, BEER, WINE_LIGHT, WINE_HEAVY, SPIRITS
-  volumeMl       Int?     // Volume in milliliters (e.g., 750 for a wine bottle)
-  abvPercent     Decimal? // Alcohol by volume percentage (e.g., 40 for 40%)
+  alcoholType String? // NONE, BEER, WINE_LIGHT, WINE_HEAVY, SPIRITS
+  volumeMl    Int? // Volume in milliliters (e.g., 750 for a wine bottle)
+  abvPercent  Decimal? // Alcohol by volume percentage (e.g., 40 for 40%)
 
   // Case Break Management
-  unitsPerCase   Int?     // How many bottles/units per case (e.g., 12)
-  casePrice      Decimal? // Price to buy/sell a full case (usually discounted)
-  sellByCase     Boolean  @default(false)  // If true, show case option at POS
-  stockCases     Int      @default(0)       // Track cases separately from units
+  unitsPerCase Int? // How many bottles/units per case (e.g., 12)
+  casePrice    Decimal? // Price to buy/sell a full case (usually discounted)
+  sellByCase   Boolean  @default(false) // If true, show case option at POS
+  stockCases   Int      @default(0) // Track cases separately from units
 
   // Link to Global Catalog
   globalProductId String?
@@ -1087,10 +1209,13 @@ model Product {
   suppliers          ProductSupplier[]
   purchaseOrderItems PurchaseOrderItem[]
   stockAdjustments   StockAdjustment[]
-  
+
   // Tag-Along Items (cross-sell suggestions)
-  tagAlongParent  TagAlongItem[] @relation("TagAlongParent")
-  tagAlongChild   TagAlongItem[] @relation("TagAlongChild")
+  tagAlongParent TagAlongItem[] @relation("TagAlongParent")
+  tagAlongChild  TagAlongItem[] @relation("TagAlongChild")
+
+  // Location-specific overrides
+  locationOverrides LocationItemOverride[]
 
   @@index([barcode])
   @@index([sku])
@@ -1100,23 +1225,22 @@ model Product {
 // Tag-Along Items - Cross-sell suggestions
 // When parent product is scanned, suggest child products
 model TagAlongItem {
-  id        String   @id @default(cuid())
-  
-  parentId  String   // The product being scanned
-  parent    Product  @relation("TagAlongParent", fields: [parentId], references: [id], onDelete: Cascade)
-  
-  childId   String   // The product to suggest
-  child     Product  @relation("TagAlongChild", fields: [childId], references: [id], onDelete: Cascade)
-  
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  
+  id String @id @default(cuid())
+
+  parentId String // The product being scanned
+  parent   Product @relation("TagAlongParent", fields: [parentId], references: [id], onDelete: Cascade)
+
+  childId String // The product to suggest
+  child   Product @relation("TagAlongChild", fields: [childId], references: [id], onDelete: Cascade)
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
   createdAt DateTime @default(now())
-  
+
   @@unique([parentId, childId])
   @@index([parentId])
 }
-
 
 // POS Transaction (sale/checkout)
 model Transaction {
@@ -1154,9 +1278,9 @@ model Transaction {
   status String @default("COMPLETED") // COMPLETED, REFUNDED, VOIDED
 
   // Void Tracking (Audit Trail)
-  voidedById  String?   // User who voided this transaction
-  voidedAt    DateTime? // When the transaction was voided
-  voidReason  String?   // Optional reason for voiding
+  voidedById String? // User who voided this transaction
+  voidedAt   DateTime? // When the transaction was voided
+  voidReason String? // Optional reason for voiding
 
   cashDrawerSessionId String?
   cashDrawerSession   CashDrawerSession? @relation(fields: [cashDrawerSessionId], references: [id])
@@ -1167,8 +1291,8 @@ model Transaction {
   refunds               Transaction[] @relation("RefundRelation")
 
   lineItems        TransactionLineItem[]
-  itemLineItems    ItemLineItem[]       // Unified Item line items (new system)
-  drawerActivities DrawerActivity[]      // Drawer opens related to this transaction
+  itemLineItems    ItemLineItem[] // Unified Item line items (new system)
+  drawerActivities DrawerActivity[] // Drawer opens related to this transaction
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1270,6 +1394,13 @@ model Terminal {
   status       String   @default("ONLINE") // ONLINE, OFFLINE, ERROR
   ipAddress    String?
   macAddress   String?
+
+  // OPS: Incident impacts
+  incidentImpacts IncidentImpact[]
+
+  // Onboarding/Shipping Relations
+  onboardingDevices OnboardingRequestDevice[] @relation("OnboardingDevices")
+  shippedItems      ShipmentItem[]            @relation("ShippedTerminals")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1451,7 +1582,6 @@ model CommissionRule {
   createdAt DateTime @default(now())
 }
 
-
 // ============ LOYALTY & GIFT CARDS ============
 // Note: LoyaltyProgram model is defined in MULTI-BRAND LOYALTY SYSTEM section below
 
@@ -1507,7 +1637,7 @@ model CashDrawerSession {
 
   cashDrops        CashDrop[]
   transactions     Transaction[]
-  drawerActivities DrawerActivity[]  // All drawer opens during this shift
+  drawerActivities DrawerActivity[] // All drawer opens during this shift
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1560,62 +1690,62 @@ model Promotion {
   id          String    @id @default(cuid())
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
-  
-  name        String    // "Any 6 Beers for $12.99"
+
+  name        String // "Any 6 Beers for $12.99"
   description String?
-  
+
   // Deal Type: MIX_MATCH, BOGO, PERCENTAGE, FIXED, BUNDLE, THRESHOLD
-  type        String    @default("PERCENTAGE")
-  
+  type String @default("PERCENTAGE")
+
   // Discount Configuration
   // PERCENT = 10 means 10% off
   // FIXED_AMOUNT = 2 means $2 off per item
   // FIXED_PRICE = 12.99 means total price is $12.99 for qualifying items
   // FREE_ITEM = quantity specified in getQty is free
-  discountType  String  @default("PERCENT")  // PERCENT, FIXED_AMOUNT, FIXED_PRICE, FREE_ITEM
+  discountType  String  @default("PERCENT") // PERCENT, FIXED_AMOUNT, FIXED_PRICE, FREE_ITEM
   discountValue Decimal @default(0)
-  
+
   // Quantity Requirements
-  requiredQty   Int?    // Buy X items to qualify
-  getQty        Int?    // Get Y items (for BOGO deals)
-  
+  requiredQty Int? // Buy X items to qualify
+  getQty      Int? // Get Y items (for BOGO deals)
+
   // Tiered Pricing (for TIERED type)
   // JSON array: [{"qty": 2, "price": 15}, {"qty": 3, "price": 20}, {"qty": 4, "price": 25}]
-  priceTiers    String?
-  
+  priceTiers String?
+
   // Threshold (for spend-based deals)
-  minSpend      Decimal? // Spend $X to qualify
-  
+  minSpend Decimal? // Spend $X to qualify
+
   // Time Constraints
-  startDate     DateTime?
-  endDate       DateTime?
-  timeStart     String?   // "16:00" for 4pm (24hr format)
-  timeEnd       String?   // "19:00" for 7pm
-  daysOfWeek    String?   // JSON array: ["MON","TUE","WED","THU","FRI","SAT","SUN"]
-  
+  startDate  DateTime?
+  endDate    DateTime?
+  timeStart  String? // "16:00" for 4pm (24hr format)
+  timeEnd    String? // "19:00" for 7pm
+  daysOfWeek String? // JSON array: ["MON","TUE","WED","THU","FRI","SAT","SUN"]
+
   // Scope - what items qualify
   // ALL = all products
   // CATEGORY = specific categories
   // PRODUCTS = specific products
   // BRAND = specific brand (matched by vendor field)
-  appliesTo     String    @default("ALL")
-  
+  appliesTo String @default("ALL")
+
   // Stacking Rules
-  stackable     Boolean   @default(false)  // Can combine with other deals
-  priority      Int       @default(0)      // Higher = applies first
+  stackable             Boolean @default(false) // Can combine with other deals
+  priority              Int     @default(0) // Higher = applies first
   maxUsesPerTransaction Int? // Limit uses per checkout
-  
+
   // Promo Code (optional)
-  promoCode     String?   // If set, must enter code to activate
-  
-  isActive      Boolean   @default(true)
-  
+  promoCode String? // If set, must enter code to activate
+
+  isActive Boolean @default(true)
+
   // Relations
-  qualifyingItems  PromotionProduct[]
-  
+  qualifyingItems PromotionProduct[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([franchiseId])
   @@index([isActive])
 }
@@ -1625,27 +1755,27 @@ model PromotionProduct {
   id          String    @id @default(cuid())
   promotionId String
   promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
-  
+
   // Can link to category OR specific product (one or the other)
-  categoryId  String?   // ProductCategory ID
-  productId   String?   // Product ID
-  
+  categoryId String? // ProductCategory ID
+  productId  String? // Product ID
+
   // Exclusion flag - if true, this item is EXCLUDED from the deal
-  isExcluded  Boolean   @default(false)
-  
+  isExcluded Boolean @default(false)
+
   @@index([promotionId])
 }
 
 // ============ COMMUNITY & AUTH ============
 
 model MagicLink {
-  id        String   @id @default(cuid())
-  email     String
-  token     String   @unique
-  expiresAt DateTime
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
+  id          String    @id @default(cuid())
+  email       String
+  token       String    @unique
+  expiresAt   DateTime
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
+  createdAt   DateTime  @default(now())
   completedAt DateTime?
 }
 
@@ -1717,10 +1847,10 @@ model Review {
   locationId String? // Which location this review is for
 
   // Google Business integration
-  googleReviewId    String?   // Google My Business review ID when posted
-  postedToGoogle    Boolean   @default(false)
-  redirectedToGoogle Boolean  @default(false) // Was customer redirected to Google?
-  postedAt          DateTime?
+  googleReviewId     String? // Google My Business review ID when posted
+  postedToGoogle     Boolean   @default(false)
+  redirectedToGoogle Boolean   @default(false) // Was customer redirected to Google?
+  postedAt           DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1733,28 +1863,35 @@ model Franchisor {
   ownerId String @unique
   owner   User   @relation("FranchisorOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
+  // Provider (Top-level tenant)
+  providerId String?
+  provider   Provider? @relation(fields: [providerId], references: [id])
+
   name String?
 
   // Approval Status
   approvalStatus String @default("PENDING") // PENDING, APPROVED, REJECTED
 
   // Account Status (for suspension/termination)
-  accountStatus    String    @default("ACTIVE") // ACTIVE, SUSPENDED, TERMINATED
-  suspendedAt      DateTime?
-  suspendedReason  String?
+  accountStatus   String    @default("ACTIVE") // ACTIVE, SUSPENDED, TERMINATED
+  suspendedAt     DateTime?
+  suspendedReason String?
 
   // Business Type (Owner Type)
   businessType String @default("MULTI_LOCATION_OWNER") // "BRAND_FRANCHISOR" | "MULTI_LOCATION_OWNER"
 
+  // Scoped Role Assignments
+  roleAssignments UserRoleAssignment[] @relation("RoleAssignments")
+
   // Industry Type (for conditional feature access)
   industryType String @default("SERVICE") // "SERVICE" | "RETAIL" | "RESTAURANT"
 
-
   // Existing Relations
-  franchises     Franchise[]
-  globalServices GlobalService[]
-  globalProducts GlobalProduct[]
-  royaltyConfig  RoyaltyConfig?
+  franchises         Franchise[]
+  globalServices     GlobalService[]
+  globalProducts     GlobalProduct[]
+  royaltyConfig      RoyaltyConfig?
+  onboardingRequests OnboardingRequest[]
 
   // Onboarding Fields
   address                 String?
@@ -1768,7 +1905,7 @@ model Franchisor {
   documents               String? // JSON string
   documentsLater          Boolean?
   processingType          String?
-  needToDiscussProcessing Boolean @default(false)
+  needToDiscussProcessing Boolean  @default(false)
 
   // Processing Details
   routingNumber String?
@@ -1788,13 +1925,13 @@ model Franchisor {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Business Configuration (PROVIDER sets this for each franchisor)
   config BusinessConfig?
-  
+
   // Integrations enabled for this franchisor (JSON string: {"googleBooking":true,"facebookBooking":false})
   integrations String?
-  
+
   // Feature Requests
   featureRequests FeatureRequest[]
 }
@@ -1803,15 +1940,15 @@ model Franchisor {
 // One config per franchisor, but PROVIDER decides what's in it
 // Franchisors can READ but NOT EDIT
 model BusinessConfig {
-  id            String     @id @default(cuid())
-  franchisorId  String     @unique
-  franchisor    Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  franchisorId String     @unique
+  franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
 
   // Core Features
-  usesCommissions  Boolean @default(true)
-  usesInventory    Boolean @default(true)
-  usesAppointments Boolean @default(true)
-  usesScheduling   Boolean @default(true)
+  usesCommissions   Boolean @default(true)
+  usesInventory     Boolean @default(true)
+  usesAppointments  Boolean @default(true)
+  usesScheduling    Boolean @default(true)
   usesVirtualKeypad Boolean @default(true)
 
   // Customer Features
@@ -1824,11 +1961,11 @@ model BusinessConfig {
   usesRoyalties Boolean @default(false) // Only for franchisors
   usesTipping   Boolean @default(true)
   usesDiscounts Boolean @default(true)
-  
+
   // Tax Configuration
-  taxRate       Float    @default(0.08)
-  taxServices   Boolean  @default(true)
-  taxProducts   Boolean  @default(true)
+  taxRate     Float   @default(0.08)
+  taxServices Boolean @default(true)
+  taxProducts Boolean @default(true)
 
   // Sales Features
   usesRetailProducts Boolean @default(true)
@@ -1839,11 +1976,11 @@ model BusinessConfig {
   // RETAIL = Products + Inventory (convenience store, liquor store)
   // RESTAURANT = Menu Items + Tables (future)
   // HYBRID = Both Services + Products (salon that sells products)
-  posMode            String  @default("SALON") // SALON, RETAIL, RESTAURANT, HYBRID
+  posMode String @default("SALON") // SALON, RETAIL, RESTAURANT, HYBRID
 
   // Marketing Features
-  usesEmailMarketing  Boolean @default(true)
-  usesSMSMarketing    Boolean @default(true)
+  usesEmailMarketing   Boolean @default(true)
+  usesSMSMarketing     Boolean @default(true)
   usesReviewManagement Boolean @default(true)
 
   // Advanced Features
@@ -1851,92 +1988,92 @@ model BusinessConfig {
   usesFranchising   Boolean @default(false)
   usesTimeTracking  Boolean @default(true)
   usesPayroll       Boolean @default(false)
-  
+
   // Mobile Features (Paid Add-ons)
-  usesMobilePulse   Boolean @default(false) // Oro Pulse mobile dashboard enabled
-  pulseSeatCount    Int     @default(0) // Number of Pulse licenses purchased
+  usesMobilePulse Boolean @default(false) // Oro Pulse mobile dashboard enabled
+  pulseSeatCount  Int     @default(0) // Number of Pulse licenses purchased
 
   // Subscription Tier & Limits
-  subscriptionTier  String  @default("STARTER") // STARTER, GROWTH, MULTI_STORE, ENTERPRISE
-  maxLocations      Int     @default(1) // Max stores allowed
-  maxUsers          Int     @default(1) // Max users/employees allowed
+  subscriptionTier String @default("STARTER") // STARTER, GROWTH, MULTI_STORE, ENTERPRISE
+  maxLocations     Int    @default(1) // Max stores allowed
+  maxUsers         Int    @default(1) // Max users/employees allowed
 
   // Payment Options
-  acceptsEbt         Boolean @default(false)
-  acceptsChecks      Boolean @default(false)
-  acceptsOnAccount   Boolean @default(false)
-  
+  acceptsEbt       Boolean @default(false)
+  acceptsChecks    Boolean @default(false)
+  acceptsOnAccount Boolean @default(false)
+
   // Shift Requirement for POS employees
   // CLOCK_IN_ONLY = Simple clock in, no cash counting
   // CASH_COUNT_ONLY = Cash counting only, no time tracking
   // BOTH = Full clock-in with cash counting (default)
   // NONE = No shift required, go straight to POS
-  shiftRequirement  String  @default("BOTH")
-  
+  shiftRequirement String @default("BOTH")
+
   // ============ WORKFLOW SETTINGS ============
-  
+
   // Review Request Workflows
   reviewRequestTiming String  @default("MANUAL") // MANUAL, AT_CHECKOUT, 1_HOUR_AFTER, 24_HOURS_AFTER, NEVER
-  reviewRequestMethod String  @default("SMS")    // SMS, EMAIL, BOTH
-  reviewIncentive     Decimal @default(0)        // e.g., $5 off next visit
-  
+  reviewRequestMethod String  @default("SMS") // SMS, EMAIL, BOTH
+  reviewIncentive     Decimal @default(0) // e.g., $5 off next visit
+
   // Tip Settings
-  tipPromptEnabled    Boolean @default(true)
-  tipPromptTiming     String  @default("AT_CHECKOUT") // AT_CHECKOUT, NEVER
-  tipSuggestions      String  @default("[15,20,25]")  // JSON array of percentages or dollar amounts
-  tipType             String  @default("PERCENT")     // PERCENT or DOLLAR
-  tipPoolingEnabled   Boolean @default(false)
-  
+  tipPromptEnabled  Boolean @default(true)
+  tipPromptTiming   String  @default("AT_CHECKOUT") // AT_CHECKOUT, NEVER
+  tipSuggestions    String  @default("[15,20,25]") // JSON array of percentages or dollar amounts
+  tipType           String  @default("PERCENT") // PERCENT or DOLLAR
+  tipPoolingEnabled Boolean @default(false)
+
   // Commission Calculation
   commissionCalculation String @default("AUTOMATIC") // AUTOMATIC, MANUAL_APPROVAL
-  commissionVisibility  String @default("ALWAYS")    // ALWAYS, PAY_PERIOD_ONLY, NEVER
-  
+  commissionVisibility  String @default("ALWAYS") // ALWAYS, PAY_PERIOD_ONLY, NEVER
+
   // Loyalty Program Workflows
   loyaltyPointsAwarding String  @default("AUTOMATIC") // AUTOMATIC, MANUAL
-  loyaltyPointsRatio    Decimal @default(1)           // $1 = 1 point
-  loyaltyBirthdayBonus  Decimal @default(0)           // Bonus points on birthday
-  
+  loyaltyPointsRatio    Decimal @default(1) // $1 = 1 point
+  loyaltyBirthdayBonus  Decimal @default(0) // Bonus points on birthday
+
   // Appointment Reminders
-  reminderEnabled     Boolean @default(true)
-  reminderTiming      String  @default("24_HOURS")    // 24_HOURS, 2_HOURS, BOTH
-  reminderMethod      String  @default("SMS")         // SMS, EMAIL, BOTH
-  
+  reminderEnabled Boolean @default(true)
+  reminderTiming  String  @default("24_HOURS") // 24_HOURS, 2_HOURS, BOTH
+  reminderMethod  String  @default("SMS") // SMS, EMAIL, BOTH
+
   // Cancellation Policy
   cancellationFeeEnabled Boolean @default(false)
   cancellationFeeAmount  Decimal @default(0)
-  cancellationWindow     Int     @default(24)         // Hours before appointment
-  
+  cancellationWindow     Int     @default(24) // Hours before appointment
+
   // Membership Workflows
-  membershipAutoBilling  Boolean @default(true)
-  membershipFailedPaymentRetry Int @default(3)       // Retry attempts
-  
+  membershipAutoBilling        Boolean @default(true)
+  membershipFailedPaymentRetry Int     @default(3) // Retry attempts
+
   // Gift Card Settings
   giftCardAutoEmail Boolean @default(true)
   giftCardPhysical  Boolean @default(true)
-  
+
   // Discount Approval
   discountRequiresApproval Boolean @default(false)
-  discountMaxPercent       Decimal @default(50)      // Max discount allowed
-  
+  discountMaxPercent       Decimal @default(50) // Max discount allowed
+
   // Inventory Alerts
   lowStockAlertEnabled Boolean @default(true)
-  lowStockThreshold    Int     @default(5)           // Alert when <= 5 units
-  
+  lowStockThreshold    Int     @default(5) // Alert when <= 5 units
+
   // Multi-Employee Service
   allowMultiProvider Boolean @default(false)
-  
+
   // New Client Tracking
   newClientBonusEnabled Boolean @default(false)
   newClientBonusAmount  Decimal @default(10)
-  
+
   // Cash Discount Program (FRANCHISOR-CONTROLLED)
   // Each salon owner decides if they want dual pricing
-  cashDiscountEnabled   Boolean @default(false)
-  cashDiscountPercent   Decimal @default(3.5)  // Default 3.5%, they can change
+  cashDiscountEnabled Boolean @default(false)
+  cashDiscountPercent Decimal @default(3.5) // Default 3.5%, they can change
 
   // Data Export Permissions (PROVIDER-CONTROLLED)
-  canExportData    Boolean @default(false)  // Can export customer/transaction data
-  canExportReports Boolean @default(false)  // Can export reports to CSV/PDF
+  canExportData    Boolean @default(false) // Can export customer/transaction data
+  canExportReports Boolean @default(false) // Can export reports to CSV/PDF
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1946,36 +2083,36 @@ model EmailTemplate {
   id        String   @id @default(cuid())
   name      String
   subject   String
-  body      String   // HTML content
-  variables String?  // JSON array of available variables
-  category  String?  // WELCOME, FOLLOW_UP, PROPOSAL, etc.
+  body      String // HTML content
+  variables String? // JSON array of available variables
+  category  String? // WELCOME, FOLLOW_UP, PROPOSAL, etc.
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model AuditLog {
-  id         String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Who performed the action
-  entityType String   // Lead, Note, Activity, Task, Franchisor, User, etc.
+  entityType String // Lead, Note, Activity, Task, Franchisor, User, etc.
   entityId   String
-  action     String   // CREATED, UPDATED, DELETED, VIEWED, LOGIN, LOGOUT
+  action     String // CREATED, UPDATED, DELETED, VIEWED, LOGIN, LOGOUT
   userId     String
   userEmail  String?
   userRole   String?
-  
+
   // Context
-  changes    String?  // JSON before/after
-  ipAddress  String?
-  userAgent  String?
-  
+  changes   String? // JSON before/after
+  ipAddress String?
+  userAgent String?
+
   // Status
-  status     String   @default("SUCCESS") // SUCCESS, FAILURE, BLOCKED
+  status       String  @default("SUCCESS") // SUCCESS, FAILURE, BLOCKED
   errorMessage String?
-  
-  createdAt  DateTime @default(now())
-  
+
+  createdAt DateTime @default(now())
+
   @@index([userId])
   @@index([action])
   @@index([entityType])
@@ -1985,37 +2122,37 @@ model AuditLog {
 // ============ ADVANCED COMMISSION SYSTEM ============
 
 model CommissionTier {
-  id         String  @id @default(cuid())
+  id         String @id @default(cuid())
   employeeId String
-  employee   User    @relation("EmployeeCommissionTiers", fields: [employeeId], references: [id], onDelete: Cascade)
-  
+  employee   User   @relation("EmployeeCommissionTiers", fields: [employeeId], references: [id], onDelete: Cascade)
+
   // Tier Definition
-  minRevenue Decimal  // e.g., 0
+  minRevenue Decimal // e.g., 0
   maxRevenue Decimal? // e.g., 2000 (null = unlimited)
-  percentage Decimal  // e.g., 0.35 (35%)
-  
-  tierName   String?  // "Bronze", "Silver", "Gold"
-  priority   Int      @default(0) // Order of evaluation
-  
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  percentage Decimal // e.g., 0.35 (35%)
+
+  tierName String? // "Bronze", "Silver", "Gold"
+  priority Int     @default(0) // Order of evaluation
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ServiceCommissionOverride {
-  id         String  @id @default(cuid())
+  id         String @id @default(cuid())
   employeeId String
-  employee   User    @relation("EmployeeServiceOverrides", fields: [employeeId], references: [id], onDelete: Cascade)
-  
+  employee   User   @relation("EmployeeServiceOverrides", fields: [employeeId], references: [id], onDelete: Cascade)
+
   // Service reference (flexible - can be service name or future ID)
-  serviceId  String  // Reference to service
+  serviceId   String // Reference to service
   serviceName String? // Human-readable name
-  
+
   percentage Decimal // Override commission for this service
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@unique([employeeId, serviceId])
 }
 
@@ -2023,43 +2160,43 @@ model EmployeePaymentConfig {
   id         String @id @default(cuid())
   employeeId String @unique
   employee   User   @relation("EmployeePaymentConfig", fields: [employeeId], references: [id], onDelete: Cascade)
-  
+
   // Payment Type
   paymentType String @default("COMMISSION") // COMMISSION, SALARY, HOURLY, BOOTH_RENTAL, HYBRID
-  
+
   // Commission Settings
   defaultCommissionRate Decimal @default(0.40) // 40%
   usesTieredCommission  Boolean @default(false)
-  
+
   // Salary Settings
-  baseSalary     Decimal? // Weekly or monthly base
-  salaryPeriod   String?  // WEEKLY, MONTHLY
-  useMaxSalaryOrCommission Boolean @default(false) // Pay whichever is higher
-  
+  baseSalary               Decimal? // Weekly or monthly base
+  salaryPeriod             String? // WEEKLY, MONTHLY
+  useMaxSalaryOrCommission Boolean  @default(false) // Pay whichever is higher
+
   // Hourly Settings
-  hourlyRate     Decimal? // $15/hour
-  useMaxHourlyOrCommission Boolean @default(false)
-  
+  hourlyRate               Decimal? // $15/hour
+  useMaxHourlyOrCommission Boolean  @default(false)
+
   // Booth Rental
-  rentalFee      Decimal? // $300/week
-  rentalPeriod   String?  // DAILY, WEEKLY, MONTHLY
-  rentalKeeps100Percent Boolean @default(false)
-  
+  rentalFee             Decimal? // $300/week
+  rentalPeriod          String? // DAILY, WEEKLY, MONTHLY
+  rentalKeeps100Percent Boolean  @default(false)
+
   // Product Commission
-  productCommissionRate Decimal @default(0.10) // 10%
+  productCommissionRate   Decimal @default(0.10) // 10%
   useProductCostDeduction Boolean @default(false) // Commission on profit vs gross
-  
+
   // Discount Handling
   commissionOnDiscountedPrice Boolean @default(true) // Most common
-  
+
   // New Client Tracking
   newClientBonusEnabled Boolean @default(false)
   newClientBonusAmount  Decimal @default(10)
-  
+
   // Cash Discount Program (PROVIDER-CONTROLLED)
   // YOU decide if this feature exists and the percentage
-  cashDiscountEnabled   Boolean @default(false)
-  cashDiscountPercent   Decimal @default(3.5)  // YOU set this
+  cashDiscountEnabled Boolean @default(false)
+  cashDiscountPercent Decimal @default(3.5) // YOU set this
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2067,18 +2204,18 @@ model EmployeePaymentConfig {
 
 model PayrollRun {
   id String @id @default(cuid())
-  
+
   // Period
   periodStart DateTime
   periodEnd   DateTime
   payDate     DateTime?
-  
+
   // Status
   status String @default("DRAFT") // DRAFT, FINALIZED, PAID
-  
+
   // Entries
   entries PayrollEntry[]
-  
+
   createdBy String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2090,31 +2227,31 @@ model PayrollEntry {
   payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employeeId   String
   employee     User       @relation("EmployeePayrollEntries", fields: [employeeId], references: [id], onDelete: Cascade)
-  
+
   // Earnings Breakdown
-  serviceRevenue   Decimal @default(0)
-  productRevenue   Decimal @default(0)
-  totalRevenue     Decimal @default(0)
-  
+  serviceRevenue Decimal @default(0)
+  productRevenue Decimal @default(0)
+  totalRevenue   Decimal @default(0)
+
   serviceCommission Decimal @default(0)
   productCommission Decimal @default(0)
   totalCommission   Decimal @default(0)
-  
-  baseSalary       Decimal @default(0)
-  hourlyWages      Decimal @default(0)
-  tips             Decimal @default(0)
-  bonuses          Decimal @default(0)
-  
+
+  baseSalary  Decimal @default(0)
+  hourlyWages Decimal @default(0)
+  tips        Decimal @default(0)
+  bonuses     Decimal @default(0)
+
   // Deductions
-  rentalFee        Decimal @default(0)
-  
+  rentalFee Decimal @default(0)
+
   // Final Pay
-  grossPay         Decimal @default(0)
-  
+  grossPay Decimal @default(0)
+
   // Metadata
-  hoursWorked      Decimal @default(0)
-  servicesPerformed Int    @default(0)
-  
+  hoursWorked       Decimal @default(0)
+  servicesPerformed Int     @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -2122,20 +2259,20 @@ model PayrollEntry {
 // ============ RATE LIMITING ============
 
 model RateLimitRecord {
-  id        String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Identifier (could be IP, userId, or combination)
   identifier String
   endpoint   String
-  
+
   // Count and window
-  count     Int      @default(1)
+  count       Int      @default(1)
   windowStart DateTime @default(now())
-  
+
   // Metadata
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@unique([identifier, endpoint])
   @@index([identifier])
   @@index([windowStart])
@@ -2144,21 +2281,21 @@ model RateLimitRecord {
 // ============ FEATURE REQUESTS ============
 
 model FeatureRequest {
-  id           String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   franchisorId String
   franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
-  
-  featureKey   String   // e.g., "usesLoyalty", "usesGiftCards"
-  status       String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  
+
+  featureKey String // e.g., "usesLoyalty", "usesGiftCards"
+  status     String @default("PENDING") // PENDING, APPROVED, REJECTED
+
   // Optional notes
   requestNotes  String?
   responseNotes String?
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([franchisorId])
   @@index([status])
 }
@@ -2166,35 +2303,35 @@ model FeatureRequest {
 // ============ DRAWER ACTIVITY (FRAUD PREVENTION) ============
 
 model DrawerActivity {
-  id        String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Activity Type
-  type      String   // SALE_OPEN, NO_SALE, CASH_DROP, PAID_IN, PAID_OUT, TIP_PAYOUT, REFUND, MANAGER_OVERRIDE
-  
+  type String // SALE_OPEN, NO_SALE, CASH_DROP, PAID_IN, PAID_OUT, TIP_PAYOUT, REFUND, MANAGER_OVERRIDE
+
   // For NO_SALE - reason required
-  reason    String?  // make_change, verify_cash, error_correction, give_receipt, cash_drop, manager_request, other
-  note      String?  // Additional explanation
-  
+  reason String? // make_change, verify_cash, error_correction, give_receipt, cash_drop, manager_request, other
+  note   String? // Additional explanation
+
   // Amount if applicable (cash drop, paid in/out, tips)
-  amount    Float?
-  
+  amount Float?
+
   // Who and When
   employeeId String
   employee   User     @relation(fields: [employeeId], references: [id])
   timestamp  DateTime @default(now())
-  
+
   // Context
   shiftId       String?
   shift         CashDrawerSession? @relation(fields: [shiftId], references: [id])
   locationId    String
-  location      Location @relation(fields: [locationId], references: [id])
-  transactionId String?  // Related transaction if any
-  transaction   Transaction? @relation(fields: [transactionId], references: [id])
-  
+  location      Location           @relation(fields: [locationId], references: [id])
+  transactionId String? // Related transaction if any
+  transaction   Transaction?       @relation(fields: [transactionId], references: [id])
+
   // Alert tracking
-  alertSent     Boolean @default(false)
-  alertLevel    String? // WARNING, CRITICAL
-  
+  alertSent  Boolean @default(false)
+  alertLevel String? // WARNING, CRITICAL
+
   @@index([locationId])
   @@index([employeeId])
   @@index([type])
@@ -2205,77 +2342,77 @@ model DrawerActivity {
 // ============ CUSTOMER SUPPORT CHAT ============
 
 model ChatConversation {
-  id           String   @id @default(cuid())
-  franchiseId  String
-  franchise    Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
-  
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+
   // Customer info (can be guest or registered client)
   customerName  String?
   customerEmail String?
   customerPhone String?
-  clientId      String?  // If linked to existing client
-  client        Client?  @relation(fields: [clientId], references: [id])
-  
+  clientId      String? // If linked to existing client
+  client        Client? @relation(fields: [clientId], references: [id])
+
   // Status and assignment
-  status       String   @default("OPEN") // OPEN, RESOLVED, SPAM
-  assignedToId String?  // Staff member ID
-  assignedTo   User?    @relation("AssignedChats", fields: [assignedToId], references: [id])
-  
+  status       String  @default("OPEN") // OPEN, RESOLVED, SPAM
+  assignedToId String? // Staff member ID
+  assignedTo   User?   @relation("AssignedChats", fields: [assignedToId], references: [id])
+
   // Tracking
   lastMessageAt DateTime?
-  unreadCount   Int      @default(0)
-  
-  messages     ChatMessage[]
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
+  unreadCount   Int       @default(0)
+
+  messages ChatMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([franchiseId])
   @@index([status])
   @@index([lastMessageAt])
 }
 
 model ChatMessage {
-  id             String   @id @default(cuid())
+  id             String           @id @default(cuid())
   conversationId String
   conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  
-  senderType     String   // CUSTOMER, STAFF, SYSTEM
-  senderId       String?  // User ID if staff sent it
-  sender         User?    @relation("SentChatMessages", fields: [senderId], references: [id])
-  
-  content        String
-  isRead         Boolean  @default(false)
-  
-  createdAt      DateTime @default(now())
-  
+
+  senderType String // CUSTOMER, STAFF, SYSTEM
+  senderId   String? // User ID if staff sent it
+  sender     User?   @relation("SentChatMessages", fields: [senderId], references: [id])
+
+  content String
+  isRead  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
   @@index([conversationId])
   @@index([createdAt])
 }
 
 // Waitlist / Walk-in Queue
 model WaitlistEntry {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   locationId    String
   customerName  String
   customerPhone String?
   customerEmail String?
-  partySize     Int      @default(1)
+  partySize     Int       @default(1)
   serviceId     String?
   notes         String?
-  status        String   @default("WAITING") // WAITING, NOTIFIED, SEATED, NO_SHOW, CANCELLED
+  status        String    @default("WAITING") // WAITING, NOTIFIED, SEATED, NO_SHOW, CANCELLED
   position      Int
-  estimatedWait Int?     // minutes
-  checkedInAt   DateTime @default(now())
+  estimatedWait Int? // minutes
+  checkedInAt   DateTime  @default(now())
   seatedAt      DateTime?
   notifiedAt    DateTime?
-  
-  location      Location  @relation(fields: [locationId], references: [id])
-  service       Service?  @relation(fields: [serviceId], references: [id])
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+
+  location Location @relation(fields: [locationId], references: [id])
+  service  Service? @relation(fields: [serviceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([locationId])
   @@index([status])
   @@index([checkedInAt])
@@ -2283,10 +2420,10 @@ model WaitlistEntry {
 
 // Client Waiver / Liability Form - Stores signed consent forms for legal protection
 model ClientWaiver {
-  id            String   @id @default(cuid())
+  id            String  @id @default(cuid())
   franchiseId   String
-  clientId      String?  // Optional - may not exist yet for new customers
-  appointmentId String?  // Link to the appointment if signed during booking
+  clientId      String? // Optional - may not exist yet for new customers
+  appointmentId String? // Link to the appointment if signed during booking
 
   // Customer Info (stored separately in case client record changes)
   customerName  String
@@ -2294,24 +2431,24 @@ model ClientWaiver {
   customerPhone String?
 
   // Waiver Details
-  waiverVersion String   @default("1.0") // Version of the waiver text
-  waiverText    String   // The actual waiver/terms text they agreed to
-  
+  waiverVersion String @default("1.0") // Version of the waiver text
+  waiverText    String // The actual waiver/terms text they agreed to
+
   // Digital Signature / Consent
-  signatureName  String   // Typed name as signature
-  signatureDate  DateTime @default(now()) // When they signed
-  consentGiven   Boolean  @default(true)
-  
+  signatureName String // Typed name as signature
+  signatureDate DateTime @default(now()) // When they signed
+  consentGiven  Boolean  @default(true)
+
   // Legal Evidence
-  ipAddress     String?  // IP address when signed
-  userAgent     String?  // Browser info
-  
+  ipAddress String? // IP address when signed
+  userAgent String? // Browser info
+
   // Status
-  isActive      Boolean  @default(true) // False if superseded by newer waiver
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  isActive Boolean @default(true) // False if superseded by newer waiver
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([franchiseId])
   @@index([clientId])
   @@index([customerEmail])
@@ -2321,24 +2458,24 @@ model ClientWaiver {
 // ============ LIVE CHAT SUPPORT ============
 
 model SupportChat {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  status       String   @default("OPEN") // OPEN, CLOSED, WAITING_SUPPORT, WAITING_USER
-  priority     String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
-  subject      String?
-  
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status   String  @default("OPEN") // OPEN, CLOSED, WAITING_SUPPORT, WAITING_USER
+  priority String  @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  subject  String?
+
   // Assignment
-  assigneeId   String?
-  assignee     User?    @relation("AssignedChats", fields: [assigneeId], references: [id])
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  closedAt     DateTime?
-  
-  messages     SupportMessage[]
-  
+  assigneeId String?
+  assignee   User?   @relation("AssignedChats", fields: [assigneeId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  closedAt  DateTime?
+
+  messages SupportMessage[]
+
   @@index([userId])
   @@index([status])
   @@index([priority])
@@ -2346,17 +2483,17 @@ model SupportChat {
 }
 
 model SupportMessage {
-  id        String      @id @default(cuid())
-  chatId    String
-  chat      SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  
-  content   String
-  sender    String      // USER or SUPPORT
-  senderId  String?     // User ID if USER, null for system/support
-  
+  id     String      @id @default(cuid())
+  chatId String
+  chat   SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  content  String
+  sender   String // USER or SUPPORT
+  senderId String? // User ID if USER, null for system/support
+
   readAt    DateTime?
-  createdAt DateTime    @default(now())
-  
+  createdAt DateTime  @default(now())
+
   @@index([chatId])
   @@index([createdAt])
 }
@@ -2365,45 +2502,45 @@ model SupportMessage {
 
 // Brand-specific loyalty program configuration
 model LoyaltyProgram {
-  id              String    @id @default(cuid())
-  franchiseId     String    @unique
-  franchise       Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
-  
-  name            String    @default("Rewards")
-  isEnabled       Boolean   @default(true)
-  pointsPerDollar Decimal   @default(1)    // Points earned per dollar spent
-  redemptionRatio Decimal   @default(0.01) // Dollar value per point (0.01 = 1 cent)
-  
-  members         LoyaltyMember[]
-  pointsHistory   PointsTransaction[]
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  franchiseId String    @unique
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+
+  name            String  @default("Rewards")
+  isEnabled       Boolean @default(true)
+  pointsPerDollar Decimal @default(1) // Points earned per dollar spent
+  redemptionRatio Decimal @default(0.01) // Dollar value per point (0.01 = 1 cent)
+
+  members       LoyaltyMember[]
+  pointsHistory PointsTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Customer membership in a specific loyalty program
 model LoyaltyMember {
-  id              String         @id @default(cuid())
-  programId       String
-  program         LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
-  
+  id        String         @id @default(cuid())
+  programId String
+  program   LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
   // Customer identification
-  phone           String         // Primary lookup key
-  email           String?
-  name            String?
-  
+  phone String // Primary lookup key
+  email String?
+  name  String?
+
   // Points balance for THIS program (used when not linked)
-  pointsBalance   Int            @default(0)
-  lifetimePoints  Int            @default(0)
-  lifetimeSpend   Decimal        @default(0)
-  
+  pointsBalance  Int     @default(0)
+  lifetimePoints Int     @default(0)
+  lifetimeSpend  Decimal @default(0)
+
   // Link to master account for cross-brand pooled balance
   masterAccountId String?
   masterAccount   LoyaltyMasterAccount? @relation(fields: [masterAccountId], references: [id])
-  
-  enrolledAt      DateTime       @default(now())
-  lastActivity    DateTime       @default(now())
-  
+
+  enrolledAt   DateTime @default(now())
+  lastActivity DateTime @default(now())
+
   @@unique([programId, phone])
   @@index([phone])
   @@index([masterAccountId])
@@ -2411,45 +2548,45 @@ model LoyaltyMember {
 
 // Master account for pooled cross-brand loyalty
 model LoyaltyMasterAccount {
-  id              String          @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Customer identity
-  phone           String          @unique
-  email           String?
-  name            String?
-  
+  phone String  @unique
+  email String?
+  name  String?
+
   // POOLED balance across all linked programs
-  pooledBalance   Int             @default(0)
-  lifetimePoints  Int             @default(0)
-  
+  pooledBalance  Int @default(0)
+  lifetimePoints Int @default(0)
+
   // Linked program memberships
-  linkedMembers   LoyaltyMember[]
-  pointsHistory   PointsTransaction[]
-  
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  linkedMembers LoyaltyMember[]
+  pointsHistory PointsTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Points transaction history
 model PointsTransaction {
-  id              String               @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Can belong to program OR master account
   programId       String?
-  program         LoyaltyProgram?      @relation(fields: [programId], references: [id])
+  program         LoyaltyProgram?       @relation(fields: [programId], references: [id])
   masterAccountId String?
   masterAccount   LoyaltyMasterAccount? @relation(fields: [masterAccountId], references: [id])
-  
-  type            String               // EARN, REDEEM, ADJUST, LINK_TRANSFER
-  points          Int                  // Positive for earn, negative for redeem
-  description     String?
-  
+
+  type        String // EARN, REDEEM, ADJUST, LINK_TRANSFER
+  points      Int // Positive for earn, negative for redeem
+  description String?
+
   // Reference to sale transaction
-  transactionId   String?
-  franchiseId     String?              // Which location the transaction occurred at
-  
-  createdAt       DateTime             @default(now())
-  
+  transactionId String?
+  franchiseId   String? // Which location the transaction occurred at
+
+  createdAt DateTime @default(now())
+
   @@index([programId, createdAt])
   @@index([masterAccountId, createdAt])
 }
@@ -2458,149 +2595,149 @@ model PointsTransaction {
 
 // Service Packages - "Buy 5 massages, get 1 free"
 model ServicePackage {
-  id           String    @id @default(cuid())
-  franchiseId  String
-  franchise    Franchise @relation(fields: [franchiseId], references: [id])
-  
-  name         String                    // "5 Massage Bundle"
-  description  String?
-  serviceId    String                    // Which service this covers
-  service      Service   @relation(fields: [serviceId], references: [id])
-  
-  sessionsIncluded Int                   // 5, 10, etc.
-  price           Decimal               // Package price
-  validityDays    Int       @default(365) // Expires after X days
-  isActive        Boolean   @default(true)
-  
-  purchases    PackagePurchase[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+
+  name        String // "5 Massage Bundle"
+  description String?
+  serviceId   String // Which service this covers
+  service     Service @relation(fields: [serviceId], references: [id])
+
+  sessionsIncluded Int // 5, 10, etc.
+  price            Decimal // Package price
+  validityDays     Int     @default(365) // Expires after X days
+  isActive         Boolean @default(true)
+
+  purchases PackagePurchase[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 }
 
 // Purchase of a package by a client
 model PackagePurchase {
-  id           String         @id @default(cuid())
-  packageId    String
-  package      ServicePackage @relation(fields: [packageId], references: [id])
-  clientId     String
-  client       Client         @relation(fields: [clientId], references: [id])
-  
-  sessionsUsed    Int       @default(0)
+  id        String         @id @default(cuid())
+  packageId String
+  package   ServicePackage @relation(fields: [packageId], references: [id])
+  clientId  String
+  client    Client         @relation(fields: [clientId], references: [id])
+
+  sessionsUsed      Int      @default(0)
   sessionsRemaining Int
-  purchaseDate    DateTime  @default(now())
-  expiresAt       DateTime
-  transactionId   String?               // Original purchase transaction
-  
-  usages       PackageUsage[]
-  createdAt    DateTime  @default(now())
+  purchaseDate      DateTime @default(now())
+  expiresAt         DateTime
+  transactionId     String? // Original purchase transaction
+
+  usages    PackageUsage[]
+  createdAt DateTime       @default(now())
 }
 
 // Track each time a package session is used
 model PackageUsage {
-  id           String          @id @default(cuid())
-  purchaseId   String
-  purchase     PackagePurchase @relation(fields: [purchaseId], references: [id])
-  
-  usedAt       DateTime  @default(now())
-  appointmentId String?                 // Optional link to appointment
-  employeeId    String?                 // Who performed service
+  id         String          @id @default(cuid())
+  purchaseId String
+  purchase   PackagePurchase @relation(fields: [purchaseId], references: [id])
+
+  usedAt        DateTime @default(now())
+  appointmentId String? // Optional link to appointment
+  employeeId    String? // Who performed service
   notes         String?
 }
 
 // Resources - Chairs, Rooms, Equipment
 model Resource {
-  id           String    @id @default(cuid())
-  locationId   String
-  location     Location  @relation(fields: [locationId], references: [id])
-  
-  name         String                    // "Chair 1", "Room A", "Laser Machine"
-  type         String    @default("CHAIR") // CHAIR, ROOM, EQUIPMENT
-  description  String?
-  capacity     Int       @default(1)     // How many clients at once
-  isActive     Boolean   @default(true)
-  sortOrder    Int       @default(0)
-  
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
+  name        String // "Chair 1", "Room A", "Laser Machine"
+  type        String  @default("CHAIR") // CHAIR, ROOM, EQUIPMENT
+  description String?
+  capacity    Int     @default(1) // How many clients at once
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
   // Services that can use this resource (comma-separated IDs or null for all)
   allowedServiceIds String?
-  
+
   appointments Appointment[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 // Client Before/After Photos
 model ClientPhoto {
-  id           String    @id @default(cuid())
-  clientId     String
-  client       Client    @relation(fields: [clientId], references: [id])
-  
-  photoUrl     String                    // Storage URL
-  photoType    String    @default("PROGRESS") // BEFORE, AFTER, PROGRESS
-  caption      String?
-  serviceId    String?                   // What service this relates to
-  takenAt      DateTime  @default(now())
-  takenBy      String?                   // Employee who took it
-  
-  createdAt    DateTime  @default(now())
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  photoUrl  String // Storage URL
+  photoType String   @default("PROGRESS") // BEFORE, AFTER, PROGRESS
+  caption   String?
+  serviceId String? // What service this relates to
+  takenAt   DateTime @default(now())
+  takenBy   String? // Employee who took it
+
+  createdAt DateTime @default(now())
 }
 
 // Time-stamped Client Notes
 model ClientNote {
-  id           String    @id @default(cuid())
-  clientId     String
-  client       Client    @relation(fields: [clientId], references: [id])
-  
-  note         String
-  noteType     String    @default("GENERAL") // GENERAL, ALLERGY, PREFERENCE, APPOINTMENT, SERVICE
-  isPinned     Boolean   @default(false)     // Show prominently
-  createdBy    String?                  // Employee who added
-  
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  note      String
+  noteType  String  @default("GENERAL") // GENERAL, ALLERGY, PREFERENCE, APPOINTMENT, SERVICE
+  isPinned  Boolean @default(false) // Show prominently
+  createdBy String? // Employee who added
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Recurring Appointments - "Same time every 4 weeks"
 model RecurringAppointment {
-  id           String    @id @default(cuid())
-  locationId   String
-  location     Location  @relation(fields: [locationId], references: [id])
-  
-  clientId     String
-  client       Client    @relation(fields: [clientId], references: [id])
-  serviceId    String
-  service      Service   @relation(fields: [serviceId], references: [id])
-  employeeId   String?                   // Preferred employee (optional)
-  
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
+  clientId   String
+  client     Client  @relation(fields: [clientId], references: [id])
+  serviceId  String
+  service    Service @relation(fields: [serviceId], references: [id])
+  employeeId String? // Preferred employee (optional)
+
   // Pattern
-  frequency    String                    // WEEKLY, BIWEEKLY, MONTHLY
-  dayOfWeek    Int?                      // 0-6 for weekly (0 = Sunday)
-  dayOfMonth   Int?                      // 1-31 for monthly
-  preferredTime String                   // "10:00"
-  
+  frequency     String // WEEKLY, BIWEEKLY, MONTHLY
+  dayOfWeek     Int? // 0-6 for weekly (0 = Sunday)
+  dayOfMonth    Int? // 1-31 for monthly
+  preferredTime String // "10:00"
+
   // Limits
-  startDate    DateTime
-  endDate      DateTime?                 // Optional end date
-  maxOccurrences Int?                    // Or max number of appointments
-  
-  isActive     Boolean   @default(true)
-  lastGeneratedDate DateTime?            // Last date we generated an appointment
-  
+  startDate      DateTime
+  endDate        DateTime? // Optional end date
+  maxOccurrences Int? // Or max number of appointments
+
+  isActive          Boolean   @default(true)
+  lastGeneratedDate DateTime? // Last date we generated an appointment
+
   // Generated appointments from this pattern
   appointments Appointment[]
-  
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model CheckIn {
-  id        String   @id @default(cuid())
-  clientId  String
-  client    Client   @relation(fields: [clientId], references: [id])
-  locationId String
-  location  Location @relation(fields: [locationId], references: [id])
-  status    String   @default("WAITING") // WAITING, SERVED, CANCELLED
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id])
+  status      String   @default("WAITING") // WAITING, SERVED, CANCELLED
   checkedInAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt   DateTime @updatedAt
 
   @@index([locationId])
   @@index([status])
@@ -2613,67 +2750,67 @@ model LotteryGame {
   id          String    @id @default(cuid())
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id])
-  
+
   gameName    String
-  gameNumber  String    // State game number
+  gameNumber  String // State game number
   ticketPrice Decimal
   prizePool   Decimal?
-  isActive    Boolean   @default(true)
-  
-  packs       LotteryPack[]
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
+  isActive    Boolean  @default(true)
+
+  packs LotteryPack[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([franchiseId])
 }
 
 model LotteryPack {
-  id          String      @id @default(cuid())
-  gameId      String
-  game        LotteryGame @relation(fields: [gameId], references: [id])
-  locationId  String
-  location    Location    @relation(fields: [locationId], references: [id])
-  
-  packNumber  String      // Pack/book number
-  ticketCount Int         // Total tickets in pack
-  soldCount   Int         @default(0)
-  status      String      @default("INVENTORY") // INVENTORY, ACTIVATED, SETTLED
-  
+  id         String      @id @default(cuid())
+  gameId     String
+  game       LotteryGame @relation(fields: [gameId], references: [id])
+  locationId String
+  location   Location    @relation(fields: [locationId], references: [id])
+
+  packNumber  String // Pack/book number
+  ticketCount Int // Total tickets in pack
+  soldCount   Int    @default(0)
+  status      String @default("INVENTORY") // INVENTORY, ACTIVATED, SETTLED
+
   activatedAt DateTime?
   settledAt   DateTime?
-  
+
   transactions LotteryTransaction[]
-  
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([gameId, packNumber])
   @@index([locationId])
   @@index([status])
 }
 
 model LotteryTransaction {
-  id          String      @id @default(cuid())
+  id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise   @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
   locationId  String
-  location    Location    @relation(fields: [locationId], references: [id])
-  
-  packId      String?
-  pack        LotteryPack? @relation(fields: [packId], references: [id])
-  
-  type        String      // SALE, PAYOUT, CLAIM
-  amount      Decimal
-  ticketNumber String?    // For payouts/claims
-  
-  employeeId  String
-  
+  location    Location  @relation(fields: [locationId], references: [id])
+
+  packId String?
+  pack   LotteryPack? @relation(fields: [packId], references: [id])
+
+  type         String // SALE, PAYOUT, CLAIM
+  amount       Decimal
+  ticketNumber String? // For payouts/claims
+
+  employeeId String
+
   // Link to regular POS transaction if applicable
   transactionId String?
-  
-  createdAt   DateTime    @default(now())
-  
+
+  createdAt DateTime @default(now())
+
   @@index([franchiseId])
   @@index([locationId])
   @@index([packId])
@@ -2683,27 +2820,27 @@ model LotteryTransaction {
 // ============ TOBACCO SCAN DATA & REBATES ============
 
 model TobaccoScanSubmission {
-  id            String    @id @default(cuid())
-  franchiseId   String
-  franchise     Franchise @relation(fields: [franchiseId], references: [id])
-  locationId    String
-  location      Location  @relation(fields: [locationId], references: [id])
-  
-  manufacturer  String    // ALTRIA, RJR, ITG
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  locationId  String
+  location    Location  @relation(fields: [locationId], references: [id])
+
+  manufacturer  String // ALTRIA, RJR, ITG
   weekStartDate DateTime
   weekEndDate   DateTime
-  recordCount   Int       // Number of scans in this submission
-  totalAmount   Decimal?  // Total sales amount
-  
-  status        String    @default("PENDING") // PENDING, SUBMITTED, CONFIRMED, REJECTED
-  submittedAt   DateTime?
-  confirmedAt   DateTime?
-  fileUrl       String?   // URL to exported CSV
-  notes         String?
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
+  recordCount   Int // Number of scans in this submission
+  totalAmount   Decimal? // Total sales amount
+
+  status      String    @default("PENDING") // PENDING, SUBMITTED, CONFIRMED, REJECTED
+  submittedAt DateTime?
+  confirmedAt DateTime?
+  fileUrl     String? // URL to exported CSV
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([franchiseId])
   @@index([locationId])
   @@index([manufacturer])
@@ -2714,77 +2851,77 @@ model TobaccoScanSubmission {
 
 // Manufacturer portal configuration (API credentials for auto-submit)
 model ManufacturerConfig {
-  id            String    @id @default(cuid())
-  franchiseId   String
-  franchise     Franchise @relation(fields: [franchiseId], references: [id])
-  
-  manufacturer  String    // ALTRIA, RJR, ITG
-  
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+
+  manufacturer String // ALTRIA, RJR, ITG
+
   // Store credentials
-  storeId       String?   // Store ID in manufacturer's system
-  accountNumber String?   // Account/License number
-  apiKey        String?   // API key for auto-submit (encrypted)
-  apiSecret     String?   // API secret (encrypted)
-  portalUrl     String?   // Custom portal URL if applicable
-  
+  storeId       String? // Store ID in manufacturer's system
+  accountNumber String? // Account/License number
+  apiKey        String? // API key for auto-submit (encrypted)
+  apiSecret     String? // API secret (encrypted)
+  portalUrl     String? // Custom portal URL if applicable
+
   // Rebate tracking
-  rebatePerPack  Decimal  @default(0.04)  // $/pack rebate rate
-  rebatePerCarton Decimal @default(0.40)  // $/carton rebate rate
-  loyaltyBonus   Decimal  @default(0)     // Extra monthly loyalty bonus
-  
-  isActive      Boolean   @default(true)
-  lastSyncAt    DateTime?
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
+  rebatePerPack   Decimal @default(0.04) // $/pack rebate rate
+  rebatePerCarton Decimal @default(0.40) // $/carton rebate rate
+  loyaltyBonus    Decimal @default(0) // Extra monthly loyalty bonus
+
+  isActive   Boolean   @default(true)
+  lastSyncAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([franchiseId, manufacturer])
   @@index([franchiseId])
 }
 
 // Tobacco manufacturer deals/promotions
 model TobaccoDeal {
-  id            String    @id @default(cuid())
-  franchiseId   String
-  franchise     Franchise @relation(fields: [franchiseId], references: [id])
-  
-  manufacturer  String    // ALTRIA, RJR, ITG, ALL
-  dealName      String    // "Buy 2 Get $0.50 Off", "Loyalty Bonus"
-  dealType      String    // MULTI_BUY, LOYALTY, SCAN_REBATE, PROMO
-  
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+
+  manufacturer String // ALTRIA, RJR, ITG, ALL
+  dealName     String // "Buy 2 Get $0.50 Off", "Loyalty Bonus"
+  dealType     String // MULTI_BUY, LOYALTY, SCAN_REBATE, PROMO
+
   // Deal conditions
-  buyQuantity    Int?      // Buy X packs
-  getFreeQuantity Int?     // For penny deals: get Y for $0.01
-  discountType   String    // FIXED, PERCENT, PER_UNIT
-  discountAmount Decimal   // Amount off (cents or percent)
-  
+  buyQuantity     Int? // Buy X packs
+  getFreeQuantity Int? // For penny deals: get Y for $0.01
+  discountType    String // FIXED, PERCENT, PER_UNIT
+  discountAmount  Decimal // Amount off (cents or percent)
+
   // UPC matching (optional - for specific products)
-  applicableUpcs String?  // Comma-separated UPCs, or null for all
-  
+  applicableUpcs String? // Comma-separated UPCs, or null for all
+
   // Active period
-  startDate     DateTime
-  endDate       DateTime?
-  isActive      Boolean   @default(true)
-  
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean   @default(true)
+
   // Tracking
-  timesApplied  Int       @default(0)
-  totalSavings  Decimal   @default(0)
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  timesApplied Int     @default(0)
+  totalSavings Decimal @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Manufacturer Penny Program Fields
-  manufacturerPLU       String?   // 77282 - deal PLU from manufacturer
-  manufacturerName      String?   // Molson Coors, Altria, etc.
-  redemptionProgram     String?   // Affiliated-Molson Coors
-  name                  String?   // Product name from deal sheet
-  brand                 String?   // Brand name
-  description           String?   // Full deal description
-  
+  manufacturerPLU   String? // 77282 - deal PLU from manufacturer
+  manufacturerName  String? // Molson Coors, Altria, etc.
+  redemptionProgram String? // Affiliated-Molson Coors
+  name              String? // Product name from deal sheet
+  brand             String? // Brand name
+  description       String? // Full deal description
+
   // Link to inventory item
-  itemId                String?
-  item                  Item?     @relation(fields: [itemId], references: [id])
-  
+  itemId String?
+  item   Item?   @relation(fields: [itemId], references: [id])
+
   @@index([franchiseId])
   @@index([manufacturer])
   @@index([isActive])
@@ -2797,79 +2934,79 @@ model TobaccoDeal {
 // For handling location-based sales tax + volume-based excise taxes (like Cook County liquor tax)
 
 model TaxJurisdiction {
-  id            String    @id @default(cuid())
-  franchiseId   String
-  franchise     Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
-  
-  name          String    // "Cook County", "City of Chicago", "Illinois State"
-  type          String    // STATE, COUNTY, CITY, DISTRICT
-  code          String?   // FIPS code or jurisdiction identifier
-  
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+
+  name String // "Cook County", "City of Chicago", "Illinois State"
+  type String // STATE, COUNTY, CITY, DISTRICT
+  code String? // FIPS code or jurisdiction identifier
+
   // Sales Tax (percentage-based)
-  salesTaxRate  Decimal   @default(0) // e.g., 6.25 for 6.25%
-  
+  salesTaxRate Decimal @default(0) // e.g., 6.25 for 6.25%
+
   // Description for display
-  description   String?
-  
-  isActive      Boolean   @default(true)
-  
+  description String?
+
+  isActive Boolean @default(true)
+
   // Order for tax calculation (lower = calculated first)
-  priority      Int       @default(0)
-  
+  priority Int @default(0)
+
   // Excise tax rules for this jurisdiction (per-unit taxes)
   exciseTaxRules ExciseTaxRule[]
-  
+
   // Locations that apply this jurisdiction
-  locations     LocationTaxJurisdiction[]
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
+  locations LocationTaxJurisdiction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([franchiseId, name])
   @@index([franchiseId])
 }
 
 // Excise Tax Rules - per-unit taxes based on product type/volume
 model ExciseTaxRule {
-  id              String    @id @default(cuid())
-  jurisdictionId  String
-  jurisdiction    TaxJurisdiction @relation(fields: [jurisdictionId], references: [id], onDelete: Cascade)
-  
+  id             String          @id @default(cuid())
+  jurisdictionId String
+  jurisdiction   TaxJurisdiction @relation(fields: [jurisdictionId], references: [id], onDelete: Cascade)
+
   // Product type this rule applies to
-  productType     String    // BEER, WINE_LIGHT, WINE_HEAVY, SPIRITS, TOBACCO_PACK, TOBACCO_CARTON
-  
+  productType String // BEER, WINE_LIGHT, WINE_HEAVY, SPIRITS, TOBACCO_PACK, TOBACCO_CARTON
+
   // Tax calculation
-  ratePerGallon   Decimal?  // For liquids - rate per gallon (will be prorated by ml)
-  ratePerUnit     Decimal?  // For non-liquids - flat rate per unit (e.g., per cigarette pack)
-  ratePerOz       Decimal?  // Alternative - per ounce
-  
+  ratePerGallon Decimal? // For liquids - rate per gallon (will be prorated by ml)
+  ratePerUnit   Decimal? // For non-liquids - flat rate per unit (e.g., per cigarette pack)
+  ratePerOz     Decimal? // Alternative - per ounce
+
   // ABV thresholds for wine classification
-  minAbv          Decimal?  // Minimum ABV for this rule to apply
-  maxAbv          Decimal?  // Maximum ABV for this rule to apply
-  
-  description     String?   // "Cook County Spirits Tax"
-  isActive        Boolean   @default(true)
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  minAbv Decimal? // Minimum ABV for this rule to apply
+  maxAbv Decimal? // Maximum ABV for this rule to apply
+
+  description String? // "Cook County Spirits Tax"
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([jurisdictionId, productType])
   @@index([jurisdictionId])
 }
 
 // Many-to-many: Which jurisdictions apply to each location
 model LocationTaxJurisdiction {
-  id              String    @id @default(cuid())
-  locationId      String
-  location        Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  jurisdictionId  String
-  jurisdiction    TaxJurisdiction @relation(fields: [jurisdictionId], references: [id], onDelete: Cascade)
-  
+  id             String          @id @default(cuid())
+  locationId     String
+  location       Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  jurisdictionId String
+  jurisdiction   TaxJurisdiction @relation(fields: [jurisdictionId], references: [id], onDelete: Cascade)
+
   // Override: disable this jurisdiction for this specific location
-  isActive        Boolean   @default(true)
-  
-  createdAt       DateTime  @default(now())
-  
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
   @@unique([locationId, jurisdictionId])
   @@index([locationId])
   @@index([jurisdictionId])
@@ -2879,35 +3016,35 @@ model LocationTaxJurisdiction {
 // Tracks all charges and payments to customer store accounts
 
 model StoreAccountTransaction {
-  id          String    @id @default(cuid())
+  id          String @id @default(cuid())
   clientId    String
-  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client      Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   franchiseId String
-  
+
   // Transaction Type
-  type        String    // CHARGE = customer bought on account, PAYMENT = customer paid down balance
-  
+  type String // CHARGE = customer bought on account, PAYMENT = customer paid down balance
+
   // Amounts
-  amount      Decimal   // Positive for CHARGE, positive for PAYMENT
-  balanceAfter Decimal  // Running balance after this transaction
-  
+  amount       Decimal // Positive for CHARGE, positive for PAYMENT
+  balanceAfter Decimal // Running balance after this transaction
+
   // References
   transactionId String? // Link to the POS transaction (for CHARGE)
   invoiceNumber String? // Invoice reference
-  
+
   // Payment Details (for PAYMENT type)
   paymentMethod String? // CASH, CHECK, CARD
   checkNumber   String? // If paid by check
-  
+
   // Notes
-  note        String?
-  
+  note String?
+
   // Who processed this
-  employeeId  String
+  employeeId   String
   employeeName String?
-  
-  createdAt   DateTime  @default(now())
-  
+
+  createdAt DateTime @default(now())
+
   @@index([clientId])
   @@index([franchiseId])
   @@index([type])
@@ -2918,22 +3055,22 @@ model StoreAccountTransaction {
 
 // Inventory Transfer between stores
 model InventoryTransfer {
-  id              String    @id @default(cuid())
-  transferNumber  String    @unique // TR-001, TR-002, etc.
-  
+  id             String @id @default(cuid())
+  transferNumber String @unique // TR-001, TR-002, etc.
+
   // From/To Locations
-  fromLocationId  String
-  fromLocation    Location  @relation("TransfersFrom", fields: [fromLocationId], references: [id])
-  toLocationId    String
-  toLocation      Location  @relation("TransfersTo", fields: [toLocationId], references: [id])
-  
+  fromLocationId String
+  fromLocation   Location @relation("TransfersFrom", fields: [fromLocationId], references: [id])
+  toLocationId   String
+  toLocation     Location @relation("TransfersTo", fields: [toLocationId], references: [id])
+
   // Status: PENDING, APPROVED, IN_TRANSIT, RECEIVED, DISCREPANCY, CANCELLED
-  status          String    @default("PENDING")
-  
+  status String @default("PENDING")
+
   // Reason/Notes
-  reason          String?   // "Stock Balance", "Emergency Request", etc.
-  notes           String?
-  
+  reason String? // "Stock Balance", "Emergency Request", etc.
+  notes  String?
+
   // Workflow tracking
   requestedById   String
   requestedByName String?
@@ -2943,85 +3080,85 @@ model InventoryTransfer {
   shippedByName   String?
   receivedById    String?
   receivedByName  String?
-  
+
   // Timestamps
-  requestedAt     DateTime  @default(now())
-  approvedAt      DateTime?
-  shippedAt       DateTime?
-  receivedAt      DateTime?
-  
+  requestedAt DateTime  @default(now())
+  approvedAt  DateTime?
+  shippedAt   DateTime?
+  receivedAt  DateTime?
+
   // Value tracking
-  totalItems      Int       @default(0)
-  totalValue      Decimal   @default(0)
-  
+  totalItems Int     @default(0)
+  totalValue Decimal @default(0)
+
   // Items
-  items           TransferItem[]
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  items TransferItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([fromLocationId])
   @@index([toLocationId])
   @@index([status])
 }
 
 model TransferItem {
-  id              String    @id @default(cuid())
-  transferId      String
-  transfer        InventoryTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
-  
+  id         String            @id @default(cuid())
+  transferId String
+  transfer   InventoryTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
   // Product reference
-  itemId          String
-  item            Item      @relation(fields: [itemId], references: [id])
-  itemName        String    // Snapshot for history
-  itemSku         String?
-  itemBarcode     String?
-  
+  itemId      String
+  item        Item    @relation(fields: [itemId], references: [id])
+  itemName    String // Snapshot for history
+  itemSku     String?
+  itemBarcode String?
+
   // Quantities
-  quantitySent    Int
-  quantityReceived Int?     // Null until received
-  
+  quantitySent     Int
+  quantityReceived Int? // Null until received
+
   // Cost tracking
-  unitCost        Decimal   @default(0)
-  
+  unitCost Decimal @default(0)
+
   // Discrepancy
   discrepancyNote String?
-  
+
   @@index([transferId])
   @@index([itemId])
 }
 
 // Cash Drawer Count (shift open/close or mid-shift)
 model CashCount {
-  id              String    @id @default(cuid())
-  locationId      String
-  location        Location  @relation(fields: [locationId], references: [id])
-  
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
   // Type: OPEN, MID_SHIFT, CLOSE
-  type            String
-  
+  type String
+
   // Employee
-  employeeId      String
-  employeeName    String?
-  
+  employeeId   String
+  employeeName String?
+
   // Amounts
-  expectedCash    Decimal   @default(0)
-  countedCash     Decimal
-  variance        Decimal   @default(0) // countedCash - expectedCash
-  
+  expectedCash Decimal @default(0)
+  countedCash  Decimal
+  variance     Decimal @default(0) // countedCash - expectedCash
+
   // Denomination breakdown (JSON)
-  denominations   String?   // JSON: {"100": 2, "50": 1, "20": 5, ...}
-  
+  denominations String? // JSON: {"100": 2, "50": 1, "20": 5, ...}
+
   // Notes
-  note            String?
-  
+  note String?
+
   // Approval (if variance is high)
-  approvedById    String?
-  approvedByName  String?
-  approvedAt      DateTime?
-  
-  createdAt       DateTime  @default(now())
-  
+  approvedById   String?
+  approvedByName String?
+  approvedAt     DateTime?
+
+  createdAt DateTime @default(now())
+
   @@index([locationId])
   @@index([employeeId])
   @@index([type])
@@ -3030,58 +3167,58 @@ model CashCount {
 
 // Safe Drop (drawer to safe)
 model SafeDrop {
-  id              String    @id @default(cuid())
-  locationId      String
-  location        Location  @relation(fields: [locationId], references: [id])
-  
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
   // Employee
-  employeeId      String
-  employeeName    String?
-  
+  employeeId   String
+  employeeName String?
+
   // Amount
-  amount          Decimal
-  
+  amount Decimal
+
   // Verification (witnessed by manager)
   witnessedById   String?
   witnessedByName String?
-  
-  createdAt       DateTime  @default(now())
-  
+
+  createdAt DateTime @default(now())
+
   @@index([locationId])
   @@index([createdAt])
 }
 
 // Bank Deposit Log
 model DepositLog {
-  id              String    @id @default(cuid())
-  locationId      String
-  location        Location  @relation(fields: [locationId], references: [id])
-  
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
   // Expected vs Actual
   expectedAmount  Decimal
   depositedAmount Decimal
-  variance        Decimal   @default(0)
-  
+  variance        Decimal @default(0)
+
   // Bank details
-  bankDate        DateTime
-  slipNumber      String?
-  slipImageUrl    String?
-  
+  bankDate     DateTime
+  slipNumber   String?
+  slipImageUrl String?
+
   // Status: PENDING, DEPOSITED, RECONCILED, DISCREPANCY
-  status          String    @default("PENDING")
-  
+  status String @default("PENDING")
+
   // Who logged/reconciled
-  loggedById      String?
-  loggedByName    String?
-  reconciledById  String?
+  loggedById       String?
+  loggedByName     String?
+  reconciledById   String?
   reconciledByName String?
-  reconciledAt    DateTime?
-  
-  note            String?
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  reconciledAt     DateTime?
+
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([locationId])
   @@index([status])
   @@index([bankDate])
@@ -3089,42 +3226,42 @@ model DepositLog {
 
 // Audit Events (for Loss Prevention)
 model AuditEvent {
-  id              String    @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Where
-  locationId      String
-  location        Location  @relation(fields: [locationId], references: [id])
-  franchiseId     String
-  
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id])
+  franchiseId String
+
   // Who
-  employeeId      String?
-  employeeName    String?
-  
+  employeeId   String?
+  employeeName String?
+
   // What type: VOID, REFUND, PRICE_OVERRIDE, NO_SALE, LINE_DELETE, 
   //            ID_OVERRIDE, RETURN_NO_RECEIPT, MANUAL_DISCOUNT, 
   //            PRICE_CHANGE, COST_CHANGE, DRAWER_OPEN
-  eventType       String
-  
+  eventType String
+
   // Severity: LOW, MEDIUM, HIGH
-  severity        String    @default("LOW")
-  
+  severity String @default("LOW")
+
   // Details (JSON)
-  details         String?   // JSON with event-specific data
-  
+  details String? // JSON with event-specific data
+
   // Financial impact
-  amount          Decimal?
-  
+  amount Decimal?
+
   // Related transaction
-  transactionId   String?
-  
+  transactionId String?
+
   // Reviewed/Acknowledged
-  reviewedById    String?
-  reviewedByName  String?
-  reviewedAt      DateTime?
-  reviewNote      String?
-  
-  createdAt       DateTime  @default(now())
-  
+  reviewedById   String?
+  reviewedByName String?
+  reviewedAt     DateTime?
+  reviewNote     String?
+
+  createdAt DateTime @default(now())
+
   @@index([locationId])
   @@index([franchiseId])
   @@index([employeeId])
@@ -3135,47 +3272,516 @@ model AuditEvent {
 
 // Store Exceptions (Aggregated alerts for owner dashboard)
 model StoreException {
-  id              String    @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Where
-  locationId      String
-  location        Location  @relation(fields: [locationId], references: [id])
-  franchiseId     String
-  
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id])
+  franchiseId String
+
   // Type: LOW_STOCK, CASH_VARIANCE, VOID_SPIKE, REFUND_SPIKE, 
   //       DEPOSIT_OVERDUE, TRANSFER_DISCREPANCY, OFFLINE, DEVICE_ERROR
-  exceptionType   String
-  
+  exceptionType String
+
   // Severity: INFO, WARNING, CRITICAL
-  severity        String    @default("WARNING")
-  
+  severity String @default("WARNING")
+
   // Title and details
-  title           String
-  description     String?
-  
+  title       String
+  description String?
+
   // Status: ACTIVE, ACKNOWLEDGED, RESOLVED
-  status          String    @default("ACTIVE")
-  
+  status String @default("ACTIVE")
+
   // Actions taken
-  acknowledgedById String?
+  acknowledgedById   String?
   acknowledgedByName String?
-  acknowledgedAt  DateTime?
-  resolvedById    String?
-  resolvedByName  String?
-  resolvedAt      DateTime?
-  resolutionNote  String?
-  
+  acknowledgedAt     DateTime?
+  resolvedById       String?
+  resolvedByName     String?
+  resolvedAt         DateTime?
+  resolutionNote     String?
+
   // Related entity
-  relatedEntityType String?  // TRANSFER, DEPOSIT, EMPLOYEE, PRODUCT
+  relatedEntityType String? // TRANSFER, DEPOSIT, EMPLOYEE, PRODUCT
   relatedEntityId   String?
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([locationId])
   @@index([franchiseId])
   @@index([exceptionType])
   @@index([severity])
   @@index([status])
   @@index([createdAt])
+}
+
+// ============ LOCATION PAYMENT PROFILE (CRITICAL NEW) ============
+// MID/TID per location - replaces legacy fields on Location
+
+model LocationPaymentProfile {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  processorName String? // DATAWIRE, TSYS, VANTIV, WORLDPAY, FIRST_DATA
+  processorMID  String? // Merchant ID from processor
+  processorTID  String? // Terminal ID from processor
+  gateway       String? // Gateway name
+
+  // Surcharge configuration
+  surchargeType  String? // PERCENT, FIXED, NONE
+  surchargeValue Decimal? // Percentage or fixed amount
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([locationId])
+  @@index([processorMID])
+  @@index([processorTID])
+}
+
+// ============ LOCATION ITEM OVERRIDE (CRITICAL NEW) ============
+// Price/availability per store - THE KEY TO MULTI-STORE
+
+model LocationItemOverride {
+  id          String    @id @default(cuid())
+  locationId  String
+  location    Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+
+  // Exactly ONE of these must be set (Item OR Product OR Service)
+  itemId    String?
+  item      Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  // Overrides (null = inherit from parent)
+  priceOverride    Decimal? // Override price for this location
+  isActiveOverride Boolean? // Override availability (null=inherit, false=off, true=on)
+  taxGroupOverride String? // Override tax group
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([locationId, itemId])
+  @@unique([locationId, productId])
+  @@unique([locationId, serviceId])
+  @@index([locationId])
+  @@index([franchiseId])
+}
+
+// ============ STOCK ON HAND (CRITICAL NEW) ============
+// Inventory per location per item - replaces global Product.stock
+
+model StockOnHand {
+  id          String    @id @default(cuid())
+  locationId  String
+  location    Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+
+  // Item reference
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  qtyOnHand    Decimal @default(0)
+  reorderPoint Int? // Alert when stock <= this
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([locationId, itemId])
+  @@index([locationId])
+  @@index([itemId])
+}
+
+// ============ OPS: CLIENT CARD (NEW) ============
+// Location health/config status for support
+
+model ClientCard {
+  id         String   @id @default(cuid())
+  locationId String   @unique
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  posType    String? // POS software type
+  posVersion String? // POS software version
+  dbType     String? // Database type
+
+  healthJson   String? // JSON health status data
+  lastHealthAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============ OPS: TICKET (NEW) ============
+// Support ticket system
+
+model Ticket {
+  id       String @id @default(cuid())
+  publicId String @unique @default(cuid())
+
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  locationId  String
+  location    Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  createdByUserId  String?
+  createdByUser    User?   @relation("TicketCreator", fields: [createdByUserId], references: [id])
+  assignedToUserId String?
+  assignedToUser   User?   @relation("TicketAssignee", fields: [assignedToUserId], references: [id])
+
+  severity String // P0, P1, P2, P3, P4
+  status   String  @default("OPEN") // OPEN, PENDING, RESOLVED, CLOSED
+  category String?
+  subject  String
+
+  slaDueAt DateTime?
+
+  messages TicketMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, severity])
+  @@index([locationId])
+  @@index([franchiseId])
+  @@index([assignedToUserId])
+}
+
+// ============ OPS: TICKET MESSAGE (NEW) ============
+
+model TicketMessage {
+  id       String @id @default(cuid())
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorUserId String?
+  authorUser   User?   @relation("TicketMessageAuthor", fields: [authorUserId], references: [id])
+
+  isInternal Boolean @default(false) // Internal note vs customer-visible
+  message    String
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+// ============ OPS: INCIDENT (NEW) ============
+// System-wide incidents
+
+model Incident {
+  id       String @id @default(cuid())
+  publicId String @unique @default(cuid())
+
+  title  String
+  status String @default("INVESTIGATING") // INVESTIGATING, MONITORING, RESOLVED
+
+  impacts IncidentImpact[]
+
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  @@index([status])
+}
+
+// ============ OPS: INCIDENT IMPACT (NEW) ============
+
+model IncidentImpact {
+  id         String   @id @default(cuid())
+  incidentId String
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  // ONE of these must be set
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
+  terminalId String?
+  terminal   Terminal? @relation(fields: [terminalId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([incidentId])
+}
+
+// ============ OPS: DOCUMENT (NEW) ============
+// Onboarding documents
+
+model Document {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  locationId  String?
+  location    Location? @relation(fields: [locationId], references: [id])
+
+  docType  String // MPA, VOID_CHECK, SS4, DL, FEIN_LETTER, OTHER
+  fileName String
+  fileUrl  String
+  status   String @default("UPLOADED") // UPLOADED, VERIFIED, REJECTED
+
+  createdAt DateTime @default(now())
+
+  @@index([franchiseId, docType])
+  @@index([locationId])
+}
+
+// ============ ONBOARDING REQUEST (NEW) ============
+// Franchisor submits → Provider processes
+
+model OnboardingRequest {
+  id            String @id @default(cuid())
+  requestNumber String @unique // e.g. ORX-ONB-20251224-000123
+  requestType   Int // 1=NEW_FRANCHISEE, 2=ADD_LOCATION, 3=DEVICE_CHANGE
+  status        Int    @default(1) // 1=SUBMITTED,2=IN_REVIEW,3=WAITING_DOCS,4=APPROVED,5=SHIPPED,6=ACTIVE,7=REJECTED
+
+  franchisorId     String?
+  franchisor       Franchisor? @relation(fields: [franchisorId], references: [id])
+  franchiseId      String?
+  franchise        Franchise?  @relation("OnboardingRequests", fields: [franchiseId], references: [id])
+  createdByUserId  String
+  createdByUser    User        @relation("CreatedOnboardingRequests", fields: [createdByUserId], references: [id])
+  assignedToUserId String?
+  assignedToUser   User?       @relation("AssignedOnboardingRequests", fields: [assignedToUserId], references: [id])
+
+  businessType Int // 1=RETAIL, 2=SALON, 3=BOTH
+
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+
+  notes         String? // Visible notes
+  internalNotes String? // Provider only
+
+  submittedAt    DateTime  @default(now())
+  lastStatusAt   DateTime  @default(now())
+  approvedAt     DateTime?
+  rejectedAt     DateTime?
+  rejectedReason String?
+  activatedAt    DateTime?
+
+  // Relations
+  locations OnboardingRequestLocation[]
+  devices   OnboardingRequestDevice[]
+  documents OnboardingRequestDocument[]
+  shipments Shipment[]
+  events    OnboardingRequestEvent[]
+
+  @@index([status, submittedAt])
+  @@index([assignedToUserId, status])
+  @@index([franchisorId, status])
+  @@index([franchiseId])
+}
+
+// ============ ONBOARDING REQUEST LOCATION (NEW) ============
+// Requested locations (pre-creation)
+
+model OnboardingRequestLocation {
+  id                  String            @id @default(cuid())
+  onboardingRequestId String
+  onboardingRequest   OnboardingRequest @relation(fields: [onboardingRequestId], references: [id], onDelete: Cascade)
+
+  franchiseId String?
+  franchise   Franchise? @relation("OnboardingLocations", fields: [franchiseId], references: [id])
+  locationId  String?
+  location    Location?  @relation("OnboardingLocations", fields: [locationId], references: [id])
+
+  locationName String
+  phone        String?
+
+  address1   String
+  address2   String?
+  city       String
+  state      String
+  postalCode String
+  country    String  @default("USA")
+
+  requestedTerminals Int @default(0)
+  requestedStations  Int @default(0)
+
+  notes     String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  devices   OnboardingRequestDevice[]
+  documents OnboardingRequestDocument[]
+
+  @@index([onboardingRequestId])
+  @@index([locationId])
+}
+
+// ============ ONBOARDING REQUEST DEVICE (NEW) ============
+// Devices reserved/assigned for request
+
+model OnboardingRequestDevice {
+  id                  String                     @id @default(cuid())
+  onboardingRequestId String
+  onboardingRequest   OnboardingRequest          @relation(fields: [onboardingRequestId], references: [id], onDelete: Cascade)
+  requestLocationId   String?
+  requestLocation     OnboardingRequestLocation? @relation(fields: [requestLocationId], references: [id])
+
+  locationId String?
+  location   Location? @relation("OnboardingDevices", fields: [locationId], references: [id])
+  terminalId String?
+  terminal   Terminal? @relation("OnboardingDevices", fields: [terminalId], references: [id])
+
+  deviceType       Int // 1=PAYMENT_TERMINAL, 2=STATION_REGISTER, 3=OTHER
+  model            String?
+  serialNumber     String?
+  ipAddress        String?
+  port             Int?
+  assignmentStatus Int       @default(1) // 1=RESERVED, 2=ASSIGNED, 3=REMOVED
+  assignedAt       DateTime?
+
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([onboardingRequestId, assignmentStatus])
+  @@index([terminalId])
+}
+
+// ============ ONBOARDING REQUEST DOCUMENT (NEW) ============
+// Docs collected for onboarding
+
+model OnboardingRequestDocument {
+  id                  String                     @id @default(cuid())
+  onboardingRequestId String
+  onboardingRequest   OnboardingRequest          @relation(fields: [onboardingRequestId], references: [id], onDelete: Cascade)
+  requestLocationId   String?
+  requestLocation     OnboardingRequestLocation? @relation(fields: [requestLocationId], references: [id])
+
+  docType Int // 1=DL, 2=SS4_FEIN, 3=VOID_CHECK, 4=LEASE, 5=OTHER
+  status  Int @default(1) // 1=MISSING, 2=UPLOADED, 3=VERIFIED, 4=REJECTED
+
+  fileName         String?
+  contentType      String?
+  fileUrl          String?
+  uploadedByUserId String?
+  uploadedByUser   User?     @relation("UploadedOnboardingDocs", fields: [uploadedByUserId], references: [id])
+  uploadedAt       DateTime?
+
+  verifiedByUserId String?
+  verifiedByUser   User?     @relation("VerifiedOnboardingDocs", fields: [verifiedByUserId], references: [id])
+  verifiedAt       DateTime?
+  rejectReason     String?
+
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([onboardingRequestId, status])
+}
+
+// ============ SHIPMENT (NEW) ============
+// Shipping header
+
+model Shipment {
+  id                  String             @id @default(cuid())
+  onboardingRequestId String?
+  onboardingRequest   OnboardingRequest? @relation(fields: [onboardingRequestId], references: [id])
+  franchiseId         String?
+  franchise           Franchise?         @relation("Shipments", fields: [franchiseId], references: [id])
+  locationId          String?
+  location            Location?          @relation("Shipments", fields: [locationId], references: [id])
+
+  status         Int     @default(1) // 1=DRAFT, 2=READY, 3=SHIPPED, 4=DELIVERED, 5=CANCELLED
+  carrier        String? // UPS, FedEx, USPS, Other
+  serviceLevel   String?
+  trackingNumber String?
+
+  shipToName       String?
+  shipToPhone      String?
+  shipToAddress1   String
+  shipToAddress2   String?
+  shipToCity       String
+  shipToState      String
+  shipToPostalCode String
+  shipToCountry    String  @default("USA")
+
+  notes String?
+
+  createdByUserId String
+  createdByUser   User      @relation("CreatedShipments", fields: [createdByUserId], references: [id])
+  createdAt       DateTime  @default(now())
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+
+  // Relations
+  packages ShipmentPackage[]
+  items    ShipmentItem[]
+
+  @@index([onboardingRequestId, status])
+  @@index([trackingNumber])
+  @@index([locationId, status])
+}
+
+// ============ SHIPMENT PACKAGE (NEW) ============
+// Multi-box shipments
+
+model ShipmentPackage {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  packageNo Int
+  weightLb  Float?
+  lengthIn  Float?
+  widthIn   Float?
+  heightIn  Float?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  items ShipmentItem[]
+
+  @@unique([shipmentId, packageNo])
+  @@index([shipmentId])
+}
+
+// ============ SHIPMENT ITEM (NEW) ============
+// What's inside each package
+
+model ShipmentItem {
+  id         String           @id @default(cuid())
+  shipmentId String
+  shipment   Shipment         @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  packageId  String?
+  package    ShipmentPackage? @relation(fields: [packageId], references: [id])
+
+  itemType     Int // 1=TERMINAL, 2=STATION, 3=ACCESSORY, 4=OTHER
+  terminalId   String?
+  terminal     Terminal? @relation("ShippedTerminals", fields: [terminalId], references: [id])
+  serialNumber String?
+
+  sku      String?
+  itemName String
+  qty      Int     @default(1)
+
+  createdAt DateTime @default(now())
+
+  @@index([shipmentId])
+  @@index([terminalId])
+}
+
+// ============ ONBOARDING REQUEST EVENT (NEW) ============
+// Timeline/audit feed
+
+model OnboardingRequestEvent {
+  id                  String            @id @default(cuid())
+  onboardingRequestId String
+  onboardingRequest   OnboardingRequest @relation(fields: [onboardingRequestId], references: [id], onDelete: Cascade)
+
+  eventType   Int // 1=STATUS_CHANGE, 2=NOTE, 3=DOC_REQUEST, 4=DOC_UPLOADED, 5=DOC_VERIFIED, 6=DEVICE_ASSIGNED, 7=SHIPMENT_CREATED, 8=ACTIVATED
+  message     String?
+  actorUserId String?
+  actorUser   User?   @relation("OnboardingEventActor", fields: [actorUserId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([onboardingRequestId, createdAt])
 }

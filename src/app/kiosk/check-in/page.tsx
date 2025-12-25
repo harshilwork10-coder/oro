@@ -88,7 +88,7 @@ export default function KioskCheckInPage() {
                 <div className="relative z-10 bg-stone-900/50 backdrop-blur-md border-b border-stone-800 p-6 shadow-lg flex items-center justify-center">
                     <div className="flex items-center gap-3">
                         <OroLogo size={32} />
-                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">Oro</span>
+                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">OroNext</span>
                     </div>
                 </div>
 
@@ -149,7 +149,7 @@ export default function KioskCheckInPage() {
                 <div className="relative z-10 bg-stone-900/50 backdrop-blur-md border-b border-stone-800 p-6 shadow-lg flex items-center justify-center">
                     <div className="flex items-center gap-3">
                         <OroLogo size={32} />
-                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">Oro</span>
+                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">OroNext</span>
                     </div>
                 </div>
 

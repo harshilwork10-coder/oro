@@ -1,5 +1,5 @@
 /**
- * Generate a unique license key in the format: AURA-XXXX-XXXX-XXXX
+ * Generate a unique license key in the format: ORO-XXXX-XXXX-XXXX
  */
 export function generateLicenseKey(): string {
     const segments: string[] = []
@@ -10,12 +10,12 @@ export function generateLicenseKey(): string {
         segments.push(segment)
     }
 
-    return `AURA-${segments.join('-')}`
+    return `ORO-${segments.join('-')}`
 }
 
 /**
  * Example outputs:
- * - AURA-X7K9-P2M4-Q8N3
- * - AURA-A1B2-C3D4-E5F6
- * - AURA-9Z8Y-7X6W-5V4U
+ * - ORO-X7K9-P2M4-Q8N3
+ * - ORO-A1B2-C3D4-E5F6
+ * - ORO-9Z8Y-7X6W-5V4U
  */

@@ -3,16 +3,22 @@
 import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Loader2, TrendingUp, Shield, Zap, BarChart3, KeyRound, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react'
+import { Loader2, TrendingUp, Shield, Zap, BarChart3, KeyRound, Mail, Lock, ArrowRight, Sparkles, ShieldCheck, ArrowLeft } from 'lucide-react'
 
 export default function LoginPage() {
     const router = useRouter()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [mfaCode, setMfaCode] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [isPairedDevice, setIsPairedDevice] = useState(false)
     const [focusedInput, setFocusedInput] = useState<string | null>(null)
+
+    // MFA state
+    const [mfaRequired, setMfaRequired] = useState(false)
+    const [mfaUserId, setMfaUserId] = useState<string | null>(null)
+    const [mfaUserName, setMfaUserName] = useState<string | null>(null)
 
     // Check if this device is paired to a station (configured POS device)
     useEffect(() => {
@@ -28,6 +34,60 @@ export default function LoginPage() {
         setError('')
 
         try {
+            // Step 1: Pre-login to check password and MFA requirement
+            if (!mfaRequired) {
+                const preLoginRes = await fetch('/api/auth/pre-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                })
+
+                const preLoginData = await preLoginRes.json()
+
+                if (!preLoginRes.ok) {
+                    if (preLoginData.locked) {
+                        setError(preLoginData.error || 'Account is locked')
+                    } else {
+                        setError(preLoginData.error || 'Invalid credentials')
+                    }
+                    setLoading(false)
+                    return
+                }
+
+                // Check if MFA is required
+                if (preLoginData.mfaRequired) {
+                    setMfaRequired(true)
+                    setMfaUserId(preLoginData.userId)
+                    setMfaUserName(preLoginData.userName)
+                    setLoading(false)
+                    return
+                }
+            }
+
+            // Step 2: If MFA is required, verify the code first
+            if (mfaRequired && mfaUserId) {
+                if (!mfaCode || mfaCode.length < 6) {
+                    setError('Please enter your 6-digit authentication code')
+                    setLoading(false)
+                    return
+                }
+
+                const mfaRes = await fetch('/api/auth/mfa/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: mfaUserId, token: mfaCode })
+                })
+
+                const mfaData = await mfaRes.json()
+
+                if (!mfaRes.ok) {
+                    setError(mfaData.error || 'Invalid authentication code')
+                    setLoading(false)
+                    return
+                }
+            }
+
+            // Step 3: Complete login with NextAuth
             const result = await signIn('credentials', {
                 email,
                 password,
@@ -41,7 +101,33 @@ export default function LoginPage() {
                 }
                 setError('Invalid credentials')
             } else {
-                router.push('/dashboard')
+                // Role-based routing after successful login
+                try {
+                    const sessionRes = await fetch('/api/auth/session');
+                    const session = await sessionRes.json();
+                    const role = session?.user?.role;
+                    const businessType = session?.user?.businessType;
+
+                    if (role === 'PROVIDER' || role === 'ADMIN') {
+                        router.push('/provider/home');
+                    } else if (role === 'FRANCHISOR') {
+                        // BRAND_FRANCHISOR goes to franchisor dashboard
+                        // MULTI_LOCATION_OWNER goes to regular dashboard
+                        if (businessType === 'BRAND_FRANCHISOR') {
+                            router.push('/franchisor');
+                        } else {
+                            router.push('/dashboard');
+                        }
+                    } else if (role === 'OWNER') {
+                        router.push('/owner');
+                    } else if (role === 'EMPLOYEE' || role === 'MANAGER') {
+                        router.push('/employee');
+                    } else {
+                        router.push('/dashboard');
+                    }
+                } catch {
+                    router.push('/dashboard');
+                }
                 router.refresh()
             }
         } catch (err) {
@@ -50,6 +136,15 @@ export default function LoginPage() {
             setLoading(false)
         }
     }
+
+    const resetMFA = () => {
+        setMfaRequired(false)
+        setMfaUserId(null)
+        setMfaUserName(null)
+        setMfaCode('')
+        setError('')
+    }
+
 
     const features = [
         {
@@ -127,7 +222,7 @@ export default function LoginPage() {
                             </div>
                         </div>
                         <div>
-                            <h1 className="text-5xl font-black text-white tracking-tight drop-shadow-lg">Oro</h1>
+                            <h1 className="text-5xl font-black text-white tracking-tight drop-shadow-lg">OroNext</h1>
                             <p className="text-orange-100/90 text-lg font-medium mt-1 flex items-center gap-2">
                                 <Sparkles className="h-4 w-4" />
                                 Ultimate Business Solution
@@ -196,120 +291,197 @@ export default function LoginPage() {
                                 <img src="/oro-logo.png" alt="Oro" className="w-full h-full object-contain" />
                             </div>
                         </div>
-                        <h1 className="text-4xl font-black bg-gradient-to-r from-orange-400 via-amber-400 to-orange-400 bg-clip-text text-transparent">Oro</h1>
+                        <h1 className="text-4xl font-black bg-gradient-to-r from-orange-400 via-amber-400 to-orange-400 bg-clip-text text-transparent">OroNext</h1>
                         <p className="text-stone-400 text-sm">Ultimate Business Solution</p>
                     </div>
 
                     {/* Login Card */}
                     <div className="bg-stone-900/50 backdrop-blur-xl rounded-3xl p-8 border border-stone-800/50 shadow-2xl">
-                        <div className="text-center mb-8">
-                            <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-orange-500/20 to-amber-500/20 rounded-2xl mb-4 border border-orange-500/20">
-                                <span className="text-3xl">👋</span>
-                            </div>
-                            <h2 className="text-3xl font-bold text-white">Welcome back!</h2>
-                            <p className="mt-2 text-stone-400">Sign in to your Oro account</p>
-                        </div>
-
-                        <form className="space-y-5" onSubmit={handleSubmit}>
-                            {/* Email Input */}
-                            <div className="relative">
-                                <label htmlFor="email-address" className="block text-sm font-medium text-stone-300 mb-2">
-                                    Email address
-                                </label>
-                                <div className="relative">
-                                    <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 transition-colors ${focusedInput === 'email' ? 'text-orange-400' : 'text-stone-500'}`} />
-                                    <input
-                                        id="email-address"
-                                        name="email"
-                                        type="email"
-                                        autoComplete="email"
-                                        required
-                                        className="w-full pl-12 pr-4 py-3.5 bg-stone-900 border-2 border-stone-700 rounded-xl text-white placeholder-stone-500 focus:ring-0 focus:border-orange-500 transition-all duration-200"
-                                        placeholder="you@example.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        onFocus={() => setFocusedInput('email')}
-                                        onBlur={() => setFocusedInput(null)}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Password Input */}
-                            <div className="relative">
-                                <label htmlFor="password" className="block text-sm font-medium text-stone-300 mb-2">
-                                    Password
-                                </label>
-                                <div className="relative">
-                                    <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 transition-colors ${focusedInput === 'password' ? 'text-orange-400' : 'text-stone-500'}`} />
-                                    <input
-                                        id="password"
-                                        name="password"
-                                        type="password"
-                                        autoComplete="current-password"
-                                        required
-                                        className="w-full pl-12 pr-4 py-3.5 bg-stone-900 border-2 border-stone-700 rounded-xl text-white placeholder-stone-500 focus:ring-0 focus:border-orange-500 transition-all duration-200"
-                                        placeholder="Enter your password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        onFocus={() => setFocusedInput('password')}
-                                        onBlur={() => setFocusedInput(null)}
-                                    />
-                                </div>
-                            </div>
-
-                            {error && (
-                                <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2 animate-shake">
-                                    <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-                                    {error}
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-4 px-4 rounded-xl transition-all duration-200 shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 group"
-                            >
-                                {loading ? (
-                                    <>
-                                        <Loader2 className="h-5 w-5 animate-spin" />
-                                        Signing in...
-                                    </>
-                                ) : (
-                                    <>
-                                        Sign in
-                                        <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                                    </>
-                                )}
-                            </button>
-                        </form>
-
-                        {/* Employee PIN Login Section */}
-                        <div className="mt-6 pt-6 border-t border-stone-700/50">
-                            {isPairedDevice && (
-                                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 mb-4 flex items-center justify-center gap-2">
-                                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                                    <p className="text-emerald-400 text-sm font-medium">
-                                        Configured POS Device
+                        {/* MFA Verification Step */}
+                        {mfaRequired ? (
+                            <>
+                                <div className="text-center mb-8">
+                                    <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl mb-4 border border-blue-500/20">
+                                        <ShieldCheck className="h-7 w-7 text-blue-400" />
+                                    </div>
+                                    <h2 className="text-2xl font-bold text-white">Two-Factor Authentication</h2>
+                                    <p className="mt-2 text-stone-400">
+                                        Hi {mfaUserName || 'there'}! Enter the code from your authenticator app
                                     </p>
                                 </div>
-                            )}
-                            <a
-                                href="/employee-login"
-                                className={`w-full flex items-center justify-center gap-3 font-semibold py-3.5 px-4 rounded-xl transition-all border-2 group ${isPairedDevice
-                                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-transparent hover:shadow-lg hover:shadow-orange-500/25'
-                                    : 'bg-stone-800/50 hover:bg-stone-800 text-stone-300 hover:text-white border-stone-700 hover:border-stone-600'
-                                    }`}
-                            >
-                                <KeyRound className="h-5 w-5" />
-                                {isPairedDevice ? 'Employee PIN Login (Recommended)' : 'Employee? Use PIN Login'}
-                                <ArrowRight className="h-4 w-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                            </a>
-                            {isPairedDevice && (
-                                <p className="text-stone-500 text-xs text-center mt-3">
-                                    Owner? Use email login above for dashboard access
-                                </p>
-                            )}
-                        </div>
+
+                                <form className="space-y-5" onSubmit={handleSubmit}>
+                                    {/* MFA Code Input */}
+                                    <div className="relative">
+                                        <label htmlFor="mfa-code" className="block text-sm font-medium text-stone-300 mb-2">
+                                            Authentication Code
+                                        </label>
+                                        <input
+                                            id="mfa-code"
+                                            name="mfaCode"
+                                            type="text"
+                                            inputMode="numeric"
+                                            autoComplete="one-time-code"
+                                            required
+                                            maxLength={9}
+                                            className="w-full px-4 py-4 bg-stone-900 border-2 border-stone-700 rounded-xl text-white text-center text-2xl font-mono tracking-[0.5em] placeholder-stone-500 focus:ring-0 focus:border-blue-500 transition-all duration-200"
+                                            placeholder="------"
+                                            value={mfaCode}
+                                            onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9A-Za-z-]/g, '').slice(0, 9))}
+                                            autoFocus
+                                        />
+                                        <p className="text-stone-500 text-xs mt-2 text-center">
+                                            Enter 6-digit code or backup code (XXXX-XXXX)
+                                        </p>
+                                    </div>
+
+                                    {error && (
+                                        <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2 animate-shake">
+                                            <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+                                            {error}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="submit"
+                                        disabled={loading || mfaCode.length < 6}
+                                        className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold py-4 px-4 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <Loader2 className="h-5 w-5 animate-spin" />
+                                                Verifying...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ShieldCheck className="h-5 w-5" />
+                                                Verify & Sign In
+                                            </>
+                                        )}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={resetMFA}
+                                        className="w-full flex items-center justify-center gap-2 text-stone-400 hover:text-white py-2 transition-colors"
+                                    >
+                                        <ArrowLeft className="h-4 w-4" />
+                                        Back to login
+                                    </button>
+                                </form>
+                            </>
+                        ) : (
+                            <>
+                                <div className="text-center mb-8">
+                                    <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-orange-500/20 to-amber-500/20 rounded-2xl mb-4 border border-orange-500/20">
+                                        <span className="text-3xl">👋</span>
+                                    </div>
+                                    <h2 className="text-3xl font-bold text-white">Welcome back!</h2>
+                                    <p className="mt-2 text-stone-400">Sign in to your Oro account</p>
+                                </div>
+
+                                <form className="space-y-5" onSubmit={handleSubmit}>
+                                    {/* Email Input */}
+                                    <div className="relative">
+                                        <label htmlFor="email-address" className="block text-sm font-medium text-stone-300 mb-2">
+                                            Email address
+                                        </label>
+                                        <div className="relative">
+                                            <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 transition-colors ${focusedInput === 'email' ? 'text-orange-400' : 'text-stone-500'}`} />
+                                            <input
+                                                id="email-address"
+                                                name="email"
+                                                type="email"
+                                                autoComplete="email"
+                                                required
+                                                className="w-full pl-12 pr-4 py-3.5 bg-stone-900 border-2 border-stone-700 rounded-xl text-white placeholder-stone-500 focus:ring-0 focus:border-orange-500 transition-all duration-200"
+                                                placeholder="you@example.com"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                onFocus={() => setFocusedInput('email')}
+                                                onBlur={() => setFocusedInput(null)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Password Input */}
+                                    <div className="relative">
+                                        <label htmlFor="password" className="block text-sm font-medium text-stone-300 mb-2">
+                                            Password
+                                        </label>
+                                        <div className="relative">
+                                            <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 transition-colors ${focusedInput === 'password' ? 'text-orange-400' : 'text-stone-500'}`} />
+                                            <input
+                                                id="password"
+                                                name="password"
+                                                type="password"
+                                                autoComplete="current-password"
+                                                required
+                                                className="w-full pl-12 pr-4 py-3.5 bg-stone-900 border-2 border-stone-700 rounded-xl text-white placeholder-stone-500 focus:ring-0 focus:border-orange-500 transition-all duration-200"
+                                                placeholder="Enter your password"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                onFocus={() => setFocusedInput('password')}
+                                                onBlur={() => setFocusedInput(null)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {error && (
+                                        <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2 animate-shake">
+                                            <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+                                            {error}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-4 px-4 rounded-xl transition-all duration-200 shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 group"
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <Loader2 className="h-5 w-5 animate-spin" />
+                                                Signing in...
+                                            </>
+                                        ) : (
+                                            <>
+                                                Sign in
+                                                <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                                            </>
+                                        )}
+                                    </button>
+                                </form>
+
+                                {/* Employee PIN Login Section */}
+                                <div className="mt-6 pt-6 border-t border-stone-700/50">
+                                    {isPairedDevice && (
+                                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 mb-4 flex items-center justify-center gap-2">
+                                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                                            <p className="text-emerald-400 text-sm font-medium">
+                                                Configured POS Device
+                                            </p>
+                                        </div>
+                                    )}
+                                    <a
+                                        href="/employee-login"
+                                        className={`w-full flex items-center justify-center gap-3 font-semibold py-3.5 px-4 rounded-xl transition-all border-2 group ${isPairedDevice
+                                            ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-transparent hover:shadow-lg hover:shadow-orange-500/25'
+                                            : 'bg-stone-800/50 hover:bg-stone-800 text-stone-300 hover:text-white border-stone-700 hover:border-stone-600'
+                                            }`}
+                                    >
+                                        <KeyRound className="h-5 w-5" />
+                                        {isPairedDevice ? 'Employee PIN Login (Recommended)' : 'Employee? Use PIN Login'}
+                                        <ArrowRight className="h-4 w-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                                    </a>
+                                    {isPairedDevice && (
+                                        <p className="text-stone-500 text-xs text-center mt-3">
+                                            Owner? Use email login above for dashboard access
+                                        </p>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <p className="mt-8 text-center text-sm text-stone-600">
@@ -342,3 +514,4 @@ export default function LoginPage() {
         </div>
     )
 }
+

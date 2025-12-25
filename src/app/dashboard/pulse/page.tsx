@@ -141,7 +141,7 @@ export default function OroPulsePage() {
                         <OroLogo size={36} showText={false} />
                         <div>
                             <h1 className="text-lg font-bold flex items-center gap-1.5">
-                                <span className="text-orange-500">Oro</span>
+                                <span className="text-orange-500">OroNext</span>
                                 <span className="text-gray-300">Pulse</span>
                                 <Zap className="w-4 h-4 text-yellow-400" />
                             </h1>

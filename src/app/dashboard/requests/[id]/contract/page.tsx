@@ -76,7 +76,7 @@ export default function ContractPage() {
                         <p>This Agreement is entered into between Oro POS ("Licensor") and the Customer ("Licensee").</p>
 
                         <h4>1. GRANT OF LICENSE</h4>
-                        <p>Licensor grants Licensee a non-exclusive, non-transferable license to use the Oronex POS software for the number of stations specified in the Order.</p>
+                        <p>Licensor grants Licensee a non-exclusive, non-transferable license to use the OroNext POS software for the number of stations specified in the Order.</p>
 
                         <h4>2. FEES AND PAYMENT</h4>
                         <p>Licensee agrees to pay the monthly subscription fees associated with the active stations. Fees are billed automatically to the payment method on file.</p>
