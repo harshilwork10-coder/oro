@@ -162,6 +162,19 @@ export default function RetailPOSPage() {
     const [showReceiptModal, setShowReceiptModal] = useState(false)
     const [pendingReceiptData, setPendingReceiptData] = useState<any>(null)
 
+    // Auto-detect screen size for responsive POS layout
+    // Small screens (< 800px height) = compact mode
+    const [compactMode, setCompactMode] = useState(false)
+    useEffect(() => {
+        const checkScreenSize = () => {
+            // Compact mode for screens under 800px height (typical 15.5" POS at 1366x768)
+            setCompactMode(window.innerHeight < 800)
+        }
+        checkScreenSize()
+        window.addEventListener('resize', checkScreenSize)
+        return () => window.removeEventListener('resize', checkScreenSize)
+    }, [])
+
     // Case Break (Single vs 6-Pack vs Case) Selection
     const [showCaseBreakModal, setShowCaseBreakModal] = useState(false)
     const [pendingCaseBreakProduct, setPendingCaseBreakProduct] = useState<any>(null)
@@ -947,8 +960,8 @@ export default function RetailPOSPage() {
                 />
             )}
 
-            {/* Today's Stats Header Bar */}
-            {todayStats && (
+            {/* Today's Stats Header Bar - Hidden on compact screens */}
+            {todayStats && !compactMode && (
                 <div className="flex items-center justify-center gap-8 py-2 bg-stone-900/50 border-b border-stone-800 text-sm">
                     <div className="flex items-center gap-2">
                         <span className="text-stone-500">Today:</span>
@@ -965,8 +978,8 @@ export default function RetailPOSPage() {
                 </div>
             )}
 
-            {/* Top Bar */}
-            <div className="flex items-center gap-4 p-3 bg-stone-900 border-b border-stone-800">
+            {/* Top Bar - More compact on small screens */}
+            <div className={`flex items-center gap-4 bg-stone-900 border-b border-stone-800 ${compactMode ? 'p-2' : 'p-3'}`}>
                 {/* Barcode Input - LEFT side */}
                 <div className="flex items-center gap-2 flex-1">
                     <div className="relative flex-1 max-w-md">
@@ -978,7 +991,7 @@ export default function RetailPOSPage() {
                             onChange={(e) => setBarcodeInput(e.target.value)}
                             onKeyDown={handleBarcodeScan}
                             placeholder="Scan Barcode Now..."
-                            className="w-full pl-10 pr-4 py-3 bg-stone-800 border border-stone-700 rounded-lg focus:outline-none focus:border-orange-500 text-lg font-mono"
+                            className={`w-full pl-10 pr-4 bg-stone-800 border border-stone-700 rounded-lg focus:outline-none focus:border-orange-500 font-mono ${compactMode ? 'py-2 text-base' : 'py-3 text-lg'}`}
                             autoFocus
                         />
                     </div>
@@ -1221,25 +1234,25 @@ export default function RetailPOSPage() {
                         )}
                     </div>
 
-                    {/* Bottom Action Bar */}
-                    <div className="flex flex-col gap-2 p-3 bg-stone-900 border-t border-stone-800">
-                        {/* Primary Actions */}
-                        <div className="grid grid-cols-6 gap-2">
+                    {/* Bottom Action Bar - Compact for 15.5" POS */}
+                    <div className="flex flex-col gap-1 p-2 bg-stone-900 border-t border-stone-800">
+                        {/* Row 1: Primary Actions - 7 columns */}
+                        <div className="grid grid-cols-7 gap-1">
                             <button
                                 onClick={voidTransaction}
                                 disabled={cart.length === 0}
-                                className="flex flex-col items-center justify-center gap-1 py-3 bg-red-900/20 hover:bg-red-900/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-red-500 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-red-900/20 hover:bg-red-900/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-red-500 transition-colors"
                             >
-                                <X className="h-6 w-6" />
-                                <span className="text-xs">VOID</span>
+                                <X className="h-5 w-5" />
+                                <span className="text-[10px]">VOID</span>
                             </button>
                             <button
                                 onClick={deleteSelectedItem}
                                 disabled={selectedItemIndex === null}
-                                className="flex flex-col items-center justify-center gap-1 py-3 bg-red-500/20 hover:bg-red-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-red-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-red-500/20 hover:bg-red-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-red-400 transition-colors"
                             >
-                                <Trash2 className="h-6 w-6" />
-                                <span className="text-xs">DELETE</span>
+                                <Trash2 className="h-5 w-5" />
+                                <span className="text-[10px]">DELETE</span>
                             </button>
                             <button
                                 onClick={() => {
@@ -1250,84 +1263,80 @@ export default function RetailPOSPage() {
                                     }
                                 }}
                                 disabled={cart.length === 0}
-                                className="flex flex-col items-center justify-center gap-1 py-3 bg-orange-500/20 hover:bg-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-orange-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-orange-500/20 hover:bg-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-orange-400 transition-colors"
                             >
-                                <Tag className="h-6 w-6" />
-                                <span className="text-xs">{selectedItemIndex !== null ? 'ITEM %' : 'INVOICE %'}</span>
+                                <Tag className="h-5 w-5" />
+                                <span className="text-[10px]">{selectedItemIndex !== null ? 'ITEM%' : 'INV%'}</span>
                             </button>
                             <button
                                 onClick={() => heldTransactions.length > 0 && recallTransaction(heldTransactions[0].id)}
                                 disabled={heldTransactions.length === 0}
-                                className="flex flex-col items-center justify-center gap-1 py-3 bg-purple-500/20 hover:bg-purple-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-purple-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-purple-500/20 hover:bg-purple-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-purple-400 transition-colors"
                             >
-                                <History className="h-6 w-6" />
-                                <span className="text-xs">RECALL ({heldTransactions.length})</span>
+                                <History className="h-5 w-5" />
+                                <span className="text-[10px]">HOLD({heldTransactions.length})</span>
                             </button>
                             <button
                                 onClick={() => selectedItemIndex !== null && setShowQuantityModal(true)}
                                 disabled={selectedItemIndex === null}
-                                className="flex flex-col items-center justify-center gap-1 py-3 bg-emerald-500/20 hover:bg-emerald-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-emerald-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-emerald-400 transition-colors"
                             >
-                                <Hash className="h-6 w-6" />
-                                <span className="text-xs">QTY</span>
+                                <Hash className="h-5 w-5" />
+                                <span className="text-[10px]">QTY</span>
                             </button>
                             <button
                                 onClick={() => selectedItemIndex !== null && setShowPriceModal(true)}
                                 disabled={selectedItemIndex === null}
-                                className="flex flex-col items-center justify-center gap-1 py-3 bg-pink-500/20 hover:bg-pink-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-pink-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-pink-500/20 hover:bg-pink-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-pink-400 transition-colors"
                             >
-                                <DollarSign className="h-6 w-6" />
-                                <span className="text-xs">PRICE</span>
+                                <DollarSign className="h-5 w-5" />
+                                <span className="text-[10px]">PRICE</span>
+                            </button>
+                            <button
+                                onClick={printLastReceipt}
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-cyan-500/20 hover:bg-cyan-500/40 rounded text-cyan-400 transition-colors"
+                            >
+                                <Printer className="h-5 w-5" />
+                                <span className="text-[10px]">RCPT</span>
                             </button>
                         </div>
 
-                        {/* Quick Actions Row */}
-                        <div className="grid grid-cols-3 gap-2 mt-1">
-                            <button
-                                onClick={printLastReceipt}
-                                className="flex items-center justify-center gap-2 py-3 bg-cyan-500/20 hover:bg-cyan-500/40 rounded-lg text-cyan-400 transition-colors"
-                            >
-                                <Printer className="h-5 w-5" />
-                                <span className="text-sm font-medium">Last Receipt</span>
-                            </button>
+                        {/* Row 2: Quick Actions - 8 columns */}
+                        <div className="grid grid-cols-8 gap-1">
                             <button
                                 onClick={() => setShowPriceCheckInputModal(true)}
-                                className="flex items-center justify-center gap-2 py-3 bg-yellow-500/20 hover:bg-yellow-500/40 rounded-lg text-yellow-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-yellow-500/20 hover:bg-yellow-500/40 rounded text-yellow-400 transition-colors"
                             >
-                                <Search className="h-5 w-5" />
-                                <span className="text-sm font-medium">Price Check</span>
+                                <Search className="h-4 w-4" />
+                                <span className="text-[10px]">CHECK</span>
                             </button>
                             <button
                                 onClick={() => setShowQuickAddModal(true)}
-                                className="flex items-center justify-center gap-2 py-3 bg-emerald-500/20 hover:bg-emerald-500/40 rounded-lg text-emerald-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/40 rounded text-emerald-400 transition-colors"
                             >
-                                <DollarSign className="h-5 w-5" />
-                                <span className="text-sm font-medium">Quick Add</span>
+                                <DollarSign className="h-4 w-4" />
+                                <span className="text-[10px]">QUICK</span>
                             </button>
-                        </div>
-
-                        {/* Quick Life Row - Super Easy Features */}
-                        <div className="grid grid-cols-5 gap-2 mt-1">
                             <button
                                 onClick={() => setShowCustomerLookup(true)}
-                                className="flex flex-col items-center justify-center gap-1 py-2 bg-blue-500/20 hover:bg-blue-500/40 rounded-lg text-blue-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-blue-500/20 hover:bg-blue-500/40 rounded text-blue-400 transition-colors"
                             >
-                                <Phone className="h-5 w-5" />
-                                <span className="text-xs font-medium">Lookup</span>
+                                <Phone className="h-4 w-4" />
+                                <span className="text-[10px]">LOOK</span>
                             </button>
                             <button
                                 onClick={() => setShowCashDropModal(true)}
-                                className="flex flex-col items-center justify-center gap-1 py-2 bg-green-500/20 hover:bg-green-500/40 rounded-lg text-green-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-green-500/20 hover:bg-green-500/40 rounded text-green-400 transition-colors"
                             >
-                                <Wallet className="h-5 w-5" />
-                                <span className="text-xs font-medium">Cash Drop</span>
+                                <Wallet className="h-4 w-4" />
+                                <span className="text-[10px]">DROP</span>
                             </button>
                             <button
                                 onClick={() => setShowReceiveStockModal(true)}
-                                className="flex flex-col items-center justify-center gap-1 py-2 bg-orange-500/20 hover:bg-orange-500/40 rounded-lg text-orange-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-orange-500/20 hover:bg-orange-500/40 rounded text-orange-400 transition-colors"
                             >
-                                <PackagePlus className="h-5 w-5" />
-                                <span className="text-xs font-medium">Receive</span>
+                                <PackagePlus className="h-4 w-4" />
+                                <span className="text-[10px]">RECV</span>
                             </button>
                             <button
                                 onClick={async () => {
@@ -1340,44 +1349,43 @@ export default function RetailPOSPage() {
                                     } catch (e) { console.error(e) }
                                     setShowRecentTransactions(true)
                                 }}
-                                className="flex flex-col items-center justify-center gap-1 py-2 bg-purple-500/20 hover:bg-purple-500/40 rounded-lg text-purple-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-purple-500/20 hover:bg-purple-500/40 rounded text-purple-400 transition-colors"
                             >
-                                <Clock className="h-5 w-5" />
-                                <span className="text-xs font-medium">Recent</span>
+                                <Clock className="h-4 w-4" />
+                                <span className="text-[10px]">HIST</span>
                             </button>
-                            <button
-                                onClick={() => setShowEndOfDayWizard(true)}
-                                className="flex flex-col items-center justify-center gap-1 py-2 bg-indigo-500/20 hover:bg-indigo-500/40 rounded-lg text-indigo-400 transition-colors"
-                            >
-                                <Moon className="h-5 w-5" />
-                                <span className="text-xs font-medium">Close</span>
-                            </button>
-                        </div>
-                        {/* Lottery Row */}
-                        <div className="grid grid-cols-2 gap-2 mt-1">
                             <button
                                 onClick={() => setShowLotteryModal(true)}
-                                className="flex items-center justify-center gap-2 py-3 bg-amber-500/20 hover:bg-amber-500/40 rounded-lg text-amber-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-amber-500/20 hover:bg-amber-500/40 rounded text-amber-400 transition-colors"
                             >
-                                <Ticket className="h-5 w-5" />
-                                <span className="text-sm font-medium">Lottery</span>
+                                <Ticket className="h-4 w-4" />
+                                <span className="text-[10px]">LOTTO</span>
                             </button>
                             <button
                                 onClick={() => setShowLotteryPayoutModal(true)}
-                                className="flex items-center justify-center gap-2 py-3 bg-teal-500/20 hover:bg-teal-500/40 rounded-lg text-teal-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-teal-500/20 hover:bg-teal-500/40 rounded text-teal-400 transition-colors"
                             >
-                                <Trophy className="h-5 w-5" />
-                                <span className="text-sm font-medium">Payout</span>
+                                <Trophy className="h-4 w-4" />
+                                <span className="text-[10px]">PAY</span>
                             </button>
                         </div>
+
+                        {/* Row 3: End of Day */}
+                        <button
+                            onClick={() => setShowEndOfDayWizard(true)}
+                            className="flex items-center justify-center gap-2 py-2 bg-indigo-500/20 hover:bg-indigo-500/40 rounded text-indigo-400 transition-colors"
+                        >
+                            <Moon className="h-4 w-4" />
+                            <span className="text-xs font-medium">End of Day / Close</span>
+                        </button>
                     </div>
                 </div>
 
-                {/* Right Side - Totals & Payment */}
-                <div className="w-80 flex flex-col bg-stone-950">
+                {/* Right Side - Totals & Payment - Narrower on compact */}
+                <div className={`flex flex-col bg-stone-950 ${compactMode ? 'w-64' : 'w-80'}`}>
                     {/* Totals */}
-                    <div className="p-4 space-y-3 bg-stone-900 border-b border-stone-800">
-                        <div className="flex justify-between text-lg">
+                    <div className={`space-y-2 bg-stone-900 border-b border-stone-800 ${compactMode ? 'p-2' : 'p-4 space-y-3'}`}>
+                        <div className={`flex justify-between ${compactMode ? 'text-base' : 'text-lg'}`}>
                             <span className="text-emerald-400">Sub Total</span>
                             <span className="font-bold">{formatCurrency(subtotal)}</span>
                         </div>
@@ -1436,11 +1444,11 @@ export default function RetailPOSPage() {
                         )}
                     </div>
 
-                    {/* PAY Button */}
+                    {/* PAY Button - Smaller on compact screens */}
                     <button
                         onClick={() => setShowPaymentModal(true)}
                         disabled={cart.length === 0 || isLoading}
-                        className="m-4 py-8 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl text-4xl font-bold transition-all shadow-lg shadow-emerald-500/20"
+                        className={`bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20 ${compactMode ? 'm-2 py-5 text-2xl' : 'm-4 py-8 text-4xl'}`}
                     >
                         PAY {formatCurrency(total)}
                     </button>
