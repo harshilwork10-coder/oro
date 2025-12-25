@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, TrendingUp, Store, DollarSign, ShoppingCart, AlertTriangle, Users, RefreshCw } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Store, DollarSign, ShoppingCart, AlertTriangle, Users, RefreshCw, Package, ChevronRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
 interface LocationData {
@@ -221,6 +221,70 @@ export default function MultiStoreDashboard() {
                             <Store className="h-16 w-16 mx-auto mb-4 opacity-50" />
                             <p className="text-xl">No locations found</p>
                             <p className="text-sm">Add locations to see performance data</p>
+                        </div>
+                    )}
+
+                    {/* Inventory Management Section */}
+                    {data.locations.length > 0 && (
+                        <div className="mt-8">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-2xl font-bold flex items-center gap-3">
+                                    <Package className="h-6 w-6 text-orange-400" />
+                                    Inventory Management
+                                </h2>
+                                <div className="flex items-center gap-3">
+                                    <Link
+                                        href="/dashboard/owner/transfers"
+                                        className="text-purple-400 hover:text-purple-300 flex items-center gap-1 text-sm"
+                                    >
+                                        Stock Transfers <ChevronRight className="h-4 w-4" />
+                                    </Link>
+                                    <Link
+                                        href="/dashboard/multi-store/inventory"
+                                        className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium"
+                                    >
+                                        Centralized View <ChevronRight className="h-4 w-4" />
+                                    </Link>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {data.locations.map((loc) => (
+                                    <div
+                                        key={`inv-${loc.location.id}`}
+                                        className="bg-stone-900/80 border border-stone-700 rounded-xl p-4 hover:border-orange-500/50 transition-colors"
+                                    >
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h3 className="font-semibold">{loc.location.name}</h3>
+                                            {loc.inventory.lowStock > 0 && (
+                                                <span className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded-full">
+                                                    {loc.inventory.lowStock} Low
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm text-stone-400 mb-3">
+                                            <span>Total Products</span>
+                                            <span className="font-medium text-white">{loc.inventory.totalProducts}</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Link
+                                                href={`/dashboard/inventory/retail?locationId=${loc.location.id}`}
+                                                className="flex-1 bg-orange-600 hover:bg-orange-500 text-center py-2 rounded-lg text-sm font-medium transition-colors"
+                                            >
+                                                Manage Inventory
+                                            </Link>
+                                            {loc.inventory.lowStock > 0 && (
+                                                <Link
+                                                    href={`/dashboard/inventory/alerts?locationId=${loc.location.id}`}
+                                                    className="bg-red-600/30 hover:bg-red-600/50 text-red-400 px-3 py-2 rounded-lg text-sm transition-colors"
+                                                    title="View Low Stock"
+                                                >
+                                                    <AlertTriangle className="h-4 w-4" />
+                                                </Link>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </>
