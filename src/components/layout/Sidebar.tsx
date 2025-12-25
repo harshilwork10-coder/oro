@@ -168,6 +168,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         // SERVICE only - services catalog
         { name: 'Services', href: '/dashboard/services', icon: Briefcase, feature: 'usesServices' as const, industry: ['SERVICE'] as const },
         { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag, feature: 'usesInventory' as const },
+        // RETAIL only - Smart Ordering
+        { name: 'Smart Ordering', href: '/dashboard/inventory/smart-ordering', icon: Sparkles, industry: ['RETAIL'] as const },
+        { name: 'Deals', href: '/dashboard/deals', icon: Gift, industry: ['RETAIL'] as const },
         // RETAIL only - Lottery management
         { name: 'Lottery', href: '/dashboard/lottery', icon: Ticket, feature: 'lotteryEnabled' as const, industry: ['RETAIL'] as const },
         { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
