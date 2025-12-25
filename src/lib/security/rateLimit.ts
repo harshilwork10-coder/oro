@@ -31,9 +31,9 @@ export const RATE_LIMITS = {
         windowSeconds: 60 * 15, // 15 minutes
         identifierType: 'ip' as const
     },
-    // Login attempts - very strict
+    // Login attempts - 10 per 5 minutes
     login: {
-        limit: 5,
+        limit: 10,
         windowSeconds: 60 * 5, // 5 minutes
         identifierType: 'ip' as const
     },
