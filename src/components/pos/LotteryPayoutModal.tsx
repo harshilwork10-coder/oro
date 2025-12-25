@@ -1,36 +1,53 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Trophy, DollarSign, AlertTriangle } from 'lucide-react'
+import { X, Trophy, DollarSign, AlertTriangle, Ticket, HelpCircle, Building2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
 interface LotteryPayoutModalProps {
     isOpen: boolean
     onClose: () => void
     onPayout: (amount: number) => void
+    maxStorePayout?: number // Default $599 for most states
 }
 
-export default function LotteryPayoutModal({ isOpen, onClose, onPayout }: LotteryPayoutModalProps) {
+type TicketType = 'scratch' | 'draw'
+
+export default function LotteryPayoutModal({
+    isOpen,
+    onClose,
+    onPayout,
+    maxStorePayout = 599
+}: LotteryPayoutModalProps) {
     const [amount, setAmount] = useState('')
     const [ticketNumber, setTicketNumber] = useState('')
+    const [ticketType, setTicketType] = useState<TicketType>('scratch')
     const [isProcessing, setIsProcessing] = useState(false)
 
+    const payoutAmount = parseFloat(amount) || 0
+    const isOverLimit = payoutAmount > maxStorePayout
+    const requiresClaimForm = payoutAmount >= 600
+
     const handlePayout = async () => {
-        const payoutAmount = parseFloat(amount)
         if (isNaN(payoutAmount) || payoutAmount <= 0) {
             alert('Please enter a valid payout amount')
             return
         }
 
+        if (isOverLimit) {
+            alert(`Winnings over $${maxStorePayout} cannot be paid from the store. Customer must claim at lottery office.`)
+            return
+        }
+
         setIsProcessing(true)
         try {
-            // Record the payout
             const res = await fetch('/api/lottery/payout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     amount: payoutAmount,
-                    ticketNumber: ticketNumber || null
+                    ticketNumber: ticketNumber || null,
+                    ticketType
                 })
             })
 
@@ -38,6 +55,7 @@ export default function LotteryPayoutModal({ isOpen, onClose, onPayout }: Lotter
                 onPayout(payoutAmount)
                 setAmount('')
                 setTicketNumber('')
+                setTicketType('scratch')
                 onClose()
             } else {
                 const data = await res.json()
@@ -51,7 +69,7 @@ export default function LotteryPayoutModal({ isOpen, onClose, onPayout }: Lotter
     }
 
     // Quick amount buttons
-    const quickAmounts = [5, 10, 20, 50, 100, 200, 500, 1000]
+    const quickAmounts = [5, 10, 20, 50, 100, 200, 500, 599]
 
     if (!isOpen) return null
 
@@ -70,24 +88,57 @@ export default function LotteryPayoutModal({ isOpen, onClose, onPayout }: Lotter
                 </div>
 
                 <div className="p-4 space-y-4">
-                    {/* Warning */}
-                    <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                        <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-amber-200">
-                            Verify winning ticket before paying out. This will be deducted from your cash drawer.
-                        </p>
-                    </div>
-
-                    {/* Ticket Number (Optional) */}
+                    {/* Ticket Type Selection */}
                     <div>
                         <label className="block text-sm font-medium text-stone-400 mb-2">
-                            Ticket Number (Optional)
+                            Ticket Type
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => setTicketType('scratch')}
+                                className={`flex items-center justify-center gap-2 py-3 rounded-lg font-medium border transition-colors ${ticketType === 'scratch'
+                                    ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                                    : 'bg-stone-800 border-stone-700 text-stone-400 hover:border-stone-600'
+                                    }`}
+                            >
+                                <Ticket className="h-4 w-4" />
+                                Scratch-Off
+                            </button>
+                            <button
+                                onClick={() => setTicketType('draw')}
+                                className={`flex items-center justify-center gap-2 py-3 rounded-lg font-medium border transition-colors ${ticketType === 'draw'
+                                    ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                                    : 'bg-stone-800 border-stone-700 text-stone-400 hover:border-stone-600'
+                                    }`}
+                            >
+                                <Trophy className="h-4 w-4" />
+                                Draw Game
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Warning / Info based on type */}
+                    <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                        <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-amber-200">
+                            <p>Verify winning ticket before paying out.</p>
+                            <p className="text-amber-300/70 mt-1">
+                                Store limit: <span className="font-bold">${maxStorePayout}</span> |
+                                Over ${maxStorePayout} → Lottery Office
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Ticket Number */}
+                    <div>
+                        <label className="block text-sm font-medium text-stone-400 mb-2">
+                            {ticketType === 'draw' ? 'Ticket Barcode / Serial' : 'Ticket Number'} (Optional)
                         </label>
                         <input
                             type="text"
                             value={ticketNumber}
                             onChange={(e) => setTicketNumber(e.target.value)}
-                            placeholder="Enter ticket number for records..."
+                            placeholder={ticketType === 'draw' ? 'Scan barcode or enter serial...' : 'Enter ticket number...'}
                             className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-white placeholder-stone-500 focus:ring-2 focus:ring-teal-500"
                         />
                     </div>
@@ -104,11 +155,34 @@ export default function LotteryPayoutModal({ isOpen, onClose, onPayout }: Lotter
                                 value={amount}
                                 onChange={(e) => setAmount(e.target.value)}
                                 placeholder="0.00"
-                                className="w-full pl-12 pr-4 py-4 bg-stone-800 border border-stone-700 rounded-lg text-white text-3xl font-bold text-center placeholder-stone-600 focus:ring-2 focus:ring-teal-500"
+                                className={`w-full pl-12 pr-4 py-4 bg-stone-800 border rounded-lg text-3xl font-bold text-center placeholder-stone-600 focus:ring-2 ${isOverLimit
+                                    ? 'border-red-500 text-red-400 focus:ring-red-500'
+                                    : 'border-stone-700 text-white focus:ring-teal-500'
+                                    }`}
                                 autoFocus
                             />
                         </div>
                     </div>
+
+                    {/* Over Limit Warning */}
+                    {isOverLimit && (
+                        <div className="flex items-start gap-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                            <Building2 className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                            <div className="text-sm text-red-200">
+                                <p className="font-bold">Cannot pay from store</p>
+                                <p className="text-red-300/70 mt-1">
+                                    Winnings over ${maxStorePayout} must be claimed at:
+                                </p>
+                                <ul className="text-red-300/70 mt-1 list-disc list-inside">
+                                    <li>$600 - $50,000 → Lottery District Office</li>
+                                    <li>$50,000+ → State Lottery Headquarters</li>
+                                </ul>
+                                <p className="text-red-300/70 mt-2">
+                                    Provide customer with claim form and direct to lottery office.
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Quick Amounts */}
                     <div className="grid grid-cols-4 gap-2">
@@ -117,8 +191,8 @@ export default function LotteryPayoutModal({ isOpen, onClose, onPayout }: Lotter
                                 key={amt}
                                 onClick={() => setAmount(amt.toString())}
                                 className={`py-2 rounded-lg font-medium transition-colors ${amount === amt.toString()
-                                        ? 'bg-teal-500 text-black'
-                                        : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
+                                    ? 'bg-teal-500 text-black'
+                                    : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
                                     }`}
                             >
                                 ${amt}
@@ -137,10 +211,13 @@ export default function LotteryPayoutModal({ isOpen, onClose, onPayout }: Lotter
                     </button>
                     <button
                         onClick={handlePayout}
-                        disabled={isProcessing || !amount || parseFloat(amount) <= 0}
-                        className="flex-1 py-3 bg-teal-500 hover:bg-teal-400 text-black font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={isProcessing || !amount || payoutAmount <= 0 || isOverLimit}
+                        className={`flex-1 py-3 font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isOverLimit
+                            ? 'bg-red-500/50 text-red-200 cursor-not-allowed'
+                            : 'bg-teal-500 hover:bg-teal-400 text-black'
+                            }`}
                     >
-                        {isProcessing ? 'Processing...' : `Pay ${amount ? formatCurrency(parseFloat(amount)) : '$0.00'}`}
+                        {isProcessing ? 'Processing...' : isOverLimit ? 'Cannot Pay' : `Pay ${formatCurrency(payoutAmount)}`}
                     </button>
                 </div>
             </div>

@@ -225,6 +225,9 @@ model User {
   verifiedOnboardingDocs     OnboardingRequestDocument[] @relation("VerifiedOnboardingDocs")
   createdShipments           Shipment[]                  @relation("CreatedShipments")
   onboardingEventActors      OnboardingRequestEvent[]    @relation("OnboardingEventActor")
+
+  // Cash Payouts
+  cashPayouts CashPayout[]
 }
 
 model Franchise {
@@ -313,6 +316,9 @@ model Franchise {
 
   // Smart Ordering
   orderTemplates OrderTemplate[]
+
+  // Cash Payouts (lottery, scratch, vendor)
+  cashPayouts CashPayout[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -608,6 +614,9 @@ model Location {
   onboardingLocations OnboardingRequestLocation[] @relation("OnboardingLocations")
   onboardingDevices   OnboardingRequestDevice[]   @relation("OnboardingDevices")
   shipments           Shipment[]                  @relation("Shipments")
+
+  // Cash payouts
+  cashPayouts CashPayout[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1645,6 +1654,7 @@ model CashDrawerSession {
   cashDrops        CashDrop[]
   transactions     Transaction[]
   drawerActivities DrawerActivity[] // All drawer opens during this shift
+  cashPayouts      CashPayout[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3828,5 +3838,38 @@ model OrderTemplateItem {
   defaultQty Int           @default(1)
 
   @@index([templateId])
+}
+
+// ============ CASH PAYOUTS ============
+// Track all cash payouts from drawer (lottery, scratch-offs, vendor payments)
+
+model CashPayout {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  locationId  String?
+  location    Location? @relation(fields: [locationId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  sessionId   String?
+  session     CashDrawerSession? @relation(fields: [sessionId], references: [id])
+
+  amount      Decimal          // Payout amount
+  type        String           // 'lottery', 'scratch', 'vendor'
+
+  // For lottery/scratch payouts
+  ticketNumber String?
+
+  // For vendor payouts  
+  vendorName    String?
+  invoiceNumber String?
+
+  notes       String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([franchiseId])
+  @@index([type])
+  @@index([createdAt])
 }
 
