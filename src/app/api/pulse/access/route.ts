@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-// Check if user has access to Oro Pulse
+// Check if user has access to Oronex Pulse
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({
                 hasAccess: false,
                 reason: 'role_not_allowed',
-                message: 'Oro Pulse is only available for business owners.'
+                message: 'Oronex Pulse is only available for business owners.'
             })
         }
 
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({
                 hasAccess: false,
                 reason: 'role_not_allowed',
-                message: 'Oro Pulse is only available for business owners.'
+                message: 'Oronex Pulse is only available for business owners.'
             })
         }
 
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({
                 hasAccess: false,
                 reason: 'no_config',
-                message: 'Oro Pulse is not configured for your business. Contact your administrator.'
+                message: 'Oronex Pulse is not configured for your business. Contact your administrator.'
             })
         }
 
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({
                 hasAccess: false,
                 reason: 'not_enabled',
-                message: 'Oro Pulse is not enabled for your business. Contact your provider to add this feature.'
+                message: 'Oronex Pulse is not enabled for your business. Contact your provider to add this feature.'
             })
         }
 
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             hasAccess: false,
             reason: 'no_seat_assigned',
-            message: 'You do not have an Oro Pulse license. Ask your administrator to assign you a seat.',
+            message: 'You do not have an Oronex Pulse license. Ask your administrator to assign you a seat.',
             seatsAvailable: config.pulseSeatCount
         })
 

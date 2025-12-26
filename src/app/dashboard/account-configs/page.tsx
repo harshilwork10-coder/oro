@@ -937,7 +937,7 @@ export default function AccountConfigurationsPage() {
                     <div className="bg-stone-900 rounded-2xl border border-stone-700 p-6">
                         <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
                             <Smartphone className="w-6 h-6 text-violet-400" />
-                            Oro Pulse Access
+                            Oronex Pulse Access
                         </h3>
 
                         <div className="mb-6">

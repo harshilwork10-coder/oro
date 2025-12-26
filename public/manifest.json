@@ -80,7 +80,7 @@
     ],
     "shortcuts": [
         {
-            "name": "Oro Pulse",
+            "name": "Oronex Pulse",
             "short_name": "Pulse",
             "description": "Mobile owner dashboard",
             "url": "/pulse",

@@ -267,17 +267,17 @@ export default function ClientDetailsPage() {
                 )}
             </div>
 
-            {/* Oro Pulse Section */}
+            {/* Oronex Pulse Section */}
             <div className="glass-panel p-6 rounded-2xl">
                 <h2 className="text-xl font-bold text-stone-100 mb-6 flex items-center gap-2">
                     <svg className="h-5 w-5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
-                    Oro Pulse
+                    Oronex Pulse
                 </h2>
                 <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-4">
                     <p className="text-violet-300 text-sm mb-3">
-                        Oro Pulse gives owners real-time mobile access to sales, inventory, and employee data.
+                        Oronex Pulse gives owners real-time mobile access to sales, inventory, and employee data.
                     </p>
                     <a
                         href="/dashboard/account-configs"

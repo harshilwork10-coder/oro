@@ -63,7 +63,7 @@ export default function PulseUpgradePage() {
                 <div className="text-center mb-8">
                     <h2 className="text-xl font-bold mb-2">Upgrade Required</h2>
                     <p className="text-gray-400">
-                        Oro Pulse is a premium feature that lets you monitor your business from anywhere on your phone.
+                        Oronex Pulse is a premium feature that lets you monitor your business from anywhere on your phone.
                     </p>
                 </div>
 
