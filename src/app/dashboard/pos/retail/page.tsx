@@ -165,6 +165,7 @@ export default function RetailPOSPage() {
     // Lottery
     const [showLotteryModal, setShowLotteryModal] = useState(false)
     const [showLotteryPayoutModal, setShowLotteryPayoutModal] = useState(false)
+    const [lotteryPayout, setLotteryPayout] = useState(0) // Tracks lottery payout amount separately (doesn't affect sales)
 
     // Category/Department Filter
     const [categories, setCategories] = useState<{ id: string; name: string; itemCount?: number }[]>([])
@@ -767,6 +768,9 @@ export default function RetailPOSPage() {
             total: cashTotal,
             cashTotal,
             cardTotal,
+            lotteryPayout, // Lottery payout amount (tracked separately, doesn't affect sales)
+            customerPayable: Math.max(0, cashTotal - lotteryPayout), // What customer actually pays after lottery offset
+            customerPayableCard: Math.max(0, cardTotal - lotteryPayout), // Card price after lottery offset
             itemCount: cart.reduce((sum, item) => sum + item.quantity, 0),
             showDualPricing: pricingSettings?.showDualPricing && pricingSettings?.pricingModel === 'DUAL_PRICING'
         }
@@ -2165,21 +2169,14 @@ export default function RetailPOSPage() {
                 isOpen={showLotteryPayoutModal}
                 onClose={() => setShowLotteryPayoutModal(false)}
                 onPayout={(amount, type) => {
-                    // Add lottery payout as a negative cart item so it offsets purchases
-                    const payoutItem = {
-                        id: `lottery-payout-${Date.now()}`,
-                        barcode: 'LOTTERY-PAYOUT',
-                        sku: 'LOTTO-PAYOUT',
-                        name: type === 'vendor' ? 'Vendor Payout' : 'Lottery Winner Payout',
-                        price: -amount, // Negative to reduce total
-                        quantity: 1,
-                        ageRestricted: false,
-                        isEbtEligible: false,
-                        taxRate: 0,
-                        category: type === 'vendor' ? 'vendor-payout' : 'lottery-payout'
+                    if (type === 'vendor') {
+                        // Vendor payouts are standalone - just show toast (API already called in modal)
+                        setToast({ message: `✓ Vendor payout $${amount.toFixed(2)} processed`, type: 'success' })
+                    } else {
+                        // Lottery payouts: track separately (doesn't affect sales, only reduces what customer pays)
+                        setLotteryPayout(prev => prev + amount)
+                        setToast({ message: `✓ Lottery payout $${amount.toFixed(2)} added - will offset customer total`, type: 'success' })
                     }
-                    setCart(prev => [...prev, payoutItem])
-                    setToast({ message: `✓ Lottery payout $${amount.toFixed(2)} added to cart`, type: 'success' })
                 }}
             />
 
