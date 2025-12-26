@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
     DollarSign,
     TrendingUp,
@@ -10,7 +11,8 @@ import {
     ArrowDown,
     Loader2,
     Filter,
-    Check
+    Check,
+    ArrowLeft
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -42,6 +44,7 @@ interface PricingAnalysis {
 }
 
 export default function AIPricingPage() {
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [analysis, setAnalysis] = useState<PricingAnalysis | null>(null)
     const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all')
@@ -108,20 +111,24 @@ export default function AIPricingPage() {
         <div className="p-6">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-                <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <Link href="/dashboard/ai-insights" className="text-gray-500 hover:text-gray-300">
-                            AI Insights
-                        </Link>
-                        <span className="text-gray-600">/</span>
-                        <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-green-500">
-                            <DollarSign className="w-5 h-5 text-white" />
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => router.back()}
+                        className="p-2 bg-stone-800 hover:bg-stone-700 rounded-lg transition-colors"
+                    >
+                        <ArrowLeft className="h-6 w-6" />
+                    </button>
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-green-500">
+                                <DollarSign className="w-5 h-5 text-white" />
+                            </div>
+                            <h1 className="text-xl font-bold text-white">AI Price Optimization</h1>
                         </div>
-                        <h1 className="text-xl font-bold text-white">AI Price Optimization</h1>
+                        <p className="text-gray-400 text-sm">
+                            Margin-based pricing suggestions to maximize revenue
+                        </p>
                     </div>
-                    <p className="text-gray-400 text-sm">
-                        Margin-based pricing suggestions to maximize revenue
-                    </p>
                 </div>
             </div>
 
@@ -162,8 +169,8 @@ export default function AIPricingPage() {
                         key={f}
                         onClick={() => setFilter(f)}
                         className={`px-3 py-1 rounded-lg text-sm capitalize transition-colors ${filter === f
-                                ? 'bg-purple-500 text-white'
-                                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                             }`}
                     >
                         {f}

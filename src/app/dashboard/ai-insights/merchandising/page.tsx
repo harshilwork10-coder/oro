@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
     Store,
     TrendingUp,
@@ -11,7 +12,8 @@ import {
     ChevronRight,
     Clock,
     ShoppingBag,
-    BarChart3
+    BarChart3,
+    ArrowLeft
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -56,6 +58,7 @@ interface MerchandisingAnalysis {
 }
 
 export default function AIMerchandisingPage() {
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [analysis, setAnalysis] = useState<MerchandisingAnalysis | null>(null)
     const [activeTab, setActiveTab] = useState<'categories' | 'crosssell' | 'recommendations'>('categories')
@@ -105,20 +108,24 @@ export default function AIMerchandisingPage() {
         <div className="p-6">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-                <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <Link href="/dashboard/ai-insights" className="text-gray-500 hover:text-gray-300">
-                            AI Insights
-                        </Link>
-                        <span className="text-gray-600">/</span>
-                        <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500">
-                            <Store className="w-5 h-5 text-white" />
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => router.back()}
+                        className="p-2 bg-stone-800 hover:bg-stone-700 rounded-lg transition-colors"
+                    >
+                        <ArrowLeft className="h-6 w-6" />
+                    </button>
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500">
+                                <Store className="w-5 h-5 text-white" />
+                            </div>
+                            <h1 className="text-xl font-bold text-white">AI Merchandising</h1>
                         </div>
-                        <h1 className="text-xl font-bold text-white">AI Merchandising</h1>
+                        <p className="text-gray-400 text-sm">
+                            Category performance and placement recommendations
+                        </p>
                     </div>
-                    <p className="text-gray-400 text-sm">
-                        Category performance and placement recommendations
-                    </p>
                 </div>
             </div>
 
@@ -159,8 +166,8 @@ export default function AIMerchandisingPage() {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as typeof activeTab)}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${activeTab === tab.id
-                                ? 'bg-purple-500 text-white'
-                                : 'text-gray-400 hover:text-gray-300 hover:bg-gray-800'
+                            ? 'bg-purple-500 text-white'
+                            : 'text-gray-400 hover:text-gray-300 hover:bg-gray-800'
                             }`}
                     >
                         <tab.icon className="w-4 h-4" />
@@ -177,9 +184,9 @@ export default function AIMerchandisingPage() {
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg font-bold ${index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                                            index === 1 ? 'bg-gray-500/20 text-gray-400' :
-                                                index === 2 ? 'bg-orange-500/20 text-orange-400' :
-                                                    'bg-gray-800 text-gray-500'
+                                        index === 1 ? 'bg-gray-500/20 text-gray-400' :
+                                            index === 2 ? 'bg-orange-500/20 text-orange-400' :
+                                                'bg-gray-800 text-gray-500'
                                         }`}>
                                         {index + 1}
                                     </div>

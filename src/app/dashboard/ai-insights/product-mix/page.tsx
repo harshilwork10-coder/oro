@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
     Package,
     Star,
@@ -12,7 +13,8 @@ import {
     Filter,
     ArrowUpRight,
     ShoppingCart,
-    Ban
+    Ban,
+    ArrowLeft
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -52,6 +54,7 @@ interface ProductMixAnalysis {
 }
 
 export default function AIProductMixPage() {
+    const router = useRouter()
     const [loading, setLoading] = useState(true)
     const [analysis, setAnalysis] = useState<ProductMixAnalysis | null>(null)
     const [filter, setFilter] = useState<'all' | ProductClassification>('all')
@@ -131,20 +134,24 @@ export default function AIProductMixPage() {
         <div className="p-6">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-                <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <Link href="/dashboard/ai-insights" className="text-gray-500 hover:text-gray-300">
-                            AI Insights
-                        </Link>
-                        <span className="text-gray-600">/</span>
-                        <div className="p-2 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500">
-                            <Package className="w-5 h-5 text-white" />
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => router.back()}
+                        className="p-2 bg-stone-800 hover:bg-stone-700 rounded-lg transition-colors"
+                    >
+                        <ArrowLeft className="h-6 w-6" />
+                    </button>
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500">
+                                <Package className="w-5 h-5 text-white" />
+                            </div>
+                            <h1 className="text-xl font-bold text-white">AI Product Mix</h1>
                         </div>
-                        <h1 className="text-xl font-bold text-white">AI Product Mix</h1>
+                        <p className="text-gray-400 text-sm">
+                            BCG Matrix analysis to optimize your product portfolio
+                        </p>
                     </div>
-                    <p className="text-gray-400 text-sm">
-                        BCG Matrix analysis to optimize your product portfolio
-                    </p>
                 </div>
             </div>
 
@@ -159,8 +166,8 @@ export default function AIProductMixPage() {
                                 key={key}
                                 onClick={() => setFilter(filter === key ? 'all' : key)}
                                 className={`p-4 rounded-xl border transition-all ${filter === key
-                                        ? `${config.bg} ring-2 ring-offset-2 ring-offset-[#0f0f1a]`
-                                        : 'bg-[#1a1a2e] border-gray-800 hover:border-gray-600'
+                                    ? `${config.bg} ring-2 ring-offset-2 ring-offset-[#0f0f1a]`
+                                    : 'bg-[#1a1a2e] border-gray-800 hover:border-gray-600'
                                     }`}
                             >
                                 <div className="flex items-center gap-2 mb-2">
