@@ -172,11 +172,28 @@ export async function saveToOroDatabase(data: {
 }
 
 /**
- * Main lookup function - tries multiple sources
+ * Timeout wrapper for fetch calls
+ */
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 3000): Promise<Response> {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+        const response = await fetch(url, { ...options, signal: controller.signal })
+        return response
+    } finally {
+        clearTimeout(timeout)
+    }
+}
+
+/**
+ * Main lookup function - tries multiple sources with timeout
  * Priority: 1) Oro shared database (fastest, crowdsourced)
  *           2) Barcode Spider (500M-1.5B products, good for alcohol)
  *           3) Open Food Facts (free API)
  *           4) UPC ItemDB (general products)
+ * 
+ * IMPORTANT: Each source has a 3s timeout, total max is ~5s to prevent UI hanging
  */
 export async function lookupBarcode(barcode: string): Promise<SKULookupResult> {
     // Clean the barcode
@@ -188,48 +205,53 @@ export async function lookupBarcode(barcode: string): Promise<SKULookupResult> {
 
     let result: SKULookupResult = { found: false, barcode: cleanBarcode }
 
-    // Try Oro shared database first (fastest, crowdsourced data)
-    try {
-        const OroResult = await lookupOroDatabase(cleanBarcode)
-        if (OroResult.found) result = OroResult
-    } catch (error) {
-        console.log('[SKU_LOOKUP] Oro database check failed:', error)
-    }
+    // Create a master timeout that cancels the entire lookup after 5 seconds
+    const masterTimeout = new Promise<SKULookupResult>((resolve) => {
+        setTimeout(() => {
+            console.log('[SKU_LOOKUP] Master timeout reached (5s)')
+            resolve({ found: false, barcode: cleanBarcode })
+        }, 5000)
+    })
 
-    // Try Barcode Spider (500M-1.5B products, good coverage)
-    if (!result.found) {
+    // The actual lookup logic
+    const doLookup = async (): Promise<SKULookupResult> => {
+        // Try Oro shared database first (fastest, crowdsourced data)
+        try {
+            const oroResult = await lookupOroDatabase(cleanBarcode)
+            if (oroResult.found) return applyBrandCategoryCorrection(oroResult)
+        } catch (error) {
+            console.log('[SKU_LOOKUP] Oro database check failed:', error)
+        }
+
+        // Try Barcode Spider (500M-1.5B products, good coverage)
         try {
             const spiderResult = await lookupBarcodeSpider(cleanBarcode)
-            if (spiderResult.found) result = spiderResult
+            if (spiderResult.found) return applyBrandCategoryCorrection(spiderResult)
         } catch (error) {
             console.log('[SKU_LOOKUP] Barcode Spider failed:', error)
         }
-    }
 
-    // Try Open Food Facts (great for food/beverages)
-    if (!result.found) {
+        // Try Open Food Facts (great for food/beverages)
         try {
             const offResult = await lookupOpenFoodFacts(cleanBarcode)
-            if (offResult.found) result = offResult
+            if (offResult.found) return applyBrandCategoryCorrection(offResult)
         } catch (error) {
             console.log('[SKU_LOOKUP] Open Food Facts failed:', error)
         }
-    }
 
-    // Try UPC ItemDB (general products)
-    if (!result.found) {
+        // Try UPC ItemDB (general products)
         try {
             const upcResult = await lookupUPCItemDB(cleanBarcode)
-            if (upcResult.found) result = upcResult
+            if (upcResult.found) return applyBrandCategoryCorrection(upcResult)
         } catch (error) {
             console.log('[SKU_LOOKUP] UPC ItemDB failed:', error)
         }
+
+        return { found: false, barcode: cleanBarcode }
     }
 
-    // Smart category correction - fix known brand miscategorizations
-    if (result.found) {
-        result = applyBrandCategoryCorrection(result)
-    }
+    // Race between actual lookup and timeout
+    result = await Promise.race([doLookup(), masterTimeout])
 
     return result
 }
@@ -298,12 +320,12 @@ function applyBrandCategoryCorrection(result: SKULookupResult): SKULookupResult 
 async function lookupBarcodeSpider(barcode: string): Promise<SKULookupResult> {
     const url = `https://api.barcodespider.com/v1/lookup?upc=${barcode}`
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
         headers: {
             'Accept': 'application/json',
             // Free tier doesn't require API key for basic lookup
         }
-    })
+    }, 3000)
 
     if (!response.ok) {
         throw new Error(`Barcode Spider API error: ${response.status}`)
@@ -344,11 +366,11 @@ async function lookupBarcodeSpider(barcode: string): Promise<SKULookupResult> {
 async function lookupOpenFoodFacts(barcode: string): Promise<SKULookupResult> {
     const url = `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
         headers: {
-            'User-Agent': 'OroPOS/1.0 (contact@Oro.com)'
+            'User-Agent': 'OroPOS/1.0 (contact@oronex.com)'
         }
-    })
+    }, 3000)
 
     if (!response.ok) {
         throw new Error(`OFF API error: ${response.status}`)
@@ -398,11 +420,11 @@ async function lookupOpenFoodFacts(barcode: string): Promise<SKULookupResult> {
 async function lookupUPCItemDB(barcode: string): Promise<SKULookupResult> {
     const url = `https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
         headers: {
             'Accept': 'application/json'
         }
-    })
+    }, 3000)
 
     if (!response.ok) {
         throw new Error(`UPC ItemDB error: ${response.status}`)
