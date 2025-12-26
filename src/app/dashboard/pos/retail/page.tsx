@@ -28,7 +28,10 @@ import {
     PackagePlus,
     Moon,
     Ticket,
-    Trophy
+    Trophy,
+    Loader2,
+    RotateCcw,
+    Ban
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useBusinessConfig } from '@/hooks/useBusinessConfig'
@@ -2333,52 +2336,235 @@ function ReceiveStockModal({ onClose, onSuccess }: {
 }
 
 // Recent Transactions Modal
-function RecentTransactionsModal({ transactions, onClose, onSelectTransaction }: {
+function RecentTransactionsModal({ transactions: initialTransactions, onClose, onSelectTransaction }: {
     transactions: any[]
     onClose: () => void
     onSelectTransaction: (tx: any) => void
 }) {
+    const [transactions, setTransactions] = useState(initialTransactions)
+    const [search, setSearch] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'all'>('today')
+    const [selectedTx, setSelectedTx] = useState<any>(null)
+    const [actionLoading, setActionLoading] = useState(false)
+
+    // Fetch transactions with filters
+    const fetchTransactions = async () => {
+        setLoading(true)
+        try {
+            let url = '/api/franchise/transactions?limit=50'
+            if (search) url += `&search=${encodeURIComponent(search)}`
+            if (dateFilter === 'today') {
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+                url += `&startDate=${today.toISOString()}`
+            } else if (dateFilter === 'week') {
+                const week = new Date()
+                week.setDate(week.getDate() - 7)
+                url += `&startDate=${week.toISOString()}`
+            }
+
+            const res = await fetch(url)
+            if (res.ok) {
+                const data = await res.json()
+                setTransactions(data.transactions || [])
+            }
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchTransactions()
+    }, [dateFilter])
+
+    // Search with debounce
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (search) fetchTransactions()
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [search])
+
+    // Refund handler
+    const handleRefund = async (tx: any) => {
+        if (!confirm(`Refund $${Number(tx.total).toFixed(2)} for invoice #${tx.invoiceNumber || tx.id.slice(-6)}?`)) return
+        setActionLoading(true)
+        try {
+            const res = await fetch(`/api/pos/transaction/${tx.id}/refund`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: 'Customer request' })
+            })
+            if (res.ok) {
+                alert('Refund processed successfully!')
+                fetchTransactions()
+                setSelectedTx(null)
+            } else {
+                const data = await res.json()
+                alert(data.error || 'Refund failed')
+            }
+        } catch (e) {
+            alert('Refund failed')
+        } finally {
+            setActionLoading(false)
+        }
+    }
+
+    // Void handler
+    const handleVoid = async (tx: any) => {
+        if (!confirm(`Void transaction #${tx.invoiceNumber || tx.id.slice(-6)}? This cannot be undone.`)) return
+        setActionLoading(true)
+        try {
+            const res = await fetch(`/api/pos/transaction/${tx.id}/void`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: 'Manager void' })
+            })
+            if (res.ok) {
+                alert('Transaction voided!')
+                fetchTransactions()
+                setSelectedTx(null)
+            } else {
+                const data = await res.json()
+                alert(data.error || 'Void failed')
+            }
+        } catch (e) {
+            alert('Void failed')
+        } finally {
+            setActionLoading(false)
+        }
+    }
+
     return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full border border-stone-700 max-h-[80vh] overflow-hidden flex flex-col">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">🕐 Recent Transactions</h2>
+            <div className="bg-stone-900 rounded-2xl w-full max-w-2xl border border-stone-700 max-h-[90vh] overflow-hidden flex flex-col">
+                {/* Header */}
+                <div className="p-4 border-b border-stone-800 flex justify-between items-center bg-gradient-to-r from-purple-600/20 to-stone-900">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-purple-400" />
+                        Transaction History
+                    </h2>
                     <button onClick={onClose} className="p-2 hover:bg-stone-800 rounded-lg">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto space-y-2">
-                    {transactions.length > 0 ? (
-                        transactions.map((tx) => (
+
+                {/* Search & Filters */}
+                <div className="p-3 border-b border-stone-800 space-y-2">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search by invoice #, amount, customer..."
+                            className="w-full pl-10 pr-4 py-2 bg-stone-800 border border-stone-700 rounded-lg text-sm focus:border-purple-500 focus:outline-none"
+                        />
+                    </div>
+                    <div className="flex gap-2">
+                        {(['today', 'week', 'all'] as const).map((filter) => (
                             <button
-                                key={tx.id}
-                                onClick={() => onSelectTransaction(tx)}
-                                className="w-full p-4 bg-stone-800 hover:bg-stone-700 rounded-xl text-left flex justify-between items-center"
+                                key={filter}
+                                onClick={() => setDateFilter(filter)}
+                                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${dateFilter === filter
+                                    ? 'bg-purple-500 text-white'
+                                    : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                    }`}
                             >
-                                <div>
-                                    <p className="font-bold text-white">
-                                        ${Number(tx.total).toFixed(2)}
-                                    </p>
-                                    <p className="text-sm text-stone-400">
-                                        {new Date(tx.createdAt).toLocaleTimeString()} • {tx.paymentMethod || 'N/A'}
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-xs text-stone-500">#{tx.invoiceNumber || tx.id.slice(-6)}</p>
-                                    <span className={`text-xs px-2 py-1 rounded ${tx.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
-                                        tx.status === 'REFUNDED' ? 'bg-red-500/20 text-red-400' :
-                                            'bg-stone-600/20 text-stone-400'
-                                        }`}>
-                                        {tx.status}
-                                    </span>
-                                </div>
+                                {filter === 'today' ? 'Today' : filter === 'week' ? 'This Week' : 'All Time'}
                             </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Transactions List */}
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                    {loading ? (
+                        <div className="flex justify-center py-8">
+                            <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+                        </div>
+                    ) : transactions.length > 0 ? (
+                        transactions.map((tx) => (
+                            <div
+                                key={tx.id}
+                                className={`p-3 rounded-xl transition-all cursor-pointer ${selectedTx?.id === tx.id
+                                    ? 'bg-purple-500/20 border border-purple-500'
+                                    : 'bg-stone-800 hover:bg-stone-700 border border-transparent'
+                                    }`}
+                                onClick={() => setSelectedTx(selectedTx?.id === tx.id ? null : tx)}
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="font-bold text-white text-lg">
+                                            ${Number(tx.total).toFixed(2)}
+                                        </p>
+                                        <p className="text-xs text-stone-400">
+                                            {new Date(tx.createdAt).toLocaleDateString()} {new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs font-mono text-stone-500">#{tx.invoiceNumber || tx.id.slice(-8)}</p>
+                                        <div className="flex gap-1 mt-1">
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${tx.paymentMethod === 'CASH' ? 'bg-green-500/20 text-green-400' :
+                                                tx.paymentMethod === 'CREDIT_CARD' ? 'bg-blue-500/20 text-blue-400' :
+                                                    'bg-stone-600/20 text-stone-400'
+                                                }`}>
+                                                {tx.paymentMethod?.replace('_', ' ')}
+                                            </span>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${tx.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
+                                                tx.status === 'REFUNDED' ? 'bg-red-500/20 text-red-400' :
+                                                    tx.status === 'VOIDED' ? 'bg-orange-500/20 text-orange-400' :
+                                                        'bg-stone-600/20 text-stone-400'
+                                                }`}>
+                                                {tx.status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Expanded Actions */}
+                                {selectedTx?.id === tx.id && tx.status === 'COMPLETED' && (
+                                    <div className="mt-3 pt-3 border-t border-stone-700 grid grid-cols-3 gap-2">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleRefund(tx) }}
+                                            disabled={actionLoading}
+                                            className="flex items-center justify-center gap-1 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg text-xs font-medium disabled:opacity-50"
+                                        >
+                                            <RotateCcw className="h-3 w-3" />
+                                            Refund
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleVoid(tx) }}
+                                            disabled={actionLoading}
+                                            className="flex items-center justify-center gap-1 py-2 bg-orange-500/20 hover:bg-orange-500/40 text-orange-400 rounded-lg text-xs font-medium disabled:opacity-50"
+                                        >
+                                            <Ban className="h-3 w-3" />
+                                            Void
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); window.print() }}
+                                            className="flex items-center justify-center gap-1 py-2 bg-stone-700 hover:bg-stone-600 text-stone-300 rounded-lg text-xs font-medium"
+                                        >
+                                            <Printer className="h-3 w-3" />
+                                            Reprint
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         ))
                     ) : (
                         <div className="text-center py-8 text-stone-400">
-                            <p>No recent transactions</p>
+                            <p>No transactions found</p>
                         </div>
                     )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-3 border-t border-stone-800 text-center text-xs text-stone-500">
+                    Showing {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
                 </div>
             </div>
         </div>
