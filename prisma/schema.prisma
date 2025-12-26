@@ -550,6 +550,9 @@ model Location {
   address     String?
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  // Terminal Setup Code - used to pair POS devices to this location
+  setupCode   String?   @unique // e.g. "MIKE-1234" - permanent code for pairing terminals
 
   // Location-specific documents (bank verification per location)
   voidCheckUrl String? // Each location may have different bank account

@@ -4,76 +4,94 @@ import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import OroLogo from '@/components/ui/OroLogo'
-import { Building2, Store, ChevronRight, Loader2 } from 'lucide-react'
+import { Building2, Store, Key, Loader2, Settings, X } from 'lucide-react'
 
-interface Business {
-    id: string
-    name: string
-    industryType: string
-    locations: { id: string, name: string }[]
+interface TerminalConfig {
+    business: { id: string; name: string; industryType: string }
+    location: { id: string; name: string }
 }
 
 export default function EmployeeLoginPage() {
-    const [step, setStep] = useState<'SELECT_BUSINESS' | 'ENTER_PIN'>('SELECT_BUSINESS')
-    const [businesses, setBusinesses] = useState<Business[]>([])
-    const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null)
-    const [selectedLocation, setSelectedLocation] = useState<{ id: string, name: string } | null>(null)
+    const [step, setStep] = useState<'LOADING' | 'ENTER_CODE' | 'ENTER_PIN'>('LOADING')
+    const [terminalConfig, setTerminalConfig] = useState<TerminalConfig | null>(null)
+
+    // Setup code entry
+    const [setupCode, setSetupCode] = useState('')
+    const [codeError, setCodeError] = useState('')
+    const [validating, setValidating] = useState(false)
+
+    // PIN entry
     const [pin, setPin] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
-    const [loadingBusinesses, setLoadingBusinesses] = useState(true)
+
+    // Admin unlock for reconfiguring
+    const [showAdminUnlock, setShowAdminUnlock] = useState(false)
+    const [adminPin, setAdminPin] = useState('')
+    const [unlockError, setUnlockError] = useState('')
+
     const router = useRouter()
 
-    // Load businesses on mount
+    // Check for existing terminal config on mount
     useEffect(() => {
-        loadBusinesses()
-
-        // Check if terminal is already configured (stored in localStorage)
         const savedConfig = localStorage.getItem('terminal_config')
         if (savedConfig) {
             try {
-                const config = JSON.parse(savedConfig)
-                setSelectedBusiness(config.business)
-                setSelectedLocation(config.location)
-                setStep('ENTER_PIN')
-            } catch (e) {
+                const config = JSON.parse(savedConfig) as TerminalConfig
+                if (config.business && config.location) {
+                    setTerminalConfig(config)
+                    setStep('ENTER_PIN')
+                } else {
+                    localStorage.removeItem('terminal_config')
+                    setStep('ENTER_CODE')
+                }
+            } catch {
                 localStorage.removeItem('terminal_config')
+                setStep('ENTER_CODE')
             }
+        } else {
+            setStep('ENTER_CODE')
         }
     }, [])
 
-    const loadBusinesses = async () => {
+    // Validate setup code
+    const handleValidateCode = async () => {
+        if (!setupCode.trim()) {
+            setCodeError('Please enter a setup code')
+            return
+        }
+
+        setValidating(true)
+        setCodeError('')
+
         try {
-            const res = await fetch('/api/pos/businesses')
-            if (res.ok) {
-                const data = await res.json()
-                setBusinesses(data.businesses || [])
+            const res = await fetch('/api/pos/validate-setup-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: setupCode.toUpperCase().trim() })
+            })
+
+            const data = await res.json()
+
+            if (res.ok && data.success) {
+                const config: TerminalConfig = {
+                    business: data.business,
+                    location: data.location
+                }
+                localStorage.setItem('terminal_config', JSON.stringify(config))
+                setTerminalConfig(config)
+                setStep('ENTER_PIN')
+            } else {
+                setCodeError(data.error || 'Invalid setup code')
             }
-        } catch (error) {
-            console.error('Error loading businesses:', error)
+        } catch (err) {
+            setCodeError('Failed to validate code')
         } finally {
-            setLoadingBusinesses(false)
+            setValidating(false)
         }
     }
 
-    const handleSelectBusiness = (business: Business) => {
-        setSelectedBusiness(business)
-        // If only one location, auto-select it
-        if (business.locations.length === 1) {
-            handleSelectLocation(business, business.locations[0])
-        }
-    }
-
-    const handleSelectLocation = (business: Business, location: { id: string, name: string }) => {
-        setSelectedLocation(location)
-        // Save terminal config
-        localStorage.setItem('terminal_config', JSON.stringify({
-            business: { id: business.id, name: business.name, industryType: business.industryType },
-            location
-        }))
-        setStep('ENTER_PIN')
-    }
-
+    // Handle PIN input
     const handlePinInput = (digit: string) => {
         if (pin.length < 4) {
             const newPin = pin + digit
@@ -95,17 +113,9 @@ export default function EmployeeLoginPage() {
         setError('')
     }
 
-    const handleChangeTerminal = () => {
-        localStorage.removeItem('terminal_config')
-        setSelectedBusiness(null)
-        setSelectedLocation(null)
-        setStep('SELECT_BUSINESS')
-        setPin('')
-        setError('')
-    }
-
+    // Login with PIN
     const handleLogin = async (pinCode: string) => {
-        if (!selectedLocation) return
+        if (!terminalConfig?.location) return
 
         setLoading(true)
         setError('')
@@ -116,7 +126,7 @@ export default function EmployeeLoginPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     pin: pinCode,
-                    locationId: selectedLocation.id  // Only search this location
+                    locationId: terminalConfig.location.id
                 })
             })
 
@@ -130,7 +140,7 @@ export default function EmployeeLoginPage() {
                 })
 
                 if (result?.ok) {
-                    const industryType = data.user.industryType || selectedBusiness?.industryType || 'RETAIL'
+                    const industryType = data.user.industryType || terminalConfig.business.industryType || 'RETAIL'
                     if (industryType === 'SERVICE' || industryType === 'SALON') {
                         router.push('/dashboard/pos/salon')
                     } else {
@@ -144,8 +154,7 @@ export default function EmployeeLoginPage() {
                 setError(data.error || 'Invalid PIN')
                 setPin('')
             }
-        } catch (error) {
-            console.error('Login error:', error)
+        } catch {
             setError('Login failed')
             setPin('')
         } finally {
@@ -153,85 +162,92 @@ export default function EmployeeLoginPage() {
         }
     }
 
-    // Step 1: Select Business/Location
-    if (step === 'SELECT_BUSINESS') {
+    // Admin unlock to reconfigure terminal (requires owner/manager PIN)
+    const handleAdminUnlock = async () => {
+        if (adminPin.length < 4) {
+            setUnlockError('Enter owner or manager PIN')
+            return
+        }
+
+        try {
+            const res = await fetch('/api/pos/verify-owner-pin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pin: adminPin })
+            })
+
+            const data = await res.json()
+            if (data.success) {
+                // Clear terminal config and show setup
+                localStorage.removeItem('terminal_config')
+                setTerminalConfig(null)
+                setShowAdminUnlock(false)
+                setAdminPin('')
+                setStep('ENTER_CODE')
+            } else {
+                setUnlockError('Invalid admin PIN')
+            }
+        } catch {
+            setUnlockError('Verification failed')
+        }
+    }
+
+    // Loading state
+    if (step === 'LOADING') {
         return (
             <div className="min-h-screen bg-stone-950 flex items-center justify-center p-4">
-                <div className="w-full max-w-lg">
+                <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+            </div>
+        )
+    }
+
+    // Step 1: Enter Setup Code
+    if (step === 'ENTER_CODE') {
+        return (
+            <div className="min-h-screen bg-stone-950 flex items-center justify-center p-4">
+                <div className="w-full max-w-sm">
                     <div className="flex justify-center mb-8">
                         <OroLogo className="h-12 w-auto" />
                     </div>
 
                     <div className="bg-stone-900 rounded-2xl p-6">
-                        <h1 className="text-xl font-bold text-center mb-2">Terminal Setup</h1>
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                            <Key className="h-5 w-5 text-orange-400" />
+                            <h1 className="text-xl font-bold">Terminal Setup</h1>
+                        </div>
                         <p className="text-stone-400 text-center text-sm mb-6">
-                            Select which business this terminal belongs to
+                            Enter the setup code provided by your business owner
                         </p>
 
-                        {loadingBusinesses ? (
-                            <div className="flex justify-center py-8">
-                                <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-                            </div>
-                        ) : businesses.length === 0 ? (
-                            <div className="text-center py-8 text-stone-400">
-                                <Store className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                <p>No businesses found</p>
-                                <p className="text-sm mt-2">Ask your administrator to set up the system</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {businesses.map((business) => (
-                                    <div key={business.id}>
-                                        {/* If business has multiple locations, show expandable */}
-                                        {business.locations.length > 1 ? (
-                                            <div className="bg-stone-800 rounded-xl overflow-hidden">
-                                                <button
-                                                    onClick={() => handleSelectBusiness(business)}
-                                                    className={`w-full flex items-center gap-4 p-4 hover:bg-stone-700 transition-colors text-left ${selectedBusiness?.id === business.id ? 'bg-stone-700' : ''}`}
-                                                >
-                                                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
-                                                        <Building2 className="h-6 w-6 text-white" />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <p className="font-medium text-white">{business.name}</p>
-                                                        <p className="text-sm text-stone-400">{business.industryType} • {business.locations.length} locations</p>
-                                                    </div>
-                                                    <ChevronRight className={`h-5 w-5 text-stone-400 transition-transform ${selectedBusiness?.id === business.id ? 'rotate-90' : ''}`} />
-                                                </button>
-                                                {selectedBusiness?.id === business.id && (
-                                                    <div className="border-t border-stone-700 p-2 space-y-1">
-                                                        {business.locations.map((loc) => (
-                                                            <button
-                                                                key={loc.id}
-                                                                onClick={() => handleSelectLocation(business, loc)}
-                                                                className="w-full flex items-center gap-3 p-3 hover:bg-stone-600 rounded-lg text-left"
-                                                            >
-                                                                <Store className="h-4 w-4 text-stone-400" />
-                                                                <span className="text-stone-200">{loc.name}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <button
-                                                onClick={() => handleSelectBusiness(business)}
-                                                className="w-full flex items-center gap-4 p-4 bg-stone-800 hover:bg-stone-700 rounded-xl transition-colors text-left"
-                                            >
-                                                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
-                                                    <Building2 className="h-6 w-6 text-white" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-white">{business.name}</p>
-                                                    <p className="text-sm text-stone-400">{business.industryType}</p>
-                                                </div>
-                                                <ChevronRight className="h-5 w-5 text-stone-400" />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                        <input
+                            type="text"
+                            value={setupCode}
+                            onChange={(e) => {
+                                setSetupCode(e.target.value.toUpperCase())
+                                setCodeError('')
+                            }}
+                            placeholder="e.g. MIKE-1234"
+                            className="w-full px-4 py-4 bg-stone-800 border border-stone-700 rounded-xl text-white text-center text-xl font-mono tracking-widest placeholder:text-stone-600 placeholder:text-base placeholder:tracking-normal focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleValidateCode()
+                            }}
+                        />
+
+                        {codeError && (
+                            <p className="text-red-400 text-sm text-center mt-3">{codeError}</p>
                         )}
+
+                        <button
+                            onClick={handleValidateCode}
+                            disabled={validating || !setupCode.trim()}
+                            className="w-full mt-4 py-4 bg-orange-600 hover:bg-orange-500 disabled:bg-stone-700 disabled:text-stone-500 rounded-xl font-bold transition-colors"
+                        >
+                            {validating ? 'Validating...' : 'Pair Terminal'}
+                        </button>
+
+                        <p className="text-stone-500 text-xs text-center mt-4">
+                            Contact your business owner for the setup code
+                        </p>
                     </div>
 
                     <div className="mt-8 text-center">
@@ -244,7 +260,7 @@ export default function EmployeeLoginPage() {
         )
     }
 
-    // Step 2: Enter PIN
+    // Step 2: Enter PIN (terminal is configured)
     return (
         <div className="min-h-screen bg-stone-950 flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
@@ -257,15 +273,16 @@ export default function EmployeeLoginPage() {
                     <div className="flex items-center gap-3">
                         <Building2 className="h-5 w-5 text-orange-400" />
                         <div>
-                            <p className="text-sm font-medium text-white">{selectedBusiness?.name}</p>
-                            <p className="text-xs text-stone-500">{selectedLocation?.name}</p>
+                            <p className="text-sm font-medium text-white">{terminalConfig?.business.name}</p>
+                            <p className="text-xs text-stone-500">{terminalConfig?.location.name}</p>
                         </div>
                     </div>
                     <button
-                        onClick={handleChangeTerminal}
-                        className="text-xs text-stone-500 hover:text-orange-400"
+                        onClick={() => setShowAdminUnlock(true)}
+                        className="p-2 text-stone-500 hover:text-orange-400 rounded-lg hover:bg-stone-800"
+                        title="Reconfigure Terminal"
                     >
-                        Change
+                        <Settings className="h-4 w-4" />
                     </button>
                 </div>
 
@@ -316,7 +333,41 @@ export default function EmployeeLoginPage() {
                     </a>
                 </div>
             </div>
+
+            {/* Admin Unlock Modal */}
+            {showAdminUnlock && (
+                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+                    <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full border border-stone-700">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-bold">Reconfigure Terminal</h2>
+                            <button onClick={() => { setShowAdminUnlock(false); setAdminPin(''); setUnlockError('') }} className="p-2 hover:bg-stone-800 rounded-lg">
+                                <X className="h-5 w-5 text-stone-400" />
+                            </button>
+                        </div>
+                        <p className="text-stone-400 text-sm mb-4">
+                            Enter owner or manager PIN to change terminal settings
+                        </p>
+                        <input
+                            type="password"
+                            value={adminPin}
+                            onChange={(e) => {
+                                setAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))
+                                setUnlockError('')
+                            }}
+                            placeholder="Admin PIN"
+                            className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-xl text-white text-center text-xl font-mono tracking-widest focus:border-orange-500"
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleAdminUnlock() }}
+                        />
+                        {unlockError && <p className="text-red-400 text-sm text-center mt-2">{unlockError}</p>}
+                        <button
+                            onClick={handleAdminUnlock}
+                            className="w-full mt-4 py-3 bg-orange-600 hover:bg-orange-500 rounded-xl font-bold"
+                        >
+                            Unlock & Reconfigure
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
-
