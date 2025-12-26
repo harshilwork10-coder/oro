@@ -12,10 +12,11 @@ interface ReceiptModalProps {
 
 export default function ReceiptModal({ isOpen, onClose, transactionData, onComplete }: ReceiptModalProps) {
     const [phoneNumber, setPhoneNumber] = useState('')
+    const [emailAddress, setEmailAddress] = useState('')
     const [sending, setSending] = useState(false)
     const [sent, setSent] = useState(false)
     const [error, setError] = useState('')
-    const [selectedOption, setSelectedOption] = useState<'none' | 'print' | 'sms'>('none')
+    const [selectedOption, setSelectedOption] = useState<'none' | 'print' | 'sms' | 'email'>('none')
 
     const formatPhone = (value: string) => {
         const numbers = value.replace(/\D/g, '')
@@ -46,6 +47,43 @@ export default function ReceiptModal({ isOpen, onClose, transactionData, onCompl
                 body: JSON.stringify({
                     phone: cleanPhone,
                     transactionData
+                })
+            })
+
+            const data = await res.json()
+            if (res.ok) {
+                setSent(true)
+                setTimeout(() => {
+                    onComplete()
+                    onClose()
+                }, 1500)
+            } else {
+                setError(data.error || 'Failed to send')
+            }
+        } catch (err) {
+            setError('Failed to send receipt')
+        } finally {
+            setSending(false)
+        }
+    }
+
+    const sendEmailReceipt = async () => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(emailAddress)) {
+            setError('Please enter a valid email address')
+            return
+        }
+
+        setSending(true)
+        setError('')
+        try {
+            const res = await fetch('/api/receipts/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    transactionId: transactionData?.id,
+                    method: 'email',
+                    destination: emailAddress
                 })
             })
 
@@ -120,38 +158,49 @@ export default function ReceiptModal({ isOpen, onClose, transactionData, onCompl
                     ) : (
                         <>
                             {/* Receipt Options */}
-                            <div className="grid grid-cols-3 gap-3 mb-6">
+                            <div className="grid grid-cols-4 gap-2 mb-6">
                                 <button
                                     onClick={() => setSelectedOption('none')}
-                                    className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${selectedOption === 'none'
-                                            ? 'border-stone-500 bg-stone-800'
-                                            : 'border-stone-700 hover:border-stone-600'
+                                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${selectedOption === 'none'
+                                        ? 'border-stone-500 bg-stone-800'
+                                        : 'border-stone-700 hover:border-stone-600'
                                         }`}
                                 >
-                                    <X className={`h-8 w-8 mb-2 ${selectedOption === 'none' ? 'text-stone-300' : 'text-stone-500'}`} />
-                                    <span className="text-sm font-medium">No Receipt</span>
+                                    <X className={`h-6 w-6 mb-1 ${selectedOption === 'none' ? 'text-stone-300' : 'text-stone-500'}`} />
+                                    <span className="text-xs font-medium">None</span>
                                 </button>
 
                                 <button
                                     onClick={() => setSelectedOption('print')}
-                                    className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${selectedOption === 'print'
-                                            ? 'border-blue-500 bg-blue-500/20'
-                                            : 'border-stone-700 hover:border-stone-600'
+                                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${selectedOption === 'print'
+                                        ? 'border-blue-500 bg-blue-500/20'
+                                        : 'border-stone-700 hover:border-stone-600'
                                         }`}
                                 >
-                                    <Printer className={`h-8 w-8 mb-2 ${selectedOption === 'print' ? 'text-blue-400' : 'text-stone-500'}`} />
-                                    <span className="text-sm font-medium">Print</span>
+                                    <Printer className={`h-6 w-6 mb-1 ${selectedOption === 'print' ? 'text-blue-400' : 'text-stone-500'}`} />
+                                    <span className="text-xs font-medium">Print</span>
                                 </button>
 
                                 <button
                                     onClick={() => setSelectedOption('sms')}
-                                    className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${selectedOption === 'sms'
-                                            ? 'border-emerald-500 bg-emerald-500/20'
-                                            : 'border-stone-700 hover:border-stone-600'
+                                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${selectedOption === 'sms'
+                                        ? 'border-emerald-500 bg-emerald-500/20'
+                                        : 'border-stone-700 hover:border-stone-600'
                                         }`}
                                 >
-                                    <MessageSquare className={`h-8 w-8 mb-2 ${selectedOption === 'sms' ? 'text-emerald-400' : 'text-stone-500'}`} />
-                                    <span className="text-sm font-medium">Text Me</span>
+                                    <MessageSquare className={`h-6 w-6 mb-1 ${selectedOption === 'sms' ? 'text-emerald-400' : 'text-stone-500'}`} />
+                                    <span className="text-xs font-medium">Text</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setSelectedOption('email')}
+                                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${selectedOption === 'email'
+                                        ? 'border-purple-500 bg-purple-500/20'
+                                        : 'border-stone-700 hover:border-stone-600'
+                                        }`}
+                                >
+                                    <Mail className={`h-6 w-6 mb-1 ${selectedOption === 'email' ? 'text-purple-400' : 'text-stone-500'}`} />
+                                    <span className="text-xs font-medium">Email</span>
                                 </button>
                             </div>
 
@@ -174,19 +223,40 @@ export default function ReceiptModal({ isOpen, onClose, transactionData, onCompl
                                 </div>
                             )}
 
+                            {/* Email Input */}
+                            {selectedOption === 'email' && (
+                                <div className="mb-6">
+                                    <label className="text-sm text-stone-400 mb-2 block">Email Address</label>
+                                    <input
+                                        type="email"
+                                        value={emailAddress}
+                                        onChange={(e) => { setEmailAddress(e.target.value); setError('') }}
+                                        placeholder="customer@email.com"
+                                        className="w-full px-4 py-4 bg-stone-800 border border-stone-700 rounded-xl text-lg text-center focus:outline-none focus:border-purple-500"
+                                        autoFocus
+                                    />
+                                    {error && (
+                                        <p className="text-red-400 text-sm mt-2 text-center">{error}</p>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Action Button */}
                             <button
                                 onClick={
                                     selectedOption === 'sms' ? sendSMSReceipt :
-                                        selectedOption === 'print' ? handlePrint :
-                                            handleNoReceipt
+                                        selectedOption === 'email' ? sendEmailReceipt :
+                                            selectedOption === 'print' ? handlePrint :
+                                                handleNoReceipt
                                 }
-                                disabled={sending || (selectedOption === 'sms' && phoneNumber.replace(/\D/g, '').length < 10)}
-                                className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${selectedOption === 'sms'
-                                        ? 'bg-emerald-600 hover:bg-emerald-500'
-                                        : selectedOption === 'print'
-                                            ? 'bg-blue-600 hover:bg-blue-500'
-                                            : 'bg-stone-700 hover:bg-stone-600'
+                                disabled={sending ||
+                                    (selectedOption === 'sms' && phoneNumber.replace(/\D/g, '').length < 10) ||
+                                    (selectedOption === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress))
+                                }
+                                className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${selectedOption === 'sms' ? 'bg-emerald-600 hover:bg-emerald-500' :
+                                        selectedOption === 'email' ? 'bg-purple-600 hover:bg-purple-500' :
+                                            selectedOption === 'print' ? 'bg-blue-600 hover:bg-blue-500' :
+                                                'bg-stone-700 hover:bg-stone-600'
                                     }`}
                             >
                                 {sending ? (
@@ -197,6 +267,11 @@ export default function ReceiptModal({ isOpen, onClose, transactionData, onCompl
                                 ) : selectedOption === 'sms' ? (
                                     <>
                                         <MessageSquare className="h-5 w-5" />
+                                        Send Receipt
+                                    </>
+                                ) : selectedOption === 'email' ? (
+                                    <>
+                                        <Mail className="h-5 w-5" />
                                         Send Receipt
                                     </>
                                 ) : selectedOption === 'print' ? (
