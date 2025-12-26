@@ -333,6 +333,19 @@ model FranchiseSettings {
   franchiseId String    @unique
   franchise   Franchise @relation(fields: [franchiseId], references: [id])
 
+  // Store Branding & Personalization
+  storeLogo         String?  // URL to uploaded store logo
+  storeDisplayName  String?  // Custom name shown on displays (overrides franchise name)
+  storeAddress      String?  // Full address line 1 (e.g., "123 Main St")
+  storeAddress2     String?  // Address line 2 (e.g., "Suite 100")
+  storeCity         String?  // City
+  storeState        String?  // State
+  storeZip          String?  // ZIP code
+  storePhone        String?  // Store phone number
+  receiptHeader     String?  // Custom text at top of receipt (multi-line supported)
+  receiptFooter     String?  // Custom text at bottom of receipt (e.g., "Thank you!")
+  primaryColor      String?  // Hex color for branding (e.g., "#FF6B00")
+  
   // Pricing Model Configuration
   pricingModel      String  @default("DUAL_PRICING") // STANDARD, DUAL_PRICING
   cardSurchargeType String  @default("PERCENTAGE") // PERCENTAGE, FLAT_AMOUNT

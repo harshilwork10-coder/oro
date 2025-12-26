@@ -24,6 +24,12 @@ interface CartData {
     stationId?: string
 }
 
+interface StoreBranding {
+    storeLogo: string | null
+    storeDisplayName: string
+    primaryColor: string
+}
+
 function CustomerDisplayContent() {
     const searchParams = useSearchParams()
     const stationId = searchParams.get('stationId')
@@ -31,6 +37,7 @@ function CustomerDisplayContent() {
     const [cart, setCart] = useState<CartData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [branding, setBranding] = useState<StoreBranding | null>(null)
 
     // Poll server for cart updates
     useEffect(() => {
@@ -59,6 +66,26 @@ function CustomerDisplayContent() {
         const interval = setInterval(pollServer, 500)
         return () => clearInterval(interval)
     }, [stationId])
+
+    // Fetch store branding (once on mount)
+    useEffect(() => {
+        const fetchBranding = async () => {
+            try {
+                const res = await fetch('/api/settings/branding')
+                if (res.ok) {
+                    const data = await res.json()
+                    setBranding({
+                        storeLogo: data.storeLogo,
+                        storeDisplayName: data.storeDisplayName,
+                        primaryColor: data.primaryColor
+                    })
+                }
+            } catch (e) {
+                console.error('Error fetching branding:', e)
+            }
+        }
+        fetchBranding()
+    }, [])
 
     // Also listen to localStorage for same-browser fallback
     useEffect(() => {
@@ -105,16 +132,35 @@ function CustomerDisplayContent() {
         return (
             <div className="min-h-screen bg-gradient-to-br from-stone-900 to-stone-950 flex flex-col items-center justify-center p-8">
                 <div className="text-center">
-                    <div className="w-32 h-32 mx-auto mb-8 rounded-full bg-stone-800 flex items-center justify-center">
-                        <ShoppingCart className="h-16 w-16 text-orange-500/50" />
-                    </div>
-                    <h1 className="text-4xl font-bold text-white mb-4">Welcome!</h1>
+                    {/* Store Logo or Placeholder */}
+                    {branding?.storeLogo ? (
+                        <img
+                            src={branding.storeLogo}
+                            alt={branding.storeDisplayName || 'Store Logo'}
+                            className="w-40 h-40 mx-auto mb-8 object-contain"
+                        />
+                    ) : (
+                        <div
+                            className="w-32 h-32 mx-auto mb-8 rounded-full flex items-center justify-center"
+                            style={{ backgroundColor: branding?.primaryColor ? `${branding.primaryColor}20` : '#1c1917' }}
+                        >
+                            <ShoppingCart
+                                className="h-16 w-16"
+                                style={{ color: branding?.primaryColor || '#f97316', opacity: 0.7 }}
+                            />
+                        </div>
+                    )}
+
+                    {/* Store Name or Welcome */}
+                    <h1 className="text-4xl font-bold text-white mb-4">
+                        {branding?.storeDisplayName || 'Welcome!'}
+                    </h1>
                     <p className="text-xl text-stone-400">Your items will appear here</p>
                 </div>
 
-                {/* Company branding at bottom */}
+                {/* Powered by at bottom */}
                 <div className="absolute bottom-8 text-stone-600 text-sm">
-                    Powered by Oro
+                    Powered by Oronex
                 </div>
             </div>
         )
@@ -188,8 +234,8 @@ function CustomerDisplayContent() {
                                 <div
                                     key={idx}
                                     className={`flex items-center justify-between rounded-lg px-4 py-2 transition-all ${isLatest
-                                            ? 'bg-orange-500/20 border border-orange-500/50'
-                                            : 'bg-stone-800/50'
+                                        ? 'bg-orange-500/20 border border-orange-500/50'
+                                        : 'bg-stone-800/50'
                                         }`}
                                 >
                                     <div className="flex items-center gap-2">
