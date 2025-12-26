@@ -371,25 +371,46 @@ export default function RetailInventoryPage() {
     // Save product
     const handleSave = async () => {
         if (!editProduct) return
+        if (!editProduct.name?.trim()) {
+            setToast({ message: 'Product name is required', type: 'error' })
+            return
+        }
         setSaving(true)
 
         try {
-            const res = await fetch(`/api/inventory/products/${editProduct.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(editProduct)
-            })
+            const isNew = editProduct.id === 'new'
+
+            // Use POST for new products, PUT for updates
+            const res = await fetch(
+                isNew ? '/api/inventory/products' : `/api/inventory/products/${editProduct.id}`,
+                {
+                    method: isNew ? 'POST' : 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(editProduct)
+                }
+            )
+
+            const data = await res.json()
 
             if (res.ok) {
-                setToast({ message: 'Saved!', type: 'success' })
-                // Update local list
-                setProducts(prev => prev.map(p =>
-                    p.id === editProduct.id ? editProduct : p
-                ))
+                setToast({ message: isNew ? 'Product created!' : 'Saved!', type: 'success' })
+                if (isNew && data.product) {
+                    // Add new product to list with real ID from server
+                    const newProduct = { ...editProduct, id: data.product.id }
+                    setProducts(prev => [newProduct, ...prev])
+                    setEditProduct(newProduct)
+                } else {
+                    // Update existing product in list
+                    setProducts(prev => prev.map(p =>
+                        p.id === editProduct.id ? editProduct : p
+                    ))
+                }
             } else {
-                setToast({ message: 'Failed to save', type: 'error' })
+                // Show actual error message from API
+                setToast({ message: data.error || 'Failed to save', type: 'error' })
             }
-        } catch {
+        } catch (e) {
+            console.error('Save error:', e)
             setToast({ message: 'Error saving', type: 'error' })
         } finally {
             setSaving(false)
