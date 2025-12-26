@@ -1235,9 +1235,19 @@ model Product {
   // Order templates
   orderTemplateItems OrderTemplateItem[]
 
-  @@index([barcode])
-  @@index([sku])
-  @@index([categoryId])
+  // INDEXES for 100K+ SKU performance
+  @@index([franchiseId])                    // Filter by franchise (most queries)
+  @@index([barcode])                        // Fast barcode scan lookup
+  @@index([sku])                            // Fast SKU lookup
+  @@index([categoryId])                     // Category filtering
+  @@index([name])                           // Name search
+  @@index([isActive])                       // Active product filter
+  @@index([vendor])                         // Vendor filtering
+  @@index([brand])                          // Brand filtering
+  @@index([franchiseId, barcode])           // Composite: barcode lookup by franchise
+  @@index([franchiseId, sku])               // Composite: SKU lookup by franchise
+  @@index([franchiseId, isActive])          // Composite: active products by franchise
+  @@index([franchiseId, categoryId])        // Composite: category by franchise
 }
 
 // Tag-Along Items - Cross-sell suggestions
