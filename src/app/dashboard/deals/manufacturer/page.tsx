@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Upload, FileSpreadsheet, Download, Loader2, CheckCircle, AlertCircle, Calendar } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Upload, FileSpreadsheet, Download, Loader2, CheckCircle, AlertCircle, Calendar, ArrowLeft } from 'lucide-react'
 
 export default function ManufacturerDealsPage() {
+    const router = useRouter()
     const [uploading, setUploading] = useState(false)
     const [uploadResult, setUploadResult] = useState<any>(null)
     const [reportStartDate, setReportStartDate] = useState('')
@@ -74,10 +76,18 @@ export default function ManufacturerDealsPage() {
     return (
         <div className="min-h-screen bg-stone-950 text-white p-6">
             <div className="max-w-4xl mx-auto space-y-8">
-                {/* Header */}
-                <div>
-                    <h1 className="text-3xl font-bold">Manufacturer Penny Programs</h1>
-                    <p className="text-stone-400 mt-1">Import deals from PDF and generate rebate reports</p>
+                {/* Header with Back Button */}
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => router.back()}
+                        className="p-2 bg-stone-800 hover:bg-stone-700 rounded-lg transition-colors"
+                    >
+                        <ArrowLeft className="h-6 w-6" />
+                    </button>
+                    <div>
+                        <h1 className="text-3xl font-bold">Manufacturer Penny Programs</h1>
+                        <p className="text-stone-400 mt-1">Import deals from PDF and generate rebate reports</p>
+                    </div>
                 </div>
 
                 {/* Upload Section */}
