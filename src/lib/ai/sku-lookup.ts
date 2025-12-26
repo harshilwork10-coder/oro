@@ -205,12 +205,12 @@ export async function lookupBarcode(barcode: string): Promise<SKULookupResult> {
 
     let result: SKULookupResult = { found: false, barcode: cleanBarcode }
 
-    // Create a master timeout that cancels the entire lookup after 5 seconds
+    // Create a master timeout that cancels the entire lookup after 15 seconds
     const masterTimeout = new Promise<SKULookupResult>((resolve) => {
         setTimeout(() => {
-            console.log('[SKU_LOOKUP] Master timeout reached (5s)')
+            console.log('[SKU_LOOKUP] Master timeout reached (15s)')
             resolve({ found: false, barcode: cleanBarcode })
-        }, 5000)
+        }, 15000)
     })
 
     // The actual lookup logic
@@ -325,7 +325,7 @@ async function lookupBarcodeSpider(barcode: string): Promise<SKULookupResult> {
             'Accept': 'application/json',
             // Free tier doesn't require API key for basic lookup
         }
-    }, 3000)
+    }, 5000)
 
     if (!response.ok) {
         throw new Error(`Barcode Spider API error: ${response.status}`)
@@ -370,7 +370,7 @@ async function lookupOpenFoodFacts(barcode: string): Promise<SKULookupResult> {
         headers: {
             'User-Agent': 'OroPOS/1.0 (contact@oronex.com)'
         }
-    }, 3000)
+    }, 5000)
 
     if (!response.ok) {
         throw new Error(`OFF API error: ${response.status}`)
@@ -424,7 +424,7 @@ async function lookupUPCItemDB(barcode: string): Promise<SKULookupResult> {
         headers: {
             'Accept': 'application/json'
         }
-    }, 3000)
+    }, 5000)
 
     if (!response.ok) {
         throw new Error(`UPC ItemDB error: ${response.status}`)
