@@ -273,52 +273,51 @@ export default function LotteryModal({ isOpen, onClose, onAddToCart }: LotteryMo
                     </>
                 ) : (
                     <>
-                        {/* Lottery / Draw Quick Sell with Numpad */}
-                        <div className="p-4">
-                            {/* Amount Display */}
-                            <div className="bg-stone-800 rounded-xl p-4 mb-4 text-center">
-                                <p className="text-stone-500 text-sm mb-1">Amount</p>
-                                <p className="text-4xl font-bold text-white">{getDisplayAmount()}</p>
+                        {/* Lottery / Draw Quick Sell with Numpad - Ultra Compact for 15" */}
+                        <div className="p-3">
+                            {/* Amount Display - Compact */}
+                            <div className="bg-stone-800 rounded-lg p-2 mb-2 text-center">
+                                <p className="text-3xl font-bold text-white">{getDisplayAmount()}</p>
                             </div>
 
                             {/* Quick Amount Buttons */}
-                            <div className="grid grid-cols-6 gap-1 mb-3">
+                            <div className="grid grid-cols-6 gap-1 mb-2">
                                 {[1, 2, 5, 10, 20, 50].map((amt) => (
                                     <button
                                         key={amt}
                                         onClick={() => handleQuickAmount(amt)}
-                                        className="py-1.5 rounded-lg font-bold text-sm bg-blue-500/20 text-blue-400 hover:bg-blue-500/40 transition-colors"
+                                        className="py-1 rounded font-bold text-xs bg-blue-500/20 text-blue-400 hover:bg-blue-500/40 transition-colors"
                                     >
                                         ${amt}
                                     </button>
                                 ))}
                             </div>
 
-                            {/* Numpad - Compact */}
+                            {/* Numpad - Ultra Compact for 15" */}
                             <div className="grid grid-cols-3 gap-1">
                                 {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'DEL'].map((key) => (
                                     <button
                                         key={key}
                                         onClick={() => handleNumpadPress(key)}
-                                        className={`py-3 rounded-lg text-xl font-bold transition-colors ${key === 'C'
+                                        className={`py-2 rounded text-lg font-bold transition-colors ${key === 'C'
                                             ? 'bg-red-500/20 text-red-400 hover:bg-red-500/40'
                                             : key === 'DEL'
                                                 ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/40'
                                                 : 'bg-stone-800 text-white hover:bg-stone-700'
                                             }`}
                                     >
-                                        {key === 'DEL' ? <Delete className="h-5 w-5 mx-auto" /> : key}
+                                        {key === 'DEL' ? <Delete className="h-4 w-4 mx-auto" /> : key}
                                     </button>
                                 ))}
                             </div>
 
-                            {/* Big Add Button - Always Visible */}
+                            {/* Big Add Button */}
                             <button
                                 onClick={handleSellLottery}
                                 disabled={!lotteryAmount || parseInt(lotteryAmount) <= 0}
-                                className="w-full mt-3 py-4 bg-emerald-500 hover:bg-emerald-400 text-white text-xl font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full mt-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-white text-lg font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                ✓ Add {getDisplayAmount()}
+                                ✓ ADD {getDisplayAmount()}
                             </button>
                         </div>
                     </>
