@@ -45,6 +45,19 @@ export async function PATCH(
             'enableResources'
         ]
 
+        // Handle storeLogo separately - save to Franchise record
+        if (updates.storeLogo !== undefined) {
+            const franchise = await prisma.franchise.findFirst({
+                where: { franchisorId: id }
+            })
+            if (franchise) {
+                await prisma.franchise.update({
+                    where: { id: franchise.id },
+                    data: { storeLogo: updates.storeLogo }
+                })
+            }
+        }
+
         // Only include valid fields in the update
         const filteredUpdates: Record<string, any> = {}
         for (const key of Object.keys(updates)) {

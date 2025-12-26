@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
     ArrowLeft, Building2, DollarSign, Settings, Star, Link2, MapPin,
     CreditCard, Gift, FileText, Clock, CheckCircle, AlertCircle, X,
-    Edit, Save, Plus, Trash2, Smartphone, RefreshCw
+    Edit, Save, Plus, Trash2, Smartphone, RefreshCw, Image, Upload, Palette
 } from 'lucide-react';
 import Toast from '@/components/ui/Toast';
 
@@ -50,7 +50,7 @@ function parseTipSuggestions(tipSuggestions: string | undefined): number[] {
     }
 }
 
-type CategoryView = 'status' | 'sales' | 'features' | 'locations' | 'pricing' | 'tips' | 'payments' | 'documents' | null;
+type CategoryView = 'status' | 'sales' | 'features' | 'locations' | 'pricing' | 'tips' | 'payments' | 'documents' | 'branding' | null;
 
 export default function ProviderClientConfigPage() {
     const params = useParams();
@@ -61,6 +61,8 @@ export default function ProviderClientConfigPage() {
     const [categoryView, setCategoryView] = useState<CategoryView>(null);
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [storeLogo, setStoreLogo] = useState<string | null>(null);
 
     // Fetch client data
     async function fetchClient() {
@@ -178,6 +180,7 @@ export default function ProviderClientConfigPage() {
         { id: 'tips', label: 'Tips', value: client.tipPercentages.join(', '), icon: Gift, color: 'green' },
         { id: 'payments', label: 'Payments', value: [client.acceptsCash ? 'Cash' : '', client.acceptsCard ? 'Card' : ''].filter(Boolean).join(' & ') || 'None', icon: CreditCard, color: 'orange' },
         { id: 'documents', label: 'Documents', value: `${[client.documents.voidCheck, client.documents.driverLicense, client.documents.feinLetter].filter(Boolean).length}/3`, icon: FileText, color: 'emerald' },
+        { id: 'branding', label: 'Branding', value: storeLogo ? 'Logo Set' : 'No Logo', icon: Palette, color: 'purple' },
     ];
 
     return (
@@ -223,6 +226,7 @@ export default function ProviderClientConfigPage() {
                         blue: 'bg-blue-500/20 text-blue-400',
                         orange: 'bg-orange-500/20 text-orange-400',
                         emerald: 'bg-emerald-500/20 text-emerald-400',
+                        purple: 'bg-purple-500/20 text-purple-400',
                     };
 
                     return (
@@ -315,8 +319,8 @@ export default function ProviderClientConfigPage() {
                                             <button
                                                 onClick={() => { updateConfig({ tipType: 'PERCENT' }); }}
                                                 className={`p-3 rounded-lg border font-medium transition-colors ${client.tipType === 'PERCENT'
-                                                        ? 'border-orange-500 bg-orange-500/20 text-orange-400'
-                                                        : 'border-stone-700 hover:border-stone-600 text-stone-300'
+                                                    ? 'border-orange-500 bg-orange-500/20 text-orange-400'
+                                                    : 'border-stone-700 hover:border-stone-600 text-stone-300'
                                                     }`}
                                             >
                                                 % Percentage
@@ -324,8 +328,8 @@ export default function ProviderClientConfigPage() {
                                             <button
                                                 onClick={() => { updateConfig({ tipType: 'DOLLAR' }); }}
                                                 className={`p-3 rounded-lg border font-medium transition-colors ${client.tipType === 'DOLLAR'
-                                                        ? 'border-orange-500 bg-orange-500/20 text-orange-400'
-                                                        : 'border-stone-700 hover:border-stone-600 text-stone-300'
+                                                    ? 'border-orange-500 bg-orange-500/20 text-orange-400'
+                                                    : 'border-stone-700 hover:border-stone-600 text-stone-300'
                                                     }`}
                                             >
                                                 $ Flat Amount
@@ -525,6 +529,71 @@ export default function ProviderClientConfigPage() {
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            )}
+
+                            {categoryView === 'branding' && (
+                                <div className="space-y-4">
+                                    <p className="text-stone-400">Upload the client's store logo for personalized POS experience</p>
+
+                                    {/* Logo Preview */}
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-24 h-24 rounded-xl bg-stone-700 border border-stone-600 flex items-center justify-center overflow-hidden">
+                                            {storeLogo ? (
+                                                <img src={storeLogo} alt="Store Logo" className="w-full h-full object-contain" />
+                                            ) : (
+                                                <Building2 className="h-10 w-10 text-stone-500" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        const reader = new FileReader();
+                                                        reader.onload = () => {
+                                                            if (typeof reader.result === 'string') {
+                                                                setStoreLogo(reader.result);
+                                                            }
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="flex items-center gap-2 px-4 py-2 bg-stone-700 hover:bg-stone-600 border border-stone-600 rounded-lg text-sm transition-colors"
+                                            >
+                                                <Upload size={16} />
+                                                Upload Logo
+                                            </button>
+                                            {storeLogo && (
+                                                <button
+                                                    onClick={() => setStoreLogo(null)}
+                                                    className="text-sm text-red-400 hover:text-red-300"
+                                                >
+                                                    Remove Logo
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <p className="text-stone-500 text-xs">PNG or JPG, max 1MB. Logo appears on employee login and customer display.</p>
+
+                                    <button
+                                        onClick={() => {
+                                            updateConfig({ storeLogo: storeLogo });
+                                            setCategoryView(null);
+                                        }}
+                                        disabled={saving}
+                                        className="w-full py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                                    >
+                                        {saving ? 'Saving...' : 'Save Branding'}
+                                    </button>
                                 </div>
                             )}
                         </div>

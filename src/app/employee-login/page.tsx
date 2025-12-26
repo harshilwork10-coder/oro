@@ -7,7 +7,7 @@ import OroLogo from '@/components/ui/OroLogo'
 import { Building2, Store, Key, Loader2, Settings, X } from 'lucide-react'
 
 interface TerminalConfig {
-    business: { id: string; name: string; industryType: string }
+    business: { id: string; name: string; industryType: string; logo?: string | null }
     location: { id: string; name: string }
 }
 
@@ -264,8 +264,17 @@ export default function EmployeeLoginPage() {
     return (
         <div className="min-h-screen bg-stone-950 flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
+                {/* Show store logo if available, otherwise show ORO logo */}
                 <div className="flex justify-center mb-8">
-                    <OroLogo className="h-12 w-auto" />
+                    {terminalConfig?.business.logo ? (
+                        <img
+                            src={terminalConfig.business.logo}
+                            alt={terminalConfig.business.name}
+                            className="h-16 w-auto object-contain max-w-[200px]"
+                        />
+                    ) : (
+                        <OroLogo className="h-12 w-auto" />
+                    )}
                 </div>
 
                 {/* Terminal Info */}

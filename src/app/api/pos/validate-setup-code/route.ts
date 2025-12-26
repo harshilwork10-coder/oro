@@ -19,7 +19,9 @@ export async function POST(request: NextRequest) {
             },
             include: {
                 franchise: {
-                    include: {
+                    select: {
+                        id: true,
+                        storeLogo: true,
                         franchisor: {
                             select: {
                                 id: true,
@@ -44,7 +46,8 @@ export async function POST(request: NextRequest) {
             business: {
                 id: franchisor?.id || location.franchiseId,
                 name: franchisor?.name || 'Business',
-                industryType: franchisor?.industryType || 'RETAIL'
+                industryType: franchisor?.industryType || 'RETAIL',
+                logo: location.franchise?.storeLogo || null
             },
             location: {
                 id: location.id,
