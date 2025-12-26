@@ -161,6 +161,11 @@ export default function RetailPOSPage() {
     const [showLotteryModal, setShowLotteryModal] = useState(false)
     const [showLotteryPayoutModal, setShowLotteryPayoutModal] = useState(false)
 
+    // Category/Department Filter
+    const [categories, setCategories] = useState<{ id: string; name: string; itemCount?: number }[]>([])
+    const [selectedCategory, setSelectedCategory] = useState<string>('')
+    const [categoryProducts, setCategoryProducts] = useState<any[]>([])
+
     // SMS Receipt Modal
     const [showReceiptModal, setShowReceiptModal] = useState(false)
     const [pendingReceiptData, setPendingReceiptData] = useState<any>(null)
@@ -325,6 +330,42 @@ export default function RetailPOSPage() {
         }
         fetchFavorites()
     }, [])
+
+    // Fetch categories for filter dropdown
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const res = await fetch('/api/inventory/categories')
+                if (res.ok) {
+                    const data = await res.json()
+                    setCategories(data.categories || data || [])
+                }
+            } catch (error) {
+                console.error('[POS] Failed to load categories:', error)
+            }
+        }
+        fetchCategories()
+    }, [])
+
+    // Fetch products when category is selected
+    useEffect(() => {
+        if (!selectedCategory) {
+            setCategoryProducts([])
+            return
+        }
+        const fetchCategoryProducts = async () => {
+            try {
+                const res = await fetch(`/api/inventory/products?categoryId=${selectedCategory}&limit=100`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setCategoryProducts(data.products || data || [])
+                }
+            } catch (error) {
+                console.error('[POS] Failed to load category products:', error)
+            }
+        }
+        fetchCategoryProducts()
+    }, [selectedCategory])
 
     // Sync cart to SERVER for customer display (station-isolated)
     useEffect(() => {
@@ -1002,6 +1043,20 @@ export default function RetailPOSPage() {
                         />
                     </div>
 
+                    {/* Category Filter Dropdown */}
+                    <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className={`bg-stone-800 border border-stone-700 rounded-lg text-sm focus:outline-none focus:border-orange-500 ${compactMode ? 'py-2 px-2' : 'py-3 px-3'} ${selectedCategory ? 'text-orange-400' : 'text-stone-400'}`}
+                    >
+                        <option value="">All Depts</option>
+                        {categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                                {cat.name}
+                            </option>
+                        ))}
+                    </select>
+
                     {/* Quantity Input */}
                     <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 rounded-lg px-3 py-2">
                         <span className="text-stone-400 text-sm">Qty:</span>
@@ -1129,7 +1184,7 @@ export default function RetailPOSPage() {
             )}
 
             {/* Favorites Bar (Top Sellers Quick Buttons) */}
-            {favorites.length > 0 && (
+            {favorites.length > 0 && !selectedCategory && (
                 <div className="px-4 py-2 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-b border-purple-700/50">
                     <div className="flex items-center gap-3">
                         <span className="text-purple-400 text-sm font-medium whitespace-nowrap">
@@ -1161,6 +1216,44 @@ export default function RetailPOSPage() {
                 </div>
             )}
 
+            {/* Category Products Grid - Shows when category is selected */}
+            {selectedCategory && categoryProducts.length > 0 && (
+                <div className="bg-gradient-to-r from-orange-900/20 to-amber-900/20 border-b border-orange-700/50 max-h-48 overflow-y-auto">
+                    <div className="px-4 py-2">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-orange-400 text-sm font-medium">
+                                📦 {categories.find(c => c.id === selectedCategory)?.name} ({categoryProducts.length} items)
+                            </span>
+                            <button
+                                onClick={() => setSelectedCategory('')}
+                                className="text-xs text-stone-400 hover:text-white px-2 py-1 bg-stone-800 rounded"
+                            >
+                                Clear Filter
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                            {categoryProducts.map((product: any) => (
+                                <button
+                                    key={product.id}
+                                    onClick={() => {
+                                        addToCart({
+                                            id: product.id,
+                                            name: product.name,
+                                            price: Number(product.price),
+                                            barcode: product.barcode
+                                        })
+                                        setToast({ message: `Added: ${product.name}`, type: 'success' })
+                                    }}
+                                    className="flex flex-col items-center p-2 bg-orange-600/20 hover:bg-orange-600/40 border border-orange-600/30 rounded-lg text-xs transition-colors"
+                                >
+                                    <span className="font-medium text-white truncate w-full text-center">{product.name}</span>
+                                    <span className="text-orange-300 font-bold">{formatCurrency(Number(product.price))}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden">
