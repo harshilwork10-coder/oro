@@ -19,7 +19,8 @@ import {
     Plus,
     X,
     Edit3,
-    Check
+    Check,
+    Download
 } from 'lucide-react'
 import OroLogo from '@/components/ui/OroLogo'
 import dynamic from 'next/dynamic'
@@ -120,6 +121,44 @@ export default function OroPulsePage() {
     // UI state
     const [activeTab, setActiveTab] = useState<TabType>('sales')
     const [lastRefresh, setLastRefresh] = useState(new Date())
+
+    // PWA Install state
+    const [installPrompt, setInstallPrompt] = useState<any>(null)
+    const [isInstalled, setIsInstalled] = useState(false)
+
+    // Listen for PWA install prompt
+    useEffect(() => {
+        // Check if already installed
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            setIsInstalled(true)
+            return
+        }
+
+        const handleBeforeInstallPrompt = (e: Event) => {
+            e.preventDefault()
+            setInstallPrompt(e)
+        }
+
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+        }
+    }, [])
+
+    const handleInstallClick = async () => {
+        if (!installPrompt) {
+            // Fallback for iOS or when prompt not available
+            alert('To install: Tap the Share button (iOS) or Menu → Install App (Android)')
+            return
+        }
+        installPrompt.prompt()
+        const { outcome } = await installPrompt.userChoice
+        if (outcome === 'accepted') {
+            setIsInstalled(true)
+            setInstallPrompt(null)
+        }
+    }
 
     // Check access on mount
     useEffect(() => {
@@ -279,6 +318,15 @@ export default function OroPulsePage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {!isInstalled && (
+                        <button
+                            onClick={handleInstallClick}
+                            className="p-2 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 active:scale-95 transition-transform"
+                            title="Install App"
+                        >
+                            <Download className="w-4 h-4 text-white" />
+                        </button>
+                    )}
                     <button onClick={fetchData} className="p-2 rounded-full bg-gray-800 active:bg-gray-700">
                         <RefreshCw className={`w-4 h-4 text-gray-400 ${loading ? 'animate-spin' : ''}`} />
                     </button>
