@@ -116,6 +116,31 @@ export async function GET(request: NextRequest) {
             taxCollected += Number(tx.tax || 0)
         })
 
+        // ===== LOTTERY DATA =====
+        let lotteryData = { sales: 0, payouts: 0, net: 0, salesCount: 0, payoutsCount: 0 }
+        try {
+            const lotteryTransactions = await prisma.lotteryTransaction.findMany({
+                where: {
+                    franchiseId: user.franchiseId,
+                    createdAt: { gte: today }
+                }
+            })
+            const lotterySales = lotteryTransactions.filter(lt => lt.type === 'SALE')
+            const lotteryPayouts = lotteryTransactions.filter(lt => lt.type === 'PAYOUT')
+            const salesTotal = lotterySales.reduce((sum, lt) => sum + Number(lt.amount), 0)
+            const payoutsTotal = lotteryPayouts.reduce((sum, lt) => sum + Number(lt.amount), 0)
+            lotteryData = {
+                sales: salesTotal,
+                payouts: payoutsTotal,
+                net: salesTotal - payoutsTotal,
+                salesCount: lotterySales.length,
+                payoutsCount: lotteryPayouts.length
+            }
+        } catch (e) {
+            // Lottery table may not exist
+            console.error('Lottery query failed:', e)
+        }
+
         return NextResponse.json({
             paymentBreakdown: { cash, card, other },
             totalSales,
@@ -131,7 +156,8 @@ export async function GET(request: NextRequest) {
                 employeeId: t.employeeId || 'Unknown',
                 time: t.createdAt?.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) || ''
             })),
-            openDrawers
+            openDrawers,
+            lottery: lotteryData
         })
 
     } catch (error) {

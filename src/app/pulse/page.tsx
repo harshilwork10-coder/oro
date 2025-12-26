@@ -68,6 +68,14 @@ interface EmployeeOnClock {
     since: string
 }
 
+interface LotteryStats {
+    sales: number
+    payouts: number
+    net: number
+    salesCount: number
+    payoutsCount: number
+}
+
 interface Product {
     id: string
     name: string
@@ -117,6 +125,7 @@ export default function OroPulsePage() {
     const [refundCount, setRefundCount] = useState(0)
     const [totalSalesReport, setTotalSalesReport] = useState(0)
     const [taxCollected, setTaxCollected] = useState(0)
+    const [lotteryStats, setLotteryStats] = useState<LotteryStats>({ sales: 0, payouts: 0, net: 0, salesCount: 0, payoutsCount: 0 })
 
     // UI state
     const [activeTab, setActiveTab] = useState<TabType>('sales')
@@ -216,6 +225,7 @@ export default function OroPulsePage() {
                 setRefundCount(reportsData.refundCount || 0)
                 setTotalSalesReport(reportsData.totalSales || 0)
                 setTaxCollected(reportsData.taxCollected || 0)
+                setLotteryStats(reportsData.lottery || { sales: 0, payouts: 0, net: 0, salesCount: 0, payoutsCount: 0 })
             }
         } catch (error) {
             console.error('Failed to fetch:', error)
@@ -693,6 +703,35 @@ export default function OroPulsePage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* 🎰 Lottery Summary - Separate from regular sales */}
+                        {(lotteryStats.sales > 0 || lotteryStats.payouts > 0) && (
+                            <div className="bg-gradient-to-br from-purple-900/40 to-indigo-900/40 rounded-xl p-4 border border-purple-500/30 mt-4">
+                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-purple-300">
+                                    🎰 Lottery Today
+                                    <span className="text-[10px] bg-purple-500/30 px-2 py-0.5 rounded-full">Separate Accounting</span>
+                                </h3>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="text-center">
+                                        <p className="text-xs text-gray-400 mb-1">Tickets Sold</p>
+                                        <p className="text-lg font-bold text-green-400">+${lotteryStats.sales.toLocaleString()}</p>
+                                        <p className="text-[10px] text-gray-500">{lotteryStats.salesCount} sales</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-xs text-gray-400 mb-1">Winner Payouts</p>
+                                        <p className="text-lg font-bold text-red-400">-${lotteryStats.payouts.toLocaleString()}</p>
+                                        <p className="text-[10px] text-gray-500">{lotteryStats.payoutsCount} payouts</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-xs text-gray-400 mb-1">Net Lottery</p>
+                                        <p className={`text-lg font-bold ${lotteryStats.net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                            {lotteryStats.net >= 0 ? '+' : ''}${lotteryStats.net.toLocaleString()}
+                                        </p>
+                                        <p className="text-[10px] text-purple-400">Cash Flow</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
 
