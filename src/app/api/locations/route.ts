@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { generateSetupCode } from '@/lib/setup-code'
 
 export async function GET() {
     try {
@@ -63,7 +64,8 @@ export async function GET() {
                         name: storeName,
                         slug: `${storeSlug}-${Date.now()}`,
                         address: 'Please update your store address',
-                        franchiseId: defaultFranchise.id
+                        franchiseId: defaultFranchise.id,
+                        setupCode: generateSetupCode(storeName) // Auto-generate terminal setup code
                     }
                 })
             }
@@ -189,6 +191,7 @@ export async function POST(request: Request) {
                 slug: uniqueSlug,
                 address,
                 franchiseId: finalFranchiseId || null, // null for direct-owned locations (Provider only)
+                setupCode: generateSetupCode(name) // Auto-generate terminal setup code
             },
             include: {
                 franchise: {
