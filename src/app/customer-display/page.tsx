@@ -157,25 +157,53 @@ function CustomerDisplayContent() {
                 <h1 className="text-3xl font-bold text-white">Your Order</h1>
             </div>
 
-            {/* Items List - Scrollable */}
-            <div className="flex-1 overflow-y-auto px-8">
-                <div className="max-w-2xl mx-auto space-y-3 pb-4">
-                    {cart.items.map((item, idx) => (
-                        <div
-                            key={idx}
-                            className="flex items-center justify-between bg-stone-800/50 rounded-xl px-6 py-3"
-                        >
-                            <div className="flex items-center gap-4">
-                                <span className="text-2xl font-bold text-orange-500">
-                                    {item.quantity}x
+            {/* Items List - Show last 5 items, summary for older ones */}
+            <div className="flex-1 overflow-hidden px-8">
+                <div className="max-w-2xl mx-auto h-full flex flex-col">
+                    {/* Summary of older items (if more than 5) */}
+                    {cart.items.length > 5 && (() => {
+                        const olderItems = cart.items.slice(0, -5)
+                        const olderTotal = olderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+                        const olderCount = olderItems.reduce((sum, item) => sum + item.quantity, 0)
+                        return (
+                            <div className="flex items-center justify-between bg-stone-800/30 rounded-lg px-4 py-2 mb-2 text-stone-400">
+                                <span className="text-sm">
+                                    + {olderCount} more item{olderCount !== 1 ? 's' : ''}
                                 </span>
-                                <span className="text-lg text-white">{item.name}</span>
+                                <span className="text-sm font-medium">
+                                    {formatCurrency(olderTotal)}
+                                </span>
                             </div>
-                            <span className="text-lg font-bold text-orange-400">
-                                {formatCurrency(item.price * item.quantity)}
-                            </span>
-                        </div>
-                    ))}
+                        )
+                    })()}
+
+                    {/* Last 5 items (most recent at bottom) */}
+                    <div className="flex-1 flex flex-col justify-end space-y-2">
+                        {cart.items.slice(-5).map((item, idx) => {
+                            const isLatest = idx === Math.min(cart.items.length, 5) - 1
+                            return (
+                                <div
+                                    key={idx}
+                                    className={`flex items-center justify-between rounded-xl px-5 py-3 transition-all ${isLatest
+                                            ? 'bg-orange-500/20 border border-orange-500/50'
+                                            : 'bg-stone-800/50'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <span className={`text-xl font-bold ${isLatest ? 'text-orange-400' : 'text-orange-500'}`}>
+                                            {item.quantity}x
+                                        </span>
+                                        <span className={`text-base ${isLatest ? 'text-white font-medium' : 'text-white'}`}>
+                                            {item.name}
+                                        </span>
+                                    </div>
+                                    <span className={`text-base font-bold ${isLatest ? 'text-orange-300' : 'text-orange-400'}`}>
+                                        {formatCurrency(item.price * item.quantity)}
+                                    </span>
+                                </div>
+                            )
+                        })}
+                    </div>
                 </div>
             </div>
 
