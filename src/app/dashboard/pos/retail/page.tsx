@@ -1380,8 +1380,8 @@ export default function RetailPOSPage() {
                                 }}
                                 disabled={cart.length === 0 && heldTransactions.length === 0}
                                 className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${cart.length > 0
-                                        ? 'bg-purple-500/30 hover:bg-purple-500/50'
-                                        : 'bg-amber-500/30 hover:bg-amber-500/50'
+                                    ? 'bg-purple-500/30 hover:bg-purple-500/50'
+                                    : 'bg-amber-500/30 hover:bg-amber-500/50'
                                     }`}
                             >
                                 <History className="h-5 w-5" />
