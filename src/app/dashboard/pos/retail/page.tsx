@@ -292,10 +292,13 @@ export default function RetailPOSPage() {
                 const res = await fetch(`/api/franchise/reports/daily?date=${today}`)
                 if (res.ok) {
                     const data = await res.json()
+                    // API returns: totalRevenue, transactionCount, averageTicket
+                    const txCount = data.summary?.transactionCount || 0
+                    const sales = data.summary?.totalRevenue || 0
                     setTodayStats({
-                        sales: data.summary?.totalSales || 0,
-                        transactions: data.summary?.totalTransactions || 0,
-                        avgTicket: data.summary?.averageTicket || 0
+                        sales: sales,
+                        transactions: txCount,
+                        avgTicket: txCount > 0 ? sales / txCount : 0  // Calculate client-side if needed
                     })
                 }
             } catch (error) {
