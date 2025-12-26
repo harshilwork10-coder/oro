@@ -17,7 +17,8 @@ import {
     Gift,
     Banknote,
     ArrowLeft,
-    Lock
+    Lock,
+    Scan
 } from "lucide-react"
 import Link from 'next/link'
 
@@ -52,6 +53,7 @@ export default function LotteryPage() {
     const [loading, setLoading] = useState(true)
     const [showAddGameModal, setShowAddGameModal] = useState(false)
     const [showAddPackModal, setShowAddPackModal] = useState(false)
+    const [showQuickAddModal, setShowQuickAddModal] = useState(false)
     const [selectedGameId, setSelectedGameId] = useState('')
 
     // Form state
@@ -64,6 +66,10 @@ export default function LotteryPage() {
         gameId: '',
         packNumber: '',
         ticketCount: 300
+    })
+    const [quickTicket, setQuickTicket] = useState({
+        barcode: '',
+        price: ''
     })
 
     useEffect(() => {
@@ -128,6 +134,32 @@ export default function LotteryPage() {
             }
         } catch (error) {
             console.error('Failed to create pack:', error)
+        }
+    }
+
+    const saveQuickTicket = async () => {
+        if (!quickTicket.barcode || !quickTicket.price) return
+
+        try {
+            const res = await fetch('/api/lottery/tickets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    barcode: quickTicket.barcode,
+                    price: parseFloat(quickTicket.price)
+                })
+            })
+
+            if (res.ok) {
+                setShowQuickAddModal(false)
+                setQuickTicket({ barcode: '', price: '' })
+                alert('Ticket saved! Now cashiers can scan this barcode and price will auto-fill.')
+            } else {
+                const data = await res.json()
+                alert(data.error || 'Failed to save ticket')
+            }
+        } catch (error) {
+            console.error('Failed to save quick ticket:', error)
         }
     }
 
@@ -197,6 +229,13 @@ export default function LotteryPage() {
                 </div>
 
                 <div className="flex gap-2">
+                    <button
+                        onClick={() => setShowQuickAddModal(true)}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    >
+                        <Scan className="h-4 w-4" />
+                        Quick Add Ticket
+                    </button>
                     <button
                         onClick={() => setShowAddGameModal(true)}
                         className="px-4 py-2 bg-stone-700 hover:bg-stone-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
@@ -487,6 +526,83 @@ export default function LotteryPage() {
                                 className="flex-1 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg disabled:opacity-50"
                             >
                                 Add Pack
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Quick Add Ticket Modal - Simple barcode to price mapping */}
+            {showQuickAddModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="glass-panel w-full max-w-md mx-4 rounded-xl p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold text-stone-100 flex items-center gap-2">
+                                <Scan className="h-5 w-5 text-emerald-500" />
+                                Quick Add Ticket
+                            </h2>
+                            <button onClick={() => setShowQuickAddModal(false)} className="text-stone-500 hover:text-stone-300">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <p className="text-stone-400 text-sm mb-4">
+                            Scan a scratch ticket barcode and set its price. Cashiers can then scan this barcode at POS and the price will auto-fill.
+                        </p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-stone-400 mb-1">Scan Ticket Barcode</label>
+                                <input
+                                    type="text"
+                                    value={quickTicket.barcode}
+                                    onChange={(e) => setQuickTicket({ ...quickTicket, barcode: e.target.value })}
+                                    placeholder="Scan or enter barcode..."
+                                    className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 font-mono text-lg focus:border-emerald-500 focus:outline-none"
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-stone-400 mb-2">Ticket Price</label>
+                                <div className="grid grid-cols-4 gap-2 mb-3">
+                                    {[1, 2, 3, 5, 10, 20, 30, 50].map((price) => (
+                                        <button
+                                            key={price}
+                                            onClick={() => setQuickTicket({ ...quickTicket, price: price.toString() })}
+                                            className={`py-2 rounded-lg font-bold transition-colors ${quickTicket.price === price.toString()
+                                                ? 'bg-emerald-500 text-white'
+                                                : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
+                                                }`}
+                                        >
+                                            ${price}
+                                        </button>
+                                    ))}
+                                </div>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={quickTicket.price}
+                                    onChange={(e) => setQuickTicket({ ...quickTicket, price: e.target.value })}
+                                    placeholder="Or enter custom price..."
+                                    className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:border-emerald-500 focus:outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => setShowQuickAddModal(false)}
+                                className="flex-1 py-2 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={saveQuickTicket}
+                                disabled={!quickTicket.barcode || !quickTicket.price}
+                                className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                <CheckCircle className="h-4 w-4" />
+                                Save Ticket
                             </button>
                         </div>
                     </div>

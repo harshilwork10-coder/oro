@@ -320,6 +320,9 @@ model Franchise {
   // Cash Payouts (lottery, scratch, vendor)
   cashPayouts CashPayout[]
 
+  // Scratch ticket barcode-price mappings
+  scratchTickets ScratchTicket[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -3873,3 +3876,21 @@ model CashPayout {
   @@index([createdAt])
 }
 
+// Scratch ticket barcode to price mapping
+// Set once in Lottery Management, looked up at POS for quick sales
+model ScratchTicket {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  barcode     String           // Ticket barcode (scanned)
+  price       Decimal          // Ticket price
+  name        String?          // Optional game name
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([franchiseId, barcode])
+  @@index([franchiseId])
+  @@index([barcode])
+}
