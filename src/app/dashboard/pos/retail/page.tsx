@@ -1368,12 +1368,26 @@ export default function RetailPOSPage() {
                                 <span className="text-[10px]">{selectedItemIndex !== null ? 'ITEM%' : 'INV%'}</span>
                             </button>
                             <button
-                                onClick={() => heldTransactions.length > 0 && recallTransaction(heldTransactions[0].id)}
-                                disabled={heldTransactions.length === 0}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-purple-500/30 hover:bg-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors"
+                                onClick={() => {
+                                    // If cart has items, hold the current transaction
+                                    if (cart.length > 0) {
+                                        holdTransaction()
+                                    }
+                                    // If no cart but there are held transactions, show recall modal or recall first one
+                                    else if (heldTransactions.length > 0) {
+                                        recallTransaction(heldTransactions[0].id)
+                                    }
+                                }}
+                                disabled={cart.length === 0 && heldTransactions.length === 0}
+                                className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${cart.length > 0
+                                        ? 'bg-purple-500/30 hover:bg-purple-500/50'
+                                        : 'bg-amber-500/30 hover:bg-amber-500/50'
+                                    }`}
                             >
                                 <History className="h-5 w-5" />
-                                <span className="text-[10px]">HOLD({heldTransactions.length})</span>
+                                <span className="text-[10px]">
+                                    {cart.length > 0 ? 'HOLD' : `RECALL(${heldTransactions.length})`}
+                                </span>
                             </button>
                             <button
                                 onClick={() => selectedItemIndex !== null && setShowQuantityModal(true)}
