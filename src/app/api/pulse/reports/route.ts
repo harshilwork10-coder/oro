@@ -117,24 +117,54 @@ export async function GET(request: NextRequest) {
         })
 
         // ===== LOTTERY DATA =====
-        let lotteryData = { sales: 0, payouts: 0, net: 0, salesCount: 0, payoutsCount: 0 }
+        let lotteryData = { sales: 0, payouts: 0, net: 0, salesCount: 0, payoutsCount: 0, topGames: [] as { name: string; price: number; sold: number; revenue: number }[] }
         try {
             const lotteryTransactions = await prisma.lotteryTransaction.findMany({
                 where: {
                     franchiseId: user.franchiseId,
                     createdAt: { gte: today }
+                },
+                include: {
+                    pack: {
+                        include: {
+                            game: true
+                        }
+                    }
                 }
             })
             const lotterySales = lotteryTransactions.filter(lt => lt.type === 'SALE')
             const lotteryPayouts = lotteryTransactions.filter(lt => lt.type === 'PAYOUT')
             const salesTotal = lotterySales.reduce((sum, lt) => sum + Number(lt.amount), 0)
             const payoutsTotal = lotteryPayouts.reduce((sum, lt) => sum + Number(lt.amount), 0)
+
+            // Group sales by game name
+            const gameMap: Record<string, { name: string; price: number; sold: number; revenue: number }> = {}
+            lotterySales.forEach(lt => {
+                if (lt.pack?.game) {
+                    const gameName = lt.pack.game.gameName
+                    if (!gameMap[gameName]) {
+                        gameMap[gameName] = {
+                            name: gameName,
+                            price: Number(lt.pack.game.ticketPrice),
+                            sold: 0,
+                            revenue: 0
+                        }
+                    }
+                    gameMap[gameName].sold += 1
+                    gameMap[gameName].revenue += Number(lt.amount)
+                }
+            })
+            const topGames = Object.values(gameMap)
+                .sort((a, b) => b.revenue - a.revenue)
+                .slice(0, 5)
+
             lotteryData = {
                 sales: salesTotal,
                 payouts: payoutsTotal,
                 net: salesTotal - payoutsTotal,
                 salesCount: lotterySales.length,
-                payoutsCount: lotteryPayouts.length
+                payoutsCount: lotteryPayouts.length,
+                topGames
             }
         } catch (e) {
             // Lottery table may not exist

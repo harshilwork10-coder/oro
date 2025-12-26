@@ -74,6 +74,7 @@ interface LotteryStats {
     net: number
     salesCount: number
     payoutsCount: number
+    topGames: { name: string; price: number; sold: number; revenue: number }[]
 }
 
 interface Product {
@@ -125,7 +126,7 @@ export default function OroPulsePage() {
     const [refundCount, setRefundCount] = useState(0)
     const [totalSalesReport, setTotalSalesReport] = useState(0)
     const [taxCollected, setTaxCollected] = useState(0)
-    const [lotteryStats, setLotteryStats] = useState<LotteryStats>({ sales: 0, payouts: 0, net: 0, salesCount: 0, payoutsCount: 0 })
+    const [lotteryStats, setLotteryStats] = useState<LotteryStats>({ sales: 0, payouts: 0, net: 0, salesCount: 0, payoutsCount: 0, topGames: [] })
 
     // UI state
     const [activeTab, setActiveTab] = useState<TabType>('sales')
@@ -225,7 +226,7 @@ export default function OroPulsePage() {
                 setRefundCount(reportsData.refundCount || 0)
                 setTotalSalesReport(reportsData.totalSales || 0)
                 setTaxCollected(reportsData.taxCollected || 0)
-                setLotteryStats(reportsData.lottery || { sales: 0, payouts: 0, net: 0, salesCount: 0, payoutsCount: 0 })
+                setLotteryStats(reportsData.lottery || { sales: 0, payouts: 0, net: 0, salesCount: 0, payoutsCount: 0, topGames: [] })
             }
         } catch (error) {
             console.error('Failed to fetch:', error)
@@ -730,6 +731,27 @@ export default function OroPulsePage() {
                                         <p className="text-[10px] text-purple-400">Cash Flow</p>
                                     </div>
                                 </div>
+
+                                {/* Top Selling Scratch Tickets */}
+                                {lotteryStats.topGames && lotteryStats.topGames.length > 0 && (
+                                    <div className="mt-4 pt-3 border-t border-purple-500/20">
+                                        <p className="text-xs text-purple-300 font-medium mb-2">🎟️ Top Scratch Tickets</p>
+                                        <div className="space-y-1.5">
+                                            {lotteryStats.topGames.map((game, idx) => (
+                                                <div key={idx} className="flex items-center justify-between bg-purple-500/10 rounded-lg px-3 py-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-purple-400 text-xs font-bold">${game.price}</span>
+                                                        <span className="text-white text-sm truncate max-w-[120px]">{game.name}</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-green-400 font-bold text-sm">{game.sold}</span>
+                                                        <span className="text-gray-500 text-xs ml-1">sold</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </>
