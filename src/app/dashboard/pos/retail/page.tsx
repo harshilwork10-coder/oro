@@ -1247,7 +1247,7 @@ export default function RetailPOSPage() {
                             <button
                                 onClick={voidTransaction}
                                 disabled={cart.length === 0}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-red-900/20 hover:bg-red-900/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-red-500 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-red-900/30 hover:bg-red-900/60 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors"
                             >
                                 <X className="h-5 w-5" />
                                 <span className="text-[10px]">VOID</span>
@@ -1255,7 +1255,7 @@ export default function RetailPOSPage() {
                             <button
                                 onClick={deleteSelectedItem}
                                 disabled={selectedItemIndex === null}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-red-500/20 hover:bg-red-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-red-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-red-500/30 hover:bg-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors"
                             >
                                 <Trash2 className="h-5 w-5" />
                                 <span className="text-[10px]">DELETE</span>
@@ -1269,7 +1269,7 @@ export default function RetailPOSPage() {
                                     }
                                 }}
                                 disabled={cart.length === 0}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-orange-500/20 hover:bg-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-orange-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-orange-500/30 hover:bg-orange-500/50 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors"
                             >
                                 <Tag className="h-5 w-5" />
                                 <span className="text-[10px]">{selectedItemIndex !== null ? 'ITEM%' : 'INV%'}</span>
@@ -1277,7 +1277,7 @@ export default function RetailPOSPage() {
                             <button
                                 onClick={() => heldTransactions.length > 0 && recallTransaction(heldTransactions[0].id)}
                                 disabled={heldTransactions.length === 0}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-purple-500/20 hover:bg-purple-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-purple-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-purple-500/30 hover:bg-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors"
                             >
                                 <History className="h-5 w-5" />
                                 <span className="text-[10px]">HOLD({heldTransactions.length})</span>
@@ -1285,7 +1285,7 @@ export default function RetailPOSPage() {
                             <button
                                 onClick={() => selectedItemIndex !== null && setShowQuantityModal(true)}
                                 disabled={selectedItemIndex === null}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-emerald-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-emerald-500/30 hover:bg-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors"
                             >
                                 <Hash className="h-5 w-5" />
                                 <span className="text-[10px]">QTY</span>
@@ -1293,14 +1293,14 @@ export default function RetailPOSPage() {
                             <button
                                 onClick={() => selectedItemIndex !== null && setShowPriceModal(true)}
                                 disabled={selectedItemIndex === null}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-pink-500/20 hover:bg-pink-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded text-pink-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-pink-500/30 hover:bg-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors"
                             >
                                 <DollarSign className="h-5 w-5" />
                                 <span className="text-[10px]">PRICE</span>
                             </button>
                             <button
                                 onClick={printLastReceipt}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-cyan-500/20 hover:bg-cyan-500/40 rounded text-cyan-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-cyan-500/30 hover:bg-cyan-500/50 rounded text-white transition-colors"
                             >
                                 <Printer className="h-5 w-5" />
                                 <span className="text-[10px]">RCPT</span>
@@ -1311,35 +1311,35 @@ export default function RetailPOSPage() {
                         <div className="grid grid-cols-8 gap-1">
                             <button
                                 onClick={() => setShowPriceCheckInputModal(true)}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-yellow-500/20 hover:bg-yellow-500/40 rounded text-yellow-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-yellow-500/30 hover:bg-yellow-500/50 rounded text-white transition-colors"
                             >
                                 <Search className="h-4 w-4" />
                                 <span className="text-[10px]">CHECK</span>
                             </button>
                             <button
                                 onClick={() => setShowQuickAddModal(true)}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/40 rounded text-emerald-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-emerald-500/30 hover:bg-emerald-500/50 rounded text-white transition-colors"
                             >
                                 <DollarSign className="h-4 w-4" />
                                 <span className="text-[10px]">QUICK</span>
                             </button>
                             <button
                                 onClick={() => setShowCustomerLookup(true)}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-blue-500/20 hover:bg-blue-500/40 rounded text-blue-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-blue-500/30 hover:bg-blue-500/50 rounded text-white transition-colors"
                             >
                                 <Phone className="h-4 w-4" />
                                 <span className="text-[10px]">LOOK</span>
                             </button>
                             <button
                                 onClick={() => setShowCashDropModal(true)}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-green-500/20 hover:bg-green-500/40 rounded text-green-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-green-500/30 hover:bg-green-500/50 rounded text-white transition-colors"
                             >
                                 <Wallet className="h-4 w-4" />
                                 <span className="text-[10px]">DROP</span>
                             </button>
                             <button
                                 onClick={() => setShowReceiveStockModal(true)}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-orange-500/20 hover:bg-orange-500/40 rounded text-orange-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-orange-500/30 hover:bg-orange-500/50 rounded text-white transition-colors"
                             >
                                 <PackagePlus className="h-4 w-4" />
                                 <span className="text-[10px]">RECV</span>
@@ -1355,21 +1355,21 @@ export default function RetailPOSPage() {
                                     } catch (e) { console.error(e) }
                                     setShowRecentTransactions(true)
                                 }}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-purple-500/20 hover:bg-purple-500/40 rounded text-purple-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-purple-500/30 hover:bg-purple-500/50 rounded text-white transition-colors"
                             >
                                 <Clock className="h-4 w-4" />
                                 <span className="text-[10px]">HIST</span>
                             </button>
                             <button
                                 onClick={() => setShowLotteryModal(true)}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-amber-500/20 hover:bg-amber-500/40 rounded text-amber-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-amber-500/30 hover:bg-amber-500/50 rounded text-white transition-colors"
                             >
                                 <Ticket className="h-4 w-4" />
                                 <span className="text-[10px]">LOTTO</span>
                             </button>
                             <button
                                 onClick={() => setShowLotteryPayoutModal(true)}
-                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-teal-500/20 hover:bg-teal-500/40 rounded text-teal-400 transition-colors"
+                                className="flex flex-col items-center justify-center gap-0.5 py-2 bg-teal-500/30 hover:bg-teal-500/50 rounded text-white transition-colors"
                             >
                                 <Trophy className="h-4 w-4" />
                                 <span className="text-[10px]">PAY</span>
@@ -1379,7 +1379,7 @@ export default function RetailPOSPage() {
                         {/* Row 3: End of Day */}
                         <button
                             onClick={() => setShowEndOfDayWizard(true)}
-                            className="flex items-center justify-center gap-2 py-2 bg-indigo-500/20 hover:bg-indigo-500/40 rounded text-indigo-400 transition-colors"
+                            className="flex items-center justify-center gap-2 py-2 bg-indigo-500/30 hover:bg-indigo-500/50 rounded text-white transition-colors"
                         >
                             <Moon className="h-4 w-4" />
                             <span className="text-xs font-medium">End of Day / Close</span>
@@ -2511,8 +2511,8 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
                                 key={filter}
                                 onClick={() => setDateFilter(filter)}
                                 className={`px-3 py-1 rounded text-xs font-medium transition-colors ${dateFilter === filter
-                                        ? 'bg-purple-500 text-white'
-                                        : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                    ? 'bg-purple-500 text-white'
+                                    : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
                                     }`}
                             >
                                 {filter === 'today' ? 'Today' : filter === 'week' ? 'Week' : filter === 'custom' ? 'Date Range' : 'All'}
