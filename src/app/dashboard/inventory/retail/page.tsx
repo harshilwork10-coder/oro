@@ -13,6 +13,7 @@ import Toast from '@/components/ui/Toast'
 import DepartmentManagerModal from '@/components/modals/DepartmentManagerModal'
 import PromotionManagerModal from '@/components/modals/PromotionManagerModal'
 import NumpadModal from '@/components/modals/NumpadModal'
+import OnScreenKeyboard from '@/components/ui/OnScreenKeyboard'
 
 interface Product {
     id: string
@@ -66,9 +67,13 @@ export default function RetailInventoryPage() {
     const [lookingUpSKU, setLookingUpSKU] = useState(false)
     const [skuLookupResult, setSKULookupResult] = useState<any>(null)
 
-    // Numpad modal states
+    // Numpad modal states (for numeric fields)
     const [numpadField, setNumpadField] = useState<'cost' | 'price' | 'stock' | null>(null)
     const [showNumpad, setShowNumpad] = useState(false)
+
+    // On-screen keyboard states (for text fields)
+    const [keyboardField, setKeyboardField] = useState<'sku' | 'size' | 'productType' | 'brand' | 'vendor' | null>(null)
+    const [showKeyboard, setShowKeyboard] = useState(false)
 
     // Product insights state
     const [insights, setInsights] = useState<any>(null)
@@ -624,34 +629,32 @@ export default function RetailInventoryPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-stone-500">SKU</label>
-                                    <input
-                                        type="text"
-                                        value={editProduct.sku || ''}
-                                        onChange={(e) => updateField('sku', e.target.value)}
-                                        className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded"
-                                    />
+                                    <label className="text-xs text-stone-500">SKU <span className="text-blue-400">(Tap to type)</span></label>
+                                    <div
+                                        onClick={() => { setKeyboardField('sku'); setShowKeyboard(true); }}
+                                        className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded cursor-pointer hover:border-orange-500 transition-colors min-h-[42px] flex items-center"
+                                    >
+                                        {editProduct.sku || <span className="text-stone-500">Tap to enter SKU...</span>}
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
                                         <label className="text-xs text-stone-500">Size <span className="text-purple-400">(AI)</span></label>
-                                        <input
-                                            type="text"
-                                            value={editProduct.size || ''}
-                                            onChange={(e) => updateField('size', e.target.value)}
-                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded"
-                                            placeholder="750ml, 12 oz..."
-                                        />
+                                        <div
+                                            onClick={() => { setKeyboardField('size'); setShowKeyboard(true); }}
+                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded cursor-pointer hover:border-orange-500 transition-colors min-h-[42px] flex items-center"
+                                        >
+                                            {editProduct.size || <span className="text-stone-500">750ml, 12 oz...</span>}
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="text-xs text-stone-500">Type</label>
-                                        <input
-                                            type="text"
-                                            value={editProduct.productType || ''}
-                                            onChange={(e) => updateField('productType', e.target.value)}
-                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded"
-                                            placeholder="Whiskey, Lager..."
-                                        />
+                                        <div
+                                            onClick={() => { setKeyboardField('productType'); setShowKeyboard(true); }}
+                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded cursor-pointer hover:border-orange-500 transition-colors min-h-[42px] flex items-center"
+                                        >
+                                            {editProduct.productType || <span className="text-stone-500">Whiskey, Lager...</span>}
+                                        </div>
                                     </div>
                                 </div>
                                 <div>
@@ -672,13 +675,12 @@ export default function RetailInventoryPage() {
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
                                         <label className="text-xs text-stone-500">Brand <span className="text-purple-400">(AI)</span></label>
-                                        <input
-                                            type="text"
-                                            value={editProduct.brand || ''}
-                                            onChange={(e) => updateField('brand', e.target.value)}
-                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded"
-                                            placeholder="Bulleit, Coca-Cola..."
-                                        />
+                                        <div
+                                            onClick={() => { setKeyboardField('brand'); setShowKeyboard(true); }}
+                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded cursor-pointer hover:border-orange-500 transition-colors min-h-[42px] flex items-center"
+                                        >
+                                            {editProduct.brand || <span className="text-stone-500">Bulleit, Coca-Cola...</span>}
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="text-xs text-stone-500">Supplier / Distributor</label>
@@ -990,6 +992,39 @@ export default function RetailInventoryPage() {
                 }
                 prefix={numpadField === 'stock' ? '' : '$'}
                 allowDecimal={numpadField !== 'stock'}
+            />
+
+            {/* On-Screen Keyboard for text fields (SKU, Size, Type, Brand, Vendor) */}
+            <OnScreenKeyboard
+                isOpen={showKeyboard}
+                onClose={() => { setShowKeyboard(false); setKeyboardField(null); }}
+                onSubmit={(value) => {
+                    if (keyboardField && editProduct) {
+                        updateField(keyboardField, value || null)
+                    }
+                }}
+                title={
+                    keyboardField === 'sku' ? 'Enter SKU' :
+                        keyboardField === 'size' ? 'Enter Size (e.g., 750ml, 12 oz)' :
+                            keyboardField === 'productType' ? 'Enter Product Type (e.g., Whiskey, Lager)' :
+                                keyboardField === 'brand' ? 'Enter Brand' :
+                                    keyboardField === 'vendor' ? 'Enter Vendor/Supplier' : 'Enter Value'
+                }
+                initialValue={
+                    keyboardField === 'sku' ? editProduct?.sku || '' :
+                        keyboardField === 'size' ? editProduct?.size || '' :
+                            keyboardField === 'productType' ? editProduct?.productType || '' :
+                                keyboardField === 'brand' ? editProduct?.brand || '' :
+                                    keyboardField === 'vendor' ? editProduct?.vendor || '' : ''
+                }
+                placeholder={
+                    keyboardField === 'sku' ? 'e.g., LIQ-001' :
+                        keyboardField === 'size' ? 'e.g., 750ml' :
+                            keyboardField === 'productType' ? 'e.g., Whiskey' :
+                                keyboardField === 'brand' ? 'e.g., Macallan' :
+                                    keyboardField === 'vendor' ? 'e.g., Southern Glazers' : ''
+                }
+                type="alphanumeric"
             />
         </div>
     )
