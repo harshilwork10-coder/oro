@@ -579,6 +579,35 @@ export default function PromotionManagerModal({
                                             </div>
                                         </div>
 
+                                        {/* Time Window (Happy Hour) */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-sm text-stone-400 flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    Start Time (Optional)
+                                                </label>
+                                                <input
+                                                    type="time"
+                                                    value={formData.timeStart}
+                                                    onChange={(e) => setFormData({ ...formData, timeStart: e.target.value })}
+                                                    className="w-full mt-1 px-3 py-2 bg-stone-900 border border-stone-600 rounded-lg"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-sm text-stone-400 flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    End Time (Optional)
+                                                </label>
+                                                <input
+                                                    type="time"
+                                                    value={formData.timeEnd}
+                                                    onChange={(e) => setFormData({ ...formData, timeEnd: e.target.value })}
+                                                    className="w-full mt-1 px-3 py-2 bg-stone-900 border border-stone-600 rounded-lg"
+                                                />
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-stone-500 -mt-2">Set both times for Happy Hour pricing (e.g., 2:00 PM - 5:00 PM)</p>
+
                                         {/* Actions */}
                                         <div className="flex gap-2 pt-2">
                                             <button
