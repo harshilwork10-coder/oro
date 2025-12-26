@@ -2346,8 +2346,11 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
 }) {
     const [transactions, setTransactions] = useState(initialTransactions)
     const [search, setSearch] = useState('')
+    const [cardLast4, setCardLast4] = useState('')
     const [loading, setLoading] = useState(false)
-    const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'all'>('today')
+    const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'custom' | 'all'>('today')
+    const [startDate, setStartDate] = useState('')
+    const [endDate, setEndDate] = useState('')
     const [selectedTx, setSelectedTx] = useState<any>(null)
     const [actionLoading, setActionLoading] = useState(false)
 
@@ -2357,6 +2360,8 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
         try {
             let url = '/api/franchise/transactions?limit=50'
             if (search) url += `&search=${encodeURIComponent(search)}`
+
+            // Date filtering
             if (dateFilter === 'today') {
                 const today = new Date()
                 today.setHours(0, 0, 0, 0)
@@ -2365,12 +2370,29 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
                 const week = new Date()
                 week.setDate(week.getDate() - 7)
                 url += `&startDate=${week.toISOString()}`
+            } else if (dateFilter === 'custom' && startDate) {
+                url += `&startDate=${new Date(startDate).toISOString()}`
+                if (endDate) {
+                    const end = new Date(endDate)
+                    end.setHours(23, 59, 59, 999)
+                    url += `&endDate=${end.toISOString()}`
+                }
             }
 
             const res = await fetch(url)
             if (res.ok) {
                 const data = await res.json()
-                setTransactions(data.transactions || [])
+                let results = data.transactions || []
+
+                // Client-side filter by card last 4 (since it's in JSON)
+                if (cardLast4 && cardLast4.length >= 4) {
+                    results = results.filter((tx: any) =>
+                        tx.cardLast4?.includes(cardLast4) ||
+                        tx.paymentDetails?.cardLast4?.includes(cardLast4)
+                    )
+                }
+
+                setTransactions(results)
             }
         } catch (e) {
             console.error(e)
@@ -2381,15 +2403,15 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
 
     useEffect(() => {
         fetchTransactions()
-    }, [dateFilter])
+    }, [dateFilter, startDate, endDate])
 
     // Search with debounce
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (search) fetchTransactions()
+            fetchTransactions()
         }, 300)
         return () => clearTimeout(timer)
-    }, [search])
+    }, [search, cardLast4])
 
     // Refund handler
     const handleRefund = async (tx: any) => {
@@ -2457,30 +2479,65 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
 
                 {/* Search & Filters */}
                 <div className="p-3 border-b border-stone-800 space-y-2">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search by invoice #, amount, customer..."
-                            className="w-full pl-10 pr-4 py-2 bg-stone-800 border border-stone-700 rounded-lg text-sm focus:border-purple-500 focus:outline-none"
-                        />
-                    </div>
+                    {/* Search Row */}
                     <div className="flex gap-2">
-                        {(['today', 'week', 'all'] as const).map((filter) => (
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search invoice #, amount..."
+                                className="w-full pl-10 pr-4 py-2 bg-stone-800 border border-stone-700 rounded-lg text-sm focus:border-purple-500 focus:outline-none"
+                            />
+                        </div>
+                        <div className="relative w-28">
+                            <CreditCard className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
+                            <input
+                                type="text"
+                                value={cardLast4}
+                                onChange={(e) => setCardLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                placeholder="Card ****"
+                                maxLength={4}
+                                className="w-full pl-8 pr-2 py-2 bg-stone-800 border border-stone-700 rounded-lg text-sm focus:border-blue-500 focus:outline-none text-center font-mono"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Date Filter Row */}
+                    <div className="flex gap-2 flex-wrap">
+                        {(['today', 'week', 'custom', 'all'] as const).map((filter) => (
                             <button
                                 key={filter}
                                 onClick={() => setDateFilter(filter)}
                                 className={`px-3 py-1 rounded text-xs font-medium transition-colors ${dateFilter === filter
-                                    ? 'bg-purple-500 text-white'
-                                    : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                        ? 'bg-purple-500 text-white'
+                                        : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
                                     }`}
                             >
-                                {filter === 'today' ? 'Today' : filter === 'week' ? 'This Week' : 'All Time'}
+                                {filter === 'today' ? 'Today' : filter === 'week' ? 'Week' : filter === 'custom' ? 'Date Range' : 'All'}
                             </button>
                         ))}
                     </div>
+
+                    {/* Custom Date Range */}
+                    {dateFilter === 'custom' && (
+                        <div className="flex gap-2 items-center">
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="flex-1 px-3 py-1.5 bg-stone-800 border border-stone-700 rounded-lg text-sm focus:border-purple-500 focus:outline-none"
+                            />
+                            <span className="text-stone-500 text-sm">to</span>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="flex-1 px-3 py-1.5 bg-stone-800 border border-stone-700 rounded-lg text-sm focus:border-purple-500 focus:outline-none"
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {/* Transactions List */}
