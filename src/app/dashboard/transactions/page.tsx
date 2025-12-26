@@ -1,8 +1,25 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Filter, Calendar, ChevronLeft, ChevronRight, Eye, Download, Loader2 } from 'lucide-react'
+import { Search, Filter, Calendar, ChevronLeft, ChevronRight, Eye, Download, Loader2, ArrowLeft, LayoutGrid, ShoppingCart } from 'lucide-react'
 import TransactionDetailModal from '@/components/transactions/TransactionDetailModal'
+import Link from 'next/link'
+
+// Convert CUID to numeric-only ID for PAX compatibility
+function toNumericId(id: string): string {
+    // Extract only digits from the ID, or convert chars to their char codes
+    let numeric = ''
+    for (const char of id) {
+        if (/\d/.test(char)) {
+            numeric += char
+        } else {
+            // Convert letter to 2-digit number (a=10, b=11, etc)
+            numeric += (char.toLowerCase().charCodeAt(0) - 87).toString().padStart(2, '0')
+        }
+    }
+    // Return last 10 digits (fits in most systems)
+    return numeric.slice(-10)
+}
 
 export default function TransactionHistoryPage() {
     const [transactions, setTransactions] = useState<any[]>([])
@@ -80,9 +97,27 @@ export default function TransactionHistoryPage() {
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-stone-100 tracking-tight">Transaction History</h1>
-                        <p className="text-stone-400 mt-1">View and manage past sales and receipts</p>
+                    <div className="flex items-center gap-4">
+                        <div className="flex gap-2">
+                            <Link
+                                href="/dashboard"
+                                className="flex items-center gap-2 px-3 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors"
+                            >
+                                <LayoutGrid className="h-4 w-4" />
+                                Dashboard
+                            </Link>
+                            <Link
+                                href="/dashboard/pos/retail"
+                                className="flex items-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg transition-colors"
+                            >
+                                <ShoppingCart className="h-4 w-4" />
+                                POS
+                            </Link>
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold text-stone-100 tracking-tight">Transaction History</h1>
+                            <p className="text-stone-400 mt-1">View and manage past sales and receipts</p>
+                        </div>
                     </div>
                     <button className="flex items-center gap-2 px-4 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-300 hover:bg-stone-700 hover:text-stone-100 transition-colors">
                         <Download className="h-4 w-4" />
@@ -171,7 +206,7 @@ export default function TransactionHistoryPage() {
                                     transactions.map((tx) => (
                                         <tr key={tx.id} className="hover:bg-stone-800/50 transition-colors group">
                                             <td className="px-6 py-4 font-mono text-stone-500">
-                                                #{tx.id.slice(-8).toUpperCase()}
+                                                #{tx.invoiceNumber || toNumericId(tx.id)}
                                             </td>
                                             <td className="px-6 py-4 text-stone-200">
                                                 <div className="flex flex-col">
