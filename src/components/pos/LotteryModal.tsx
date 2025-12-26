@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Ticket, Minus, Plus, Search, Trophy, DollarSign } from 'lucide-react'
+import { X, Ticket, Minus, Plus, Search, Trophy, Delete } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
 interface LotteryGame {
@@ -35,15 +35,13 @@ export default function LotteryModal({ isOpen, onClose, onAddToCart }: LotteryMo
     const [quantity, setQuantity] = useState(1)
     const [searchQuery, setSearchQuery] = useState('')
 
-    // For lottery (quick sell)
+    // For lottery (quick sell) - stores as cents for precision
     const [lotteryAmount, setLotteryAmount] = useState('')
-    const [lotteryType, setLotteryType] = useState('Pick 3')
-
-    const lotteryTypes = ['Pick 3', 'Pick 4', 'Cash 5', 'Lotto', 'Powerball', 'Mega Millions', 'Other']
 
     useEffect(() => {
         if (isOpen) {
             fetchGames()
+            setLotteryAmount('')
         }
     }, [isOpen])
 
@@ -99,22 +97,45 @@ export default function LotteryModal({ isOpen, onClose, onAddToCart }: LotteryMo
     }
 
     const handleSellLottery = () => {
-        const amount = parseFloat(lotteryAmount)
+        const amount = parseFloat(lotteryAmount) / 100 // Convert cents to dollars
         if (isNaN(amount) || amount <= 0) {
-            alert('Please enter a valid amount')
             return
         }
 
         onAddToCart({
-            name: `Lottery - ${lotteryType}`,
+            name: 'Lottery',
             price: amount,
             quantity: 1,
             category: 'LOTTERY'
         })
 
         setLotteryAmount('')
-        setLotteryType('Pick 3')
         onClose()
+    }
+
+    // Numpad handlers
+    const handleNumpadPress = (key: string) => {
+        if (key === 'C') {
+            setLotteryAmount('')
+        } else if (key === 'DEL') {
+            setLotteryAmount(prev => prev.slice(0, -1))
+        } else {
+            // Max 6 digits (9999.99)
+            if (lotteryAmount.length < 6) {
+                setLotteryAmount(prev => prev + key)
+            }
+        }
+    }
+
+    // Quick dollar amounts (stored as cents)
+    const handleQuickAmount = (dollars: number) => {
+        setLotteryAmount((dollars * 100).toString())
+    }
+
+    const getDisplayAmount = () => {
+        if (!lotteryAmount) return '$0.00'
+        const cents = parseInt(lotteryAmount)
+        return formatCurrency(cents / 100)
     }
 
     const filteredGames = games.filter(g =>
@@ -122,16 +143,13 @@ export default function LotteryModal({ isOpen, onClose, onAddToCart }: LotteryMo
         g.gameNumber.includes(searchQuery)
     )
 
-    // Quick amounts for lottery
-    const quickAmounts = [1, 2, 5, 10, 20, 50]
-
     if (!isOpen) return null
 
     return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-stone-900 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-stone-700">
+            <div className="bg-stone-900 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden border border-stone-700">
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-stone-700 bg-amber-500/10">
+                <div className="flex items-center justify-between p-3 border-b border-stone-700 bg-amber-500/10">
                     <div className="flex items-center gap-3">
                         <Ticket className="h-6 w-6 text-amber-400" />
                         <h2 className="text-xl font-bold text-white">Sell Lottery</h2>
@@ -145,7 +163,7 @@ export default function LotteryModal({ isOpen, onClose, onAddToCart }: LotteryMo
                 <div className="flex border-b border-stone-700">
                     <button
                         onClick={() => setSellType('scratch')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 font-medium transition-colors ${sellType === 'scratch'
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 font-medium transition-colors ${sellType === 'scratch'
                             ? 'bg-purple-500/20 text-purple-400 border-b-2 border-purple-500'
                             : 'text-stone-400 hover:bg-stone-800'
                             }`}
@@ -155,7 +173,7 @@ export default function LotteryModal({ isOpen, onClose, onAddToCart }: LotteryMo
                     </button>
                     <button
                         onClick={() => setSellType('lottery')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 font-medium transition-colors ${sellType === 'lottery'
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 font-medium transition-colors ${sellType === 'lottery'
                             ? 'bg-blue-500/20 text-blue-400 border-b-2 border-blue-500'
                             : 'text-stone-400 hover:bg-stone-800'
                             }`}
@@ -310,59 +328,41 @@ export default function LotteryModal({ isOpen, onClose, onAddToCart }: LotteryMo
                     </>
                 ) : (
                     <>
-                        {/* Lottery / Draw Quick Sell */}
-                        <div className="p-4 space-y-4">
-                            {/* Lottery Type */}
-                            <div>
-                                <label className="block text-sm font-medium text-stone-400 mb-2">
-                                    Game Type
-                                </label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {lotteryTypes.map((type) => (
-                                        <button
-                                            key={type}
-                                            onClick={() => setLotteryType(type)}
-                                            className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${lotteryType === type
-                                                ? 'bg-blue-500 text-white'
-                                                : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
-                                                }`}
-                                        >
-                                            {type}
-                                        </button>
-                                    ))}
-                                </div>
+                        {/* Lottery / Draw Quick Sell with Numpad */}
+                        <div className="p-4">
+                            {/* Amount Display */}
+                            <div className="bg-stone-800 rounded-xl p-4 mb-4 text-center">
+                                <p className="text-stone-500 text-sm mb-1">Amount</p>
+                                <p className="text-4xl font-bold text-white">{getDisplayAmount()}</p>
                             </div>
 
-                            {/* Amount */}
-                            <div>
-                                <label className="block text-sm font-medium text-stone-400 mb-2">
-                                    Amount
-                                </label>
-                                <div className="relative">
-                                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-6 w-6 text-stone-500" />
-                                    <input
-                                        type="number"
-                                        value={lotteryAmount}
-                                        onChange={(e) => setLotteryAmount(e.target.value)}
-                                        placeholder="0.00"
-                                        className="w-full pl-12 pr-4 py-4 bg-stone-800 border border-stone-700 rounded-lg text-white text-3xl font-bold text-center placeholder-stone-600 focus:ring-2 focus:ring-blue-500"
-                                        autoFocus
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Quick Amounts */}
-                            <div className="grid grid-cols-6 gap-2">
-                                {quickAmounts.map((amt) => (
+                            {/* Quick Amount Buttons */}
+                            <div className="grid grid-cols-6 gap-2 mb-4">
+                                {[1, 2, 5, 10, 20, 50].map((amt) => (
                                     <button
                                         key={amt}
-                                        onClick={() => setLotteryAmount(amt.toString())}
-                                        className={`py-2 rounded-lg font-medium transition-colors ${lotteryAmount === amt.toString()
-                                            ? 'bg-blue-500 text-white'
-                                            : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
-                                            }`}
+                                        onClick={() => handleQuickAmount(amt)}
+                                        className="py-2 rounded-lg font-bold text-sm bg-blue-500/20 text-blue-400 hover:bg-blue-500/40 transition-colors"
                                     >
                                         ${amt}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Numpad */}
+                            <div className="grid grid-cols-3 gap-2">
+                                {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'DEL'].map((key) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => handleNumpadPress(key)}
+                                        className={`py-4 rounded-xl text-2xl font-bold transition-colors ${key === 'C'
+                                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/40'
+                                                : key === 'DEL'
+                                                    ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/40'
+                                                    : 'bg-stone-800 text-white hover:bg-stone-700'
+                                            }`}
+                                    >
+                                        {key === 'DEL' ? <Delete className="h-6 w-6 mx-auto" /> : key}
                                     </button>
                                 ))}
                             </div>
@@ -378,10 +378,10 @@ export default function LotteryModal({ isOpen, onClose, onAddToCart }: LotteryMo
                             </button>
                             <button
                                 onClick={handleSellLottery}
-                                disabled={!lotteryAmount || parseFloat(lotteryAmount) <= 0}
+                                disabled={!lotteryAmount || parseInt(lotteryAmount) <= 0}
                                 className="flex-1 py-3 bg-blue-500 hover:bg-blue-400 text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Add {lotteryAmount ? formatCurrency(parseFloat(lotteryAmount)) : '$0.00'}
+                                Add {getDisplayAmount()}
                             </button>
                         </div>
                     </>
