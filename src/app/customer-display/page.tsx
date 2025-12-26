@@ -149,29 +149,29 @@ function CustomerDisplayContent() {
         )
     }
 
-    // Active cart display
+    // Active cart display - TOTALS MUST ALWAYS BE VISIBLE (STATE LAW)
     return (
-        <div className="min-h-screen bg-gradient-to-br from-stone-900 to-stone-950 flex flex-col p-8">
-            {/* Header */}
-            <div className="text-center mb-8">
+        <div className="h-screen bg-gradient-to-br from-stone-900 to-stone-950 flex flex-col overflow-hidden">
+            {/* Header - Fixed */}
+            <div className="text-center py-4 flex-shrink-0">
                 <h1 className="text-3xl font-bold text-white">Your Order</h1>
             </div>
 
-            {/* Items List */}
-            <div className="flex-1 overflow-auto">
-                <div className="max-w-2xl mx-auto space-y-4">
+            {/* Items List - Scrollable */}
+            <div className="flex-1 overflow-y-auto px-8">
+                <div className="max-w-2xl mx-auto space-y-3 pb-4">
                     {cart.items.map((item, idx) => (
                         <div
                             key={idx}
-                            className="flex items-center justify-between bg-stone-800/50 rounded-xl px-6 py-4"
+                            className="flex items-center justify-between bg-stone-800/50 rounded-xl px-6 py-3"
                         >
                             <div className="flex items-center gap-4">
                                 <span className="text-2xl font-bold text-orange-500">
                                     {item.quantity}x
                                 </span>
-                                <span className="text-xl text-white">{item.name}</span>
+                                <span className="text-lg text-white">{item.name}</span>
                             </div>
-                            <span className="text-xl font-bold text-orange-400">
+                            <span className="text-lg font-bold text-orange-400">
                                 {formatCurrency(item.price * item.quantity)}
                             </span>
                         </div>
@@ -179,47 +179,44 @@ function CustomerDisplayContent() {
                 </div>
             </div>
 
-            {/* Totals */}
-            <div className="mt-8 max-w-2xl mx-auto w-full">
-                <div className="bg-stone-800 rounded-2xl p-6 space-y-3">
-                    <div className="flex justify-between text-lg text-stone-400">
-                        <span>Subtotal</span>
-                        <span>{formatCurrency(cart.subtotal)}</span>
-                    </div>
-                    <div className="flex justify-between text-lg text-stone-400">
-                        <span>Tax</span>
-                        <span>{formatCurrency(cart.tax)}</span>
-                    </div>
-                    <div className="border-t border-stone-700 pt-3">
-                        {/* Dual Pricing Display */}
-                        {cart.showDualPricing ? (
-                            <div className="space-y-3">
-                                <div className="flex justify-between text-2xl font-bold">
-                                    <span className="text-green-400 flex items-center gap-2">
-                                        💵 Cash
-                                    </span>
-                                    <span className="text-green-400">{formatCurrency(cart.cashTotal || cart.total)}</span>
+            {/* Totals - FIXED AT BOTTOM (ALWAYS VISIBLE - STATE LAW REQUIREMENT) */}
+            <div className="flex-shrink-0 bg-stone-950 border-t border-stone-800 px-8 py-4">
+                <div className="max-w-2xl mx-auto">
+                    <div className="bg-stone-800 rounded-2xl p-4 space-y-2">
+                        <div className="flex justify-between text-base text-stone-400">
+                            <span>Subtotal</span>
+                            <span>{formatCurrency(cart.subtotal)}</span>
+                        </div>
+                        <div className="flex justify-between text-base text-stone-400">
+                            <span>Tax</span>
+                            <span>{formatCurrency(cart.tax)}</span>
+                        </div>
+                        <div className="border-t border-stone-700 pt-2">
+                            {/* Dual Pricing Display */}
+                            {cart.showDualPricing ? (
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-xl font-bold">
+                                        <span className="text-green-400 flex items-center gap-2">
+                                            💵 Cash
+                                        </span>
+                                        <span className="text-green-400">{formatCurrency(cart.cashTotal || cart.total)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xl font-bold">
+                                        <span className="text-blue-400 flex items-center gap-2">
+                                            💳 Card
+                                        </span>
+                                        <span className="text-blue-400">{formatCurrency(cart.cardTotal || cart.total)}</span>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between text-2xl font-bold">
-                                    <span className="text-blue-400 flex items-center gap-2">
-                                        💳 Card
-                                    </span>
-                                    <span className="text-blue-400">{formatCurrency(cart.cardTotal || cart.total)}</span>
+                            ) : (
+                                <div className="flex justify-between text-2xl font-bold text-white">
+                                    <span>TOTAL</span>
+                                    <span className="text-orange-500">{formatCurrency(cart.total)}</span>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="flex justify-between text-3xl font-bold text-white">
-                                <span>Total</span>
-                                <span className="text-orange-500">{formatCurrency(cart.total)}</span>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            {/* Branding */}
-            <div className="mt-8 text-center text-stone-600 text-sm">
-                Powered by Oro
             </div>
         </div>
     )
