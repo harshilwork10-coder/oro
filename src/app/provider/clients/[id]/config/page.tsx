@@ -343,7 +343,7 @@ export default function ProviderClientConfigPage() {
                                         <div className="flex gap-2">
                                             {client.tipPercentages.map((tip, i) => (
                                                 <input
-                                                    key={i}
+                                                    key={`${client.tipType}-${i}`}
                                                     id={`tip-input-${i}`}
                                                     type="number"
                                                     defaultValue={tip}

@@ -42,7 +42,7 @@ export async function PATCH(
             'usesMultiLocation', 'usesFranchising', 'usesTimeTracking', 'usesPayroll',
             'usesMobilePulse', 'pulseSeatCount', 'subscriptionTier', 'maxLocations',
             'maxUsers', 'acceptsEbt', 'acceptsChecks', 'acceptsOnAccount', 'shiftRequirement',
-            'enableResources'
+            'enableResources', 'tipType', 'tipSuggestions'
         ]
 
         // Handle storeLogo separately - save to Franchise record
