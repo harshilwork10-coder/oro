@@ -2164,9 +2164,22 @@ export default function RetailPOSPage() {
             <LotteryPayoutModal
                 isOpen={showLotteryPayoutModal}
                 onClose={() => setShowLotteryPayoutModal(false)}
-                onPayout={(amount) => {
-                    // Payout is recorded, show confirmation
-                    setToast({ message: `✓ Paid out $${amount.toFixed(2)} to customer`, type: 'success' })
+                onPayout={(amount, type) => {
+                    // Add lottery payout as a negative cart item so it offsets purchases
+                    const payoutItem = {
+                        id: `lottery-payout-${Date.now()}`,
+                        barcode: 'LOTTERY-PAYOUT',
+                        sku: 'LOTTO-PAYOUT',
+                        name: type === 'vendor' ? 'Vendor Payout' : 'Lottery Winner Payout',
+                        price: -amount, // Negative to reduce total
+                        quantity: 1,
+                        ageRestricted: false,
+                        isEbtEligible: false,
+                        taxRate: 0,
+                        category: type === 'vendor' ? 'vendor-payout' : 'lottery-payout'
+                    }
+                    setCart(prev => [...prev, payoutItem])
+                    setToast({ message: `✓ Lottery payout $${amount.toFixed(2)} added to cart`, type: 'success' })
                 }}
             />
 

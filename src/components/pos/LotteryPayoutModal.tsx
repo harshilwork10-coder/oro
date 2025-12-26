@@ -50,31 +50,32 @@ export default function LotteryPayoutModal({
             return
         }
 
+        // For lottery payouts, don't call API here - just add to cart
+        // The API will be called when transaction completes
+        if (tab === 'lottery') {
+            onPayout(payoutAmount, 'lottery')
+            resetForm()
+            onClose()
+            return
+        }
+
+        // Only call API immediately for vendor payouts (standalone transactions)
         setIsProcessing(true)
         try {
-            const endpoint = tab === 'lottery' ? '/api/lottery/payout' : '/api/pos/payout'
-            const body = tab === 'lottery'
-                ? {
-                    amount: payoutAmount,
-                    ticketNumber: ticketNumber || null,
-                    ticketType
-                }
-                : {
+            const res = await fetch('/api/pos/payout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     amount: payoutAmount,
                     type: 'VENDOR_PAYOUT',
                     vendorName,
                     invoiceNumber: vendorInvoice || null,
                     note: vendorNote || `Vendor payout to ${vendorName}`
-                }
-
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                })
             })
 
             if (res.ok) {
-                onPayout(payoutAmount, tab)
+                onPayout(payoutAmount, 'vendor')
                 resetForm()
                 onClose()
             } else {
@@ -119,8 +120,8 @@ export default function LotteryPayoutModal({
                         <button
                             onClick={() => { setTab('lottery'); resetForm() }}
                             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium transition-colors ${tab === 'lottery'
-                                    ? 'bg-teal-500 text-black'
-                                    : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                ? 'bg-teal-500 text-black'
+                                : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
                                 }`}
                         >
                             <Trophy className="h-4 w-4" />
@@ -129,8 +130,8 @@ export default function LotteryPayoutModal({
                         <button
                             onClick={() => { setTab('vendor'); resetForm() }}
                             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium transition-colors ${tab === 'vendor'
-                                    ? 'bg-orange-500 text-black'
-                                    : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                ? 'bg-orange-500 text-black'
+                                : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
                                 }`}
                         >
                             <Truck className="h-4 w-4" />
@@ -324,10 +325,10 @@ export default function LotteryPayoutModal({
                         onClick={handlePayout}
                         disabled={isProcessing || !amount || payoutAmount <= 0 || isOverLimit || (tab === 'vendor' && !vendorName.trim())}
                         className={`flex-1 py-3 font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isOverLimit
-                                ? 'bg-red-500/50 text-red-200 cursor-not-allowed'
-                                : tab === 'lottery'
-                                    ? 'bg-teal-500 hover:bg-teal-400 text-black'
-                                    : 'bg-orange-500 hover:bg-orange-400 text-black'
+                            ? 'bg-red-500/50 text-red-200 cursor-not-allowed'
+                            : tab === 'lottery'
+                                ? 'bg-teal-500 hover:bg-teal-400 text-black'
+                                : 'bg-orange-500 hover:bg-orange-400 text-black'
                             }`}
                     >
                         {isProcessing ? 'Processing...' : isOverLimit ? 'Cannot Pay' : `Pay ${formatCurrency(payoutAmount)}`}
