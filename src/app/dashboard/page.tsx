@@ -24,6 +24,7 @@ import TodayAppointments from "@/components/dashboard/employee/TodayAppointments
 import UpcomingAppointments from "@/components/dashboard/employee/UpcomingAppointments"
 import EmployeePerformanceStats from "@/components/dashboard/employee/EmployeePerformanceStats"
 import NextClientSpotlight from "@/components/dashboard/employee/NextClientSpotlight"
+import AIInsightsCard from "@/components/dashboard/AIInsightsCard"
 import { useState, useEffect } from "react"
 
 type DashboardStats = {
@@ -360,6 +361,9 @@ export default function DashboardPage() {
                         </Link>
                     </div>
                 </div>
+
+                {/* AI Insights */}
+                <AIInsightsCard />
             </div>
         )
     }
