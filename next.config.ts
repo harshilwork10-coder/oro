@@ -6,9 +6,39 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
 
-  // CEO DECISION: API Response Caching for Performance & Cost Savings
   async headers() {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    // SECURITY: Headers applied to all routes
+    const securityHeaders = [
+      // SECURITY: Prevent clickjacking attacks
+      { key: 'X-Frame-Options', value: 'DENY' },
+      // SECURITY: Prevent MIME type sniffing
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      // SECURITY: Enable XSS filter in older browsers
+      { key: 'X-XSS-Protection', value: '1; mode=block' },
+      // SECURITY: Control referrer information
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      // SECURITY: Permissions policy - restrict browser features
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+    ];
+
+    // SECURITY: HSTS - Force HTTPS (only in production)
+    if (isProduction) {
+      securityHeaders.push({
+        key: 'Strict-Transport-Security',
+        value: 'max-age=31536000; includeSubDomains; preload'
+      });
+    }
+
     return [
+      // SECURITY: Apply security headers to ALL routes
+      {
+        source: '/:path*',
+        headers: securityHeaders
+      },
+
+      // CEO DECISION: API Response Caching for Performance & Cost Savings
       // Cache product/inventory data (60 seconds) - Most accessed, rarely changes
       {
         source: '/api/inventory/:path*',

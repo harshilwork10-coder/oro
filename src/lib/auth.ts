@@ -3,9 +3,44 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import { compareSync } from "bcryptjs"
 
+// SECURITY: Determine if running in production
+const isProduction = process.env.NODE_ENV === 'production'
+
 export const authOptions: NextAuthOptions = {
     session: {
         strategy: "jwt",
+        // SECURITY: Session expires after 24 hours of inactivity
+        maxAge: 24 * 60 * 60, // 24 hours
+    },
+    // SECURITY: Secure cookie settings to prevent session hijacking
+    cookies: {
+        sessionToken: {
+            name: isProduction ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+            options: {
+                httpOnly: true,           // Cannot be accessed by JavaScript
+                sameSite: 'lax',          // CSRF protection
+                path: '/',
+                secure: isProduction,     // HTTPS only in production
+            },
+        },
+        callbackUrl: {
+            name: isProduction ? '__Secure-next-auth.callback-url' : 'next-auth.callback-url',
+            options: {
+                httpOnly: true,
+                sameSite: 'lax',
+                path: '/',
+                secure: isProduction,
+            },
+        },
+        csrfToken: {
+            name: isProduction ? '__Host-next-auth.csrf-token' : 'next-auth.csrf-token',
+            options: {
+                httpOnly: true,
+                sameSite: 'lax',
+                path: '/',
+                secure: isProduction,
+            },
+        },
     },
     pages: {
         signIn: "/login",
