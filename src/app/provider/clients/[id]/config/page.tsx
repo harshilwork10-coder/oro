@@ -346,6 +346,8 @@ export default function ProviderClientConfigPage() {
                                                     key={`${client.tipType}-${i}`}
                                                     id={`tip-input-${i}`}
                                                     type="number"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
                                                     defaultValue={tip}
                                                     min="0"
                                                     className="w-20 px-3 py-2 bg-stone-700 border border-stone-600 rounded-lg text-stone-100 text-center focus:outline-none focus:ring-2 focus:ring-orange-500"
