@@ -745,45 +745,45 @@ function generateBoxedTemplate(label, dim) {
 
     // === BRAND/SIZE (below name) ===
     if (brand || sizeInfo) {
-        zpl += '^FO10,38\n';
-        zpl += '^A0N,18,18\n';
+        zpl += '^FO10,35\n';
+        zpl += '^A0N,16,16\n';
         zpl += `^FD${brand}${brand && sizeInfo ? ' - ' : ''}${sizeInfo}^FS\n`;
     }
 
-    // === PRICE BOX (right side, large) ===
-    // Black box background
-    const boxWidth = 150;
-    const boxHeight = 65;
-    const boxX = dim.width - boxWidth - 10;
-    const boxY = 10;
+    // === PRICE BOX (right side) ===
+    // Black box background - smaller to fit both prices
+    const boxWidth = 130;
+    const boxHeight = 50;
+    const boxX = dim.width - boxWidth - 8;
+    const boxY = 8;
 
     zpl += `^FO${boxX},${boxY}\n`;
     zpl += `^GB${boxWidth},${boxHeight},${boxHeight}^FS\n`; // Filled black box
 
     // CARD price (main price, white text on black)
-    zpl += `^FO${boxX + 10},${boxY + 5}\n`;
-    zpl += '^A0N,16,16\n';
+    zpl += `^FO${boxX + 8},${boxY + 5}\n`;
+    zpl += '^A0N,14,14\n';
     zpl += '^FR^FDCARD^FS\n'; // Reversed (white)
 
-    zpl += `^FO${boxX + 10},${boxY + 22}\n`;
-    zpl += '^A0N,38,38\n';
+    zpl += `^FO${boxX + 8},${boxY + 18}\n`;
+    zpl += '^A0N,30,30\n';
     zpl += `^FR^FD${cardPrice}^FS\n`; // Reversed (white)
 
-    // === CASH PRICE (below box) ===
-    zpl += `^FO${boxX + 15},${boxY + boxHeight + 5}\n`;
-    zpl += '^A0N,16,16\n';
+    // === CASH PRICE (below black box, inside label) ===
+    zpl += `^FO${boxX + 5},${boxY + boxHeight + 3}\n`;
+    zpl += '^A0N,14,14\n';
     zpl += `^FDCASH: ${cashPrice}^FS\n`;
 
     // === BARCODE (bottom left) ===
     if (label.barcode) {
-        zpl += '^FO10,60\n';
-        zpl += '^BY1.5\n';
-        zpl += '^BCN,55,N,N,N\n';
+        zpl += '^FO10,55\n';
+        zpl += '^BY1.3\n';
+        zpl += '^BCN,45,N,N,N\n';
         zpl += `^FD${label.barcode}^FS\n`;
 
         // UPC text below barcode
-        zpl += '^FO10,120\n';
-        zpl += '^A0N,14,14\n';
+        zpl += '^FO10,105\n';
+        zpl += '^A0N,12,12\n';
         zpl += `^FD${label.barcode}^FS\n`;
     }
 
