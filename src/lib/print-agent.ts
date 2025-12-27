@@ -180,3 +180,177 @@ export function formatReceiptFromTransaction(
         openDrawer: transaction.paymentMethod === 'CASH'
     };
 }
+
+// ============ LABEL PRINTING (Zebra ZPL) ============
+
+export interface LabelData {
+    productName: string;
+    price: number;
+    barcode?: string;
+    brand?: string;
+    size?: '2x1' | '1.5x1' | '1x1';
+    quantity?: number;
+}
+
+/**
+ * Print a single price label (Zebra ZPL)
+ */
+export async function printLabel(label: LabelData, agentUrl = PRINT_AGENT_URL): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+        const response = await fetch(`${agentUrl}/print-label`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            return { success: false, error: result.error || 'Label print failed' };
+        }
+
+        return { success: true, message: result.message };
+    } catch (e: any) {
+        return { success: false, error: e.message || 'Cannot connect to print agent' };
+    }
+}
+
+/**
+ * Print multiple labels at once (batch)
+ */
+export async function printLabels(labels: LabelData[], agentUrl = PRINT_AGENT_URL): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+        const response = await fetch(`${agentUrl}/print-labels`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ labels })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            return { success: false, error: result.error || 'Batch label print failed' };
+        }
+
+        return { success: true, message: result.message };
+    } catch (e: any) {
+        return { success: false, error: e.message || 'Cannot connect to print agent' };
+    }
+}
+
+// ============ PRINTER ROUTING ============
+
+export interface PrinterConfig {
+    id: string;
+    name: string;
+    type: 'RECEIPT' | 'KITCHEN' | 'BAR' | 'LABEL';
+    printerLang: 'ESCPOS' | 'ZPL';
+    agentUrl: string;
+    isDefault: boolean;
+    isActive: boolean;
+    stationId?: string;
+    labelWidth?: string;
+}
+
+/**
+ * Get configured printers from API
+ */
+export async function getConfiguredPrinters(): Promise<PrinterConfig[]> {
+    try {
+        const response = await fetch('/api/settings/printers');
+        if (!response.ok) return [];
+        const data = await response.json();
+        return data.printers || [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Get printers by type
+ */
+export async function getPrintersByType(type: 'RECEIPT' | 'KITCHEN' | 'BAR' | 'LABEL'): Promise<PrinterConfig[]> {
+    const printers = await getConfiguredPrinters();
+    return printers.filter(p => p.type === type && p.isActive);
+}
+
+/**
+ * Get default printer for a type
+ */
+export async function getDefaultPrinter(type: 'RECEIPT' | 'KITCHEN' | 'BAR' | 'LABEL'): Promise<PrinterConfig | null> {
+    const printers = await getPrintersByType(type);
+    return printers.find(p => p.isDefault) || printers[0] || null;
+}
+
+/**
+ * Print receipt to configured receipt printer
+ */
+export async function printReceiptToConfigured(receipt: ReceiptData): Promise<{ success: boolean; error?: string }> {
+    const printer = await getDefaultPrinter('RECEIPT');
+
+    if (!printer) {
+        // Fallback to localhost
+        return printReceipt(receipt);
+    }
+
+    try {
+        const response = await fetch(`${printer.agentUrl}/print`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receipt })
+        });
+
+        if (!response.ok) {
+            const result = await response.json();
+            return { success: false, error: result.error };
+        }
+
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+/**
+ * Print to kitchen printer(s)
+ */
+export async function printKitchenOrder(orderData: any): Promise<{ success: boolean; printed: number; errors: string[] }> {
+    const kitchenPrinters = await getPrintersByType('KITCHEN');
+    const errors: string[] = [];
+    let printed = 0;
+
+    for (const printer of kitchenPrinters) {
+        try {
+            const response = await fetch(`${printer.agentUrl}/print`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ receipt: orderData })
+            });
+
+            if (response.ok) {
+                printed++;
+            } else {
+                const result = await response.json();
+                errors.push(`${printer.name}: ${result.error}`);
+            }
+        } catch (e: any) {
+            errors.push(`${printer.name}: ${e.message}`);
+        }
+    }
+
+    return { success: printed > 0, printed, errors };
+}
+
+/**
+ * Print label to configured label printer
+ */
+export async function printLabelToConfigured(label: LabelData): Promise<{ success: boolean; error?: string }> {
+    const printer = await getDefaultPrinter('LABEL');
+
+    if (!printer) {
+        return { success: false, error: 'No label printer configured' };
+    }
+
+    return printLabel(label, printer.agentUrl);
+}
+

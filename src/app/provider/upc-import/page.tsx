@@ -80,7 +80,7 @@ export default function UpcImportPage() {
         setResults([])
         abortRef.current = false
 
-        const batchSize = 50 // Process 50 at a time
+        const batchSize = 1 // Process 1 at a time to avoid rate limits
         const batches = []
         for (let i = 0; i < codes.length; i += batchSize) {
             batches.push(codes.slice(i, i + batchSize))
@@ -104,7 +104,7 @@ export default function UpcImportPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         upcCodes: batches[i],
-                        delayMs: 300 // Delay between API calls
+                        delayMs: 5000 // 5 second delay between each API call
                     })
                 })
 

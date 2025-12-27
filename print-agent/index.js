@@ -339,6 +339,212 @@ function generateEscPosCommands(receipt) {
     return commands;
 }
 
+/**
+ * Print label (ZPL for Zebra printers)
+ * POST /print-label
+ * Body: { label: { productName, price, barcode, size } }
+ * Sizes: "2x1", "1.5x1", "1x1" (inches)
+ */
+app.post('/print-label', async (req, res) => {
+    const { label } = req.body;
+
+    if (!label) {
+        return res.status(400).json({ error: 'No label data provided' });
+    }
+
+    // Generate ZPL commands for Zebra printers
+    const zpl = generateZplLabel(label);
+
+    // For USB Zebra printers, we need to send raw ZPL
+    if (!usbAvailable) {
+        return res.json({
+            success: false,
+            fallback: true,
+            message: 'USB not available - copy ZPL manually',
+            zpl: zpl
+        });
+    }
+
+    try {
+        // Find Zebra printer (different vendor IDs than Epson/Bixolon)
+        const devices = escpos.USB.findPrinter();
+        if (devices.length === 0) {
+            return res.status(404).json({ error: 'No USB printer found' });
+        }
+
+        // Send raw ZPL to printer
+        const device = new escpos.USB(devices[0]);
+
+        await new Promise((resolve, reject) => {
+            device.open(err => {
+                if (err) return reject(err);
+
+                // Send ZPL as raw data
+                device.write(Buffer.from(zpl));
+                device.close(resolve);
+            });
+        });
+
+        res.json({ success: true, message: 'Label printed successfully' });
+    } catch (e) {
+        console.error('Label print error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
+ * Generate ZPL commands for Zebra label printers
+ * @param {Object} label - { productName, price, barcode, brand, size, quantity }
+ */
+function generateZplLabel(label) {
+    const size = label.size || '2x1';
+
+    // Label dimensions in dots (203 DPI)
+    // 2x1" = 406 x 203, 1.5x1" = 305 x 203, 1x1" = 203 x 203
+    const sizes = {
+        '2x1': { width: 406, height: 203 },
+        '1.5x1': { width: 305, height: 203 },
+        '1x1': { width: 203, height: 203 }
+    };
+
+    const dim = sizes[size] || sizes['2x1'];
+    const quantity = label.quantity || 1;
+
+    // Format price
+    const priceText = label.price ? `$${Number(label.price).toFixed(2)}` : '';
+
+    // Truncate product name for label
+    const productName = (label.productName || 'Product').substring(0, 25);
+    const brand = (label.brand || '').substring(0, 20);
+
+    let zpl = '';
+
+    // ZPL header
+    zpl += '^XA\n'; // Start format
+    zpl += `^PW${dim.width}\n`; // Print width
+    zpl += '^LL' + dim.height + '\n'; // Label length
+    zpl += '^CF0,20\n'; // Default font
+
+    if (size === '2x1') {
+        // Large label - full layout
+        // Price (large, top left)
+        zpl += '^FO20,15\n';
+        zpl += '^A0N,60,60\n';
+        zpl += `^FD${priceText}^FS\n`;
+
+        // Product name (below price)
+        zpl += '^FO20,85\n';
+        zpl += '^A0N,25,25\n';
+        zpl += `^FD${productName}^FS\n`;
+
+        // Brand (smaller, below name)
+        if (brand) {
+            zpl += '^FO20,115\n';
+            zpl += '^A0N,18,18\n';
+            zpl += `^FD${brand}^FS\n`;
+        }
+
+        // Barcode (right side)
+        if (label.barcode) {
+            zpl += '^FO220,20\n';
+            zpl += '^BY1.5\n';
+            zpl += `^BCN,80,N,N,N\n`;
+            zpl += `^FD${label.barcode}^FS\n`;
+
+            // UPC text below barcode
+            zpl += '^FO220,110\n';
+            zpl += '^A0N,16,16\n';
+            zpl += `^FD${label.barcode}^FS\n`;
+        }
+    } else if (size === '1.5x1') {
+        // Medium label
+        // Price (large, centered)
+        zpl += '^FO10,10\n';
+        zpl += '^A0N,50,50\n';
+        zpl += `^FD${priceText}^FS\n`;
+
+        // Product name
+        zpl += '^FO10,70\n';
+        zpl += '^A0N,22,22\n';
+        zpl += `^FD${productName.substring(0, 18)}^FS\n`;
+
+        // Barcode (small, right)
+        if (label.barcode) {
+            zpl += '^FO180,10\n';
+            zpl += '^BY1\n';
+            zpl += `^BCN,50,N,N,N\n`;
+            zpl += `^FD${label.barcode}^FS\n`;
+        }
+    } else {
+        // Small label (1x1)
+        // Price only
+        zpl += '^FO10,20\n';
+        zpl += '^A0N,70,70\n';
+        zpl += `^FD${priceText}^FS\n`;
+
+        // Product name (truncated)
+        zpl += '^FO10,100\n';
+        zpl += '^A0N,18,18\n';
+        zpl += `^FD${productName.substring(0, 12)}^FS\n`;
+    }
+
+    // Print quantity
+    zpl += `^PQ${quantity}\n`;
+
+    // End format
+    zpl += '^XZ\n';
+
+    return zpl;
+}
+
+/**
+ * Print multiple labels (batch)
+ * POST /print-labels
+ * Body: { labels: [{ productName, price, barcode, size, quantity }] }
+ */
+app.post('/print-labels', async (req, res) => {
+    const { labels } = req.body;
+
+    if (!labels || !Array.isArray(labels) || labels.length === 0) {
+        return res.status(400).json({ error: 'No labels provided' });
+    }
+
+    // Generate combined ZPL for all labels
+    const zplCommands = labels.map(label => generateZplLabel(label)).join('');
+
+    if (!usbAvailable) {
+        return res.json({
+            success: false,
+            fallback: true,
+            message: 'USB not available',
+            zpl: zplCommands,
+            count: labels.length
+        });
+    }
+
+    try {
+        const devices = escpos.USB.findPrinter();
+        if (devices.length === 0) {
+            return res.status(404).json({ error: 'No USB printer found' });
+        }
+
+        const device = new escpos.USB(devices[0]);
+
+        await new Promise((resolve, reject) => {
+            device.open(err => {
+                if (err) return reject(err);
+                device.write(Buffer.from(zplCommands));
+                device.close(resolve);
+            });
+        });
+
+        res.json({ success: true, message: `${labels.length} labels printed` });
+    } catch (e) {
+        console.error('Batch label print error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log('');

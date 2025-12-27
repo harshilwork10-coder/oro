@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 
 // UPCitemdb API configuration
 const UPC_API_KEY = process.env.UPCITEMDB_API_KEY || ''
-const UPC_API_URL = 'https://api.upcitemdb.com/prod/trial/lookup'
+const UPC_API_URL = 'https://api.upcitemdb.com/prod/v1/lookup'
 
 interface ImportResult {
     upc: string
@@ -85,6 +85,8 @@ export async function POST(request: NextRequest) {
                 })
 
                 if (response.status === 429) {
+                    const errorText = await response.text()
+                    console.error('[UPC API Rate Limited]', response.status, errorText)
                     results.push({ upc, status: 'error', error: 'Rate limited - try again later' })
                     errorCount++
                     // Stop further requests if rate limited

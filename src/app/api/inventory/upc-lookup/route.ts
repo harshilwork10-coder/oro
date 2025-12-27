@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 // UPCitemdb API configuration
 // Get your API key from https://www.upcitemdb.com/wp/docs/main/development/getting-started/
 const UPC_API_KEY = process.env.UPCITEMDB_API_KEY || ''
-const UPC_API_URL = 'https://api.upcitemdb.com/prod/trial/lookup'
+const UPC_API_URL = 'https://api.upcitemdb.com/prod/v1/lookup'
 
 interface UpcProduct {
     ean: string

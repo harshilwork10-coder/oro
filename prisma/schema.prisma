@@ -329,6 +329,9 @@ model Franchise {
   // In-app notifications
   notifications Notification[]
 
+  // Printers configuration
+  printers PrinterConfig[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -3977,3 +3980,33 @@ model MasterUpcProduct {
   @@index([brand])
   @@index([category])
 }
+
+// ============ PRINTER CONFIGURATION ============
+// Configure printers per store with type routing (receipt, kitchen, bar, label)
+model PrinterConfig {
+  id          String   @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  name        String   // "Register 1 Receipt", "Kitchen", "Bar", "Label Printer"
+  type        String   // RECEIPT, KITCHEN, BAR, LABEL
+  printerLang String   @default("ESCPOS") // ESCPOS, ZPL
+  agentUrl    String   // "http://localhost:9100" or "http://192.168.1.50:9100"
+  
+  isDefault   Boolean  @default(false) // Default printer for this type
+  isActive    Boolean  @default(true)
+  
+  // For identification
+  stationId   String?  // Which register this belongs to
+  macAddress  String?  // For network printers
+  
+  // Label printer settings (Zebra)
+  labelWidth  String?  // "2x1", "1.5x1", "1x1"
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([franchiseId])
+  @@index([type])
+}
+
