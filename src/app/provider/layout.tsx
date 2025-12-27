@@ -20,6 +20,7 @@ const PROVIDER_SIDEBAR = [
     { name: 'Devices', href: '/provider/devices', icon: HardDrive },
     { name: 'Monitoring', href: '/provider/monitoring', icon: Monitor },
     { name: 'Billing', href: '/provider/billing', icon: CreditCard },
+    { name: 'UPC Import', href: '/provider/upc-import', icon: Package },
     { name: 'System', href: '/provider/system', icon: Settings },
 ];
 
