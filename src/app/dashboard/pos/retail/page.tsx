@@ -1782,18 +1782,18 @@ export default function RetailPOSPage() {
                         {showDualPricing ? (
                             <div className="border-t border-stone-700 pt-3 space-y-2">
                                 <div className="flex justify-between text-xl">
-                                    <span className="text-green-400 font-bold flex items-center gap-2">
-                                        <Banknote className="h-5 w-5" />
-                                        Cash
-                                    </span>
-                                    <span className="font-bold text-green-400">{formatCurrency(cashTotal)}</span>
-                                </div>
-                                <div className="flex justify-between text-xl">
                                     <span className="text-blue-400 font-bold flex items-center gap-2">
                                         <CreditCard className="h-5 w-5" />
                                         Card
                                     </span>
                                     <span className="font-bold text-blue-400">{formatCurrency(cardTotal)}</span>
+                                </div>
+                                <div className="flex justify-between text-xl">
+                                    <span className="text-green-400 font-bold flex items-center gap-2">
+                                        <Banknote className="h-5 w-5" />
+                                        Cash
+                                    </span>
+                                    <span className="font-bold text-green-400">{formatCurrency(cashTotal)}</span>
                                 </div>
                             </div>
                         ) : (

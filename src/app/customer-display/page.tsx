@@ -273,12 +273,12 @@ function CustomerDisplayContent() {
                             {cart.showDualPricing ? (
                                 <div className="flex gap-4">
                                     <div className="flex-1 flex justify-between text-base font-bold">
-                                        <span className="text-green-400">💵 Cash</span>
-                                        <span className="text-green-400">{formatCurrency(cart.cashTotal || cart.total)}</span>
-                                    </div>
-                                    <div className="flex-1 flex justify-between text-base font-bold">
                                         <span className="text-blue-400">💳 Card</span>
                                         <span className="text-blue-400">{formatCurrency(cart.cardTotal || cart.total)}</span>
+                                    </div>
+                                    <div className="flex-1 flex justify-between text-base font-bold">
+                                        <span className="text-green-400">💵 Cash</span>
+                                        <span className="text-green-400">{formatCurrency(cart.cashTotal || cart.total)}</span>
                                     </div>
                                 </div>
                             ) : (
