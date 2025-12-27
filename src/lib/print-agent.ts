@@ -188,15 +188,17 @@ export function formatReceiptFromTransaction(
  * - PRICE_ONLY: Just big price centered (shelf tags)
  * - NAME_PRICE: Product name + price, no barcode
  * - FULL: Name, brand, price, barcode (default)
- * - DUAL_PRICE: Regular price crossed out + sale price
+ * - DUAL_PRICE: Cash price vs Card price (for dual pricing stores)
  * - BIG_PRICE: Extra large price with small name
+ * - SALE: Regular price crossed out + sale price
  */
-export type LabelTemplate = 'PRICE_ONLY' | 'NAME_PRICE' | 'FULL' | 'DUAL_PRICE' | 'BIG_PRICE';
+export type LabelTemplate = 'PRICE_ONLY' | 'NAME_PRICE' | 'FULL' | 'DUAL_PRICE' | 'BIG_PRICE' | 'SALE';
 
 export interface LabelData {
     productName: string;
-    price: number;
-    salePrice?: number;      // For DUAL_PRICE template
+    price: number;           // Cash price (or regular price for SALE template)
+    cardPrice?: number;      // For DUAL_PRICE template - card price
+    salePrice?: number;      // For SALE template - sale price
     barcode?: string;
     brand?: string;
     size?: '2x1' | '1.5x1' | '1x1';

@@ -394,14 +394,15 @@ app.post('/print-label', async (req, res) => {
 
 /**
  * Generate ZPL commands for Zebra label printers
- * @param {Object} label - { productName, price, salePrice, barcode, brand, size, quantity, template }
+ * @param {Object} label - { productName, price, cardPrice, salePrice, barcode, brand, size, quantity, template }
  * 
  * Templates:
  * 1. PRICE_ONLY     - Just big price, no barcode (for shelf tags)
  * 2. NAME_PRICE     - Product name + price, no barcode
  * 3. FULL           - Name, brand, price, barcode (default)
- * 4. DUAL_PRICE     - Regular price + sale price (crossed out)
+ * 4. DUAL_PRICE     - Cash price vs Card price (for dual pricing stores)
  * 5. BIG_PRICE      - Extra large price with small name
+ * 6. SALE           - Regular price crossed out + sale price
  */
 function generateZplLabel(label) {
     const size = label.size || '2x1';
@@ -444,13 +445,18 @@ function generateZplLabel(label) {
             break;
 
         case 'DUAL_PRICE':
-            // Template 4: Regular + sale price
+            // Template 4: Cash price vs Card price
             zpl += generateDualPriceTemplate(label, dim);
             break;
 
         case 'BIG_PRICE':
             // Template 5: Extra large price
             zpl += generateBigPriceTemplate(label, dim);
+            break;
+
+        case 'SALE':
+            // Template 6: Regular price crossed out + sale price
+            zpl += generateSalePriceTemplate(label, dim);
             break;
 
         case 'FULL':
@@ -567,9 +573,61 @@ function generateFullTemplate(label, dim) {
 }
 
 /**
- * Template 4: DUAL_PRICE - Regular price crossed out + sale price
+ * Template 4: DUAL_PRICE - Cash price vs Card price (for dual pricing stores)
  */
 function generateDualPriceTemplate(label, dim) {
+    const cashPrice = label.price ? `$${Number(label.price).toFixed(2)}` : '';
+    const cardPrice = label.cardPrice ? `$${Number(label.cardPrice).toFixed(2)}` : '';
+    const productName = (label.productName || 'Product').substring(0, 22);
+    let zpl = '';
+
+    // Product name (top)
+    zpl += '^FO20,8\n';
+    zpl += '^A0N,20,20\n';
+    zpl += `^FD${productName}^FS\n`;
+
+    // CASH label with price (left side)
+    zpl += '^FO20,35\n';
+    zpl += '^A0N,16,16\n';
+    zpl += '^FD CASH ^FS\n';
+
+    zpl += '^FO20,55\n';
+    zpl += '^A0N,55,55\n';
+    zpl += `^FD${cashPrice}^FS\n`;
+
+    // CARD label with price (right side)
+    zpl += '^FO150,35\n';
+    zpl += '^A0N,16,16\n';
+    zpl += '^FD CARD ^FS\n';
+
+    zpl += '^FO150,55\n';
+    zpl += '^A0N,55,55\n';
+    zpl += `^FD${cardPrice}^FS\n`;
+
+    // Vertical separator line
+    zpl += '^FO140,30\n';
+    zpl += '^GB2,80,2^FS\n';
+
+    // Barcode (bottom if fits)
+    if (label.barcode && dim.width >= 400) {
+        zpl += '^FO280,20\n';
+        zpl += '^BY1.2\n';
+        zpl += '^BCN,60,N,N,N\n';
+        zpl += `^FD${label.barcode}^FS\n`;
+
+        // UPC text
+        zpl += '^FO280,85\n';
+        zpl += '^A0N,14,14\n';
+        zpl += `^FD${label.barcode}^FS\n`;
+    }
+
+    return zpl;
+}
+
+/**
+ * Template 6: SALE - Regular price crossed out + sale price
+ */
+function generateSalePriceTemplate(label, dim) {
     const regularPrice = label.price ? `$${Number(label.price).toFixed(2)}` : '';
     const salePrice = label.salePrice ? `$${Number(label.salePrice).toFixed(2)}` : '';
     const productName = (label.productName || 'Product').substring(0, 22);
@@ -582,28 +640,30 @@ function generateDualPriceTemplate(label, dim) {
 
     // Regular price (crossed out with strikethrough line)
     zpl += '^FO20,40\n';
-    zpl += '^A0N,35,35\n';
-    zpl += `^FDReg: ${regularPrice}^FS\n`;
+    zpl += '^A0N,30,30\n';
+    zpl += `^FDWas: ${regularPrice}^FS\n`;
 
     // Strikethrough line over regular price
-    zpl += '^FO65,55\n';
-    zpl += '^GB80,2,2^FS\n';
+    zpl += '^FO60,53\n';
+    zpl += '^GB70,2,2^FS\n';
 
     // SALE label
-    zpl += '^FO20,85\n';
-    zpl += '^A0N,20,20\n';
-    zpl += '^FR^FD SALE ^FS\n'; // Reversed (white on black)
+    zpl += '^FO20,78\n';
+    zpl += '^GB50,25,25^FS\n'; // Black box
+    zpl += '^FO25,80\n';
+    zpl += '^A0N,18,18\n';
+    zpl += '^FR^FDSALE^FS\n'; // Reversed (white on black)
 
     // Sale price (large)
-    zpl += '^FO80,75\n';
-    zpl += '^A0N,60,60\n';
+    zpl += '^FO75,70\n';
+    zpl += '^A0N,55,55\n';
     zpl += `^FD${salePrice}^FS\n`;
 
-    // Barcode (bottom or right if fits)
+    // Barcode (right if fits)
     if (label.barcode && dim.width >= 400) {
-        zpl += '^FO250,20\n';
+        zpl += '^FO280,15\n';
         zpl += '^BY1.2\n';
-        zpl += '^BCN,60,N,N,N\n';
+        zpl += '^BCN,65,N,N,N\n';
         zpl += `^FD${label.barcode}^FS\n`;
     }
 
