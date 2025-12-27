@@ -394,13 +394,20 @@ app.post('/print-label', async (req, res) => {
 
 /**
  * Generate ZPL commands for Zebra label printers
- * @param {Object} label - { productName, price, barcode, brand, size, quantity }
+ * @param {Object} label - { productName, price, salePrice, barcode, brand, size, quantity, template }
+ * 
+ * Templates:
+ * 1. PRICE_ONLY     - Just big price, no barcode (for shelf tags)
+ * 2. NAME_PRICE     - Product name + price, no barcode
+ * 3. FULL           - Name, brand, price, barcode (default)
+ * 4. DUAL_PRICE     - Regular price + sale price (crossed out)
+ * 5. BIG_PRICE      - Extra large price with small name
  */
 function generateZplLabel(label) {
     const size = label.size || '2x1';
+    const template = label.template || 'FULL';
 
     // Label dimensions in dots (203 DPI)
-    // 2x1" = 406 x 203, 1.5x1" = 305 x 203, 1x1" = 203 x 203
     const sizes = {
         '2x1': { width: 406, height: 203 },
         '1.5x1': { width: 305, height: 203 },
@@ -410,10 +417,9 @@ function generateZplLabel(label) {
     const dim = sizes[size] || sizes['2x1'];
     const quantity = label.quantity || 1;
 
-    // Format price
+    // Format prices
     const priceText = label.price ? `$${Number(label.price).toFixed(2)}` : '';
-
-    // Truncate product name for label
+    const salePriceText = label.salePrice ? `$${Number(label.salePrice).toFixed(2)}` : '';
     const productName = (label.productName || 'Product').substring(0, 25);
     const brand = (label.brand || '').substring(0, 20);
 
@@ -425,8 +431,98 @@ function generateZplLabel(label) {
     zpl += '^LL' + dim.height + '\n'; // Label length
     zpl += '^CF0,20\n'; // Default font
 
-    if (size === '2x1') {
-        // Large label - full layout
+    // Generate based on template
+    switch (template) {
+        case 'PRICE_ONLY':
+            // Template 1: Just big price centered
+            zpl += generatePriceOnlyTemplate(label, dim);
+            break;
+
+        case 'NAME_PRICE':
+            // Template 2: Name + price, no barcode
+            zpl += generateNamePriceTemplate(label, dim);
+            break;
+
+        case 'DUAL_PRICE':
+            // Template 4: Regular + sale price
+            zpl += generateDualPriceTemplate(label, dim);
+            break;
+
+        case 'BIG_PRICE':
+            // Template 5: Extra large price
+            zpl += generateBigPriceTemplate(label, dim);
+            break;
+
+        case 'FULL':
+        default:
+            // Template 3: Full layout (default)
+            zpl += generateFullTemplate(label, dim);
+            break;
+    }
+
+    // Print quantity
+    zpl += `^PQ${quantity}\n`;
+
+    // End format
+    zpl += '^XZ\n';
+
+    return zpl;
+}
+
+/**
+ * Template 1: PRICE_ONLY - Just big price centered
+ */
+function generatePriceOnlyTemplate(label, dim) {
+    const priceText = label.price ? `$${Number(label.price).toFixed(2)}` : '';
+    let zpl = '';
+
+    // Center big price
+    zpl += '^FO' + Math.floor(dim.width / 2 - 80) + ',50\n';
+    zpl += '^A0N,100,100\n';
+    zpl += `^FD${priceText}^FS\n`;
+
+    return zpl;
+}
+
+/**
+ * Template 2: NAME_PRICE - Product name + price, no barcode
+ */
+function generateNamePriceTemplate(label, dim) {
+    const priceText = label.price ? `$${Number(label.price).toFixed(2)}` : '';
+    const productName = (label.productName || 'Product').substring(0, 25);
+    let zpl = '';
+
+    // Price (large, top)
+    zpl += '^FO20,15\n';
+    zpl += '^A0N,70,70\n';
+    zpl += `^FD${priceText}^FS\n`;
+
+    // Product name (below price)
+    zpl += '^FO20,100\n';
+    zpl += '^A0N,30,30\n';
+    zpl += `^FD${productName}^FS\n`;
+
+    // Brand if available
+    if (label.brand) {
+        zpl += '^FO20,140\n';
+        zpl += '^A0N,20,20\n';
+        zpl += `^FD${label.brand.substring(0, 20)}^FS\n`;
+    }
+
+    return zpl;
+}
+
+/**
+ * Template 3: FULL - Name, brand, price, barcode (default)
+ */
+function generateFullTemplate(label, dim) {
+    const priceText = label.price ? `$${Number(label.price).toFixed(2)}` : '';
+    const productName = (label.productName || 'Product').substring(0, 25);
+    const brand = (label.brand || '').substring(0, 20);
+    let zpl = '';
+
+    if (dim.width >= 400) {
+        // 2x1 layout
         // Price (large, top left)
         zpl += '^FO20,15\n';
         zpl += '^A0N,60,60\n';
@@ -448,7 +544,7 @@ function generateZplLabel(label) {
         if (label.barcode) {
             zpl += '^FO220,20\n';
             zpl += '^BY1.5\n';
-            zpl += `^BCN,80,N,N,N\n`;
+            zpl += '^BCN,80,N,N,N\n';
             zpl += `^FD${label.barcode}^FS\n`;
 
             // UPC text below barcode
@@ -456,43 +552,95 @@ function generateZplLabel(label) {
             zpl += '^A0N,16,16\n';
             zpl += `^FD${label.barcode}^FS\n`;
         }
-    } else if (size === '1.5x1') {
-        // Medium label
-        // Price (large, centered)
+    } else {
+        // Smaller labels - compact layout
         zpl += '^FO10,10\n';
         zpl += '^A0N,50,50\n';
         zpl += `^FD${priceText}^FS\n`;
 
-        // Product name
         zpl += '^FO10,70\n';
-        zpl += '^A0N,22,22\n';
-        zpl += `^FD${productName.substring(0, 18)}^FS\n`;
-
-        // Barcode (small, right)
-        if (label.barcode) {
-            zpl += '^FO180,10\n';
-            zpl += '^BY1\n';
-            zpl += `^BCN,50,N,N,N\n`;
-            zpl += `^FD${label.barcode}^FS\n`;
-        }
-    } else {
-        // Small label (1x1)
-        // Price only
-        zpl += '^FO10,20\n';
-        zpl += '^A0N,70,70\n';
-        zpl += `^FD${priceText}^FS\n`;
-
-        // Product name (truncated)
-        zpl += '^FO10,100\n';
-        zpl += '^A0N,18,18\n';
-        zpl += `^FD${productName.substring(0, 12)}^FS\n`;
+        zpl += '^A0N,20,20\n';
+        zpl += `^FD${productName.substring(0, 15)}^FS\n`;
     }
 
-    // Print quantity
-    zpl += `^PQ${quantity}\n`;
+    return zpl;
+}
 
-    // End format
-    zpl += '^XZ\n';
+/**
+ * Template 4: DUAL_PRICE - Regular price crossed out + sale price
+ */
+function generateDualPriceTemplate(label, dim) {
+    const regularPrice = label.price ? `$${Number(label.price).toFixed(2)}` : '';
+    const salePrice = label.salePrice ? `$${Number(label.salePrice).toFixed(2)}` : '';
+    const productName = (label.productName || 'Product').substring(0, 22);
+    let zpl = '';
+
+    // Product name (top)
+    zpl += '^FO20,10\n';
+    zpl += '^A0N,22,22\n';
+    zpl += `^FD${productName}^FS\n`;
+
+    // Regular price (crossed out with strikethrough line)
+    zpl += '^FO20,40\n';
+    zpl += '^A0N,35,35\n';
+    zpl += `^FDReg: ${regularPrice}^FS\n`;
+
+    // Strikethrough line over regular price
+    zpl += '^FO65,55\n';
+    zpl += '^GB80,2,2^FS\n';
+
+    // SALE label
+    zpl += '^FO20,85\n';
+    zpl += '^A0N,20,20\n';
+    zpl += '^FR^FD SALE ^FS\n'; // Reversed (white on black)
+
+    // Sale price (large)
+    zpl += '^FO80,75\n';
+    zpl += '^A0N,60,60\n';
+    zpl += `^FD${salePrice}^FS\n`;
+
+    // Barcode (bottom or right if fits)
+    if (label.barcode && dim.width >= 400) {
+        zpl += '^FO250,20\n';
+        zpl += '^BY1.2\n';
+        zpl += '^BCN,60,N,N,N\n';
+        zpl += `^FD${label.barcode}^FS\n`;
+    }
+
+    return zpl;
+}
+
+/**
+ * Template 5: BIG_PRICE - Extra large price with small name
+ */
+function generateBigPriceTemplate(label, dim) {
+    const priceText = label.price ? `$${Number(label.price).toFixed(2)}` : '';
+    const productName = (label.productName || 'Product').substring(0, 20);
+    let zpl = '';
+
+    // Small product name at top
+    zpl += '^FO10,5\n';
+    zpl += '^A0N,18,18\n';
+    zpl += `^FD${productName}^FS\n`;
+
+    // HUGE price centered
+    if (dim.width >= 400) {
+        zpl += '^FO40,35\n';
+        zpl += '^A0N,140,140\n';
+        zpl += `^FD${priceText}^FS\n`;
+    } else {
+        zpl += '^FO10,30\n';
+        zpl += '^A0N,100,100\n';
+        zpl += `^FD${priceText}^FS\n`;
+    }
+
+    // Small barcode at bottom if fits
+    if (label.barcode && dim.height >= 200) {
+        zpl += `^FO${Math.floor(dim.width / 2 - 50)},${dim.height - 35}\n`;
+        zpl += '^BY1\n';
+        zpl += '^BCN,25,N,N,N\n';
+        zpl += `^FD${label.barcode}^FS\n`;
+    }
 
     return zpl;
 }

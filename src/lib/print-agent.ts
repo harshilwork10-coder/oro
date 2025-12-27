@@ -183,13 +183,25 @@ export function formatReceiptFromTransaction(
 
 // ============ LABEL PRINTING (Zebra ZPL) ============
 
+/**
+ * Label Templates:
+ * - PRICE_ONLY: Just big price centered (shelf tags)
+ * - NAME_PRICE: Product name + price, no barcode
+ * - FULL: Name, brand, price, barcode (default)
+ * - DUAL_PRICE: Regular price crossed out + sale price
+ * - BIG_PRICE: Extra large price with small name
+ */
+export type LabelTemplate = 'PRICE_ONLY' | 'NAME_PRICE' | 'FULL' | 'DUAL_PRICE' | 'BIG_PRICE';
+
 export interface LabelData {
     productName: string;
     price: number;
+    salePrice?: number;      // For DUAL_PRICE template
     barcode?: string;
     brand?: string;
     size?: '2x1' | '1.5x1' | '1x1';
     quantity?: number;
+    template?: LabelTemplate; // Default: 'FULL'
 }
 
 /**
