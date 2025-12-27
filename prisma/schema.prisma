@@ -228,6 +228,9 @@ model User {
 
   // Cash Payouts
   cashPayouts CashPayout[]
+
+  // In-app notifications
+  notifications Notification[]
 }
 
 model Franchise {
@@ -322,6 +325,9 @@ model Franchise {
 
   // Scratch ticket barcode-price mappings
   scratchTickets ScratchTicket[]
+
+  // In-app notifications
+  notifications Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3919,4 +3925,30 @@ model ScratchTicket {
   @@unique([franchiseId, barcode])
   @@index([franchiseId])
   @@index([barcode])
+}
+
+// ============ NOTIFICATIONS ============
+// In-app notifications for owners/managers
+// Types: LOW_INVENTORY, SHIFT_STARTED, SHIFT_ENDED, LARGE_REFUND, DAILY_SUMMARY, STORE_OFFLINE
+model Notification {
+  id          String    @id @default(cuid())
+  franchiseId String?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  userId      String?   // Target user (null = broadcast to all franchise users)
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type        String    // LOW_INVENTORY, SHIFT_STARTED, etc.
+  title       String
+  message     String
+  data        String?   // JSON data for deep linking
+  
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  
+  createdAt   DateTime  @default(now())
+  
+  @@index([franchiseId])
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
 }
