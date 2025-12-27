@@ -25,9 +25,10 @@ interface LabelItem {
     template: string
 }
 
-type LabelTemplate = 'PRICE_ONLY' | 'NAME_PRICE' | 'FULL' | 'DUAL_PRICE' | 'BIG_PRICE' | 'SALE'
+type LabelTemplate = 'PRICE_ONLY' | 'NAME_PRICE' | 'FULL' | 'DUAL_PRICE' | 'BIG_PRICE' | 'SALE' | 'BOXED'
 
 const TEMPLATES: { id: LabelTemplate; name: string; description: string; requiresDualPricing?: boolean }[] = [
+    { id: 'BOXED', name: 'Boxed Price', description: 'Border frame, boxed price' },
     { id: 'FULL', name: 'Full Label', description: 'Name, brand, price, barcode' },
     { id: 'PRICE_ONLY', name: 'Price Only', description: 'Just big price' },
     { id: 'NAME_PRICE', name: 'Name + Price', description: 'No barcode' },
@@ -37,6 +38,7 @@ const TEMPLATES: { id: LabelTemplate; name: string; description: string; require
 ]
 
 const LABEL_SIZES = [
+    { id: '2.25x1.25', name: '2.25" x 1.25" (Standard)' },
     { id: '2x1', name: '2" x 1"' },
     { id: '1.5x1', name: '1.5" x 1"' },
     { id: '1x1', name: '1" x 1"' },
@@ -46,8 +48,8 @@ export default function LabelPrintPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [products, setProducts] = useState<Product[]>([])
     const [labelQueue, setLabelQueue] = useState<LabelItem[]>([])
-    const [selectedTemplate, setSelectedTemplate] = useState<LabelTemplate>('FULL')
-    const [selectedSize, setSelectedSize] = useState('2x1')
+    const [selectedTemplate, setSelectedTemplate] = useState<LabelTemplate>('BOXED')
+    const [selectedSize, setSelectedSize] = useState('2.25x1.25')
     const [isPrinting, setIsPrinting] = useState(false)
     const [printStatus, setPrintStatus] = useState('')
     const [hasDualPricing, setHasDualPricing] = useState(false)
@@ -237,8 +239,8 @@ export default function LabelPrintPage() {
                     {/* Printer Status */}
                     <div className="flex items-center gap-4">
                         <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${printerStatus === 'online' ? 'bg-emerald-500/20 text-emerald-400' :
-                                printerStatus === 'offline' ? 'bg-red-500/20 text-red-400' :
-                                    'bg-stone-800 text-stone-400'
+                            printerStatus === 'offline' ? 'bg-red-500/20 text-red-400' :
+                                'bg-stone-800 text-stone-400'
                             }`}>
                             <Printer className="h-4 w-4" />
                             {printerStatus === 'online' ? 'Printer Ready' :

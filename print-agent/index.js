@@ -403,6 +403,7 @@ app.post('/print-label', async (req, res) => {
  * 4. DUAL_PRICE     - Cash price vs Card price (for dual pricing stores)
  * 5. BIG_PRICE      - Extra large price with small name
  * 6. SALE           - Regular price crossed out + sale price
+ * 7. BOXED          - Boxed price with border frame (retail standard)
  */
 function generateZplLabel(label) {
     const size = label.size || '2x1';
@@ -410,6 +411,7 @@ function generateZplLabel(label) {
 
     // Label dimensions in dots (203 DPI)
     const sizes = {
+        '2.25x1.25': { width: 457, height: 254 }, // Standard liquor store
         '2x1': { width: 406, height: 203 },
         '1.5x1': { width: 305, height: 203 },
         '1x1': { width: 203, height: 203 }
@@ -457,6 +459,11 @@ function generateZplLabel(label) {
         case 'SALE':
             // Template 6: Regular price crossed out + sale price
             zpl += generateSalePriceTemplate(label, dim);
+            break;
+
+        case 'BOXED':
+            // Template 7: Boxed price with border (retail standard)
+            zpl += generateBoxedTemplate(label, dim);
             break;
 
         case 'FULL':
@@ -699,6 +706,84 @@ function generateBigPriceTemplate(label, dim) {
         zpl += `^FO${Math.floor(dim.width / 2 - 50)},${dim.height - 35}\n`;
         zpl += '^BY1\n';
         zpl += '^BCN,25,N,N,N\n';
+        zpl += `^FD${label.barcode}^FS\n`;
+    }
+
+    return zpl;
+}
+
+/**
+ * Template 7: BOXED - Boxed price with border frame (retail standard)
+ * For 2.25" x 1.25" shelf edge labels
+ */
+function generateBoxedTemplate(label, dim) {
+    const cashPrice = label.price ? `$${Number(label.price).toFixed(2)}` : '';
+    const cardPrice = label.cardPrice ? `$${Number(label.cardPrice).toFixed(2)}` : cashPrice;
+    const productName = (label.productName || 'Product').substring(0, 20);
+    const brand = (label.brand || '').substring(0, 15);
+    const sizeInfo = label.productSize || '';
+    let zpl = '';
+
+    // === OUTER BORDER FRAME ===
+    // Top border
+    zpl += '^FO0,0\n';
+    zpl += `^GB${dim.width},3,3^FS\n`;
+    // Bottom border
+    zpl += `^FO0,${dim.height - 3}\n`;
+    zpl += `^GB${dim.width},3,3^FS\n`;
+    // Left border
+    zpl += '^FO0,0\n';
+    zpl += `^GB3,${dim.height},3^FS\n`;
+    // Right border
+    zpl += `^FO${dim.width - 3},0\n`;
+    zpl += `^GB3,${dim.height},3^FS\n`;
+
+    // === PRODUCT NAME (top left) ===
+    zpl += '^FO10,10\n';
+    zpl += '^A0N,24,24\n';
+    zpl += `^FD${productName}^FS\n`;
+
+    // === BRAND/SIZE (below name) ===
+    if (brand || sizeInfo) {
+        zpl += '^FO10,38\n';
+        zpl += '^A0N,18,18\n';
+        zpl += `^FD${brand}${brand && sizeInfo ? ' - ' : ''}${sizeInfo}^FS\n`;
+    }
+
+    // === PRICE BOX (right side, large) ===
+    // Black box background
+    const boxWidth = 150;
+    const boxHeight = 65;
+    const boxX = dim.width - boxWidth - 10;
+    const boxY = 10;
+
+    zpl += `^FO${boxX},${boxY}\n`;
+    zpl += `^GB${boxWidth},${boxHeight},${boxHeight}^FS\n`; // Filled black box
+
+    // CARD price (main price, white text on black)
+    zpl += `^FO${boxX + 10},${boxY + 5}\n`;
+    zpl += '^A0N,16,16\n';
+    zpl += '^FR^FDCARD^FS\n'; // Reversed (white)
+
+    zpl += `^FO${boxX + 10},${boxY + 22}\n`;
+    zpl += '^A0N,38,38\n';
+    zpl += `^FR^FD${cardPrice}^FS\n`; // Reversed (white)
+
+    // === CASH PRICE (below box) ===
+    zpl += `^FO${boxX + 15},${boxY + boxHeight + 5}\n`;
+    zpl += '^A0N,16,16\n';
+    zpl += `^FDCASH: ${cashPrice}^FS\n`;
+
+    // === BARCODE (bottom left) ===
+    if (label.barcode) {
+        zpl += '^FO10,60\n';
+        zpl += '^BY1.5\n';
+        zpl += '^BCN,55,N,N,N\n';
+        zpl += `^FD${label.barcode}^FS\n`;
+
+        // UPC text below barcode
+        zpl += '^FO10,120\n';
+        zpl += '^A0N,14,14\n';
         zpl += `^FD${label.barcode}^FS\n`;
     }
 
