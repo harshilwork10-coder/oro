@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { CreditCard, DollarSign, Users, Shield, Save, AlertCircle, FileText } from 'lucide-react'
+import { CreditCard, DollarSign, Users, Shield, Save, AlertCircle, FileText, Printer } from 'lucide-react'
 
 export default function SettingsPage() {
     const { data: session } = useSession()
@@ -24,6 +24,10 @@ export default function SettingsPage() {
     const [acceptsEbt, setAcceptsEbt] = useState(false)
     const [acceptsChecks, setAcceptsChecks] = useState(false)
     const [acceptsOnAccount, setAcceptsOnAccount] = useState(false)
+
+    // Receipt Print Settings
+    const [receiptPrintMode, setReceiptPrintMode] = useState('ALL')
+    const [openDrawerOnCash, setOpenDrawerOnCash] = useState(true)
 
     // Employee List
     const [employees, setEmployees] = useState<any[]>([])
@@ -50,6 +54,9 @@ export default function SettingsPage() {
                     setAcceptsEbt(data.acceptsEbt ?? false)
                     setAcceptsChecks(data.acceptsChecks ?? false)
                     setAcceptsOnAccount(data.acceptsOnAccount ?? false)
+                    // Receipt print settings
+                    setReceiptPrintMode(data.receiptPrintMode || 'ALL')
+                    setOpenDrawerOnCash(data.openDrawerOnCash ?? true)
                 }
             }
         } catch (error) {
@@ -91,7 +98,10 @@ export default function SettingsPage() {
                     // Payment settings
                     acceptsEbt,
                     acceptsChecks,
-                    acceptsOnAccount
+                    acceptsOnAccount,
+                    // Receipt print settings
+                    receiptPrintMode,
+                    openDrawerOnCash
                 })
             })
 
@@ -439,6 +449,76 @@ export default function SettingsPage() {
                             />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                         </label>
+                    </div>
+                </div>
+            </div>
+
+            {/* Receipt Printing Settings */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="h-12 w-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                        <Printer className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold">Receipt Printing</h2>
+                        <p className="text-gray-600">Configure when receipts auto-print and cash drawer behavior</p>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    {/* Auto-Print Mode */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">Auto-Print Receipts</label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {[
+                                { id: 'ALL', label: 'All Transactions', desc: 'Print every receipt' },
+                                { id: 'CARD_ONLY', label: 'Card Only', desc: 'Credit/Debit only' },
+                                { id: 'EBT_ONLY', label: 'EBT Only', desc: 'EBT transactions only' },
+                                { id: 'CARD_AND_EBT', label: 'Card & EBT', desc: 'Card and EBT only' },
+                                { id: 'NONE', label: 'Never', desc: 'Use Last Receipt button' },
+                            ].map(mode => (
+                                <button
+                                    key={mode.id}
+                                    onClick={() => setReceiptPrintMode(mode.id)}
+                                    className={`p-3 rounded-lg border-2 transition-all text-left ${receiptPrintMode === mode.id
+                                            ? 'border-purple-500 bg-purple-50'
+                                            : 'border-gray-200 hover:border-gray-300'
+                                        }`}
+                                >
+                                    <div className="font-semibold text-sm">{mode.label}</div>
+                                    <div className="text-xs text-gray-500">{mode.desc}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Cash Drawer */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                <DollarSign className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div>
+                                <div className="font-bold text-gray-800">Open Drawer on Cash</div>
+                                <div className="text-sm text-gray-500">Automatically open cash drawer for cash payments</div>
+                            </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={openDrawerOnCash}
+                                onChange={(e) => setOpenDrawerOnCash(e.target.checked)}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                        </label>
+                    </div>
+
+                    {/* Info Box */}
+                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-200">
+                        <div className="text-sm text-purple-900">
+                            <strong>💡 Tip:</strong> Use "Never" mode to save paper. Customers can request a receipt using the "Last Receipt" button in the POS.
+                        </div>
                     </div>
                 </div>
             </div>
