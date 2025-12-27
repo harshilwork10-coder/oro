@@ -16,7 +16,6 @@ interface ImportResult {
 
 interface Stats {
     totalProducts: number
-    bySource: { source: string; count: number }[]
     recentProducts: { upc: string; name: string; brand: string; createdAt: string }[]
 }
 
@@ -175,19 +174,9 @@ export default function UpcImportPage() {
                                 </button>
                             </div>
                             {stats ? (
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="text-center">
-                                        <div className="text-3xl font-bold text-purple-400">{stats.totalProducts.toLocaleString()}</div>
-                                        <div className="text-sm text-stone-500">Total Products</div>
-                                    </div>
-                                    <div className="text-center">
-                                        <div className="text-3xl font-bold text-emerald-400">{stats.bySource.find(s => s.source === 'UPCITEMDB')?.count || 0}</div>
-                                        <div className="text-sm text-stone-500">From API</div>
-                                    </div>
-                                    <div className="text-center">
-                                        <div className="text-3xl font-bold text-blue-400">{stats.bySource.find(s => s.source === 'MANUAL')?.count || 0}</div>
-                                        <div className="text-sm text-stone-500">Manual</div>
-                                    </div>
+                                <div className="text-center">
+                                    <div className="text-4xl font-bold text-purple-400">{stats.totalProducts.toLocaleString()}</div>
+                                    <div className="text-sm text-stone-500">Total Products in Master DB</div>
                                 </div>
                             ) : (
                                 <button onClick={loadStats} className="w-full py-3 text-stone-500 hover:text-white">
@@ -340,9 +329,9 @@ export default function UpcImportPage() {
                                         <div
                                             key={i}
                                             className={`p-2 rounded-lg text-sm flex items-center gap-2 ${r.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' :
-                                                    r.status === 'exists' ? 'bg-blue-500/10 text-blue-400' :
-                                                        r.status === 'not_found' ? 'bg-yellow-500/10 text-yellow-400' :
-                                                            'bg-red-500/10 text-red-400'
+                                                r.status === 'exists' ? 'bg-blue-500/10 text-blue-400' :
+                                                    r.status === 'not_found' ? 'bg-yellow-500/10 text-yellow-400' :
+                                                        'bg-red-500/10 text-red-400'
                                                 }`}
                                         >
                                             {r.status === 'success' && <CheckCircle className="h-4 w-4 flex-shrink-0" />}

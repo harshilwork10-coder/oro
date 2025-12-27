@@ -107,13 +107,7 @@ export async function POST(request: NextRequest) {
 
                 const item = data.items[0]
 
-                // Calculate average price
-                let avgPrice = null
-                if (item.offers && item.offers.length > 0) {
-                    avgPrice = item.offers.reduce((sum: number, o: any) => sum + (o.price || 0), 0) / item.offers.length
-                }
-
-                // Save to master database
+                // Save to master database (only essential fields)
                 await prisma.masterUpcProduct.create({
                     data: {
                         upc,
@@ -122,15 +116,7 @@ export async function POST(request: NextRequest) {
                         description: item.description || null,
                         category: item.category || null,
                         size: item.size || null,
-                        weight: item.weight || null,
-                        color: item.color || null,
-                        model: item.model || null,
-                        lowestPrice: item.lowest_recorded_price || null,
-                        highestPrice: item.highest_recorded_price || null,
-                        avgPrice: avgPrice,
-                        imageUrl: item.images?.[0] || null,
-                        images: item.images ? JSON.stringify(item.images) : null,
-                        source: 'UPCITEMDB'
+                        weight: item.weight || null
                     }
                 })
 
@@ -175,11 +161,6 @@ export async function GET(request: NextRequest) {
 
         const totalProducts = await prisma.masterUpcProduct.count()
 
-        const bySource = await prisma.masterUpcProduct.groupBy({
-            by: ['source'],
-            _count: { id: true }
-        })
-
         const recentProducts = await prisma.masterUpcProduct.findMany({
             orderBy: { createdAt: 'desc' },
             take: 10,
@@ -193,7 +174,6 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
             totalProducts,
-            bySource: bySource.map(s => ({ source: s.source, count: s._count.id })),
             recentProducts
         })
 

@@ -3969,20 +3969,6 @@ model MasterUpcProduct {
   // Sizing
   size        String?
   weight      String?
-  color       String?
-  model       String?
-  
-  // Pricing (from API - suggested retail)
-  lowestPrice  Decimal?
-  highestPrice Decimal?
-  avgPrice     Decimal?
-  
-  // Images
-  imageUrl    String?  // Primary image
-  images      String?  // JSON array of all images
-  
-  // Source tracking
-  source      String   @default("UPCITEMDB") // UPCITEMDB, MANUAL, etc.
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

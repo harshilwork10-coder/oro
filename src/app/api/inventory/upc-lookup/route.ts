@@ -66,16 +66,9 @@ export async function GET(request: NextRequest) {
                     brand: masterProduct.brand || '',
                     description: masterProduct.description || '',
                     barcode: cleanUpc,
-                    suggestedPrice: Number(masterProduct.avgPrice || masterProduct.lowestPrice || 0),
-                    lowestPrice: Number(masterProduct.lowestPrice || 0),
-                    highestPrice: Number(masterProduct.highestPrice || 0),
                     category: masterProduct.category || '',
                     size: masterProduct.size || '',
-                    weight: masterProduct.weight || '',
-                    color: masterProduct.color || '',
-                    images: masterProduct.images ? JSON.parse(masterProduct.images) : [],
-                    model: masterProduct.model || '',
-                    imageUrl: masterProduct.imageUrl || ''
+                    weight: masterProduct.weight || ''
                 }
             })
         }
