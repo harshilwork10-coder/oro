@@ -45,7 +45,7 @@ import {
 import clsx from 'clsx'
 import { hasPermission, Role } from '@/lib/permissions'
 import { useBusinessConfig } from '@/hooks/useBusinessConfig'
-import { Sparkles, Armchair, Ticket, Cigarette, Store, TrendingUp } from 'lucide-react'
+import { Sparkles, Armchair, Ticket, Cigarette, Store, TrendingUp, Tag } from 'lucide-react'
 
 // Type for sidebar link
 type SidebarLink = {
@@ -170,6 +170,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag, feature: 'usesInventory' as const },
         // RETAIL only - Smart Ordering
         { name: 'Smart Ordering', href: '/dashboard/inventory/smart-ordering', icon: Sparkles, industry: ['RETAIL'] as const },
+        // RETAIL only - Label Printing
+        { name: 'Labels', href: '/dashboard/labels', icon: Tag, industry: ['RETAIL'] as const },
         { name: 'Deals', href: '/dashboard/deals', icon: Gift, industry: ['RETAIL'] as const },
         // RETAIL only - Lottery management
         { name: 'Lottery', href: '/dashboard/lottery', icon: Ticket, feature: 'lotteryEnabled' as const, industry: ['RETAIL'] as const },
