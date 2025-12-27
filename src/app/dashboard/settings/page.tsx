@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { CreditCard, DollarSign, Users, Shield, Save, AlertCircle, FileText, Printer } from 'lucide-react'
+import { CreditCard, DollarSign, Users, Shield, Save, AlertCircle, FileText, Printer, Settings } from 'lucide-react'
+import Link from 'next/link'
 
 export default function SettingsPage() {
     const { data: session } = useSession()
@@ -481,8 +482,8 @@ export default function SettingsPage() {
                                     key={mode.id}
                                     onClick={() => setReceiptPrintMode(mode.id)}
                                     className={`p-3 rounded-lg border-2 transition-all text-left ${receiptPrintMode === mode.id
-                                            ? 'border-purple-500 bg-purple-50'
-                                            : 'border-gray-200 hover:border-gray-300'
+                                        ? 'border-purple-500 bg-purple-50'
+                                        : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                 >
                                     <div className="font-semibold text-sm">{mode.label}</div>
@@ -520,6 +521,15 @@ export default function SettingsPage() {
                             <strong>💡 Tip:</strong> Use "Never" mode to save paper. Customers can request a receipt using the "Last Receipt" button in the POS.
                         </div>
                     </div>
+
+                    {/* Configure Printers Link */}
+                    <Link
+                        href="/dashboard/settings/printers"
+                        className="flex items-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 rounded-lg text-sm border border-stone-600"
+                    >
+                        <Settings className="h-4 w-4" />
+                        Configure Printer Hardware
+                    </Link>
                 </div>
             </div>
 
