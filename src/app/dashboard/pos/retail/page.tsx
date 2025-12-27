@@ -56,6 +56,8 @@ import {
     formatReceiptFromTransaction,
     isPrintAgentAvailable
 } from '@/lib/print-agent'
+import { useOfflineMode } from '@/lib/use-offline-mode'
+import { OfflineStatusIndicator } from '@/components/pos/OfflineStatusIndicator'
 
 interface CartItem {
     id: string
@@ -107,6 +109,9 @@ export default function RetailPOSPage() {
     const [barcodeInput, setBarcodeInput] = useState('')
     const router = useRouter()
     const [quantityInput, setQuantityInput] = useState('1')
+
+    // Offline Mode
+    const offlineMode = useOfflineMode()
 
     // Cart state
     const [cart, setCart] = useState<CartItem[]>([])
@@ -1432,6 +1437,17 @@ export default function RetailPOSPage() {
                         </div>
                     </div>
                 )}
+
+                {/* Offline Status Indicator */}
+                <OfflineStatusIndicator
+                    isOnline={offlineMode.isOnline}
+                    isReady={offlineMode.isReady}
+                    isSyncing={offlineMode.isSyncing}
+                    lastSync={offlineMode.lastSync}
+                    pendingCount={offlineMode.pendingCount}
+                    productCount={offlineMode.productCount}
+                    onSync={offlineMode.sync}
+                />
             </div>
 
             {/* Tag-Along Suggestions Bar (Cross-sell) */}
