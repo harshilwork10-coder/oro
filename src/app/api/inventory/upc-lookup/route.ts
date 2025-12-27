@@ -53,29 +53,34 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Invalid UPC length' }, { status: 400 })
         }
 
-        // First check if we already have this product in our database
-        const user = session.user as any
-        const existingProduct = await prisma.retailProduct.findFirst({
-            where: {
-                franchiseId: user.franchiseId,
-                barcode: cleanUpc
-            }
+        // 1. First check MASTER UPC DATABASE (shared across all stores - FREE lookup!)
+        const masterProduct = await prisma.masterUpcProduct.findUnique({
+            where: { upc: cleanUpc }
         })
 
-        if (existingProduct) {
+        if (masterProduct) {
             return NextResponse.json({
-                source: 'local',
+                source: 'master_db',
                 product: {
-                    name: existingProduct.name,
-                    price: Number(existingProduct.price),
-                    barcode: existingProduct.barcode,
-                    category: existingProduct.categoryId,
-                    existingProductId: existingProduct.id
+                    name: masterProduct.name,
+                    brand: masterProduct.brand || '',
+                    description: masterProduct.description || '',
+                    barcode: cleanUpc,
+                    suggestedPrice: Number(masterProduct.avgPrice || masterProduct.lowestPrice || 0),
+                    lowestPrice: Number(masterProduct.lowestPrice || 0),
+                    highestPrice: Number(masterProduct.highestPrice || 0),
+                    category: masterProduct.category || '',
+                    size: masterProduct.size || '',
+                    weight: masterProduct.weight || '',
+                    color: masterProduct.color || '',
+                    images: masterProduct.images ? JSON.parse(masterProduct.images) : [],
+                    model: masterProduct.model || '',
+                    imageUrl: masterProduct.imageUrl || ''
                 }
             })
         }
 
-        // Not in local DB, lookup from UPCitemdb
+        // 2. Not in master DB, call UPCitemdb API
         if (!UPC_API_KEY) {
             return NextResponse.json({
                 error: 'UPC API not configured',

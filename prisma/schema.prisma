@@ -3952,3 +3952,42 @@ model Notification {
   @@index([isRead])
   @@index([createdAt])
 }
+
+// ============ MASTER UPC DATABASE ============
+// Global product catalog from UPCitemdb.com - shared across ALL stores
+// Lookup once, store forever - saves API calls
+model MasterUpcProduct {
+  id          String   @id @default(cuid())
+  upc         String   @unique // The UPC/EAN barcode
+  
+  // Product Info
+  name        String
+  brand       String?
+  description String?
+  category    String?
+  
+  // Sizing
+  size        String?
+  weight      String?
+  color       String?
+  model       String?
+  
+  // Pricing (from API - suggested retail)
+  lowestPrice  Decimal?
+  highestPrice Decimal?
+  avgPrice     Decimal?
+  
+  // Images
+  imageUrl    String?  // Primary image
+  images      String?  // JSON array of all images
+  
+  // Source tracking
+  source      String   @default("UPCITEMDB") // UPCITEMDB, MANUAL, etc.
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([upc])
+  @@index([brand])
+  @@index([category])
+}
