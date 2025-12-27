@@ -18,16 +18,26 @@ interface Product {
 
 interface PendingTransaction {
     id: string;
-    items: { productId: string; name: string; quantity: number; price: number }[];
+    items: { productId: string; name: string; quantity: number; price: number; priceAtSale: number }[];
     subtotal: number;
     tax: number;
     total: number;
     paymentMethod: string;
-    status: 'pending' | 'synced' | 'failed';
+    status: 'pending' | 'synced' | 'failed' | 'card_pending';
     createdAt: Date;
     synced: boolean;
     employeeId?: string;
     stationId?: string;
+    // Card payment data (for processing when back online)
+    cardData?: {
+        isCardPayment: boolean;
+        cardLast4?: string;
+        cardBrand?: string;
+        terminalId?: string;
+        requiresProcessing: boolean;
+    };
+    // Price conflict info
+    priceConflicts?: { productId: string; soldPrice: number; currentPrice: number }[];
 }
 
 interface OfflineSettings {
@@ -90,6 +100,12 @@ class OfflineDB {
                 if (!db.objectStoreNames.contains('syncLog')) {
                     const logStore = db.createObjectStore('syncLog', { keyPath: 'id', autoIncrement: true });
                     logStore.createIndex('timestamp', 'timestamp', { unique: false });
+                }
+
+                // Price snapshots for conflict detection
+                if (!db.objectStoreNames.contains('priceSnapshots')) {
+                    const priceStore = db.createObjectStore('priceSnapshots', { keyPath: 'productId' });
+                    priceStore.createIndex('updatedAt', 'updatedAt', { unique: false });
                 }
 
                 console.log('[OfflineDB] Database schema created');
@@ -294,6 +310,134 @@ class OfflineDB {
             request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
         });
+    }
+
+    // ========== CARD PAYMENT QUEUE ==========
+
+    async getCardPendingTransactions(): Promise<PendingTransaction[]> {
+        if (!this.db) return [];
+
+        return new Promise((resolve, reject) => {
+            const tx = this.db!.transaction('pendingTransactions', 'readonly');
+            const store = tx.objectStore('pendingTransactions');
+            const index = store.index('status');
+            const request = index.getAll('card_pending');
+
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getCardPendingCount(): Promise<number> {
+        if (!this.db) return 0;
+
+        return new Promise((resolve, reject) => {
+            const tx = this.db!.transaction('pendingTransactions', 'readonly');
+            const store = tx.objectStore('pendingTransactions');
+            const index = store.index('status');
+            const request = index.count('card_pending');
+
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    // ========== PRICE SNAPSHOTS (for conflict detection) ==========
+
+    async savePriceSnapshot(productId: string, price: number): Promise<void> {
+        if (!this.db) return;
+
+        return new Promise((resolve, reject) => {
+            const tx = this.db!.transaction('priceSnapshots', 'readwrite');
+            const store = tx.objectStore('priceSnapshots');
+            const request = store.put({
+                productId,
+                price,
+                updatedAt: new Date()
+            });
+
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getPriceSnapshot(productId: string): Promise<number | null> {
+        if (!this.db) return null;
+
+        return new Promise((resolve, reject) => {
+            const tx = this.db!.transaction('priceSnapshots', 'readonly');
+            const store = tx.objectStore('priceSnapshots');
+            const request = store.get(productId);
+
+            request.onsuccess = () => resolve(request.result?.price || null);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async checkPriceConflicts(items: { productId: string; price: number }[]): Promise<{ productId: string; soldPrice: number; currentPrice: number }[]> {
+        const conflicts: { productId: string; soldPrice: number; currentPrice: number }[] = [];
+
+        for (const item of items) {
+            const currentProduct = await this.getProductById(item.productId);
+            if (currentProduct && Math.abs(currentProduct.price - item.price) > 0.01) {
+                conflicts.push({
+                    productId: item.productId,
+                    soldPrice: item.price,
+                    currentPrice: currentProduct.price
+                });
+            }
+        }
+
+        return conflicts;
+    }
+
+    async getProductById(id: string): Promise<Product | null> {
+        if (!this.db) return null;
+
+        return new Promise((resolve, reject) => {
+            const tx = this.db!.transaction('products', 'readonly');
+            const store = tx.objectStore('products');
+            const request = store.get(id);
+
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    // ========== CLEANUP ==========
+
+    async clearSyncedTransactions(): Promise<number> {
+        if (!this.db) return 0;
+
+        const synced = await new Promise<PendingTransaction[]>((resolve, reject) => {
+            const tx = this.db!.transaction('pendingTransactions', 'readonly');
+            const store = tx.objectStore('pendingTransactions');
+            const index = store.index('status');
+            const request = index.getAll('synced');
+
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+
+        // Delete older than 24 hours
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        let deleted = 0;
+
+        for (const tx of synced) {
+            if (new Date(tx.createdAt) < cutoff) {
+                await new Promise<void>((resolve) => {
+                    const dbTx = this.db!.transaction('pendingTransactions', 'readwrite');
+                    const store = dbTx.objectStore('pendingTransactions');
+                    store.delete(tx.id);
+                    dbTx.oncomplete = () => {
+                        deleted++;
+                        resolve();
+                    };
+                });
+            }
+        }
+
+        return deleted;
     }
 }
 
