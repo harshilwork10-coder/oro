@@ -573,7 +573,7 @@ function generateFullTemplate(label, dim) {
 }
 
 /**
- * Template 4: DUAL_PRICE - Cash price vs Card price (for dual pricing stores)
+ * Template 4: DUAL_PRICE - Card price vs Cash price (CARD first!)
  */
 function generateDualPriceTemplate(label, dim) {
     const cashPrice = label.price ? `$${Number(label.price).toFixed(2)}` : '';
@@ -586,29 +586,29 @@ function generateDualPriceTemplate(label, dim) {
     zpl += '^A0N,20,20\n';
     zpl += `^FD${productName}^FS\n`;
 
-    // CASH label with price (left side)
+    // CARD label with price (LEFT side - first/primary)
     zpl += '^FO20,35\n';
-    zpl += '^A0N,16,16\n';
-    zpl += '^FD CASH ^FS\n';
-
-    zpl += '^FO20,55\n';
-    zpl += '^A0N,55,55\n';
-    zpl += `^FD${cashPrice}^FS\n`;
-
-    // CARD label with price (right side)
-    zpl += '^FO150,35\n';
     zpl += '^A0N,16,16\n';
     zpl += '^FD CARD ^FS\n';
 
-    zpl += '^FO150,55\n';
+    zpl += '^FO20,55\n';
     zpl += '^A0N,55,55\n';
     zpl += `^FD${cardPrice}^FS\n`;
+
+    // CASH label with price (RIGHT side - secondary)
+    zpl += '^FO150,35\n';
+    zpl += '^A0N,16,16\n';
+    zpl += '^FD CASH ^FS\n';
+
+    zpl += '^FO150,55\n';
+    zpl += '^A0N,55,55\n';
+    zpl += `^FD${cashPrice}^FS\n`;
 
     // Vertical separator line
     zpl += '^FO140,30\n';
     zpl += '^GB2,80,2^FS\n';
 
-    // Barcode (bottom if fits)
+    // Barcode (right side if fits)
     if (label.barcode && dim.width >= 400) {
         zpl += '^FO280,20\n';
         zpl += '^BY1.2\n';
