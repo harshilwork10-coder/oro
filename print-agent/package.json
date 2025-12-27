@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "description": "Local print agent for Epson/Bixolon USB receipt printers",
     "main": "index.js",
+    "bin": "index.js",
     "scripts": {
         "start": "node index.js",
         "build": "pkg . --targets node18-win-x64 --output dist/print-agent.exe"
