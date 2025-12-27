@@ -373,6 +373,10 @@ model FranchiseSettings {
   promoStackingMode  String  @default("BEST_ONLY") // BEST_ONLY, STACK_ALL, STACK_WITH_CAP
   maxDiscountPercent Decimal @default(50) // Max discount cap (50% default)
 
+  // Receipt Printing Settings
+  receiptPrintMode  String  @default("ALL") // ALL, CARD_ONLY, EBT_ONLY, CARD_AND_EBT, NONE
+  openDrawerOnCash  Boolean @default(true) // Open cash drawer on cash transactions
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

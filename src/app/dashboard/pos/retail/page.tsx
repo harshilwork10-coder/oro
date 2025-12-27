@@ -50,6 +50,12 @@ import EndOfDayWizard from '@/components/pos/EndOfDayWizard'
 import LotteryModal from '@/components/pos/LotteryModal'
 import LotteryPayoutModal from '@/components/pos/LotteryPayoutModal'
 import ReceiptModal from '@/components/pos/ReceiptModal'
+import {
+    printReceipt,
+    openCashDrawer,
+    formatReceiptFromTransaction,
+    isPrintAgentAvailable
+} from '@/lib/print-agent'
 
 interface CartItem {
     id: string
@@ -314,8 +320,12 @@ export default function RetailPOSPage() {
         cardSurchargeType: 'PERCENTAGE' | 'FLAT_AMOUNT'
         cardSurcharge: number
         showDualPricing: boolean
+        // Receipt Print Settings
+        receiptPrintMode: 'ALL' | 'CARD_ONLY' | 'EBT_ONLY' | 'CARD_AND_EBT' | 'NONE'
+        openDrawerOnCash: boolean
     }
     const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
+    const [printerConnected, setPrinterConnected] = useState(false)
 
     // Station selection (multi-register support) with terminal info
     interface StationInfo {
@@ -400,7 +410,9 @@ export default function RetailPOSPage() {
                         pricingModel: data.pricingModel || 'STANDARD',
                         cardSurchargeType: data.cardSurchargeType || 'PERCENTAGE',
                         cardSurcharge: parseFloat(data.cardSurcharge) || 0,
-                        showDualPricing: data.showDualPricing ?? false
+                        showDualPricing: data.showDualPricing ?? false,
+                        receiptPrintMode: data.receiptPrintMode || 'ALL',
+                        openDrawerOnCash: data.openDrawerOnCash ?? true
                     })
                 }
             } catch (error) {
@@ -408,6 +420,9 @@ export default function RetailPOSPage() {
             }
         }
         loadPricingSettings()
+
+        // Check if print agent is connected
+        isPrintAgentAvailable().then(setPrinterConnected)
     }, [])
 
     // Fetch today's stats for header (refresh every 60s)
@@ -931,6 +946,36 @@ export default function RetailPOSPage() {
                 // Show receipt modal instead of just toast
                 setPendingReceiptData(receiptData)
                 setShowReceiptModal(true)
+
+                // === PRINT AGENT INTEGRATION ===
+                if (printerConnected && pricingSettings) {
+                    // 1. Open cash drawer on CASH payments
+                    if (method === 'CASH' && pricingSettings.openDrawerOnCash) {
+                        openCashDrawer().catch(console.error)
+                    }
+
+                    // 2. Auto-print receipt based on settings
+                    const printMode = pricingSettings.receiptPrintMode
+                    const shouldPrint =
+                        printMode === 'ALL' ||
+                        (printMode === 'CARD_ONLY' && ['CREDIT_CARD', 'DEBIT_CARD'].includes(method)) ||
+                        (printMode === 'EBT_ONLY' && method === 'EBT') ||
+                        (printMode === 'CARD_AND_EBT' && ['CREDIT_CARD', 'DEBIT_CARD', 'EBT'].includes(method))
+
+                    if (shouldPrint) {
+                        // Build receipt for thermal printer
+                        const thermalReceipt = formatReceiptFromTransaction(
+                            { ...transaction, items: cart },
+                            {
+                                name: (session?.user as any)?.franchiseName || 'Store',
+                                address: pricingSettings.showDualPricing ? undefined : undefined,
+                                phone: undefined
+                            },
+                            session?.user?.name || 'Cashier'
+                        )
+                        printReceipt(thermalReceipt).catch(console.error)
+                    }
+                }
 
                 setCart([])
                 setSelectedCustomer(null)
