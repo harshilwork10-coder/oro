@@ -36,6 +36,15 @@ interface PendingTransaction {
         terminalId?: string;
         requiresProcessing: boolean;
     };
+    // Offline card waiver (customer authorization)
+    offlineWaiver?: {
+        customerName: string;
+        customerPhone: string;
+        customerEmail?: string;
+        signatureDataUrl: string;
+        agreedAt: Date;
+        waiverText: string;
+    };
     // Price conflict info
     priceConflicts?: { productId: string; soldPrice: number; currentPrice: number }[];
 }
