@@ -599,6 +599,24 @@ model Location {
   // Google Reviews Integration
   googlePlaceId String? // Google Place ID for review links
 
+  // ============ ORO PLUS CUSTOMER APP - PUBLIC DIRECTORY ============
+  showInDirectory  Boolean @default(false)  // Opt-in to appear in customer app
+  publicName       String?                  // Customer-facing store name
+  publicDescription String?                 // Short description for app
+  publicPhone      String?                  // Customer contact number
+  businessType     String  @default("RETAIL") // RESTAURANT, RETAIL, SALON, GROCERY, CONVENIENCE
+  
+  // Location coordinates for map
+  latitude         Float?
+  longitude        Float?
+  
+  // Operating hours (JSON: {"mon": "9:00-21:00", "tue": "9:00-21:00", ...})
+  operatingHours   String?
+  
+  // Branding for public display
+  publicLogoUrl    String?
+  publicBannerUrl  String?
+
   // New Relations
   resources             Resource[]
   recurringAppointments RecurringAppointment[]

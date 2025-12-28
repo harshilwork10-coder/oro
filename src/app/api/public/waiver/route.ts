@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import {
+    checkRateLimit,
+    getRateLimitKey,
+    isValidEmail,
+    sanitizeInput,
+    RATE_LIMITS
+} from '@/lib/rateLimit'
 
 // Default waiver text - franchises can customize this
 const DEFAULT_WAIVER_TEXT = `
@@ -50,6 +57,20 @@ export async function GET(request: NextRequest) {
 // POST - Save signed waiver
 export async function POST(request: NextRequest) {
     try {
+        // Rate limiting - max 10 waivers per minute per IP
+        const rateLimitKey = getRateLimitKey(request, 'waiver')
+        const rateLimit = checkRateLimit(rateLimitKey, RATE_LIMITS.standard)
+
+        if (!rateLimit.allowed) {
+            return NextResponse.json({
+                error: 'Too many requests. Please try again later.',
+                retryAfter: Math.ceil(rateLimit.resetIn / 1000)
+            }, {
+                status: 429,
+                headers: { 'Retry-After': String(Math.ceil(rateLimit.resetIn / 1000)) }
+            })
+        }
+
         const body = await request.json()
         const {
             franchiseId,
@@ -70,6 +91,25 @@ export async function POST(request: NextRequest) {
             }, { status: 400 })
         }
 
+        // Validate email format
+        if (!isValidEmail(customerEmail)) {
+            return NextResponse.json({
+                error: 'Invalid email format'
+            }, { status: 400 })
+        }
+
+        // Sanitize text inputs
+        const cleanName = sanitizeInput(customerName)
+        const cleanSignature = sanitizeInput(signatureName)
+
+        // Verify franchise exists
+        const franchise = await prisma.franchise.findUnique({
+            where: { id: franchiseId }
+        })
+        if (!franchise) {
+            return NextResponse.json({ error: 'Invalid franchise' }, { status: 404 })
+        }
+
         // Get IP and user agent from request
         const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] ||
             request.headers.get('x-real-ip') ||
@@ -82,12 +122,12 @@ export async function POST(request: NextRequest) {
                 franchiseId,
                 clientId: clientId || null,
                 appointmentId: appointmentId || null,
-                customerName,
+                customerName: cleanName,
                 customerEmail,
                 customerPhone: customerPhone || null,
                 waiverVersion: waiverVersion || '1.0',
                 waiverText: waiverText || DEFAULT_WAIVER_TEXT.trim(),
-                signatureName,
+                signatureName: cleanSignature,
                 signatureDate: new Date(),
                 consentGiven: true,
                 ipAddress,

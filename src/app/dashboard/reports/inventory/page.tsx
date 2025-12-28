@@ -10,11 +10,21 @@ import {
     FileText,
     ShoppingCart,
     ChevronRight,
-    Search
+    Search,
+    PackageX
 } from 'lucide-react'
 import Link from 'next/link'
 
 const inventoryReports = [
+    {
+        id: 'dead-stock',
+        name: 'Dead Stock Alert',
+        description: 'Products not sold in 90+ days - identify capital tied up in slow-moving inventory',
+        icon: PackageX,
+        href: '/dashboard/reports/dead-stock',
+        status: 'available',
+        featured: true
+    },
     {
         id: 'stock-levels',
         name: 'Stock Levels / Low Stock Alerts',
@@ -83,7 +93,7 @@ export default function InventoryReportsPage() {
                             </div>
                             Inventory Reports
                         </h1>
-                        <p className="text-gray-400 mt-1">5 reports available</p>
+                        <p className="text-gray-400 mt-1">6 reports available</p>
                     </div>
                 </div>
 
@@ -109,18 +119,23 @@ export default function InventoryReportsPage() {
                         <Link
                             key={report.id}
                             href={isAvailable ? report.href : '#'}
-                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isAvailable
-                                ? 'bg-gray-800/50 border-gray-700 hover:border-blue-500/50 hover:bg-gray-800'
-                                : 'bg-gray-800/30 border-gray-700/50 cursor-not-allowed opacity-60'
+                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${(report as any).featured
+                                    ? 'bg-gradient-to-r from-red-900/30 to-orange-900/20 border-red-500/50 hover:border-red-400'
+                                    : isAvailable
+                                        ? 'bg-gray-800/50 border-gray-700 hover:border-blue-500/50 hover:bg-gray-800'
+                                        : 'bg-gray-800/30 border-gray-700/50 cursor-not-allowed opacity-60'
                                 }`}
                         >
                             <div className="flex items-center gap-4">
-                                <div className="p-2 rounded-lg bg-gray-700">
-                                    <Icon className="w-5 h-5 text-gray-400" />
+                                <div className={`p-2 rounded-lg ${(report as any).featured ? 'bg-gradient-to-br from-red-500 to-orange-600' : 'bg-gray-700'}`}>
+                                    <Icon className={`w-5 h-5 ${(report as any).featured ? 'text-white' : 'text-gray-400'}`} />
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-medium text-white">{report.name}</h3>
+                                        {(report as any).featured && (
+                                            <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded">NEW</span>
+                                        )}
                                         {!isAvailable && (
                                             <span className="text-xs bg-gray-600 text-gray-300 px-2 py-0.5 rounded">Coming Soon</span>
                                         )}

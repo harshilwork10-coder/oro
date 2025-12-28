@@ -1,10 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendBookingRequestSMS } from '@/lib/sms'
+import {
+    checkRateLimit,
+    getRateLimitKey,
+    isValidEmail,
+    isValidPhone,
+    sanitizeInput,
+    RATE_LIMITS
+} from '@/lib/rateLimit'
 
 // POST - Create a booking
 export async function POST(request: NextRequest) {
     try {
+        // Rate limiting - max 5 bookings per 5 minutes per IP
+        const rateLimitKey = getRateLimitKey(request, 'booking')
+        const rateLimit = checkRateLimit(rateLimitKey, RATE_LIMITS.booking)
+
+        if (!rateLimit.allowed) {
+            return NextResponse.json({
+                error: 'Too many booking attempts. Please try again later.',
+                retryAfter: Math.ceil(rateLimit.resetIn / 1000)
+            }, {
+                status: 429,
+                headers: { 'Retry-After': String(Math.ceil(rateLimit.resetIn / 1000)) }
+            })
+        }
+
         const body = await request.json()
         const {
             franchiseId,
@@ -25,10 +47,41 @@ export async function POST(request: NextRequest) {
             }, { status: 400 })
         }
 
+        // Validate email format
+        if (!isValidEmail(customerEmail)) {
+            return NextResponse.json({
+                error: 'Invalid email format'
+            }, { status: 400 })
+        }
+
+        // Validate phone if provided  
+        if (customerPhone && !isValidPhone(customerPhone)) {
+            return NextResponse.json({
+                error: 'Invalid phone number format'
+            }, { status: 400 })
+        }
+
+        // Sanitize text inputs
+        const cleanName = sanitizeInput(customerName)
+        const cleanNotes = notes ? sanitizeInput(notes) : null
+
+        // Verify location exists and get franchiseId from it
+        const location = await prisma.location.findUnique({
+            where: { id: locationId },
+            include: { franchise: true }
+        })
+
+        if (!location) {
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+        }
+
+        // Use franchiseId from location (don't trust client input)
+        const verifiedFranchiseId = location.franchiseId
+
         // Find or create client
         let client = await prisma.client.findFirst({
             where: {
-                franchiseId,
+                franchiseId: verifiedFranchiseId,
                 OR: [
                     { email: customerEmail },
                     ...(customerPhone ? [{ phone: customerPhone }] : [])
@@ -37,14 +90,14 @@ export async function POST(request: NextRequest) {
         })
 
         if (!client) {
-            // Parse name
-            const nameParts = customerName.trim().split(' ')
+            // Parse sanitized name
+            const nameParts = cleanName.split(' ')
             const firstName = nameParts[0]
             const lastName = nameParts.slice(1).join(' ') || ''
 
             client = await prisma.client.create({
                 data: {
-                    franchiseId,
+                    franchiseId: verifiedFranchiseId,
                     firstName,
                     lastName,
                     email: customerEmail,
@@ -63,11 +116,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Service not found' }, { status: 404 })
         }
 
-        // Get location with franchise for SMS
-        const location = await prisma.location.findUnique({
-            where: { id: locationId },
-            include: { franchise: true }
-        })
+        // Location already fetched above with franchise info
 
         // Calculate end time
         const startTime = new Date(dateTime)
