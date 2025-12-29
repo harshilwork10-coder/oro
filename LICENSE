@@ -1,0 +1,61 @@
+# PROPRIETARY LICENSE
+
+Copyright (c) 2024 Oro POS Systems. All Rights Reserved.
+
+## NOTICE
+
+This software and associated documentation files (the "Software") are the exclusive 
+proprietary property of Oro POS Systems and its licensors.
+
+## RESTRICTIONS
+
+**THIS SOFTWARE IS NOT OPEN SOURCE.**
+
+You may NOT:
+
+1. **Copy** - Reproduce, duplicate, or copy any portion of the Software
+2. **Modify** - Create derivative works based on the Software
+3. **Distribute** - Distribute, publish, or transfer the Software to any third party
+4. **Sublicense** - Grant any rights to the Software to any third party
+5. **Reverse Engineer** - Decompile, disassemble, or reverse engineer the Software
+6. **Commercial Use** - Use the Software for commercial purposes without written permission
+7. **Public Display** - Publicly display or perform the Software
+
+## CONFIDENTIALITY
+
+The Software contains trade secrets and proprietary information. You agree to:
+
+- Maintain the confidentiality of the Software
+- Not disclose any portion of the Software to unauthorized parties
+- Implement reasonable security measures to protect the Software
+
+## OWNERSHIP
+
+All intellectual property rights in the Software, including but not limited to:
+
+- Source code
+- Database schemas
+- API designs
+- Business logic
+- User interfaces
+- Documentation
+
+Are and shall remain the exclusive property of Oro POS Systems.
+
+## ENFORCEMENT
+
+Unauthorized use, copying, or distribution of this Software may result in:
+
+- Civil liability and legal action
+- Criminal prosecution under applicable laws
+- Injunctive relief
+
+## NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+
+---
+
+**For licensing inquiries, contact the repository owner.**
+
+© 2024 Oro POS Systems. All Rights Reserved.
