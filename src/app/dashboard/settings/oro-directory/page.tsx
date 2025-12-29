@@ -160,7 +160,7 @@ export default function OroDirectorySettingsPage() {
                             <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600">
                                 <Store className="w-6 h-6 text-white" />
                             </div>
-                            Oro Plus Directory
+                            Oro Buddy Directory
                         </h1>
                         <p className="text-gray-400 mt-1">Get discovered by new customers</p>
                     </div>
@@ -182,11 +182,11 @@ export default function OroDirectorySettingsPage() {
                 </button>
             </div>
 
-            {/* What is Oro Plus */}
+            {/* What is Oro Buddy */}
             <div className="bg-gradient-to-r from-orange-900/30 to-amber-900/20 border border-orange-500/30 rounded-xl p-6">
                 <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <Smartphone className="w-5 h-5 text-orange-400" />
-                    What is Oro Plus?
+                    What is Oro Buddy?
                 </h2>
                 <div className="grid md:grid-cols-3 gap-4">
                     <div className="bg-stone-900/50 rounded-lg p-4">
@@ -215,7 +215,7 @@ export default function OroDirectorySettingsPage() {
                             <Globe className="w-6 h-6 text-green-400" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold text-white">Show in Oro Plus Directory</h3>
+                            <h3 className="text-lg font-semibold text-white">Show in Oro Buddy Directory</h3>
                             <p className="text-sm text-gray-400">Allow customers to discover your store in the app</p>
                         </div>
                     </div>
@@ -357,7 +357,7 @@ export default function OroDirectorySettingsPage() {
                             <p className="text-xs text-gray-400 mb-1">Message Preview:</p>
                             <p className="text-white text-sm">
                                 {selectedCustomerName ? `Hi ${selectedCustomerName}! ` : ''}
-                                Check out our store on Oro Plus! Get exclusive deals 🏷️ {typeof window !== 'undefined' ? window.location.origin : ''}/app
+                                Check out our store on Oro Buddy! Get exclusive deals 🏷️ {typeof window !== 'undefined' ? window.location.origin : ''}/app
                             </p>
                         </div>
 
@@ -409,8 +409,8 @@ export default function OroDirectorySettingsPage() {
                                         // WhatsApp - opens app (no API needed)
                                         const url = `${window.location.origin}/app`
                                         const message = selectedCustomerName
-                                            ? `Hi ${selectedCustomerName}! Check out our store on Oro Plus! Get exclusive deals 🏷️ ${url}`
-                                            : `Check out our store on Oro Plus! Get exclusive deals 🏷️ ${url}`
+                                            ? `Hi ${selectedCustomerName}! Check out our store on Oro Buddy! Get exclusive deals 🏷️ ${url}`
+                                            : `Check out our store on Oro Buddy! Get exclusive deals 🏷️ ${url}`
                                         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank')
                                     }
 

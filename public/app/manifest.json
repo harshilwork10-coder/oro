@@ -1,6 +1,6 @@
 {
-    "name": "Oro Plus",
-    "short_name": "Oro Plus",
+    "name": "Oro Buddy",
+    "short_name": "Oro Buddy",
     "description": "Discover local deals at restaurants, retail stores, and salons near you",
     "start_url": "/app",
     "display": "standalone",

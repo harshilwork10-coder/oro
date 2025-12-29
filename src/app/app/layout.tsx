@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from 'next'
 
 export const metadata: Metadata = {
-    title: 'Oro Plus - Discover Local Deals',
+    title: 'Oro Buddy - Discover Local Deals',
     description: 'Find deals at restaurants, retail stores, and salons near you',
     manifest: '/app/manifest.json',
     appleWebApp: {
         capable: true,
         statusBarStyle: 'black-translucent',
-        title: 'Oro Plus'
+        title: 'Oro Buddy'
     }
 }
 

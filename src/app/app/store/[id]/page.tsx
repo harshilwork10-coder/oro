@@ -80,7 +80,7 @@ export default function StorePage() {
         if (navigator.share) {
             await navigator.share({
                 title: store?.name,
-                text: `Check out ${store?.name} on Oro Plus!`,
+                text: `Check out ${store?.name} on Oro Buddy!`,
                 url: window.location.href
             })
         }

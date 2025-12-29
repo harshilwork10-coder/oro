@@ -146,7 +146,7 @@ export default function OroPlus() {
             {showInstallBanner && !isInstalled && (
                 <div className="bg-gradient-to-r from-orange-600 to-amber-600 px-4 py-3 flex items-center gap-3 animate-in slide-in-from-top">
                     <div className="flex-1">
-                        <p className="text-white font-semibold text-sm">📱 Add Oro Plus to your phone!</p>
+                        <p className="text-white font-semibold text-sm">📱 Add Oro Buddy to your phone!</p>
                         {isIOS ? (
                             <p className="text-orange-100 text-xs flex items-center gap-1">
                                 Tap <Share className="w-3 h-3 inline" /> then "Add to Home Screen"
@@ -176,7 +176,7 @@ export default function OroPlus() {
                         <span className="text-xl font-bold text-white">O</span>
                     </div>
                     <div className="flex-1">
-                        <h1 className="text-lg font-bold text-white">Oro Plus</h1>
+                        <h1 className="text-lg font-bold text-white">Oro Buddy</h1>
                         <p className="text-xs text-stone-400">
                             {location ? '📍 Near you' : 'Discover local deals'}
                         </p>

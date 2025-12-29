@@ -402,7 +402,7 @@ export default function DeadStockReportPage() {
                                         key={product.id}
                                         onClick={() => toggleSelect(product.id)}
                                         className={`border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors cursor-pointer ${selectedIds.has(product.id) ? 'bg-green-900/20 border-green-500/30' :
-                                                product.neverSold ? 'bg-red-900/10' : ''
+                                            product.neverSold ? 'bg-red-900/10' : ''
                                             }`}
                                     >
                                         <td className="py-3 px-4">
@@ -431,8 +431,8 @@ export default function DeadStockReportPage() {
                                         <td className="py-3 px-4 text-center">
                                             {product.daysSinceLastSale !== null ? (
                                                 <span className={`font-semibold ${product.daysSinceLastSale > 180 ? 'text-red-400' :
-                                                        product.daysSinceLastSale > 90 ? 'text-orange-400' :
-                                                            'text-yellow-400'
+                                                    product.daysSinceLastSale > 90 ? 'text-orange-400' :
+                                                        'text-yellow-400'
                                                     }`}>
                                                     {product.daysSinceLastSale}
                                                 </span>
@@ -563,8 +563,8 @@ export default function DeadStockReportPage() {
                                             key={days}
                                             onClick={() => setDealDuration(days)}
                                             className={`py-2 rounded-lg text-sm font-medium transition-colors ${dealDuration === days
-                                                    ? 'bg-green-600 text-white'
-                                                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                                ? 'bg-green-600 text-white'
+                                                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                                                 }`}
                                         >
                                             {days} days
@@ -597,7 +597,7 @@ export default function DeadStockReportPage() {
                                 <div className="w-px h-6 bg-gray-600"></div>
                                 <div className="flex items-center gap-2 text-blue-300">
                                     <Smartphone className="w-5 h-5" />
-                                    <span className="text-sm">Oro Plus App</span>
+                                    <span className="text-sm">Oro Buddy App</span>
                                 </div>
                             </div>
                         </div>

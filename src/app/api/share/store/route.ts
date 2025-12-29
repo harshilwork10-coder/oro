@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://yoursite.com'
         const greeting = customerName ? `Hi ${customerName.split(' ')[0]}! ` : ''
 
-        const message = `${greeting}Check out ${storeName} on Oro Plus! 🏷️
+        const message = `${greeting}Check out ${storeName} on Oro Buddy! 🏷️
 
 Get exclusive deals and discounts on your phone:
 ${appUrl}/app

@@ -209,8 +209,8 @@ function CustomerDisplayContent() {
                                 <div
                                     key={idx}
                                     className={`w-2 h-2 rounded-full transition-all ${idx === currentDealIndex
-                                            ? 'bg-green-400 w-6'
-                                            : 'bg-gray-600'
+                                        ? 'bg-green-400 w-6'
+                                        : 'bg-gray-600'
                                         }`}
                                 />
                             ))}
@@ -222,7 +222,7 @@ function CustomerDisplayContent() {
                 <div className="p-4 bg-stone-900/80 border-t border-stone-700">
                     <div className="text-center">
                         <p className="text-purple-300 text-xs font-medium">
-                            📱 Download Oro Plus App
+                            📱 Download Oro Buddy App
                         </p>
                         <p className="text-gray-500 text-xs">
                             Get exclusive deals on your phone!
