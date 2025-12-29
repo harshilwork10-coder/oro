@@ -332,6 +332,15 @@ model Franchise {
   // Printers configuration
   printers PrinterConfig[]
 
+  // === Account Offboarding (GDPR/CCPA Compliant) ===
+  accountStatus       String    @default("ACTIVE") // ACTIVE, SUSPENDED, PENDING_DELETION, DELETED
+  suspendedAt         DateTime?
+  suspendedReason     String?
+  suspendedBy         String?   // User ID who suspended
+  scheduledDeletionAt DateTime? // When data will be permanently deleted
+  deletedAt           DateTime?
+  dataExportedAt      DateTime? // When client downloaded their data
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
