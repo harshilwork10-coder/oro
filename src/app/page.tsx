@@ -1,97 +1,196 @@
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, LayoutDashboard, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, Store, LayoutDashboard, ShieldCheck, Zap, Globe, CreditCard } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-        <div className="container flex h-14 items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-2 font-bold text-xl">
-            <div className="h-8 w-8 rounded-lg bg-orange-600 flex items-center justify-center text-white">
-              T
+    <div className="flex min-h-screen flex-col bg-stone-950">
+      {/* Header */}
+      <header className="sticky top-0 z-50 w-full border-b border-stone-800 bg-stone-950/95 backdrop-blur">
+        <div className="container mx-auto flex h-16 items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+              <span className="text-white font-bold text-xl">O</span>
             </div>
-            <span>OroNext</span>
+            <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-300 bg-clip-text text-transparent">
+              OroNext
+            </span>
           </div>
-          <nav className="flex gap-4 sm:gap-6">
-            <Link className="text-sm font-medium hover:underline underline-offset-4" href="/login">
+          <nav className="flex items-center gap-4">
+            <Link
+              className="px-5 py-2.5 text-sm font-medium text-stone-300 hover:text-white transition-colors"
+              href="/login"
+            >
               Sign In
+            </Link>
+            <Link
+              className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg text-sm font-medium hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/20"
+              href="/login"
+            >
+              Get Started
             </Link>
           </nav>
         </div>
       </header>
+
+      {/* Hero Section */}
       <main className="flex-1">
-        <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48 bg-gray-50">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center space-y-4 text-center">
-              <div className="space-y-2">
-                <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
-                  Manage Your Franchise Empire with <span className="text-orange-600">OroNext</span>
-                </h1>
-                <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
-                  The all-in-one POS and management solution for modern franchises.
-                  Streamline operations, track performance, and grow your business.
-                </p>
+        <section className="relative w-full py-20 md:py-32 lg:py-40 overflow-hidden">
+          {/* Background gradient */}
+          <div className="absolute inset-0 bg-gradient-to-b from-orange-500/10 via-transparent to-transparent" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/20 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl" />
+
+          <div className="container relative mx-auto px-6">
+            <div className="flex flex-col items-center space-y-8 text-center">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm font-medium">
+                <Zap size={16} />
+                The Gold Standard in POS
               </div>
-              <div className="space-x-4">
+
+              <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight text-white max-w-4xl leading-tight">
+                Manage Your Business with{" "}
+                <span className="bg-gradient-to-r from-orange-400 to-amber-300 bg-clip-text text-transparent">
+                  OroNext
+                </span>
+              </h1>
+
+              <p className="mx-auto max-w-2xl text-lg md:text-xl text-stone-400 leading-relaxed">
+                The all-in-one POS and management solution for modern businesses.
+                Streamline operations, track performance, and grow your revenue.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
                 <Link
-                  className="inline-flex h-10 items-center justify-center rounded-md bg-indigo-600 px-8 text-sm font-medium text-white shadow transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-700 disabled:pointer-events-none disabled:opacity-50"
+                  className="inline-flex h-12 items-center justify-center rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-8 text-base font-semibold text-white shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all hover:scale-105"
                   href="/login"
                 >
-                  Get Started
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  Start Free Trial
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+                <Link
+                  className="inline-flex h-12 items-center justify-center rounded-xl border border-stone-700 bg-stone-900/50 px-8 text-base font-semibold text-stone-300 hover:bg-stone-800 hover:text-white transition-all"
+                  href="/login"
+                >
+                  Watch Demo
                 </Link>
               </div>
             </div>
           </div>
         </section>
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-white">
-          <div className="container px-4 md:px-6">
-            <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="flex flex-col items-center space-y-4 text-center">
-                <div className="p-4 bg-indigo-100 rounded-full text-indigo-600">
-                  <Store className="h-6 w-6" />
+
+        {/* Features Section */}
+        <section className="w-full py-20 md:py-28 border-t border-stone-800">
+          <div className="container mx-auto px-6">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                Everything You Need to Succeed
+              </h2>
+              <p className="text-stone-400 text-lg max-w-2xl mx-auto">
+                Powerful features designed for modern retail and service businesses
+              </p>
+            </div>
+
+            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                {
+                  icon: Store,
+                  title: "Multi-Location Support",
+                  description: "Seamlessly manage multiple locations from a single dashboard with real-time sync."
+                },
+                {
+                  icon: LayoutDashboard,
+                  title: "Real-Time Analytics",
+                  description: "Get instant insights into sales, inventory, and employee performance metrics."
+                },
+                {
+                  icon: ShieldCheck,
+                  title: "Role-Based Security",
+                  description: "Secure access control for Owners, Managers, and Employees with audit trails."
+                },
+                {
+                  icon: CreditCard,
+                  title: "Integrated Payments",
+                  description: "Accept all payment methods with built-in PAX terminal integration."
+                },
+                {
+                  icon: Globe,
+                  title: "Offline Mode",
+                  description: "Keep selling even when the internet goes down. Auto-sync when back online."
+                },
+                {
+                  icon: Zap,
+                  title: "Lightning Fast",
+                  description: "Optimized for speed. Check out customers in seconds, not minutes."
+                }
+              ].map((feature, idx) => (
+                <div
+                  key={idx}
+                  className="relative group p-6 rounded-2xl bg-stone-900/50 border border-stone-800 hover:border-orange-500/30 transition-all hover:bg-stone-900"
+                >
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center text-orange-400 mb-4">
+                      <feature.icon className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-white mb-2">{feature.title}</h3>
+                    <p className="text-stone-400">{feature.description}</p>
+                  </div>
                 </div>
-                <h2 className="text-xl font-bold">Multi-Location Support</h2>
-                <p className="text-gray-500">
-                  Seamlessly manage multiple franchise locations from a single dashboard.
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section className="w-full py-20 border-t border-stone-800">
+          <div className="container mx-auto px-6">
+            <div className="relative rounded-3xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/20 p-12 md:p-16 text-center overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl" />
+              <div className="relative">
+                <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                  Ready to Transform Your Business?
+                </h2>
+                <p className="text-stone-400 text-lg mb-8 max-w-xl mx-auto">
+                  Join thousands of businesses already using OroNext to streamline their operations.
                 </p>
-              </div>
-              <div className="flex flex-col items-center space-y-4 text-center">
-                <div className="p-4 bg-indigo-100 rounded-full text-indigo-600">
-                  <LayoutDashboard className="h-6 w-6" />
-                </div>
-                <h2 className="text-xl font-bold">Real-Time Analytics</h2>
-                <p className="text-gray-500">
-                  Get instant insights into sales, inventory, and employee performance.
-                </p>
-              </div>
-              <div className="flex flex-col items-center space-y-4 text-center">
-                <div className="p-4 bg-indigo-100 rounded-full text-indigo-600">
-                  <ShieldCheck className="h-6 w-6" />
-                </div>
-                <h2 className="text-xl font-bold">Role-Based Security</h2>
-                <p className="text-gray-500">
-                  Secure access control for Providers, Franchisors, Franchisees, and Employees.
-                </p>
+                <Link
+                  className="inline-flex h-12 items-center justify-center rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-8 text-base font-semibold text-white shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all hover:scale-105"
+                  href="/login"
+                >
+                  Get Started Free
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
               </div>
             </div>
           </div>
         </section>
       </main>
-      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          © 2025 Oro Systems. All rights reserved.
-        </p>
-        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <Link className="text-xs hover:underline underline-offset-4" href="#">
-            Terms of Service
-          </Link>
-          <Link className="text-xs hover:underline underline-offset-4" href="#">
-            Privacy
-          </Link>
-        </nav>
+
+      {/* Footer */}
+      <footer className="border-t border-stone-800 py-8">
+        <div className="container mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+              <span className="text-white font-bold text-sm">O</span>
+            </div>
+            <span className="text-lg font-bold text-white">OroNext</span>
+          </div>
+          <p className="text-sm text-stone-500">
+            © 2025 OroNext Systems. All rights reserved.
+          </p>
+          <nav className="flex gap-6">
+            <Link className="text-sm text-stone-400 hover:text-white transition-colors" href="#">
+              Terms
+            </Link>
+            <Link className="text-sm text-stone-400 hover:text-white transition-colors" href="#">
+              Privacy
+            </Link>
+            <Link className="text-sm text-stone-400 hover:text-white transition-colors" href="#">
+              Contact
+            </Link>
+          </nav>
+        </div>
       </footer>
     </div>
   );
 }
-
