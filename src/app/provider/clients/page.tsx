@@ -191,20 +191,9 @@ export default function ProviderClientsPage() {
     return (
         <div>
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-stone-100">Clients</h1>
-                    <p className="text-sm text-stone-400 mt-1">Manage all franchises and their locations</p>
-                </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
-                    >
-                        <Plus size={16} />
-                        Add Client
-                    </button>
-                </div>
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold text-stone-100">Clients</h1>
+                <p className="text-sm text-stone-400 mt-1">Manage all franchises and their locations</p>
             </div>
 
             {/* Search */}
@@ -369,13 +358,7 @@ export default function ProviderClientsPage() {
                 <div className="text-center py-12 bg-stone-800/30 rounded-xl border border-stone-800">
                     <Building2 size={48} className="mx-auto text-stone-600 mb-4" />
                     <h2 className="text-lg font-semibold text-stone-100">No clients found</h2>
-                    <p className="text-stone-400 mt-2">Add your first client to get started</p>
-                    <button
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="mt-4 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
-                    >
-                        Add Client
-                    </button>
+                    <p className="text-stone-400 mt-2">Use the <span className="text-orange-400 font-medium">+ New</span> button above to add your first client</p>
                 </div>
             )}
 

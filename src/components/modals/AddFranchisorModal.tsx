@@ -225,10 +225,10 @@ export default function AddFranchisorModal({ isOpen, onClose, onSuccess }: AddFr
                                         disabled={option.disabled}
                                         onClick={() => !option.disabled && setFormData({ ...formData, industryType: option.value })}
                                         className={`p-3 rounded-lg border text-left transition-all ${formData.industryType === option.value
-                                                ? 'border-purple-500 bg-purple-500/20 text-purple-300'
-                                                : option.disabled
-                                                    ? 'border-stone-700 bg-stone-900/30 text-stone-600 cursor-not-allowed'
-                                                    : 'border-stone-700 bg-stone-900/50 text-stone-300 hover:border-stone-600'
+                                            ? 'border-purple-500 bg-purple-500/20 text-purple-300'
+                                            : option.disabled
+                                                ? 'border-stone-700 bg-stone-900/30 text-stone-600 cursor-not-allowed'
+                                                : 'border-stone-700 bg-stone-900/50 text-stone-300 hover:border-stone-600'
                                             }`}
                                     >
                                         <span className="block text-sm font-medium">{option.label}</span>
@@ -258,20 +258,20 @@ export default function AddFranchisorModal({ isOpen, onClose, onSuccess }: AddFr
                         </div>
                     </div>
 
-                    <div className="pt-4 flex gap-3">
+                    <div className="pt-6 mt-4 flex gap-3 border-t border-stone-700/50 sticky bottom-0 bg-stone-900/95 -mx-6 px-6 pb-2">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-4 py-2.5 bg-transparent hover:bg-stone-800 text-stone-400 hover:text-stone-200 rounded-lg transition-all text-sm font-medium"
+                            className="flex-1 px-4 py-3 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg transition-all text-sm font-medium"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {loading ? <Loader2 className="animate-spin h-4 w-4" /> : 'Send Invite'}
+                            {loading ? <Loader2 className="animate-spin h-4 w-4" /> : 'Send Invite →'}
                         </button>
                     </div>
                 </form>
