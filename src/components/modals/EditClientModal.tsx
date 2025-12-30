@@ -245,3 +245,4 @@ export default function EditClientModal({ client, isOpen, onClose, onSuccess }: 
         </div>
     )
 }
+

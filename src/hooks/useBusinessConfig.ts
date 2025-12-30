@@ -73,3 +73,4 @@ export function useFeature(featureName: keyof Omit<BusinessConfig, 'id' | 'franc
     const { data: config } = useBusinessConfig()
     return config?.[featureName] ?? true // Default to true if not loaded yet
 }
+

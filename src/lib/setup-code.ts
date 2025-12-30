@@ -37,3 +37,4 @@ export function generateSetupCode(businessName?: string): string {
 export function generateRandomSetupCode(): string {
     return `${randomCode(4)}-${randomCode(4)}`
 }
+

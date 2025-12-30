@@ -447,3 +447,4 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
         </div>
     )
 }
+

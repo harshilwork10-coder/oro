@@ -156,3 +156,4 @@ async function processBirthdayRule(rule: any, now: Date, results: any) {
     // For now, log that birthday rule was checked
     results.details.push('Birthday rule checked (requires birthday field on Client)')
 }
+

@@ -163,10 +163,10 @@ export async function POST(request: NextRequest) {
         // Send Email
         await sendEmail({
             to: sanitizedEmail,
-            subject: 'Welcome to Oro - Setup Your Franchise Account',
+            subject: 'Welcome to OroNext - Setup Your Franchise Account',
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h1>Welcome to Oro!</h1>
+                    <h1>Welcome to OroNext!</h1>
                     <p>You have been invited to join Oro as a ${finalBusinessType === 'BRAND_FRANCHISOR' ? 'Franchise Brand Owner' : 'Multi-Location Owner'}.</p>
                     <p><strong>Company:</strong> ${sanitizedCompanyName}</p>
                     <br/>
@@ -193,3 +193,4 @@ export async function POST(request: NextRequest) {
         )
     }
 }
+

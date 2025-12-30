@@ -143,3 +143,4 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to update notification' }, { status: 500 })
     }
 }
+

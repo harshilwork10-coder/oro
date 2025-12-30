@@ -83,3 +83,4 @@ export function withReportPermission<P extends object>(
         )
     }
 }
+

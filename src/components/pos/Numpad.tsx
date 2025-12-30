@@ -41,3 +41,4 @@ export default function Numpad({ onInput, onClear, onBackspace, className = '' }
         </div>
     )
 }
+

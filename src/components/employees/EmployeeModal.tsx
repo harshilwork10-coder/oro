@@ -264,3 +264,4 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
         </div>
     )
 }
+

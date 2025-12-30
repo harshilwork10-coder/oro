@@ -36,3 +36,4 @@ export default function MobileHeader({ onMenuClick, forceShow }: MobileHeaderPro
         </header>
     )
 }
+

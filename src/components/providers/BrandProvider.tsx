@@ -13,7 +13,7 @@ type BrandingContextType = {
 const BrandingContext = createContext<BrandingContextType>({
     primaryColor: '#9D7DD9',
     secondaryColor: '#5B9FE3',
-    logoUrl: '/Oro-logo.png',
+    logoUrl: '/oronext-logo.jpg',
     loading: true
 })
 
@@ -24,7 +24,7 @@ export default function BrandProvider({ children }: { children: React.ReactNode 
     const [branding, setBranding] = useState({
         primaryColor: '#9D7DD9',
         secondaryColor: '#5B9FE3',
-        logoUrl: '/Oro-logo.png',
+        logoUrl: '/oronext-logo.jpg',
         loading: true
     })
 
@@ -63,3 +63,4 @@ export default function BrandProvider({ children }: { children: React.ReactNode 
         </BrandingContext.Provider>
     )
 }
+

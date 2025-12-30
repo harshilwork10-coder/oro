@@ -182,3 +182,4 @@ export default function CreateLicenseModal({ isOpen, onClose, onSuccess }: Creat
         </div>
     )
 }
+

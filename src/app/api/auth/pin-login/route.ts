@@ -195,3 +195,4 @@ function buildUserResponse(employee: any) {
         industryType: industryType
     }
 }
+

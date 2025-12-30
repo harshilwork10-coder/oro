@@ -288,3 +288,4 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
         </div>
     )
 }
+

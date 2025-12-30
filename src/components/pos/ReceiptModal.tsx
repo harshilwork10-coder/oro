@@ -298,3 +298,4 @@ export default function ReceiptModal({ isOpen, onClose, transactionData, onCompl
         </div>
     )
 }
+

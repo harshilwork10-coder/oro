@@ -24,3 +24,4 @@ export function validatePin(pin: string): { valid: boolean; error?: string } {
 
     return { valid: true }
 }
+

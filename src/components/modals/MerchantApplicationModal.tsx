@@ -329,3 +329,4 @@ export default function MerchantApplicationModal({ isOpen, onClose, onSuccess }:
         </div>
     )
 }
+

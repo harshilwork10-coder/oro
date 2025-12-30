@@ -141,3 +141,4 @@ export default function AddTerminalModal({ isOpen, onClose, onSuccess, locations
         </div>
     )
 }
+

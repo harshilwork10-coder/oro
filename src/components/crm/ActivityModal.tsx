@@ -204,3 +204,4 @@ export default function ActivityModal({ isOpen, onClose, onSave, leadId }: Activ
         </div>
     )
 }
+

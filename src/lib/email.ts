@@ -28,3 +28,4 @@ export async function sendEmail({ to, subject, html }: { to: string, subject: st
         // Don't throw, just log, so we don't break the flow if email fails
     }
 }
+

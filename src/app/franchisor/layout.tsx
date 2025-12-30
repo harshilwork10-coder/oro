@@ -182,3 +182,4 @@ export default function FranchisorLayout({ children }: { children: React.ReactNo
         </div>
     );
 }
+

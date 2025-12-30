@@ -453,3 +453,4 @@ class OfflineDB {
 // Singleton instance
 export const offlineDB = new OfflineDB();
 export type { Product, PendingTransaction, OfflineSettings };
+

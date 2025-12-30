@@ -325,3 +325,4 @@ export default function AddClientPage() {
         </div>
     );
 }
+

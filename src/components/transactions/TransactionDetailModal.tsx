@@ -458,3 +458,4 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
         </div>
     )
 }
+

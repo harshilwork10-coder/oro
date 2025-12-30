@@ -38,3 +38,4 @@ export async function PUT(req: NextRequest) {
         error: 'License management feature is not yet implemented'
     }, { status: 501 })
 }
+

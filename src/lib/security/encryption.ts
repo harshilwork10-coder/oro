@@ -180,3 +180,4 @@ export function reEncrypt(ciphertext: string, newKey: Buffer, oldKey: Buffer): s
 
 // Export types for TypeScript
 export type EncryptedField = string
+

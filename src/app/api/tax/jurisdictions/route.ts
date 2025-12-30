@@ -97,3 +97,4 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to create jurisdiction' }, { status: 500 })
     }
 }
+

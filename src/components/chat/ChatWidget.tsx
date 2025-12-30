@@ -274,3 +274,4 @@ export default function ChatWidget({ franchiseId, position = 'bottom-right' }: C
         </div>
     )
 }
+

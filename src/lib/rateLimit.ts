@@ -135,3 +135,4 @@ export const RATE_LIMITS = {
     // Password reset - very strict
     passwordReset: { windowMs: 15 * 60 * 1000, maxRequests: 3 }
 }
+

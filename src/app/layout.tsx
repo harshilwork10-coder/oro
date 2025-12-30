@@ -6,13 +6,13 @@ import { Providers } from "./providers";
 const outfit = Outfit({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Oro | The Gold Standard in POS',
+  title: 'OroNext | The Gold Standard in POS',
   description: 'Complete franchise and business management platform with insights that see everything',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Oro',
+    title: 'OroNext',
   },
   formatDetection: {
     telephone: false,
@@ -50,7 +50,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Oro" />
+        <meta name="apple-mobile-web-app-title" content="OroNext" />
         <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
       </head>
@@ -64,10 +64,10 @@ export default function RootLayout({
                 window.addEventListener('load', function() {
                   navigator.serviceWorker.register('/sw.js').then(
                     function(registration) {
-                      console.log('Oro PWA: Service Worker registered', registration.scope);
+                      console.log('OroNext PWA: Service Worker registered', registration.scope);
                     },
                     function(err) {
-                      console.log('Oro PWA: Service Worker registration failed', err);
+                      console.log('OroNext PWA: Service Worker registration failed', err);
                     }
                   );
                 });
@@ -79,3 +79,4 @@ export default function RootLayout({
     </html>
   );
 }
+

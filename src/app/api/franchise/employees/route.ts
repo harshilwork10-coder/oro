@@ -173,3 +173,4 @@ export async function POST(request: Request) {
     const { password: _, ...employeeWithoutPassword } = employee
     return NextResponse.json(employeeWithoutPassword)
 }
+

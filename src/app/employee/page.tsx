@@ -6,3 +6,4 @@ export default function EmployeePage() {
     // Default to check-in for demo (salon first)
     redirect('/employee/check-in');
 }
+

@@ -48,3 +48,4 @@ export default function ReportPageLayout({ title, description, children, actions
         </div>
     )
 }
+

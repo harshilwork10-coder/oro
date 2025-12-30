@@ -277,3 +277,4 @@ export default function KioskModeGuard({ children, onExitRequested }: KioskModeG
         </div>
     )
 }
+

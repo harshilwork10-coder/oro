@@ -236,3 +236,4 @@ export default function TransactionFilters({ filters, onFiltersChange, onApply }
         </div>
     )
 }
+

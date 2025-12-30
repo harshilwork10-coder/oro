@@ -378,3 +378,4 @@ export default function LoyaltyProgramPage() {
         </div>
     )
 }
+

@@ -182,3 +182,4 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }: AddTe
         </div>
     )
 }
+

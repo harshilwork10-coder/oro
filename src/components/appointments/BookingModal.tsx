@@ -449,3 +449,4 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
         </div>
     )
 }
+

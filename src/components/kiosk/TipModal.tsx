@@ -156,7 +156,7 @@ export default function TipModal({
             {/* Header with Logo */}
             <div className="w-full max-w-2xl mb-6 text-center">
                 <div className="flex justify-center mb-4">
-                    <img src="/Oro-logo.png" alt="Oro" className="h-16 object-contain" />
+                    <img src="/oronext-logo.jpg" alt="OroNext" className="h-16 object-contain" />
                 </div>
                 <h1 className="text-5xl font-bold text-white mb-4">Add a Tip?</h1>
                 <p className="text-2xl text-stone-400">Your service provider would greatly appreciate it!</p>
@@ -272,3 +272,4 @@ export default function TipModal({
         </div>
     )
 }
+

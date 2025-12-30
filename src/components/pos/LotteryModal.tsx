@@ -326,3 +326,4 @@ export default function LotteryModal({ isOpen, onClose, onAddToCart }: LotteryMo
         </div>
     )
 }
+

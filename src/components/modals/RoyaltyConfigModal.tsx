@@ -198,3 +198,4 @@ export default function RoyaltyConfigModal({ isOpen, onClose, onSuccess }: Royal
         </div>
     )
 }
+

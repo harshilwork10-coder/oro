@@ -99,3 +99,4 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ hasAccess: false, reason: 'error' }, { status: 500 })
     }
 }
+

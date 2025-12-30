@@ -67,3 +67,4 @@ export async function GET() {
         return NextResponse.json({ error: 'Failed to seed database' }, { status: 500 })
     }
 }
+

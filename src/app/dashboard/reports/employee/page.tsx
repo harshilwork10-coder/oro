@@ -120,3 +120,4 @@ export default function EmployeeReportsPage() {
         </div>
     )
 }
+

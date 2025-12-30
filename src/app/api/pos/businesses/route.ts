@@ -9,3 +9,4 @@ export async function GET() {
         error: 'This endpoint has been disabled for security. Use setup codes for terminal pairing.'
     }, { status: 403 })
 }
+

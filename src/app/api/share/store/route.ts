@@ -74,3 +74,4 @@ See you soon! 😊`
         return NextResponse.json({ error: 'Failed to send SMS' }, { status: 500 })
     }
 }
+

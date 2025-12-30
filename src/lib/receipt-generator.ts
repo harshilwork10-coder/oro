@@ -163,3 +163,4 @@ export async function generateReceipt(data: ReceiptData) {
     const filename = `receipt_${data.id.slice(0, 8)}_${Date.now()}.pdf`
     doc.save(filename)
 }
+

@@ -218,7 +218,7 @@ export default function LoginPage() {
                         <div className="relative group">
                             <div className="absolute -inset-1 bg-white/20 rounded-2xl blur group-hover:bg-white/30 transition-all"></div>
                             <div className="relative h-20 w-20 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 shadow-2xl overflow-hidden">
-                                <img src="/oro-logo.png" alt="Oro" className="w-14 h-14 object-contain drop-shadow-lg" />
+                                <img src="/oronext-logo.jpg" alt="OroNext" className="w-14 h-14 object-contain drop-shadow-lg" />
                             </div>
                         </div>
                         <div>
@@ -288,7 +288,7 @@ export default function LoginPage() {
                         <div className="relative">
                             <div className="absolute inset-0 bg-orange-500/30 blur-xl rounded-full scale-150"></div>
                             <div className="relative h-20 w-20 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden bg-gradient-to-br from-orange-500 to-amber-500 p-2">
-                                <img src="/oro-logo.png" alt="Oro" className="w-full h-full object-contain" />
+                                <img src="/oronext-logo.jpg" alt="OroNext" className="w-full h-full object-contain" />
                             </div>
                         </div>
                         <h1 className="text-4xl font-black bg-gradient-to-r from-orange-400 via-amber-400 to-orange-400 bg-clip-text text-transparent">OroNext</h1>
@@ -514,4 +514,5 @@ export default function LoginPage() {
         </div>
     )
 }
+
 

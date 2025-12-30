@@ -91,3 +91,4 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Failed to lookup customer' }, { status: 500 })
     }
 }
+

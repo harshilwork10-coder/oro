@@ -137,3 +137,4 @@ export function canManageUser(manager: User, targetUser: User): boolean {
 
     return false
 }
+

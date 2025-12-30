@@ -82,3 +82,4 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ promotions: [], count: 0 })
     }
 }
+

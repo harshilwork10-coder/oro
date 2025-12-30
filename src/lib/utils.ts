@@ -13,3 +13,4 @@ export function formatCurrency(amount: number | string | undefined | null) {
         currency: 'USD',
     }).format(val)
 }
+

@@ -153,3 +153,4 @@ export default function NoteModal({ isOpen, onClose, onSave, leadId }: NoteModal
         </div>
     )
 }
+

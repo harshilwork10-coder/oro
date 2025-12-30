@@ -94,3 +94,4 @@ export default function ThankYou({ onComplete }: ThankYouProps) {
         </div>
     )
 }
+

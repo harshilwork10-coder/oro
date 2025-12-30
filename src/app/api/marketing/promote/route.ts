@@ -294,3 +294,4 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ all: 0, vip: 0, category: 0, creditsRemaining: 0 })
     }
 }
+

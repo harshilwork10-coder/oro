@@ -279,3 +279,4 @@ export default function AddFranchisorModal({ isOpen, onClose, onSuccess }: AddFr
         </div>
     )
 }
+

@@ -33,3 +33,4 @@ declare module "next-auth/jwt" {
         businessType?: string | null
     }
 }
+

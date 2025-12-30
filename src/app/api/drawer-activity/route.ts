@@ -207,3 +207,4 @@ async function checkNoSaleAlerts(locationId: string, employeeId: string) {
         console.error('Error checking no-sale alerts:', error)
     }
 }
+

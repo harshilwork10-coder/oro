@@ -405,3 +405,4 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
         </div>
     )
 }
+

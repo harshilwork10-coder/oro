@@ -112,3 +112,4 @@ function getColumnValue(row: any, columnName: string | null): string {
     if (!columnName) return ''
     return String(row[columnName] || '').trim()
 }
+

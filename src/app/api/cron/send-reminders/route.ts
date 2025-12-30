@@ -199,3 +199,4 @@ async function sendSmsReminder(appointment: any, franchiseId: string, type: '24h
     return result
 }
 
+

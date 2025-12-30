@@ -70,3 +70,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Failed to create membership plan' }, { status: 500 })
     }
 }
+

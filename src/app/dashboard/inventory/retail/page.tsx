@@ -1029,3 +1029,4 @@ export default function RetailInventoryPage() {
         </div>
     )
 }
+

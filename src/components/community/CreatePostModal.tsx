@@ -127,3 +127,4 @@ export default function CreatePostModal({ isOpen, onClose, onSuccess }: CreatePo
         </div>
     )
 }
+

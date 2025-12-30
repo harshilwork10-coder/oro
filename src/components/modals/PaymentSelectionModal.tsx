@@ -57,3 +57,4 @@ export default function PaymentSelectionModal({ total, onSelect, onClose }: Paym
         </div>
     )
 }
+

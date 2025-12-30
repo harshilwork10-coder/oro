@@ -368,3 +368,4 @@ export async function printLabelToConfigured(label: LabelData): Promise<{ succes
     return printLabel(label, printer.agentUrl);
 }
 
+

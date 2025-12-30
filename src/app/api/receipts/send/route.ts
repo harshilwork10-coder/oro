@@ -162,3 +162,4 @@ Thank you for your purchase!
         return NextResponse.json({ error: 'Failed to send receipt' }, { status: 500 })
     }
 }
+

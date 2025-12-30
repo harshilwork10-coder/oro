@@ -75,3 +75,4 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to redeem package' }, { status: 500 })
     }
 }
+

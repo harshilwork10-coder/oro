@@ -75,3 +75,4 @@ export default function OroLogo({ size = 'md', showText = true, className = '' }
 
 // Keep backward compatibility - export with old name too
 export { OroLogo as OroLogo }
+

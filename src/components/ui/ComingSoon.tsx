@@ -26,3 +26,4 @@ export default function ComingSoon({ title, description = "This feature is curre
         </div>
     )
 }
+

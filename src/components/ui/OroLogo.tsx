@@ -51,3 +51,4 @@ export default function OroLogo({ size = 'md', showText = true, className = '' }
 }
 
 export { OroLogo as OroLogo }
+

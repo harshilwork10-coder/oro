@@ -277,3 +277,4 @@ async function generateRealTimeExceptions(franchiseId: string | null, locationId
 
     return exceptions
 }
+

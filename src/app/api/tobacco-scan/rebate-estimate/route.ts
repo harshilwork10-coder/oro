@@ -138,3 +138,4 @@ export async function GET() {
         return NextResponse.json({ error: 'Failed to calculate estimate' }, { status: 500 })
     }
 }
+

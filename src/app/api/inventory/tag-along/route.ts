@@ -123,3 +123,4 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to remove tag-along item' }, { status: 500 })
     }
 }
+

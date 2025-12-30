@@ -13,3 +13,4 @@ export async function POST(request: NextRequest) {
     // In production, update database
     return NextResponse.json({ success: true })
 }
+

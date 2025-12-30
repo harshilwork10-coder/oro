@@ -196,3 +196,4 @@ export default function NoSaleDrawerModal({ isOpen, onClose, onSuccess, location
         </div>
     )
 }
+

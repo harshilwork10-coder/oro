@@ -290,3 +290,4 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to check promotions' }, { status: 500 })
     }
 }
+

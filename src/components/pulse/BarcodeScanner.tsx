@@ -175,3 +175,4 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
         </div>
     )
 }
+

@@ -42,7 +42,7 @@ export async function GET(req: Request) {
             await prisma.supportMessage.create({
                 data: {
                     chatId: chat.id,
-                    content: "👋 Welcome to Oro Support! How can we help you today?",
+                    content: "👋 Welcome to OroNext Support! How can we help you today?",
                     sender: 'SUPPORT'
                 }
             })
@@ -157,3 +157,4 @@ export async function PUT(req: Request) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
 }
+

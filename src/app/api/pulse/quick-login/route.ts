@@ -343,3 +343,4 @@ async function handleRevoke(deviceToken: string) {
 
     return NextResponse.json({ error: 'Device not found' }, { status: 404 })
 }
+

@@ -47,3 +47,4 @@ export default function EmployeeHelpPage() {
         </div>
     );
 }
+

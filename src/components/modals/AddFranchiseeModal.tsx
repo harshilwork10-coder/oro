@@ -246,3 +246,4 @@ export default function AddFranchiseeModal({ isOpen, onClose, onSuccess }: AddFr
     )
 }
 
+

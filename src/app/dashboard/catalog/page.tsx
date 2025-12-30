@@ -195,3 +195,4 @@ export default function GlobalCatalogPage() {
         </div>
     )
 }
+

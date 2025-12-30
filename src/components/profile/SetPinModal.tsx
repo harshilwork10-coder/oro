@@ -203,3 +203,4 @@ export default function SetPinModal({ isOpen, onClose, onSuccess }: SetPinModalP
         </div>
     )
 }
+

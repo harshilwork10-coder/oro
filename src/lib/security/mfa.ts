@@ -190,3 +190,4 @@ export function isMFARecommendedForRole(role: string): boolean {
     const mfaRecommendedRoles = ['MANAGER']
     return mfaRecommendedRoles.includes(role)
 }
+

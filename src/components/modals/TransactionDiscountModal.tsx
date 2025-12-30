@@ -181,3 +181,4 @@ export default function TransactionDiscountModal({ subtotal, onApply, onClose }:
         </div>
     )
 }
+

@@ -138,3 +138,4 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
         Math.sin(dLon / 2) * Math.sin(dLon / 2)
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
+

@@ -169,3 +169,4 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to delete promotion' }, { status: 500 })
     }
 }
+

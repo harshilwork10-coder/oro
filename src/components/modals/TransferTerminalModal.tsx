@@ -169,3 +169,4 @@ export default function TransferTerminalModal({ isOpen, onClose, onSuccess, term
         </div>
     )
 }
+

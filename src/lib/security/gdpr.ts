@@ -392,3 +392,4 @@ export const gdprCompliance = {
     shouldPurgeData,
     getPrivacyDashboard
 }
+

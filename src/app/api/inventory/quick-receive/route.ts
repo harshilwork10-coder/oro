@@ -50,3 +50,4 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to receive stock' }, { status: 500 })
     }
 }
+

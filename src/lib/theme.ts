@@ -112,3 +112,4 @@ export const spacing = {
     xl: '2rem',     // 32px
     '2xl': '3rem',  // 48px
 }
+

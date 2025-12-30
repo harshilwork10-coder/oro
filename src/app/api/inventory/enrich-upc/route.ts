@@ -166,3 +166,4 @@ function extractBrand(text: string): string | null {
     }
     return null
 }
+

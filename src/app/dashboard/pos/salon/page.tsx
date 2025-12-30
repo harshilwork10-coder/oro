@@ -2907,3 +2907,4 @@ export default function POSPage() {
         </Suspense>
     )
 }
+

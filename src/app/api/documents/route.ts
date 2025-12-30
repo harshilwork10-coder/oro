@@ -36,3 +36,4 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Failed to generate document URL' }, { status: 500 })
     }
 }
+

@@ -168,3 +168,4 @@ export async function POST() {
         return NextResponse.json({ error: 'Failed to auto-generate purchase orders' }, { status: 500 })
     }
 }
+

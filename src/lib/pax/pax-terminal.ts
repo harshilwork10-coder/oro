@@ -396,3 +396,4 @@ export class PaxTerminal {
         return parsedResponse;
     }
 }
+

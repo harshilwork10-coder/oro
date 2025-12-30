@@ -281,3 +281,4 @@ export default function TerminalSetupModal({ isOpen, onClose, onSuccess }: Termi
         </div>
     )
 }
+

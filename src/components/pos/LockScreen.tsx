@@ -140,3 +140,4 @@ export default function LockScreen({ isOpen, onUnlock, user }: LockScreenProps) 
         </div>
     )
 }
+

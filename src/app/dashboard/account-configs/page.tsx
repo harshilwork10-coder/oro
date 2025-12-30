@@ -2498,3 +2498,4 @@ export default function AccountConfigurationsPage() {
         </RoleGuard>
     )
 }
+

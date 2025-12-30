@@ -146,3 +146,4 @@ export default function QuickAddModal({ onAdd, onClose }: QuickAddModalProps) {
         </div>
     )
 }
+

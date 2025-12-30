@@ -87,3 +87,4 @@ export function isValidStationCode(code: string): boolean {
     // S followed by number, dash, then 4 chars
     return /^S\d+-[A-Z0-9]{4}$/.test(code) || /^[A-Z0-9]{4,8}$/.test(code)
 }
+

@@ -176,3 +176,4 @@ function getHourlySales(transactions: any[]) {
 
     return Object.entries(hourly).map(([hour, sales]) => ({ hour, sales }))
 }
+

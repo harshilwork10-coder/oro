@@ -110,3 +110,4 @@ export default function NumberPadModal({ title, initialValue, isDecimal = false,
         </div>
     )
 }
+

@@ -67,3 +67,4 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Failed to get top sellers' }, { status: 500 })
     }
 }
+

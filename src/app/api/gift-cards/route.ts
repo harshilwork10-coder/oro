@@ -78,3 +78,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Failed to create gift card' }, { status: 500 })
     }
 }
+
