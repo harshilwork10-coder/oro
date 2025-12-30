@@ -51,7 +51,7 @@ export async function PUT(
 }
 
 // DELETE: Hard Delete Franchisor
-// NOTE: Soft delete (deletedAt) is not implemented in current schema
+// NOTE: Must delete related records in correct order due to foreign key constraints
 export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -62,15 +62,72 @@ export async function DELETE(
     try {
         const { id } = await params
 
-        // Delete franchisor (cascade will handle related records)
-        await prisma.franchisor.delete({
-            where: { id }
+        // Find the franchisor first
+        const franchisor = await prisma.franchisor.findUnique({
+            where: { id },
+            include: {
+                franchises: {
+                    include: {
+                        locations: true
+                    }
+                }
+            }
         })
+
+        if (!franchisor) {
+            return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })
+        }
+
+        // Get all franchise IDs and location IDs
+        const franchiseIds = franchisor.franchises.map(f => f.id)
+        const locationIds = franchisor.franchises.flatMap(f => f.locations.map(l => l.id))
+
+        // Delete in correct order (most dependent first)
+        // 1. Delete products
+        if (franchiseIds.length > 0) {
+            await prisma.product.deleteMany({ where: { franchiseId: { in: franchiseIds } } })
+            await prisma.productCategory.deleteMany({ where: { franchiseId: { in: franchiseIds } } })
+        }
+
+        // 2. Delete stations and terminals
+        if (locationIds.length > 0) {
+            await prisma.station.deleteMany({ where: { locationId: { in: locationIds } } })
+            await prisma.paymentTerminal.deleteMany({ where: { locationId: { in: locationIds } } })
+        }
+
+        // 3. Delete employees (users tied to franchise)
+        if (franchiseIds.length > 0) {
+            await prisma.user.deleteMany({
+                where: {
+                    franchiseId: { in: franchiseIds },
+                    role: 'EMPLOYEE'
+                }
+            })
+        }
+
+        // 4. Delete locations
+        if (locationIds.length > 0) {
+            await prisma.location.deleteMany({ where: { id: { in: locationIds } } })
+        }
+
+        // 5. Delete franchises
+        if (franchiseIds.length > 0) {
+            await prisma.franchise.deleteMany({ where: { id: { in: franchiseIds } } })
+        }
+
+        // 6. Delete magic links for the owner
+        await prisma.magicLink.deleteMany({ where: { userId: franchisor.ownerId } })
+
+        // 7. Delete the franchisor (this should now work)
+        await prisma.franchisor.delete({ where: { id } })
+
+        // 8. Delete the owner user
+        await prisma.user.delete({ where: { id: franchisor.ownerId } })
 
         return NextResponse.json({ success: true, message: 'Deleted successfully' })
     } catch (error) {
         console.error('Error deleting franchisor:', error)
-        return NextResponse.json({ error: 'Failed to delete' }, { status: 500 })
+        return NextResponse.json({ error: 'Failed to delete client. Check server logs for details.' }, { status: 500 })
     }
 }
 
