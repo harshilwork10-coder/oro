@@ -10,6 +10,11 @@ const isS3Configured = Boolean(
     process.env.AWS_S3_BUCKET
 )
 
+console.log(`[S3] Configuration status: ${isS3Configured ? 'CONFIGURED' : 'NOT CONFIGURED'}`)
+if (isS3Configured) {
+    console.log(`[S3] Bucket: ${process.env.AWS_S3_BUCKET}, Region: ${process.env.AWS_REGION || 'us-east-1'}`)
+}
+
 // Initialize S3 Client (only if configured)
 const s3Client = isS3Configured ? new S3Client({
     region: process.env.AWS_REGION || 'us-east-1',
