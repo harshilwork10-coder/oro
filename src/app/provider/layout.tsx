@@ -96,13 +96,6 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
                                 <p className="text-xs text-stone-500 truncate">Platform Admin</p>
                             </div>
                         </div>
-                        <button
-                            onClick={() => signOut({ callbackUrl: '/login' })}
-                            className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-sm text-stone-400 hover:text-red-400 hover:bg-stone-800 rounded-lg transition-colors"
-                        >
-                            <LogOut size={16} />
-                            Sign out
-                        </button>
                     </div>
                 )}
             </aside>
