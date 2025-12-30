@@ -377,7 +377,7 @@ export default function LoginPage() {
                                         <span className="text-3xl">👋</span>
                                     </div>
                                     <h2 className="text-3xl font-bold text-white">Welcome back!</h2>
-                                    <p className="mt-2 text-stone-400">Sign in to your Oro account</p>
+                                    <p className="mt-2 text-stone-400">Sign in to your OroNext account</p>
                                 </div>
 
                                 <form className="space-y-5" onSubmit={handleSubmit}>
@@ -485,7 +485,7 @@ export default function LoginPage() {
                     </div>
 
                     <p className="mt-8 text-center text-sm text-stone-600">
-                        © 2024 Oro POS System. All rights reserved.
+                        © 2025 OroNext POS System. All rights reserved.
                     </p>
                 </div>
             </div>

@@ -11,7 +11,7 @@ export interface ProviderSettings {
 export function getProviderSettings(): ProviderSettings {
     return {
         cashDiscountPercent: 3.5, // YOU set this percentage for ALL clients
-        platformName: 'Oro POS',
+        platformName: 'OroNext POS',
         supportEmail: 'support@Oropos.com'
     }
 }
