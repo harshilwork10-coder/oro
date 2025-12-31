@@ -42,7 +42,10 @@ export async function PATCH(
             'usesMultiLocation', 'usesFranchising', 'usesTimeTracking', 'usesPayroll',
             'usesMobilePulse', 'pulseSeatCount', 'subscriptionTier', 'maxLocations',
             'maxUsers', 'acceptsEbt', 'acceptsChecks', 'acceptsOnAccount', 'shiftRequirement',
-            'enableResources', 'tipType', 'tipSuggestions'
+            'enableResources', 'tipType', 'tipSuggestions',
+            // Pricing fields
+            'cashDiscountEnabled', 'cashDiscountPercent', 'pricingModel',
+            'cardSurchargeType', 'cardSurcharge', 'showDualPricing'
         ]
 
         // Handle storeLogo separately - save to Franchise record

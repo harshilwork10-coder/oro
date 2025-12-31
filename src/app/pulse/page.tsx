@@ -20,7 +20,8 @@ import {
     X,
     Edit3,
     Check,
-    Download
+    Download,
+    Bell
 } from 'lucide-react'
 import OroLogo from '@/components/ui/OroLogo'
 import dynamic from 'next/dynamic'
@@ -314,6 +315,79 @@ export default function OroPulsePage() {
         ? 'All Stores'
         : locations.find(l => l.id === selectedLocation)?.name || 'Store'
 
+    // Push Notification state and handlers
+    const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+    const [notificationLoading, setNotificationLoading] = useState(false)
+
+    // Check notification status on mount
+    useEffect(() => {
+        if ('Notification' in window && 'serviceWorker' in navigator) {
+            setNotificationsEnabled(Notification.permission === 'granted')
+        }
+    }, [])
+
+    const handleNotificationToggle = async () => {
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+            alert('Notifications not supported in this browser')
+            return
+        }
+
+        setNotificationLoading(true)
+        try {
+            if (notificationsEnabled) {
+                // Unsubscribe
+                const registration = await navigator.serviceWorker.ready
+                const subscription = await registration.pushManager.getSubscription()
+                if (subscription) {
+                    await subscription.unsubscribe()
+                    await fetch('/api/notifications/subscribe', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ endpoint: subscription.endpoint })
+                    })
+                }
+                setNotificationsEnabled(false)
+            } else {
+                // Subscribe
+                const permission = await Notification.requestPermission()
+                if (permission !== 'granted') {
+                    alert('Please allow notifications to receive alerts')
+                    return
+                }
+
+                const res = await fetch('/api/notifications/subscribe')
+                const { vapidPublicKey } = await res.json()
+
+                if (!vapidPublicKey) {
+                    alert('Push notifications not configured on server')
+                    return
+                }
+
+                const registration = await navigator.serviceWorker.ready
+                const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: vapidPublicKey
+                })
+
+                await fetch('/api/notifications/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subscription: subscription.toJSON(),
+                        deviceName: navigator.userAgent.includes('iPhone') ? 'iPhone' :
+                            navigator.userAgent.includes('Android') ? 'Android' : 'Browser'
+                    })
+                })
+                setNotificationsEnabled(true)
+            }
+        } catch (error) {
+            console.error('Notification toggle error:', error)
+            alert('Failed to toggle notifications')
+        } finally {
+            setNotificationLoading(false)
+        }
+    }
+
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white flex flex-col">
             {/* Header */}
@@ -329,6 +403,17 @@ export default function OroPulsePage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* Notification Toggle */}
+                    <button
+                        onClick={handleNotificationToggle}
+                        disabled={notificationLoading}
+                        className={`p-2 rounded-full transition-colors ${notificationsEnabled
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-800 text-gray-400'} active:scale-95`}
+                        title={notificationsEnabled ? 'Notifications ON' : 'Enable Notifications'}
+                    >
+                        <Bell className={`w-4 h-4 ${notificationLoading ? 'animate-pulse' : ''}`} />
+                    </button>
                     {!isInstalled && (
                         <button
                             onClick={handleInstallClick}

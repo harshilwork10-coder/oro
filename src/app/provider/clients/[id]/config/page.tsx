@@ -500,36 +500,85 @@ export default function ProviderClientConfigPage() {
 
                             {categoryView === 'pricing' && (
                                 <div className="space-y-4">
-                                    <p className="text-stone-400">Pricing tier and card surcharge settings</p>
+                                    <p className="text-stone-400">Pricing model and card surcharge settings</p>
                                     <div className="space-y-4">
+                                        {/* Pricing Model Selection */}
                                         <div>
-                                            <label className="block text-sm text-stone-300 mb-2">Pricing Tier</label>
+                                            <label className="block text-sm text-stone-300 mb-2">Pricing Model</label>
                                             <div className="grid grid-cols-2 gap-2">
-                                                {['Standard', 'Premium', 'Enterprise'].map((tier) => (
+                                                {[
+                                                    { id: 'STANDARD', label: 'Standard', desc: 'Single price for all' },
+                                                    { id: 'DUAL_PRICING', label: 'Dual Pricing', desc: 'Cash vs Card prices' },
+                                                ].map((model) => (
                                                     <button
-                                                        key={tier}
-                                                        className="p-3 rounded-lg border border-stone-700 hover:border-orange-500/50 text-stone-200"
+                                                        key={model.id}
+                                                        onClick={() => {
+                                                            updateConfig({
+                                                                pricingModel: model.id,
+                                                                showDualPricing: model.id === 'DUAL_PRICING'
+                                                            });
+                                                        }}
+                                                        disabled={saving}
+                                                        className={`p-3 rounded-lg border text-left transition-colors ${(model.id === 'DUAL_PRICING' && client.cardSurchargeType !== 'NONE') ||
+                                                                (model.id === 'STANDARD' && client.cardSurchargeType === 'NONE')
+                                                                ? 'border-orange-500 bg-orange-500/20 text-orange-400'
+                                                                : 'border-stone-700 hover:border-stone-600 text-stone-200'
+                                                            }`}
                                                     >
-                                                        {tier}
+                                                        <span className="font-medium">{model.label}</span>
+                                                        <p className="text-xs text-stone-500">{model.desc}</p>
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
+
+                                        {/* Card Surcharge Settings */}
                                         <div>
-                                            <label className="block text-sm text-stone-300 mb-2">Card Surcharge</label>
+                                            <label className="block text-sm text-stone-300 mb-2">Card Surcharge / Cash Discount</label>
                                             <div className="flex gap-2">
-                                                <select className="flex-1 bg-stone-700 border border-stone-600 rounded-lg px-3 py-2 text-stone-200">
+                                                <select
+                                                    id="surcharge-type-select"
+                                                    defaultValue={client.cardSurchargeType}
+                                                    className="flex-1 bg-stone-700 border border-stone-600 rounded-lg px-3 py-2 text-stone-200"
+                                                >
                                                     <option value="PERCENTAGE">Percentage</option>
                                                     <option value="FLAT">Flat Fee</option>
                                                 </select>
                                                 <input
+                                                    id="surcharge-value-input"
                                                     type="number"
-                                                    defaultValue={client.cardSurchargeValue}
+                                                    step="0.01"
+                                                    defaultValue={client.cardSurchargeValue || 3.99}
                                                     className="w-24 bg-stone-700 border border-stone-600 rounded-lg px-3 py-2 text-stone-200"
-                                                    placeholder="0"
+                                                    placeholder="3.99"
                                                 />
                                             </div>
+                                            <p className="text-xs text-stone-500 mt-1">
+                                                For Dual Pricing: Card price = Cash price + surcharge
+                                            </p>
                                         </div>
+
+                                        {/* Save Button */}
+                                        <button
+                                            onClick={() => {
+                                                const typeSelect = document.getElementById('surcharge-type-select') as HTMLSelectElement;
+                                                const valueInput = document.getElementById('surcharge-value-input') as HTMLInputElement;
+                                                const surchargeType = typeSelect?.value || 'PERCENTAGE';
+                                                const surchargeValue = parseFloat(valueInput?.value) || 3.99;
+
+                                                updateConfig({
+                                                    cardSurchargeType: surchargeType,
+                                                    cardSurcharge: surchargeValue,
+                                                    cashDiscountEnabled: true,
+                                                    cashDiscountPercent: surchargeValue
+                                                });
+                                                setCategoryView(null);
+                                            }}
+                                            disabled={saving}
+                                            className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                                        >
+                                            {saving ? 'Saving...' : 'Save Pricing Settings'}
+                                        </button>
                                     </div>
                                 </div>
                             )}
