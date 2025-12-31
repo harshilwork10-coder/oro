@@ -45,7 +45,7 @@ import {
 import clsx from 'clsx'
 import { hasPermission, Role } from '@/lib/permissions'
 import { useBusinessConfig } from '@/hooks/useBusinessConfig'
-import { Sparkles, Armchair, Ticket, Cigarette, Store, TrendingUp, Tag } from 'lucide-react'
+import { Sparkles, Armchair, Ticket, Cigarette, Store, TrendingUp, Tag, Zap } from 'lucide-react'
 
 // Type for sidebar link
 type SidebarLink = {
@@ -493,6 +493,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                             </p>
                         </div>
                     </div>
+
+                    {/* OroNext Pulse App - For Owners/Managers */}
+                    {(role === 'FRANCHISOR' || role === 'FRANCHISEE' || role === 'MANAGER') && (
+                        <Link
+                            href="/pulse"
+                            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 px-3 py-2 mb-2 text-xs xl:text-sm font-medium text-orange-300 hover:from-orange-500/20 hover:to-amber-500/20 hover:text-orange-200 transition-all duration-200 group"
+                        >
+                            <Zap className="h-4 w-4 text-orange-400" />
+                            <span>OroNext Pulse</span>
+                            <span className="text-[9px] bg-orange-500/30 px-1.5 py-0.5 rounded text-orange-200">App</span>
+                        </Link>
+                    )}
+
                     <button
                         onClick={() => signOut({ callbackUrl: '/login' })}
                         className="flex w-full items-center justify-center rounded-lg bg-red-500/5 border border-red-500/10 px-3 py-1.5 text-xs xl:text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/30 transition-all duration-200 group"
