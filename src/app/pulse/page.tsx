@@ -171,6 +171,9 @@ export default function OroPulsePage() {
         }
     }
 
+    // Allowed locations for filtering (null = all)
+    const [allowedLocationIds, setAllowedLocationIds] = useState<string[] | null>(null)
+
     // Check access on mount
     useEffect(() => {
         const checkAccess = async () => {
@@ -182,6 +185,10 @@ export default function OroPulsePage() {
                     return
                 }
                 setHasAccess(true)
+                // Store allowed locations from API
+                if (data.allowedLocationIds && Array.isArray(data.allowedLocationIds)) {
+                    setAllowedLocationIds(data.allowedLocationIds)
+                }
             } catch (e) {
                 console.error('Access check failed:', e)
                 setHasAccess(true)
@@ -210,7 +217,14 @@ export default function OroPulsePage() {
             const res = await fetch(`/api/pulse/live?locationId=${selectedLocation}`)
             if (res.ok) {
                 const data = await res.json()
-                setLocations(data.locations || [])
+                // Filter locations by allowed list if set
+                let availableLocations = data.locations || []
+                if (allowedLocationIds && allowedLocationIds.length > 0) {
+                    availableLocations = availableLocations.filter((loc: Location) =>
+                        allowedLocationIds.includes(loc.id)
+                    )
+                }
+                setLocations(availableLocations)
                 setStats(data.stats || { todaySales: 0, yesterdaySales: 0, weekSales: 0, transactionCount: 0, averageTicket: 0 })
                 setStoreBreakdown(data.storeBreakdown || [])
                 setTopSellers(data.topSellers || [])

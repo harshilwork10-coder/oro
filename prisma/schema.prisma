@@ -153,6 +153,7 @@ model User {
 
   // Mobile Features (Paid Per-Seat Licenses)
   hasPulseAccess Boolean @default(false) // Oro Pulse mobile dashboard access
+  pulseLocationIds String? // JSON array of location IDs user can view (null = all locations)
 
   // Relations
   franchiseId String?

@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
             select: {
                 role: true,
                 hasPulseAccess: true, // Per-user license
+                pulseLocationIds: true, // Allowed locations (null = all)
                 franchiseId: true,
                 franchise: {
                     select: {
@@ -65,7 +66,20 @@ export async function GET(request: NextRequest) {
 
         // Check if this specific user has a Pulse license
         if (user.hasPulseAccess) {
-            return NextResponse.json({ hasAccess: true, reason: 'user_licensed' })
+            // Parse allowed locations (null = all, JSON array = specific locations)
+            let allowedLocationIds = null
+            if (user.pulseLocationIds) {
+                try {
+                    allowedLocationIds = JSON.parse(user.pulseLocationIds)
+                } catch {
+                    allowedLocationIds = null // Fall back to all locations
+                }
+            }
+            return NextResponse.json({
+                hasAccess: true,
+                reason: 'user_licensed',
+                allowedLocationIds // null = all locations, array = specific IDs
+            })
         }
 
         // Check if franchisor has Pulse enabled (for backwards compatibility)
