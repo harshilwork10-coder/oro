@@ -699,16 +699,27 @@ export default function MyClientsPage() {
                                         ))
                                     )}
 
-                                    {/* Add Location Button */}
+                                    {/* Add Location Button - Generate Magic Link */}
                                     <button
-                                        onClick={(e) => {
+                                        onClick={async (e) => {
                                             e.stopPropagation()
-                                            setAddLocationModal({ id: client.id, name: client.name })
+                                            try {
+                                                const res = await fetch(`/api/admin/franchisors/${client.id}/location-link`, { method: 'POST' })
+                                                const data = await res.json()
+                                                if (data.url) {
+                                                    await navigator.clipboard.writeText(data.url)
+                                                    setToast({ message: 'Location onboarding link copied! Send to owner.', type: 'success' })
+                                                } else {
+                                                    setToast({ message: data.error || 'Failed to generate link', type: 'error' })
+                                                }
+                                            } catch {
+                                                setToast({ message: 'Failed to generate link', type: 'error' })
+                                            }
                                         }}
                                         className="w-full py-2 mt-2 border border-dashed border-stone-600 hover:border-purple-500 text-stone-400 hover:text-purple-400 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
                                     >
                                         <Plus className="h-4 w-4" />
-                                        Add New Location
+                                        Get Location Onboarding Link
                                     </button>
                                 </div>
                             )}

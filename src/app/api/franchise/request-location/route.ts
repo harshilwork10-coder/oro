@@ -6,20 +6,14 @@ import { prisma } from '@/lib/prisma'
 // POST: Create a new location request (for adding locations to existing franchisors)
 export async function POST(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
-        // Only PROVIDER or the franchisor themselves can request new locations
-        if (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR') {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-        }
-
         const body = await request.json()
         const {
+            // Legacy flow (provider/franchisor session)
             franchisorId,
+            // Magic link flow
+            franchiseId,
+            token,
+            // Common fields
             locationName,
             address,
             phone,
@@ -28,35 +22,72 @@ export async function POST(request: NextRequest) {
             feinLetterUrl
         } = body
 
-        if (!franchisorId || !locationName) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+        if (!locationName) {
+            return NextResponse.json({ error: 'Location name is required' }, { status: 400 })
         }
 
         if (!voidCheckUrl) {
             return NextResponse.json({ error: 'Void check is required for new locations' }, { status: 400 })
         }
 
-        // Get the franchisor and their first franchise
-        const franchisor = await prisma.franchisor.findUnique({
-            where: { id: franchisorId },
-            include: {
-                franchises: {
-                    take: 1
-                }
+        let franchise: any = null
+        let franchisor: any = null
+
+        // Magic link flow - verify token and get franchise directly
+        if (token && franchiseId) {
+            // Verify the magic link token
+            const magicLink = await prisma.magicLink.findUnique({
+                where: { token },
+                include: { user: true }
+            })
+
+            if (!magicLink || magicLink.expiresAt < new Date()) {
+                return NextResponse.json({ error: 'Invalid or expired link' }, { status: 401 })
             }
-        })
 
-        if (!franchisor) {
-            return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })
+            // Get the franchise
+            franchise = await prisma.franchise.findUnique({
+                where: { id: franchiseId },
+                include: { franchisor: true }
+            })
+
+            if (!franchise || franchise.franchisor.ownerId !== magicLink.userId) {
+                return NextResponse.json({ error: 'Invalid franchise access' }, { status: 403 })
+            }
+
+            franchisor = franchise.franchisor
+        } else {
+            // Session-based flow
+            const session = await getServerSession(authOptions)
+
+            if (!session?.user) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            }
+
+            if (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR') {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+            }
+
+            if (!franchisorId) {
+                return NextResponse.json({ error: 'Missing franchisor ID' }, { status: 400 })
+            }
+
+            // Get the franchisor and their first franchise
+            franchisor = await prisma.franchisor.findUnique({
+                where: { id: franchisorId },
+                include: { franchises: { take: 1 } }
+            })
+
+            if (!franchisor) {
+                return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })
+            }
+
+            if (session.user.role === 'FRANCHISOR' && franchisor.ownerId !== session.user.id) {
+                return NextResponse.json({ error: 'Forbidden - not your account' }, { status: 403 })
+            }
+
+            franchise = franchisor.franchises[0]
         }
-
-        // If FRANCHISOR role, verify they own this franchisor
-        if (session.user.role === 'FRANCHISOR' && franchisor.ownerId !== session.user.id) {
-            return NextResponse.json({ error: 'Forbidden - not your account' }, { status: 403 })
-        }
-
-        // Get or create a franchise for this location
-        let franchise = franchisor.franchises[0]
 
         if (!franchise) {
             // Create a default franchise if none exists
