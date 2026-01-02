@@ -3,15 +3,29 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { checkRateLimit, getClientIP, PIN_RATE_LIMIT } from '@/lib/security/rateLimit'
 
 /**
  * POST /api/pos/verify-owner-pin
  * 
  * Verifies PIN to exit kiosk mode
  * Allowed roles: OWNER, FRANCHISOR, MANAGER, PROVIDER (support team)
+ * SECURITY: Rate limited to prevent brute force
  */
 export async function POST(request: NextRequest) {
     try {
+        // SECURITY: Rate limiting to prevent PIN brute force
+        const clientIP = getClientIP(request)
+        const rateLimit = checkRateLimit(`pin:${clientIP}`, PIN_RATE_LIMIT)
+
+        if (!rateLimit.allowed) {
+            console.warn(`[SECURITY] PIN rate limit exceeded for IP: ${clientIP}`)
+            return NextResponse.json({
+                success: false,
+                error: `Too many attempts. Try again after ${rateLimit.resetAt.toLocaleTimeString()}`
+            }, { status: 429 })
+        }
+
         const session = await getServerSession(authOptions)
         if (!session?.user) {
             return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 })

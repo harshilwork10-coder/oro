@@ -1,265 +1,122 @@
 /**
- * Rate Limiting Utility
- * Protects against brute force and denial-of-service attacks
+ * Simple in-memory rate limiter for API routes
+ * SECURITY: Protects against brute force attacks
+ * 
+ * Note: For production with multiple instances, use Redis-based rate limiting
  */
 
-import { prisma } from '@/lib/prisma'
-import { headers } from 'next/headers'
-import { NextResponse } from 'next/server'
+interface RateLimitEntry {
+    count: number
+    resetAt: number
+}
+
+// In-memory store (works for single instance, use Redis for distributed)
+const rateLimitStore = new Map<string, RateLimitEntry>()
+
+// Clean up old entries every 5 minutes
+setInterval(() => {
+    const now = Date.now()
+    for (const [key, entry] of rateLimitStore.entries()) {
+        if (entry.resetAt < now) {
+            rateLimitStore.delete(key)
+        }
+    }
+}, 5 * 60 * 1000)
 
 export interface RateLimitConfig {
-    // Number of requests allowed in the window
-    limit: number
-    // Window size in seconds
-    windowSeconds: number
-    // Identifier type: 'ip', 'user', or 'combined'
-    identifierType?: 'ip' | 'user' | 'combined'
+    maxAttempts: number      // Max attempts allowed
+    windowMs: number         // Time window in milliseconds
+    blockDurationMs?: number // How long to block after exceeding limit
 }
 
 export interface RateLimitResult {
     allowed: boolean
     remaining: number
     resetAt: Date
-    retryAfterSeconds?: number
-}
-
-// Default rate limit configurations for different endpoint types
-export const RATE_LIMITS = {
-    // Authentication endpoints - stricter limits
-    auth: {
-        limit: 5,
-        windowSeconds: 60 * 15, // 15 minutes
-        identifierType: 'ip' as const
-    },
-    // Login attempts - 10 per 5 minutes
-    login: {
-        limit: 10,
-        windowSeconds: 60 * 5, // 5 minutes
-        identifierType: 'ip' as const
-    },
-    // Password reset - strict
-    passwordReset: {
-        limit: 3,
-        windowSeconds: 60 * 60, // 1 hour
-        identifierType: 'ip' as const
-    },
-    // API endpoints - general use
-    api: {
-        limit: 100,
-        windowSeconds: 60, // 1 minute
-        identifierType: 'user' as const
-    },
-    // Heavy operations like bulk delete, export
-    heavy: {
-        limit: 10,
-        windowSeconds: 60 * 5, // 5 minutes
-        identifierType: 'user' as const
-    },
-    // Delete operations
-    delete: {
-        limit: 20,
-        windowSeconds: 60, // 1 minute
-        identifierType: 'user' as const
-    }
+    blocked: boolean
 }
 
 /**
- * Get client IP address from request headers
+ * Check rate limit for a given identifier (IP, email, etc.)
  */
-async function getClientIp(): Promise<string> {
-    try {
-        const headersList = await headers()
-        const forwardedFor = headersList.get('x-forwarded-for')
-        if (forwardedFor) {
-            return forwardedFor.split(',')[0].trim()
-        }
-
-        return headersList.get('x-real-ip') ||
-            headersList.get('cf-connecting-ip') ||
-            'unknown'
-    } catch {
-        return 'unknown'
-    }
-}
-
-/**
- * Generate rate limit identifier based on config
- */
-async function getIdentifier(
-    config: RateLimitConfig,
-    userId?: string
-): Promise<string> {
-    const ip = await getClientIp()
-
-    switch (config.identifierType) {
-        case 'user':
-            return userId || ip
-        case 'combined':
-            return userId ? `${userId}:${ip}` : ip
-        case 'ip':
-        default:
-            return ip
-    }
-}
-
-/**
- * Check rate limit and update counter
- */
-export async function checkRateLimit(
-    endpoint: string,
-    config: RateLimitConfig,
-    userId?: string
-): Promise<RateLimitResult> {
-    const identifier = await getIdentifier(config, userId)
-    const now = new Date()
-    const windowStart = new Date(now.getTime() - config.windowSeconds * 1000)
-
-    try {
-        // Try to find existing record
-        const existing = await prisma.rateLimitRecord.findUnique({
-            where: {
-                identifier_endpoint: {
-                    identifier,
-                    endpoint
-                }
-            }
-        })
-
-        if (existing) {
-            // Check if window has expired
-            if (existing.windowStart < windowStart) {
-                // Reset the window
-                await prisma.rateLimitRecord.update({
-                    where: { id: existing.id },
-                    data: {
-                        count: 1,
-                        windowStart: now
-                    }
-                })
-
-                return {
-                    allowed: true,
-                    remaining: config.limit - 1,
-                    resetAt: new Date(now.getTime() + config.windowSeconds * 1000)
-                }
-            }
-
-            // Window still active
-            if (existing.count >= config.limit) {
-                const resetAt = new Date(existing.windowStart.getTime() + config.windowSeconds * 1000)
-                const retryAfterSeconds = Math.ceil((resetAt.getTime() - now.getTime()) / 1000)
-
-                return {
-                    allowed: false,
-                    remaining: 0,
-                    resetAt,
-                    retryAfterSeconds
-                }
-            }
-
-            // Increment counter
-            await prisma.rateLimitRecord.update({
-                where: { id: existing.id },
-                data: { count: existing.count + 1 }
-            })
-
-            return {
-                allowed: true,
-                remaining: config.limit - existing.count - 1,
-                resetAt: new Date(existing.windowStart.getTime() + config.windowSeconds * 1000)
-            }
-        }
-
-        // Create new record
-        await prisma.rateLimitRecord.create({
-            data: {
-                identifier,
-                endpoint,
-                count: 1,
-                windowStart: now
-            }
-        })
-
-        return {
-            allowed: true,
-            remaining: config.limit - 1,
-            resetAt: new Date(now.getTime() + config.windowSeconds * 1000)
-        }
-    } catch (error) {
-        // If rate limiting fails, allow the request but log the error
-        console.error('Rate limiting error:', error)
-        return {
-            allowed: true,
-            remaining: config.limit,
-            resetAt: new Date(now.getTime() + config.windowSeconds * 1000)
-        }
-    }
-}
-
-/**
- * Apply rate limiting to a request
- * Returns the rate limit response if blocked, or null if allowed
- */
-export async function applyRateLimit(
-    endpoint: string,
-    config: RateLimitConfig = RATE_LIMITS.api,
-    userId?: string
-): Promise<NextResponse | null> {
-    const result = await checkRateLimit(endpoint, config, userId)
-
-    if (!result.allowed) {
-        return NextResponse.json(
-            {
-                error: 'Too many requests',
-                message: `Rate limit exceeded. Please try again in ${result.retryAfterSeconds} seconds.`,
-                retryAfter: result.retryAfterSeconds
-            },
-            {
-                status: 429,
-                headers: {
-                    'Retry-After': String(result.retryAfterSeconds),
-                    'X-RateLimit-Limit': String(config.limit),
-                    'X-RateLimit-Remaining': '0',
-                    'X-RateLimit-Reset': result.resetAt.toISOString()
-                }
-            }
-        )
-    }
-
-    return null
-}
-
-/**
- * Get rate limit headers to add to successful responses
- */
-export function getRateLimitHeaders(
-    result: RateLimitResult,
+export function checkRateLimit(
+    identifier: string,
     config: RateLimitConfig
-): Record<string, string> {
+): RateLimitResult {
+    const now = Date.now()
+    const key = identifier
+    const entry = rateLimitStore.get(key)
+
+    // If no entry or window expired, create new entry
+    if (!entry || entry.resetAt < now) {
+        const resetAt = now + config.windowMs
+        rateLimitStore.set(key, { count: 1, resetAt })
+        return {
+            allowed: true,
+            remaining: config.maxAttempts - 1,
+            resetAt: new Date(resetAt),
+            blocked: false
+        }
+    }
+
+    // Increment count
+    entry.count++
+
+    // Check if blocked
+    if (entry.count > config.maxAttempts) {
+        // Extend block duration if configured
+        if (config.blockDurationMs) {
+            entry.resetAt = now + config.blockDurationMs
+        }
+        return {
+            allowed: false,
+            remaining: 0,
+            resetAt: new Date(entry.resetAt),
+            blocked: true
+        }
+    }
+
     return {
-        'X-RateLimit-Limit': String(config.limit),
-        'X-RateLimit-Remaining': String(result.remaining),
-        'X-RateLimit-Reset': result.resetAt.toISOString()
+        allowed: true,
+        remaining: config.maxAttempts - entry.count,
+        resetAt: new Date(entry.resetAt),
+        blocked: false
     }
 }
 
 /**
- * Clean up old rate limit records
- * Should be run periodically (e.g., via cron job)
+ * Get client IP from request headers
  */
-export async function cleanupRateLimitRecords(
-    olderThanHours: number = 24
-): Promise<number> {
-    const cutoff = new Date(Date.now() - olderThanHours * 60 * 60 * 1000)
+export function getClientIP(request: Request): string {
+    // Check common headers for proxied requests
+    const forwardedFor = request.headers.get('x-forwarded-for')
+    if (forwardedFor) {
+        return forwardedFor.split(',')[0].trim()
+    }
 
-    const result = await prisma.rateLimitRecord.deleteMany({
-        where: {
-            windowStart: {
-                lt: cutoff
-            }
-        }
-    })
+    const realIP = request.headers.get('x-real-ip')
+    if (realIP) {
+        return realIP
+    }
 
-    return result.count
+    // Fallback to unknown (should have IP in production)
+    return 'unknown'
 }
 
+// Pre-configured rate limiters
+export const AUTH_RATE_LIMIT: RateLimitConfig = {
+    maxAttempts: 5,           // 5 login attempts
+    windowMs: 15 * 60 * 1000, // per 15 minutes
+    blockDurationMs: 30 * 60 * 1000 // Block for 30 mins after limit
+}
+
+export const PIN_RATE_LIMIT: RateLimitConfig = {
+    maxAttempts: 3,           // 3 PIN attempts
+    windowMs: 5 * 60 * 1000,  // per 5 minutes
+    blockDurationMs: 15 * 60 * 1000 // Block for 15 mins
+}
+
+export const API_RATE_LIMIT: RateLimitConfig = {
+    maxAttempts: 100,         // 100 requests
+    windowMs: 60 * 1000,      // per minute
+}

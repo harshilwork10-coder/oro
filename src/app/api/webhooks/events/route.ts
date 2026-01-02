@@ -3,14 +3,21 @@ import { NextRequest, NextResponse } from 'next/server'
 // Webhook to notify provider when client adds location
 // SECURITY: Requires valid webhook secret to prevent unauthorized calls
 
-const WEBHOOK_SECRET = process.env.INTERNAL_WEBHOOK_SECRET || 'Oro_internal_webhook_secret'
+// SECURITY: No fallback - must be configured in environment
+const WEBHOOK_SECRET = process.env.INTERNAL_WEBHOOK_SECRET
 
 export async function POST(request: NextRequest) {
     try {
+        // SECURITY: Reject if webhook secret not configured
+        if (!WEBHOOK_SECRET) {
+            console.error('[SECURITY] Webhook secret not configured')
+            return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
+        }
+
         // SECURITY: Verify webhook secret
         const authHeader = request.headers.get('x-webhook-secret')
         if (authHeader !== WEBHOOK_SECRET) {
-            console.warn('[WEBHOOK] Unauthorized webhook attempt')
+            console.warn('[SECURITY] Unauthorized webhook attempt')
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 

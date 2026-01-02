@@ -49,19 +49,12 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // If still no auth but userId was provided, validate it exists (fallback for onboarding)
-        if (!userId && providedUserId) {
-            const user = await prisma.user.findUnique({
-                where: { id: providedUserId },
-                select: { id: true }
-            })
-            if (user) {
-                userId = user.id
-            }
-        }
+        // SECURITY: Do NOT allow uploads without proper authentication
+        // Removed insecure providedUserId fallback that allowed unauthenticated uploads
 
         if (!userId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            console.warn('[SECURITY] Rejected unauthenticated upload attempt')
+            return NextResponse.json({ error: 'Unauthorized - valid session or magic link required' }, { status: 401 })
         }
 
         // Validation
