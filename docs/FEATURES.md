@@ -114,8 +114,17 @@
 | **Customer Database** | Contact info, history |
 | **Loyalty Program** | Points earning/redemption |
 | **Purchase History** | All transactions |
-| **SMS Marketing** | Promotional messages |
 | **Customer Lookup** | Quick phone search at POS |
+
+### SMS Marketing & Notifications
+| Feature | Description |
+|---------|-------------|
+| **SMS Campaigns** | Send promotions to customers |
+| **SMS Receipts** | Text receipts to customers |
+| **Marketing Rules** | Automated trigger-based SMS |
+| **SMS Credits** | Pre-paid credit system |
+| **Phone Verification** | OTP verification |
+| **Opt-in/Opt-out** | Compliance management |
 
 ### Financial Reports
 | Type | Details |
@@ -126,6 +135,28 @@
 | **Shift Reports** | Cash reconciliation |
 | **Refund Reports** | Refund tracking |
 | **Lottery Reports** | Ticket sales/payouts |
+
+### Tobacco & Rebate Management
+| Feature | Description |
+|---------|-------------|
+| **Tobacco Scanning** | Scan tobacco products for rebates |
+| **Manufacturer Config** | Altria, RJR, ITG settings |
+| **Rebate Estimates** | Calculate expected rebates |
+| **Weekly Submissions** | Submit scans to manufacturers |
+| **Deal Import** | Import manufacturer deals |
+| **Rebate Tracking** | Per-pack and per-carton rates |
+| **Loyalty Bonuses** | Manufacturer loyalty programs |
+
+### Service Business Features (Salons, Spas)
+| Feature | Description |
+|---------|-------------|
+| **Online Booking** | Customers book from website |
+| **Appointment Calendar** | Visual schedule management |
+| **Service Menu** | Services with durations/prices |
+| **Staff Assignment** | Assign appointments to employees |
+| **Customer Waivers** | Digital consent forms |
+| **SMS Reminders** | Automated appointment reminders |
+| **Walk-in Queue** | Manage walk-in customers |
 
 ---
 
