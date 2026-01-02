@@ -190,10 +190,22 @@ export default function RetailPOSPage() {
     // Auto-detect screen size for responsive POS layout
     // Small screens (< 800px height) = compact mode
     const [compactMode, setCompactMode] = useState(false)
+    const [uiScale, setUiScale] = useState(1)
     useEffect(() => {
         const checkScreenSize = () => {
             // Compact mode for screens under 800px height (typical 15.5" POS at 1366x768)
             setCompactMode(window.innerHeight < 800)
+
+            // Auto-scale for narrow screens (like 1024px square displays)
+            // Reference width is 1366px - scale down proportionally for smaller
+            const referenceWidth = 1366
+            const currentWidth = window.innerWidth
+            if (currentWidth < referenceWidth) {
+                const scale = currentWidth / referenceWidth
+                setUiScale(Math.max(0.75, scale)) // Min 75% scale
+            } else {
+                setUiScale(1)
+            }
         }
         checkScreenSize()
         window.addEventListener('resize', checkScreenSize)
@@ -1085,7 +1097,15 @@ export default function RetailPOSPage() {
     const totalWithTip = total // Placeholder for now, tip logic would be in PaymentSelectionModal
 
     return (
-        <div className="h-screen flex flex-col bg-stone-950 text-stone-100">
+        <div
+            className="h-screen flex flex-col bg-stone-950 text-stone-100"
+            style={{
+                transform: uiScale < 1 ? `scale(${uiScale})` : undefined,
+                transformOrigin: 'top left',
+                width: uiScale < 1 ? `${100 / uiScale}%` : '100%',
+                height: uiScale < 1 ? `${100 / uiScale}vh` : '100vh',
+            }}
+        >
             {/* Toast */}
             {toast && (
                 <Toast
