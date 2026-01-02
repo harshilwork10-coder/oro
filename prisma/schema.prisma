@@ -4064,3 +4064,28 @@ model PushSubscription {
   
   @@index([userId])
 }
+
+// ============ LOCATION-SPECIFIC PRICING ============
+// Allows multi-store owners and franchisees to set different prices per location
+// If no LocationProduct exists, falls back to Product.price (franchise default)
+
+model LocationProduct {
+  id         String   @id @default(cuid())
+  locationId String
+  productId  String
+  
+  price      Decimal  @default(0)      // Location-specific sell price
+  costPrice  Decimal  @default(0)      // Location-specific cost
+  stock      Int      @default(0)      // Location-specific stock count
+  
+  // Relations (SQLite compatible - no cascade delete)
+  // location   Location @relation(fields: [locationId], references: [id])
+  // product    Product  @relation(fields: [productId], references: [id])
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  @@unique([locationId, productId])  // One entry per product per location
+  @@index([locationId])
+  @@index([productId])
+}

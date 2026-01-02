@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// PUT: Update product stock/price
+// PUT: Update product stock/price (supports per-location updates)
 export async function PUT(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
@@ -91,7 +91,7 @@ export async function PUT(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { productId, price, costPrice, stock } = body
+        const { productId, price, costPrice, stock, locationIds } = body
 
         if (!productId) {
             return NextResponse.json({ error: 'Product ID required' }, { status: 400 })
@@ -115,7 +115,44 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'Product not found' }, { status: 404 })
         }
 
-        // Update product
+        // If locationIds provided, update per-location pricing
+        if (locationIds && Array.isArray(locationIds) && locationIds.length > 0) {
+            // Update or create LocationProduct for each selected location
+            const updates = await Promise.all(
+                locationIds.map(async (locationId: string) => {
+                    return prisma.locationProduct.upsert({
+                        where: {
+                            locationId_productId: {
+                                locationId,
+                                productId
+                            }
+                        },
+                        update: {
+                            ...(price !== undefined ? { price } : {}),
+                            ...(costPrice !== undefined ? { costPrice } : {}),
+                            ...(stock !== undefined ? { stock } : {}),
+                            updatedAt: new Date()
+                        },
+                        create: {
+                            locationId,
+                            productId,
+                            price: price ?? product.price,
+                            costPrice: costPrice ?? product.cost ?? 0,
+                            stock: stock ?? product.stock ?? 0
+                        }
+                    })
+                })
+            )
+
+            return NextResponse.json({
+                success: true,
+                updated: updates.length,
+                locations: locationIds,
+                message: `Updated price for ${updates.length} location(s)`
+            })
+        }
+
+        // Fallback: Update franchise-wide (all locations)
         const updated = await prisma.product.update({
             where: { id: productId },
             data: {
