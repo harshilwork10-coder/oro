@@ -87,6 +87,17 @@
 | **Price Updates** | Single or bulk |
 | **Per-Location Pricing** | Different prices per store |
 
+### Printing & Hardware
+| Feature | Description |
+|---------|-------------|
+| **Receipt Printing** | Thermal receipt printers (ESC/POS) |
+| **Price Tag/Label Printing** | ZPL label printers for shelf tags |
+| **Kitchen Printing** | Orders to kitchen (restaurants) |
+| **Bar Printing** | Drink orders to bar |
+| **Multi-Printer Support** | Different printers per station |
+| **Print Agent** | Windows print agent for hardware |
+| **Configurable Label Width** | Custom label sizes |
+
 ### Employee Management
 | Feature | Description |
 |---------|-------------|
