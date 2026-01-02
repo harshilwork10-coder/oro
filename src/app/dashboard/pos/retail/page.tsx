@@ -1322,11 +1322,11 @@ export default function RetailPOSPage() {
                 </div>
             )}
 
-            {/* Top Bar - More compact on small screens */}
-            <div className={`flex items-center gap-4 bg-stone-900 border-b border-stone-800 ${compactMode ? 'p-2' : 'p-3'}`}>
+            {/* Top Bar - Scrollable on small screens for 15-inch square displays */}
+            <div className={`flex items-center gap-2 bg-stone-900 border-b border-stone-800 overflow-x-auto ${compactMode ? 'p-2' : 'p-3'}`}>
                 {/* Barcode Input - LEFT side */}
-                <div className="flex items-center gap-2 flex-1">
-                    <div className="relative flex-1 max-w-md">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="relative w-48 lg:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-stone-500" />
                         <input
                             ref={barcodeInputRef}
@@ -1377,20 +1377,20 @@ export default function RetailPOSPage() {
                 {/* 1. Search Button */}
                 <button
                     onClick={() => setShowSearchModal(true)}
-                    className="px-4 py-3 bg-stone-800 hover:bg-stone-700 rounded-lg flex items-center gap-2 transition-colors"
+                    className="px-3 py-2 bg-stone-800 hover:bg-stone-700 rounded-lg flex items-center gap-2 transition-colors flex-shrink-0"
                 >
                     <Search className="h-5 w-5" />
-                    <span>Search</span>
+                    <span className="hidden xl:inline">Search</span>
                 </button>
 
                 {/* 2. Dashboard Button - Using plain anchor for reliable navigation */}
                 <a
                     href="/dashboard"
                     target="_self"
-                    className="px-4 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg flex items-center gap-2 transition-colors cursor-pointer no-underline text-white"
+                    className="px-3 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg flex items-center gap-2 transition-colors cursor-pointer no-underline text-white flex-shrink-0"
                 >
                     <FileText className="h-5 w-5" />
-                    <span>Dashboard</span>
+                    <span className="hidden xl:inline">Dashboard</span>
                 </a>
 
                 <button
@@ -1401,19 +1401,19 @@ export default function RetailPOSPage() {
                         }
                         window.open(`/customer-display?stationId=${selectedStation.id}`, 'customer_display', 'popup=true,width=800,height=600')
                     }}
-                    className="px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center gap-2 transition-colors"
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center gap-2 transition-colors flex-shrink-0"
                 >
                     <Monitor className="h-5 w-5" />
-                    <span>Customer Display</span>
+                    <span className="hidden xl:inline">Customer Display</span>
                 </button>
 
                 {/* 5. Logout Button */}
                 <button
                     onClick={() => signOut({ callbackUrl: '/login' })}
-                    className="px-4 py-3 bg-red-600 hover:bg-red-500 rounded-lg flex items-center gap-2 transition-colors"
+                    className="px-3 py-2 bg-red-600 hover:bg-red-500 rounded-lg flex items-center gap-2 transition-colors flex-shrink-0"
                 >
                     <LogOut className="h-5 w-5" />
-                    <span>Logout</span>
+                    <span className="hidden xl:inline">Logout</span>
                 </button>
 
                 {/* 4. Station Indicator - FAR RIGHT */}
