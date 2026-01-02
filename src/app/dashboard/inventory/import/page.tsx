@@ -175,7 +175,7 @@ export default function InventoryImportPage() {
                         </p>
 
                         <label className="block cursor-pointer">
-                            <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} disabled={uploading} className="hidden" />
+                            <input type="file" accept=".csv" onChange={handleFileUpload} disabled={uploading} className="hidden" />
                             <div className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors
                                 ${uploading ? 'border-blue-500 bg-blue-500/10' : 'border-stone-700 hover:border-blue-500'}`}>
                                 {uploading ? (
@@ -187,7 +187,7 @@ export default function InventoryImportPage() {
                                     <div className="flex flex-col items-center gap-3">
                                         <Upload className="h-10 w-10 text-stone-500" />
                                         <span className="text-lg">Click to upload CSV or Excel</span>
-                                        <span className="text-stone-500 text-sm">Supports .csv, .xlsx, .xls</span>
+                                        <span className="text-stone-500 text-sm">Supports .csv files only</span>
                                     </div>
                                 )}
                             </div>

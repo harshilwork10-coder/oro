@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
-// POST - Parse uploaded CSV/Excel file
+// POST - Parse uploaded CSV file
+// SECURITY: Only CSV supported (xlsx removed due to security vulnerability)
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
@@ -28,22 +29,16 @@ export async function POST(request: NextRequest) {
         const buffer = Buffer.from(await file.arrayBuffer())
         let rows: any[] = []
 
-        // Parse based on file type
-        if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-            // Excel file
-            const XLSX = require('xlsx')
-            const workbook = XLSX.read(buffer, { type: 'buffer' })
-            const sheetName = workbook.SheetNames[0]
-            const sheet = workbook.Sheets[sheetName]
-            rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-        } else if (fileName.endsWith('.csv')) {
-            // CSV file
+        // SECURITY: Only CSV supported (xlsx removed due to prototype pollution vulnerability)
+        if (fileName.endsWith('.csv')) {
             const Papa = require('papaparse')
             const csvText = buffer.toString('utf-8')
             const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true })
             rows = parsed.data
         } else {
-            return NextResponse.json({ error: 'Unsupported file type. Use .csv, .xlsx, or .xls' }, { status: 400 })
+            return NextResponse.json({
+                error: 'Only CSV files are supported. Please save your Excel file as CSV first.'
+            }, { status: 400 })
         }
 
         if (rows.length === 0) {
