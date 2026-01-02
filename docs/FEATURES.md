@@ -137,10 +137,12 @@
 | Feature | Description |
 |---------|-------------|
 | **Install to Home Screen** | Add to phone like a native app |
-| **Works Offline** | Core features available without internet |
+| **Cached Data Viewing** | View last-synced stats when offline |
 | **Push Notifications** | Real-time alerts |
 | **No App Store Needed** | No fees, instant updates |
 | **Auto-Updates** | Always latest version |
+
+> **Note:** Full offline mode is in the POS (transaction queuing). Pulse shows cached data when offline.
 
 ### Sales Tab
 | Feature | Description |
