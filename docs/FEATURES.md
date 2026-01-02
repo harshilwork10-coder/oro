@@ -133,6 +133,15 @@
 
 > Mobile-first dashboard for owners on the go
 
+### PWA (Progressive Web App)
+| Feature | Description |
+|---------|-------------|
+| **Install to Home Screen** | Add to phone like a native app |
+| **Works Offline** | Core features available without internet |
+| **Push Notifications** | Real-time alerts |
+| **No App Store Needed** | No fees, instant updates |
+| **Auto-Updates** | Always latest version |
+
 ### Sales Tab
 | Feature | Description |
 |---------|-------------|
@@ -276,12 +285,9 @@
 - [ ] AI Voice POS
 - [ ] AI Dynamic Pricing Suggestions
 - [ ] E-commerce Integration
-- [ ] Mobile App (iOS/Android)
 - [ ] Advanced Analytics Dashboard
 - [ ] Automated Reordering
 - [ ] Vendor Management
 - [ ] Accounting Integration (QuickBooks)
 
----
-
-*This document serves as a comprehensive overview of the Oronex POS platform capabilities.*
+> **Note:** Native iOS/Android apps are NOT needed - Oro Pulse is a **PWA (Progressive Web App)** that can be installed directly from the browser to the home screen. Works offline, sends push notifications, and looks/feels like a native app without App Store/Play Store fees.
