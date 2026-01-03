@@ -2,36 +2,57 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { ApiResponse } from '@/lib/api-response'
+import { parsePaginationParams } from '@/lib/pagination'
 
-// GET - List all products with category info for inventory management
+// GET - List products with pagination, search, and filters
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return ApiResponse.unauthorized()
         }
 
-        const user = session.user as any
+        const user = session.user as { franchiseId?: string }
         if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
+            return ApiResponse.error('No franchise associated', 400)
         }
 
-        // Check for tobacco filter
         const searchParams = request.nextUrl.searchParams
-        const tobaccoFilter = searchParams.get('tobacco')
+        const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
 
-        const whereClause: any = {
+        // Filters
+        const search = searchParams.get('search')
+        const categoryId = searchParams.get('categoryId')
+        const departmentId = searchParams.get('departmentId')
+        const tobaccoFilter = searchParams.get('tobacco')
+        const lowStock = searchParams.get('lowStock')
+
+        // Build where clause
+        const whereClause: Record<string, unknown> = {
             franchiseId: user.franchiseId,
             isActive: true
         }
 
-        // If tobacco=true, only return tobacco products
-        if (tobaccoFilter === 'true') {
-            whereClause.isTobacco = true
+        if (search) {
+            whereClause.OR = [
+                { name: { contains: search } },
+                { barcode: { contains: search } },
+                { sku: { contains: search } }
+            ]
         }
 
-        const products = await prisma.product.findMany({
+        if (categoryId) whereClause.categoryId = categoryId
+        if (departmentId) whereClause.departmentId = departmentId
+        if (tobaccoFilter === 'true') whereClause.isTobacco = true
+        if (lowStock === 'true') {
+            whereClause.stock = { lte: prisma.product.fields.reorderPoint || 10 }
+        }
+
+        // Build query args with cursor pagination
+        const queryArgs: Record<string, unknown> = {
             where: whereClause,
+            take: (take || 50) + 1, // Fetch extra to check hasMore
             select: {
                 id: true,
                 name: true,
@@ -55,19 +76,33 @@ export async function GET(request: NextRequest) {
                 },
                 vendor: true,
                 isActive: true,
-                // Case break fields
                 unitsPerCase: true,
                 casePrice: true,
                 sellByCase: true,
                 stockCases: true
             },
-            orderBy: { name: 'asc' }
-        })
+            orderBy: orderBy || { name: 'asc' }
+        }
 
-        return NextResponse.json({ products })
+        if (cursor) {
+            queryArgs.cursor = { id: cursor }
+            queryArgs.skip = 1
+        }
+
+        const products = await prisma.product.findMany(queryArgs as Parameters<typeof prisma.product.findMany>[0])
+
+        const hasMore = products.length > take
+        const data = hasMore ? products.slice(0, take) : products
+        const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
+
+        return ApiResponse.paginated(data, {
+            nextCursor,
+            hasMore,
+            total: data.length
+        })
     } catch (error) {
         console.error('[INVENTORY_PRODUCTS_GET]', error)
-        return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 })
+        return ApiResponse.serverError('Failed to fetch products')
     }
 }
 

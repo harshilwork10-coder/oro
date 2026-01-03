@@ -161,8 +161,8 @@ export async function GET(request: NextRequest) {
             id: s.id,
             locationId: s.locationId,
             locationName: s.location.name,
-            openedBy: s.employee?.name || s.openedBy || 'Unknown',
-            openedAt: s.openedAt,
+            openedBy: s.employee?.name || 'Unknown',
+            openedAt: s.createdAt,
             startingCash: Number(s.startingCash),
             expectedCash: Number(s.expectedCash)
         }))

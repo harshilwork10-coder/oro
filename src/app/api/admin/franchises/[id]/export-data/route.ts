@@ -64,10 +64,6 @@ export async function GET(
                     id: true,
                     name: true,
                     address: true,
-                    city: true,
-                    state: true,
-                    zip: true,
-                    phone: true,
                     createdAt: true
                 }
             }),
@@ -88,15 +84,14 @@ export async function GET(
                 where: { franchiseId: id },
                 select: {
                     id: true,
-                    name: true,
-                    color: true
+                    name: true
                 }
             }),
             prisma.transaction.findMany({
                 where: { franchiseId: id },
                 select: {
                     id: true,
-                    receiptNumber: true,
+                    invoiceNumber: true,
                     subtotal: true,
                     tax: true,
                     total: true,
@@ -115,7 +110,6 @@ export async function GET(
                     lastName: true,
                     email: true,
                     phone: true,
-                    loyaltyPoints: true,
                     createdAt: true
                 }
             }),

@@ -13,22 +13,12 @@ export async function GET(request: NextRequest) {
 
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: {
-                role: true,
-                hasPulseAccess: true, // Per-user license
-                pulseLocationIds: true, // Allowed locations (null = all)
-                franchiseId: true,
+            include: {
                 franchise: {
-                    select: {
-                        franchisorId: true,
+                    include: {
                         franchisor: {
-                            select: {
-                                config: {
-                                    select: {
-                                        usesMobilePulse: true,
-                                        pulseSeatCount: true
-                                    }
-                                }
+                            include: {
+                                config: true
                             }
                         }
                     }
@@ -64,26 +54,18 @@ export async function GET(request: NextRequest) {
             })
         }
 
-        // Check if this specific user has a Pulse license
-        if (user.hasPulseAccess) {
-            // Parse allowed locations (null = all, JSON array = specific locations)
-            let allowedLocationIds = null
-            if (user.pulseLocationIds) {
-                try {
-                    allowedLocationIds = JSON.parse(user.pulseLocationIds)
-                } catch {
-                    allowedLocationIds = null // Fall back to all locations
-                }
-            }
-            return NextResponse.json({
-                hasAccess: true,
-                reason: 'user_licensed',
-                allowedLocationIds // null = all locations, array = specific IDs
+        // Try to get config from franchise relationship first
+        let config = user.franchise?.franchisor?.config
+
+        // If no config found, check if this user IS the franchisor owner directly
+        if (!config) {
+            const franchisor = await prisma.franchisor.findFirst({
+                where: { ownerId: session.user.id },
+                include: { config: true }
             })
+            config = franchisor?.config ?? null
         }
 
-        // Check if franchisor has Pulse enabled (for backwards compatibility)
-        const config = user.franchise?.franchisor?.config
         if (!config) {
             return NextResponse.json({
                 hasAccess: false,
@@ -100,11 +82,10 @@ export async function GET(request: NextRequest) {
             })
         }
 
-        // Pulse is enabled for business but this user doesn't have a seat
+        // Franchisor owners automatically get Pulse access if enabled
         return NextResponse.json({
-            hasAccess: false,
-            reason: 'no_seat_assigned',
-            message: 'You do not have an Oronex Pulse license. Ask your administrator to assign you a seat.',
+            hasAccess: true,
+            reason: 'franchisor_owner',
             seatsAvailable: config.pulseSeatCount
         })
 
@@ -113,4 +94,3 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ hasAccess: false, reason: 'error' }, { status: 500 })
     }
 }
-

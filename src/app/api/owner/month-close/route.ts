@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         const transactions = await prisma.transaction.findMany({
             where: transactionWhere,
             include: {
-                items: true,
+                itemLineItems: true,
                 cashDrawerSession: {
                     select: { locationId: true }
                 }
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
             const locationId = tx.cashDrawerSession?.locationId
 
             summary.totalSales += total
-            summary.totalItems += tx.items?.length || 0
+            summary.totalItems += tx.itemLineItems?.length || 0
 
             // Payment method
             const method = tx.paymentMethod || 'OTHER'
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
             if (locationId && byLocation[locationId]) {
                 byLocation[locationId].sales += total
                 byLocation[locationId].transactions++
-                byLocation[locationId].items += tx.items?.length || 0
+                byLocation[locationId].items += tx.itemLineItems?.length || 0
                 if (method === 'CASH') byLocation[locationId].cash += total
                 else if (method === 'CARD') byLocation[locationId].card += total
             }

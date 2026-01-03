@@ -77,24 +77,13 @@ export async function GET(request: NextRequest) {
                 .sort((a, b) => (a.distance || 999) - (b.distance || 999))
         }
 
-        // Get deals count for each store
-        const storeIds = filteredStores.map(s => s.id)
-        const dealsCount = await prisma.promotion.groupBy({
-            by: ['franchiseId'],
-            where: {
-                isActive: true,
-                OR: [
-                    { endDate: null },
-                    { endDate: { gte: new Date() } }
-                ]
-            },
-            _count: { id: true }
-        })
+        // NOTE: Promotion model not implemented - deals count disabled
+        // TODO: Re-enable when Promotion model is added to schema
 
-        // Map deals count to stores
+        // Map deals count to stores (returning 0 since Promotion model doesn't exist)
         const storesWithDeals = filteredStores.map(store => ({
             ...store,
-            dealsCount: dealsCount.find(d => d.franchiseId === store.id)?._count.id || 0
+            dealsCount: 0
         }))
 
         return NextResponse.json({

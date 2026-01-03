@@ -69,40 +69,15 @@ export async function GET(request: NextRequest) {
             take: 100
         })
 
-        // Get location-specific stock from LocationProduct
-        const locationProducts = await prisma.locationProduct.findMany({
-            where: {
-                productId: { in: lowStockProducts.map(p => p.id) },
-                ...(locationId ? { locationId } : {})
-            },
-            select: {
-                productId: true,
-                locationId: true,
-                stock: true,
-                price: true
-            }
-        })
+        // NOTE: LocationProduct model is not yet implemented in schema
+        // Using franchise-level product stock for now
+        // TODO: Implement LocationProduct or StockOnHand model for per-location inventory tracking
 
-        // Build location stock map
-        const locationStockMap = new Map<string, Map<string, { stock: number; price: number }>>()
-        for (const lp of locationProducts) {
-            if (!locationStockMap.has(lp.productId)) {
-                locationStockMap.set(lp.productId, new Map())
-            }
-            locationStockMap.get(lp.productId)!.set(lp.locationId, {
-                stock: lp.stock,
-                price: Number(lp.price)
-            })
-        }
-
-        // Build alerts with location breakdown
+        // Build alerts with location breakdown (using franchise-level stock for all locations)
         const alerts = lowStockProducts.map(product => {
-            const locationStock = locationStockMap.get(product.id)
-
-            // Calculate per-location status
+            // Calculate per-location status (same stock for all until location-specific inventory is implemented)
             const locationBreakdown = locations.map(loc => {
-                const locData = locationStock?.get(loc.id)
-                const stock = locData?.stock ?? product.stock
+                const stock = product.stock
                 return {
                     locationId: loc.id,
                     locationName: loc.name,

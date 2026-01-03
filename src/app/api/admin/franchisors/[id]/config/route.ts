@@ -48,15 +48,16 @@ export async function PATCH(
             'cardSurchargeType', 'cardSurcharge', 'showDualPricing'
         ]
 
-        // Handle storeLogo separately - save to Franchise record
+        // Handle storeLogo separately - save to FranchiseSettings record (not Franchise)
         if (updates.storeLogo !== undefined) {
             const franchise = await prisma.franchise.findFirst({
                 where: { franchisorId: id }
             })
             if (franchise) {
-                await prisma.franchise.update({
-                    where: { id: franchise.id },
-                    data: { storeLogo: updates.storeLogo }
+                await prisma.franchiseSettings.upsert({
+                    where: { franchiseId: franchise.id },
+                    create: { franchiseId: franchise.id, storeLogo: updates.storeLogo },
+                    update: { storeLogo: updates.storeLogo }
                 })
             }
         }

@@ -3,6 +3,20 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { saveToOroDatabase } from '@/lib/ai/sku-lookup'
+import { z } from 'zod'
+import { validateBody, badRequestResponse } from '@/lib/validation'
+
+// Validation schemas
+const productCreateSchema = z.object({
+    name: z.string().min(1, 'Name is required'),
+    sku: z.string().optional(),
+    barcode: z.string().optional(),
+    price: z.union([z.number(), z.string()]).transform(v => Number(v)),
+    stock: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
+    description: z.string().optional(),
+    category: z.string().optional().default('RETAIL'),
+    size: z.string().optional(),
+})
 
 export async function GET(request: Request) {
     const session = await getServerSession(authOptions)
@@ -47,21 +61,21 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 
-    try {
-        const body = await request.json()
-        const { name, sku, barcode, price, stock, description, category, size } = body
+    // Validate request body
+    const validation = await validateBody(request, productCreateSchema)
+    if ('error' in validation) return validation.error
 
-        if (!name || !price) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-        }
+    const { name, sku, barcode, price, stock, description, category, size } = validation.data
+
+    try {
 
         const item = await prisma.product.create({
             data: {
                 name,
                 sku,
                 barcode,
-                price: parseFloat(price),
-                stock: parseInt(stock) || 0,
+                price: price,
+                stock: stock || 0,
                 description,
                 category: category || 'RETAIL',
                 franchiseId: user.franchiseId!,
@@ -77,7 +91,7 @@ export async function POST(request: Request) {
                 category,
                 size,
                 description,
-                price: parseFloat(price),
+                price: price,
                 userId: user.id,
                 franchiseId: user.franchiseId!
             }).catch(err => console.error('[PRODUCTS] Failed to save to shared DB:', err))

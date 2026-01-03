@@ -150,9 +150,8 @@ export async function DELETE(
 
         // 3. Rate Limiting
         const rateLimitResponse = await applyRateLimit(
-            '/api/admin/clients/delete',
-            RATE_LIMITS.delete,
-            session.user.id
+            `/api/admin/clients/delete:${session.user.id}`,
+            RATE_LIMITS.api
         )
         if (rateLimitResponse) {
             return rateLimitResponse

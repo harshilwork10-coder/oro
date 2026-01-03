@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
 
             const total = Number(tx.total)
             const tax = Number(tx.tax)
-            const tip = Number(tx.tipAmount || 0)
+            const tip = Number(tx.tip || 0)
             const paymentMethod = tx.paymentMethod || 'CASH'
 
             loc.totalSales += total

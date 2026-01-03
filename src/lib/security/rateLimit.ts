@@ -104,19 +104,91 @@ export function getClientIP(request: Request): string {
 }
 
 // Pre-configured rate limiters
+// NOTE: These are tuned for busy retail/salon environments
+// Balance between security and operational practicality
 export const AUTH_RATE_LIMIT: RateLimitConfig = {
     maxAttempts: 5,           // 5 login attempts
-    windowMs: 15 * 60 * 1000, // per 15 minutes
-    blockDurationMs: 30 * 60 * 1000 // Block for 30 mins after limit
+    windowMs: 5 * 60 * 1000,  // per 5 minutes
+    blockDurationMs: 5 * 60 * 1000 // Block for 5 mins after limit (practical for retail)
 }
 
 export const PIN_RATE_LIMIT: RateLimitConfig = {
-    maxAttempts: 3,           // 3 PIN attempts
-    windowMs: 5 * 60 * 1000,  // per 5 minutes
-    blockDurationMs: 15 * 60 * 1000 // Block for 15 mins
+    maxAttempts: 5,           // 5 PIN attempts (more forgiving)
+    windowMs: 2 * 60 * 1000,  // per 2 minutes
+    blockDurationMs: 2 * 60 * 1000 // Block for only 2 mins (quick recovery for busy cashiers)
 }
 
 export const API_RATE_LIMIT: RateLimitConfig = {
     maxAttempts: 100,         // 100 requests
     windowMs: 60 * 1000,      // per minute
+}
+
+// RATE_LIMITS collection for convenient access
+export const RATE_LIMITS = {
+    login: AUTH_RATE_LIMIT,
+    pin: PIN_RATE_LIMIT,
+    api: API_RATE_LIMIT,
+    mfa: {
+        maxAttempts: 5,
+        windowMs: 5 * 60 * 1000,
+        blockDurationMs: 3 * 60 * 1000 // 3 min block
+    },
+    passwordReset: {
+        maxAttempts: 5,           // More attempts allowed
+        windowMs: 30 * 60 * 1000, // 30 min window
+        blockDurationMs: 10 * 60 * 1000 // 10 min block
+    }
+} as const
+
+/**
+ * Apply rate limiting and return a NextResponse if blocked
+ * Returns null if allowed, NextResponse with 429 status if blocked
+ */
+export async function applyRateLimit(
+    identifier: string,
+    config: RateLimitConfig
+): Promise<Response | null> {
+    const result = checkRateLimit(identifier, config)
+
+    if (!result.allowed) {
+        const { NextResponse } = await import('next/server')
+        return NextResponse.json(
+            {
+                error: 'Too many requests',
+                retryAfter: Math.ceil((result.resetAt.getTime() - Date.now()) / 1000)
+            },
+            {
+                status: 429,
+                headers: getRateLimitHeaders(result)
+            }
+        )
+    }
+
+    return null
+}
+
+/**
+ * Get rate limit headers for HTTP response
+ */
+export function getRateLimitHeaders(result: RateLimitResult): HeadersInit {
+    return {
+        'X-RateLimit-Remaining': String(result.remaining),
+        'X-RateLimit-Reset': String(Math.floor(result.resetAt.getTime() / 1000)),
+        ...(result.blocked ? { 'Retry-After': String(Math.ceil((result.resetAt.getTime() - Date.now()) / 1000)) } : {})
+    }
+}
+
+/**
+ * Cleanup expired rate limit records (called by interval, but can be manual)
+ */
+export function cleanupRateLimitRecords(): number {
+    const now = Date.now()
+    let cleaned = 0
+    for (const [key, entry] of rateLimitStore.entries()) {
+        if (entry.resetAt < now) {
+            rateLimitStore.delete(key)
+            cleaned++
+        }
+    }
+    return cleaned
 }

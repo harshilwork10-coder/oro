@@ -1,51 +1,66 @@
-import { NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcryptjs'
+import { ApiResponse } from '@/lib/api-response'
+import { parsePaginationParams } from '@/lib/pagination'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.user?.email) return ApiResponse.unauthorized()
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
         include: { franchise: true }
     })
 
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (!user) return ApiResponse.notFound('User')
 
-    let whereClause: any = { role: 'EMPLOYEE' }
+    const searchParams = request.nextUrl.searchParams
+    const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
+    const search = searchParams.get('search')
+    const locationId = searchParams.get('locationId')
+
+    // Build where clause based on user role
+    const whereClause: Record<string, unknown> = { role: 'EMPLOYEE' }
 
     if (user.role === 'FRANCHISOR') {
         const franchisor = await prisma.franchisor.findUnique({
             where: { ownerId: user.id }
         })
-        if (!franchisor) return NextResponse.json([])
+        if (!franchisor) return ApiResponse.success({ data: [], pagination: { hasMore: false, nextCursor: null } })
 
-        // Get all employees in franchises owned by this franchisor
-        whereClause.franchise = {
-            franchisorId: franchisor.id
-        }
+        whereClause.franchise = { franchisorId: franchisor.id }
     } else if (user.franchiseId) {
         whereClause.franchiseId = user.franchiseId
     } else {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+        return ApiResponse.forbidden()
     }
 
-    const employees = await prisma.user.findMany({
+    // Search filter
+    if (search) {
+        whereClause.OR = [
+            { name: { contains: search } },
+            { email: { contains: search } }
+        ]
+    }
+
+    // Location filter
+    if (locationId) {
+        whereClause.locationId = locationId
+    }
+
+    // Build query with pagination
+    const queryArgs: Record<string, unknown> = {
         where: whereClause,
+        take: (take || 50) + 1,
         select: {
             id: true,
             name: true,
             email: true,
             role: true,
-            location: {
-                select: {
-                    id: true,
-                    name: true
-                }
-            },
+            location: { select: { id: true, name: true } },
             canAddServices: true,
             canAddProducts: true,
             canManageInventory: true,
@@ -55,36 +70,53 @@ export async function GET() {
             canManageEmployees: true,
             createdAt: true
         },
-        orderBy: { createdAt: 'desc' }
-    })
+        orderBy: orderBy || { createdAt: 'desc' }
+    }
 
-    return NextResponse.json(employees)
+    if (cursor) {
+        queryArgs.cursor = { id: cursor }
+        queryArgs.skip = 1
+    }
+
+    const employees = await prisma.user.findMany(
+        queryArgs as Parameters<typeof prisma.user.findMany>[0]
+    )
+
+    const hasMore = employees.length > (take || 50)
+    const data = hasMore ? employees.slice(0, take || 50) : employees
+    const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
+
+    return ApiResponse.paginated(data, {
+        nextCursor,
+        hasMore,
+        total: data.length
+    })
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.user?.email) return ApiResponse.unauthorized()
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
         include: { franchise: true }
     })
 
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (!user) return ApiResponse.notFound('User')
 
     // Only owners/managers can add employees
     if (user.role !== 'FRANCHISOR' && user.role !== 'FRANCHISEE' && !user.canManageEmployees) {
-        return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+        return ApiResponse.forbidden('Permission denied to manage employees')
     }
 
     const body = await request.json()
-    const { name, email, password, permissions, locationId } = body
+    const { name, email, password, permissions, locationId, pin } = body
 
     if (!name || !email || !password) {
-        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+        return ApiResponse.validationError('Name, email, and password are required')
     }
 
-    // Validate Location if provided (Optional for now to support legacy, but recommended)
+    // Validate Location if provided
     let finalFranchiseId = user.franchiseId
 
     if (locationId) {
@@ -94,28 +126,28 @@ export async function POST(request: Request) {
         })
 
         if (!location) {
-            return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+            return ApiResponse.notFound('Location')
         }
 
         // Verify Access to this Location
         if (user.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({ where: { ownerId: user.id } })
             if (!franchisor || location.franchise?.franchisorId !== franchisor.id) {
-                return NextResponse.json({ error: 'You do not own this location' }, { status: 403 })
+                return ApiResponse.forbidden('You do not own this location')
             }
         } else if (user.franchiseId && location.franchiseId !== user.franchiseId) {
-            return NextResponse.json({ error: 'Location does not belong to your franchise' }, { status: 403 })
+            return ApiResponse.forbidden('Location does not belong to your franchise')
         }
 
         finalFranchiseId = location.franchiseId
     } else if (user.role === 'FRANCHISOR') {
-        return NextResponse.json({ error: 'Location is required for Franchisors' }, { status: 400 })
+        return ApiResponse.validationError('Location is required for Franchisors')
     }
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({ where: { email } })
     if (existingUser) {
-        return NextResponse.json({ error: 'User already exists' }, { status: 400 })
+        return ApiResponse.conflict('User with this email already exists')
     }
 
     // Check user limit based on subscription
@@ -136,19 +168,17 @@ export async function POST(request: Request) {
             const maxUsers = franchisor.config?.maxUsers || 1
 
             if (currentUserCount >= maxUsers) {
-                return NextResponse.json({
-                    error: 'User limit reached',
-                    message: `Your ${franchisor.config?.subscriptionTier || 'STARTER'} plan allows ${maxUsers} user(s). Upgrade to add more.`,
-                    code: 'LIMIT_REACHED',
-                    current: currentUserCount,
-                    limit: maxUsers
-                }, { status: 403 })
+                return ApiResponse.error(
+                    `User limit reached. Your ${franchisor.config?.subscriptionTier || 'STARTER'} plan allows ${maxUsers} user(s). Upgrade to add more.`,
+                    403,
+                    { code: 'LIMIT_REACHED', details: { current: currentUserCount, limit: maxUsers } }
+                )
             }
         }
     }
 
     const hashedPassword = await hash(password, 10)
-    const hashedPin = body.pin ? await hash(body.pin, 10) : undefined
+    const hashedPin = pin ? await hash(pin, 10) : undefined
 
     const employee = await prisma.user.create({
         data: {
@@ -159,7 +189,6 @@ export async function POST(request: Request) {
             role: 'EMPLOYEE',
             franchiseId: finalFranchiseId,
             locationId: locationId || null,
-            // Permissions
             canAddServices: permissions?.canAddServices || false,
             canAddProducts: permissions?.canAddProducts || false,
             canManageInventory: permissions?.canManageInventory || false,
@@ -171,6 +200,5 @@ export async function POST(request: Request) {
     })
 
     const { password: _, ...employeeWithoutPassword } = employee
-    return NextResponse.json(employeeWithoutPassword)
+    return ApiResponse.created(employeeWithoutPassword)
 }
-

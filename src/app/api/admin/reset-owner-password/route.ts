@@ -19,9 +19,8 @@ export async function POST(request: NextRequest) {
 
         // Rate limiting - prevent brute force
         const rateLimitResponse = await applyRateLimit(
-            '/api/admin/reset-owner-password',
-            RATE_LIMITS.passwordReset,
-            session.user.id
+            `/api/admin/reset-owner-password:${session.user.id}`,
+            RATE_LIMITS.passwordReset
         )
         if (rateLimitResponse) return rateLimitResponse
 

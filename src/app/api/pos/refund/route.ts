@@ -75,45 +75,51 @@ export async function POST(req: Request) {
         const refundTax = refundSubtotal * (isNaN(taxRate) ? 0 : taxRate)
         const refundTotal = refundSubtotal + refundTax
 
-        // Create Refund Transaction (Negative values)
-        const refundTx = await prisma.transaction.create({
-            data: {
-                franchiseId: user.franchiseId,
-                clientId: originalTx.clientId,
-                employeeId: user.id,
-                originalTransactionId: originalTx.id,
-                status: 'REFUNDED',
-                paymentMethod: refundMethod || originalTx.paymentMethod,
-                subtotal: -refundSubtotal,
-                tax: -refundTax,
-                total: -refundTotal,
-                voidReason: reason || 'No reason provided', // Store refund reason for audit
-                cashDrawerSessionId: originalTx.cashDrawerSessionId,
-                lineItems: {
-                    create: refundItems
+        // ===== ATOMIC TRANSACTION BLOCK =====
+        // All refund operations are wrapped for rollback safety
+        const refundTx = await prisma.$transaction(async (tx) => {
+            // Create Refund Transaction (Negative values)
+            const refundTransaction = await tx.transaction.create({
+                data: {
+                    franchiseId: user.franchiseId,
+                    clientId: originalTx.clientId,
+                    employeeId: user.id,
+                    originalTransactionId: originalTx.id,
+                    status: 'REFUNDED',
+                    paymentMethod: refundMethod || originalTx.paymentMethod,
+                    subtotal: -refundSubtotal,
+                    tax: -refundTax,
+                    total: -refundTotal,
+                    voidReason: reason || 'No reason provided',
+                    cashDrawerSessionId: originalTx.cashDrawerSessionId,
+                    lineItems: {
+                        create: refundItems
+                    }
                 }
-            }
-        })
-
-        // Update Original Transaction Status
-        // Only mark as REFUNDED if all items were refunded
-        const allItemsRefunded = refundType === 'FULL'
-        if (allItemsRefunded) {
-            await prisma.transaction.update({
-                where: { id: originalTx.id },
-                data: { status: 'REFUNDED' }
             })
-        }
 
-        // Restock Inventory for refunded items
-        for (const refundItem of refundLineItems) {
-            if (refundItem.type === 'PRODUCT' && refundItem.productId) {
-                await prisma.product.update({
-                    where: { id: refundItem.productId },
-                    data: { stock: { increment: refundItem.quantityToRefund } }
+            // Update Original Transaction Status
+            const allItemsRefunded = refundType === 'FULL'
+            if (allItemsRefunded) {
+                await tx.transaction.update({
+                    where: { id: originalTx.id },
+                    data: { status: 'REFUNDED' }
                 })
             }
-        }
+
+            // Restock Inventory for refunded items
+            for (const refundItem of refundLineItems) {
+                if (refundItem.type === 'PRODUCT' && refundItem.productId) {
+                    await tx.product.update({
+                        where: { id: refundItem.productId },
+                        data: { stock: { increment: refundItem.quantityToRefund } }
+                    })
+                }
+            }
+
+            return refundTransaction
+        })
+        // ===== END ATOMIC TRANSACTION BLOCK =====
 
         // ===== AUDIT LOG - Record this refund for legal protection =====
         await logActivity({

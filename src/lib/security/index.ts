@@ -30,9 +30,13 @@ export {
 // Rate limiting
 export {
     checkRateLimit,
+    getClientIP,
     applyRateLimit,
     getRateLimitHeaders,
     cleanupRateLimitRecords,
+    AUTH_RATE_LIMIT,
+    PIN_RATE_LIMIT,
+    API_RATE_LIMIT,
     RATE_LIMITS,
     type RateLimitConfig,
     type RateLimitResult

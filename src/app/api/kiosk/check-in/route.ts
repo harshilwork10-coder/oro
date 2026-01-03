@@ -7,7 +7,7 @@ export async function POST(request: Request) {
         // Rate limit by IP - max 30 check-ins per minute per IP to prevent abuse
         const rateLimitResponse = await applyRateLimit(
             '/api/kiosk/check-in',
-            { limit: 18, windowSeconds: 60, identifierType: 'ip' }
+            { maxAttempts: 18, windowMs: 60000 }
         )
         if (rateLimitResponse) return rateLimitResponse
 

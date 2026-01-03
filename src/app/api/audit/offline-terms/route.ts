@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 // POST - Log audit events for offline mode
 export async function POST(request: NextRequest) {
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
                 entityType: 'OFFLINE_MODE',
                 entityId: storeName || 'unknown',
                 userId: (session.user as any).id,
-                details: JSON.stringify({
+                changes: JSON.stringify({
                     storeName,
                     ownerName,
                     termsVersion,
@@ -29,8 +29,7 @@ export async function POST(request: NextRequest) {
                     userAgent: request.headers.get('user-agent'),
                     ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
                     ...details
-                }),
-                createdAt: new Date()
+                })
             }
         });
 
@@ -76,12 +75,12 @@ export async function GET(request: NextRequest) {
         });
 
         return NextResponse.json({
-            logs: logs.map(log => ({
+            logs: logs.map((log: typeof logs[number]) => ({
                 id: log.id,
                 action: log.action,
                 storeId: log.entityId,
                 userId: log.userId,
-                details: JSON.parse(log.details || '{}'),
+                details: JSON.parse(log.changes || '{}'),
                 createdAt: log.createdAt
             }))
         });

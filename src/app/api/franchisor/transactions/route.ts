@@ -56,11 +56,11 @@ export async function GET(request: NextRequest) {
             where,
             include: {
                 employee: { select: { name: true } },
-                client: { select: { name: true, phone: true } },
+                client: { select: { firstName: true, lastName: true, phone: true } },
                 cashDrawerSession: {
                     select: { location: { select: { name: true } } }
                 },
-                items: {
+                itemLineItems: {
                     take: 3,
                     include: { item: { select: { name: true } } }
                 }
@@ -77,16 +77,16 @@ export async function GET(request: NextRequest) {
             dateTime: tx.createdAt,
             location: tx.cashDrawerSession?.location?.name || 'Unknown',
             employee: tx.employee?.name || 'Unknown',
-            customer: tx.client?.name || 'Walk-in',
+            customer: tx.client ? `${tx.client.firstName} ${tx.client.lastName}` : 'Walk-in',
             customerPhone: tx.client?.phone,
             subtotal: Number(tx.subtotal),
             tax: Number(tx.tax),
             total: Number(tx.total),
-            tip: Number(tx.tipAmount || 0),
+            tip: Number(tx.tip || 0),
             paymentMethod: tx.paymentMethod,
             status: tx.status,
-            itemCount: tx.items.length,
-            itemPreview: tx.items.slice(0, 3).map(i => i.item?.name || 'Item').join(', ')
+            itemCount: tx.itemLineItems.length,
+            itemPreview: tx.itemLineItems.slice(0, 3).map(i => i.item?.name || 'Item').join(', ')
         }))
 
         return NextResponse.json({

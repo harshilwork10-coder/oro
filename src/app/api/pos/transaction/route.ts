@@ -4,27 +4,68 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateInvoiceNumber } from '@/lib/invoice'
 import { logActivity, ActionTypes } from '@/lib/auditLog'
+import { checkIdempotency, storeIdempotencyKey, getIdempotencyKey } from '@/lib/api/idempotency'
+import { z } from 'zod'
+import { validateBody, unauthorizedResponse, badRequestResponse } from '@/lib/validation'
+
+// Request validation schema
+const transactionRequestSchema = z.object({
+    items: z.array(z.object({
+        id: z.string().optional(),
+        type: z.enum(['SERVICE', 'PRODUCT']),
+        name: z.string(),
+        price: z.union([z.number(), z.string()]).transform(v => Number(v)),
+        quantity: z.union([z.number(), z.string()]).transform(v => Number(v)),
+        discount: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
+    })).min(1, 'At least one item required'),
+    subtotal: z.union([z.number(), z.string()]).transform(v => Number(v)),
+    tax: z.union([z.number(), z.string()]).transform(v => Number(v)),
+    total: z.union([z.number(), z.string()]).transform(v => Number(v)),
+    paymentMethod: z.enum(['CASH', 'CREDIT_CARD', 'DEBIT_CARD', 'SPLIT', 'GIFT_CARD', 'EBT']),
+    cashDrawerSessionId: z.string().optional().nullable(),
+    clientId: z.string().optional().nullable(),
+    cashAmount: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
+    cardAmount: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
+    gatewayTxId: z.string().optional().nullable(),
+    authCode: z.string().optional().nullable(),
+    cardLast4: z.string().optional().nullable(),
+    cardType: z.string().optional().nullable(),
+    tip: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
+})
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.franchiseId) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        return unauthorizedResponse()
     }
 
-    try {
-        const body = await req.json()
-        const { items, subtotal, tax, total, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType, tip } = body
+    // Validate request body
+    const validation = await validateBody(req, transactionRequestSchema)
+    if ('error' in validation) return validation.error
 
+    const { items, subtotal, tax, total, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType, tip } = validation.data
+
+    // ===== IDEMPOTENCY CHECK =====
+    // Prevents duplicate transaction processing (double-charge protection)
+    const idempotencyKey = getIdempotencyKey(req)
+    if (idempotencyKey) {
+        const idempotencyResult = await checkIdempotency(idempotencyKey, session.user.franchiseId)
+        if (idempotencyResult.isDuplicate) {
+            console.log(`[POS_TRANSACTION] Duplicate request detected, returning cached response`)
+            return NextResponse.json(idempotencyResult.cachedResponse)
+        }
+    }
+    // ===== END IDEMPOTENCY CHECK =====
+
+    try {
         // Security: Log minimal info only
         console.log(`[POS_TRANSACTION] Processing ${paymentMethod} transaction for ${items?.length || 0} items`)
 
         // Validate split payment
         if (paymentMethod === 'SPLIT') {
-            const splitTotal = (parseFloat(cashAmount) || 0) + (parseFloat(cardAmount) || 0)
-            if (Math.abs(splitTotal - parseFloat(total)) > 0.01) {
-                return NextResponse.json({
-                    error: `Split payment amounts ($${cashAmount} cash + $${cardAmount} card) must equal total ($${total})`
-                }, { status: 400 })
+            const splitTotal = (cashAmount || 0) + (cardAmount || 0)
+            if (Math.abs(splitTotal - total) > 0.01) {
+                return badRequestResponse(`Split payment amounts ($${cashAmount} cash + $${cardAmount} card) must equal total ($${total})`)
             }
         }
 
@@ -71,15 +112,33 @@ export async function POST(req: Request) {
             }
         }
 
-        console.log('[POS_TRANSACTION_POST] Creating transaction with:', JSON.stringify(transactionData, null, 2))
+        console.log('[POS_TRANSACTION_POST] Creating transaction atomically')
 
-        const transaction = await prisma.transaction.create({
-            data: transactionData,
-            include: {
-                lineItems: true,
-                client: true
+        // ===== ATOMIC TRANSACTION BLOCK =====
+        // All sale operations wrapped for rollback safety
+        const transaction = await prisma.$transaction(async (tx) => {
+            // Create the transaction with line items
+            const newTransaction = await tx.transaction.create({
+                data: transactionData,
+                include: {
+                    lineItems: true,
+                    client: true
+                }
+            })
+
+            // Decrement inventory for product items
+            for (const item of items) {
+                if (item.type === 'PRODUCT' && item.id && !item.id.startsWith('p') && !item.id.startsWith('custom')) {
+                    await tx.product.update({
+                        where: { id: item.id },
+                        data: { stock: { decrement: item.quantity } }
+                    })
+                }
             }
+
+            return newTransaction
         })
+        // ===== END ATOMIC TRANSACTION BLOCK =====
 
         // ===== AUDIT LOG - Record this sale for legal protection =====
         const user = session.user as any
@@ -93,7 +152,7 @@ export async function POST(req: Request) {
             entityId: transaction.id,
             details: {
                 invoiceNumber: transaction.invoiceNumber,
-                total: parseFloat(total),
+                total: total,
                 paymentMethod,
                 itemCount: items?.length || 0,
                 tip: tip || 0,
@@ -104,6 +163,12 @@ export async function POST(req: Request) {
             }
         })
         // =============================================================
+
+        // ===== STORE IDEMPOTENCY KEY =====
+        if (idempotencyKey) {
+            await storeIdempotencyKey(idempotencyKey, session.user.franchiseId, transaction)
+        }
+        // ===== END STORE IDEMPOTENCY KEY =====
 
         return NextResponse.json(transaction)
     } catch (error: any) {

@@ -248,8 +248,8 @@ export default function CrossStoreInventoryPage() {
                                 key={product.id}
                                 onClick={() => selectProduct(product)}
                                 className={`w-full text-left p-4 rounded-xl transition-all ${selectedProduct?.id === product.id
-                                        ? 'bg-orange-500/20 border border-orange-500'
-                                        : 'bg-stone-800 hover:bg-stone-700 border border-stone-700'
+                                    ? 'bg-orange-500/20 border border-orange-500'
+                                    : 'bg-stone-800 hover:bg-stone-700 border border-stone-700'
                                     }`}
                             >
                                 <p className="font-medium">{product.name}</p>
@@ -353,8 +353,8 @@ export default function CrossStoreInventoryPage() {
                                         <div
                                             key={loc.locationId}
                                             className={`p-5 rounded-xl border ${priceChanged || stockChanged
-                                                    ? 'bg-orange-500/10 border-orange-500/50'
-                                                    : 'bg-stone-800 border-stone-700'
+                                                ? 'bg-orange-500/10 border-orange-500/50'
+                                                : 'bg-stone-800 border-stone-700'
                                                 }`}
                                         >
                                             <div className="flex items-center justify-between mb-4">
@@ -395,12 +395,33 @@ export default function CrossStoreInventoryPage() {
                                                 <div>
                                                     <label className="text-xs text-stone-500">Stock</label>
                                                     {editMode ? (
-                                                        <input
-                                                            type="number"
-                                                            value={editedStock ?? loc.stock}
-                                                            onChange={(e) => updateStock(loc.locationId, e.target.value)}
-                                                            className="w-full px-3 py-2 bg-stone-900 border border-stone-600 rounded-lg text-lg mt-1"
-                                                        />
+                                                        <div className="mt-1">
+                                                            <p className="text-xl font-bold mb-2">{editedStock ?? loc.stock}</p>
+                                                            <div className="flex gap-1">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const amount = parseInt(prompt('How many to ADD?') || '0')
+                                                                        if (amount > 0) {
+                                                                            updateStock(loc.locationId, String((editedStock ?? loc.stock) + amount))
+                                                                        }
+                                                                    }}
+                                                                    className="flex-1 py-1.5 bg-green-600/30 border border-green-500/50 rounded text-green-400 text-xs font-bold"
+                                                                >
+                                                                    + Add
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const amount = parseInt(prompt('How many to REMOVE?') || '0')
+                                                                        if (amount > 0) {
+                                                                            updateStock(loc.locationId, String(Math.max(0, (editedStock ?? loc.stock) - amount)))
+                                                                        }
+                                                                    }}
+                                                                    className="flex-1 py-1.5 bg-red-600/30 border border-red-500/50 rounded text-red-400 text-xs font-bold"
+                                                                >
+                                                                    - Remove
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     ) : (
                                                         <p className={`text-2xl font-bold mt-1 ${loc.stock <= 5 ? 'text-red-400' : ''}`}>
                                                             {loc.stock}

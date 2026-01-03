@@ -1,14 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { ApiResponse } from '@/lib/api-response'
+import { parsePaginationParams } from '@/lib/pagination'
 
-// GET - Get all store accounts with balances
+// GET - Get all store accounts with balances and pagination
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return ApiResponse.unauthorized()
         }
 
         const user = await prisma.user.findUnique({
@@ -17,13 +19,16 @@ export async function GET(request: NextRequest) {
         })
 
         if (!user?.franchiseId) {
-            return NextResponse.json({ accounts: [] })
+            return ApiResponse.success({ accounts: [], totals: { totalAccounts: 0, totalOutstanding: 0, accountsWithBalance: 0 } })
         }
 
-        const { searchParams } = new URL(request.url)
-        const filter = searchParams.get('filter') || 'all' // all, outstanding, zero
+        const searchParams = request.nextUrl.searchParams
+        const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
+        const filter = searchParams.get('filter') || 'all'
+        const search = searchParams.get('search')
 
-        let whereClause: any = {
+        // Build where clause
+        const whereClause: Record<string, unknown> = {
             franchiseId: user.franchiseId,
             hasStoreAccount: true
         }
@@ -34,8 +39,19 @@ export async function GET(request: NextRequest) {
             whereClause.storeAccountBalance = { equals: 0 }
         }
 
-        const clients = await prisma.client.findMany({
+        if (search) {
+            whereClause.OR = [
+                { firstName: { contains: search } },
+                { lastName: { contains: search } },
+                { phone: { contains: search } },
+                { email: { contains: search } }
+            ]
+        }
+
+        // Build query with pagination
+        const queryArgs: Record<string, unknown> = {
             where: whereClause,
+            take: (take || 50) + 1,
             select: {
                 id: true,
                 firstName: true,
@@ -45,14 +61,34 @@ export async function GET(request: NextRequest) {
                 storeAccountBalance: true,
                 storeAccountLimit: true,
                 storeAccountApprovedAt: true,
-                _count: {
-                    select: { storeAccountTransactions: true }
-                }
+                _count: { select: { storeAccountTransactions: true } }
             },
-            orderBy: { storeAccountBalance: 'desc' }
-        })
+            orderBy: orderBy || { storeAccountBalance: 'desc' }
+        }
 
-        const accounts = clients.map(c => ({
+        if (cursor) {
+            queryArgs.cursor = { id: cursor }
+            queryArgs.skip = 1
+        }
+
+        const clients = await prisma.client.findMany(
+            queryArgs as Parameters<typeof prisma.client.findMany>[0]
+        )
+
+        // Get totals (separate query for accurate counts)
+        const [totalCount, outstandingCount] = await Promise.all([
+            prisma.client.count({
+                where: { franchiseId: user.franchiseId, hasStoreAccount: true }
+            }),
+            prisma.client.count({
+                where: { franchiseId: user.franchiseId, hasStoreAccount: true, storeAccountBalance: { gt: 0 } }
+            })
+        ])
+
+        const hasMore = clients.length > (take || 50)
+        const data = hasMore ? clients.slice(0, take || 50) : clients
+
+        const accounts = data.map((c) => ({
             id: c.id,
             name: `${c.firstName} ${c.lastName}`,
             phone: c.phone || '',
@@ -63,16 +99,15 @@ export async function GET(request: NextRequest) {
             approvedAt: c.storeAccountApprovedAt
         }))
 
-        const totals = {
-            totalAccounts: accounts.length,
-            totalOutstanding: accounts.reduce((sum, a) => sum + a.balance, 0),
-            accountsWithBalance: accounts.filter(a => a.balance > 0).length
-        }
+        const nextCursor = hasMore && accounts.length > 0 ? accounts[accounts.length - 1].id : null
 
-        return NextResponse.json({ accounts, totals })
+        return ApiResponse.paginated(
+            { accounts, totals: { totalAccounts: totalCount, totalOutstanding: 0, accountsWithBalance: outstandingCount } },
+            { nextCursor, hasMore, total: totalCount }
+        )
     } catch (error) {
         console.error('Error:', error)
-        return NextResponse.json({ error: 'Failed' }, { status: 500 })
+        return ApiResponse.serverError('Failed to fetch store accounts')
     }
 }
 
@@ -81,24 +116,23 @@ export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return ApiResponse.unauthorized()
         }
 
-        // SECURITY: Get user's franchiseId
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             select: { franchiseId: true }
         })
 
         if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'No franchise assigned' }, { status: 403 })
+            return ApiResponse.forbidden('No franchise assigned')
         }
 
         const body = await request.json()
         const { clientId, creditLimit } = body
 
         if (!clientId) {
-            return NextResponse.json({ error: 'Client ID required' }, { status: 400 })
+            return ApiResponse.validationError('Client ID required')
         }
 
         // SECURITY: Verify client belongs to user's franchise before modifying
@@ -108,12 +142,12 @@ export async function POST(request: NextRequest) {
         })
 
         if (!existingClient) {
-            return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+            return ApiResponse.notFound('Client')
         }
 
         if (existingClient.franchiseId !== user.franchiseId) {
             console.warn(`[SECURITY] IDOR attempt: User ${session.user.id} tried to modify client ${clientId}`)
-            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+            return ApiResponse.forbidden('Access denied')
         }
 
         const client = await prisma.client.update({
@@ -127,18 +161,13 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        return NextResponse.json({
-            success: true,
-            message: 'Store account created',
-            client: {
-                id: client.id,
-                name: `${client.firstName} ${client.lastName}`,
-                limit: Number(client.storeAccountLimit)
-            }
+        return ApiResponse.created({
+            id: client.id,
+            name: `${client.firstName} ${client.lastName}`,
+            limit: Number(client.storeAccountLimit)
         })
     } catch (error) {
         console.error('Error:', error)
-        return NextResponse.json({ error: 'Failed' }, { status: 500 })
+        return ApiResponse.serverError('Failed to create store account')
     }
 }
-

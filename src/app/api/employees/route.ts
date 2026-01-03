@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcrypt'
+import { logActivity, ActionTypes } from '@/lib/auditLog'
 
 export async function GET() {
     try {
@@ -119,6 +120,18 @@ export async function POST(request: Request) {
 
         // Remove password from response but include temp password for user to see once
         const { password, ...userWithoutPassword } = user
+
+        // Audit log
+        await logActivity({
+            userId: session.user.id,
+            userEmail: session.user.email || '',
+            userRole: session.user.role,
+            franchiseId: franchiseId || undefined,
+            action: ActionTypes.EMPLOYEE_ADDED,
+            entityType: 'USER',
+            entityId: user.id,
+            details: { name, email, role }
+        })
 
         return NextResponse.json({
             ...userWithoutPassword,

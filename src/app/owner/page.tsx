@@ -24,7 +24,7 @@ function KpiCard({ title, value, change, changeType, icon: Icon }: {
             <div className="text-2xl font-bold text-[var(--text-primary)]">{value}</div>
             {change && (
                 <div className={`flex items-center gap-1 mt-2 text-sm ${changeType === 'up' ? 'text-emerald-400' :
-                        changeType === 'down' ? 'text-red-400' : 'text-[var(--text-muted)]'
+                    changeType === 'down' ? 'text-red-400' : 'text-[var(--text-muted)]'
                     }`}>
                     {changeType === 'up' ? <ArrowUpRight size={14} /> :
                         changeType === 'down' ? <ArrowDownRight size={14} /> : null}
@@ -38,7 +38,7 @@ function KpiCard({ title, value, change, changeType, icon: Icon }: {
 // Quick Action Button
 function QuickAction({ label, icon: Icon, href }: {
     label: string;
-    icon: React.ComponentType<{ size?: number }>;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
     href: string;
 }) {
     return (
@@ -73,8 +73,8 @@ export default function OwnerDashboard() {
                             key={p}
                             onClick={() => setPeriod(p)}
                             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${period === p
-                                    ? 'bg-[var(--primary)] text-white'
-                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                ? 'bg-[var(--primary)] text-white'
+                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                 }`}
                         >
                             {p}

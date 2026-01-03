@@ -353,7 +353,7 @@ model Franchise {
 model FranchiseSettings {
   id          String    @id @default(cuid())
   franchiseId String    @unique
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   // Store Branding & Personalization
   storeLogo         String?  // URL to uploaded store logo
@@ -398,7 +398,7 @@ model FranchiseSettings {
 model ReminderSettings {
   id          String    @id @default(cuid())
   franchiseId String    @unique
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   // Email Settings
   emailEnabled      Boolean @default(true)
@@ -466,7 +466,7 @@ model ProviderSmsConfig {
 model SmsCredits {
   id          String    @id @default(cuid())
   franchiseId String    @unique
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   creditsRemaining Int       @default(0) // Current SMS credits
   creditsUsed      Int       @default(0) // Total SMS sent
@@ -495,7 +495,7 @@ model SmsLog {
 model SmsMarketingRule {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   name     String // "Win-Back", "Birthday", "VIP Reward"
   ruleType String // WIN_BACK, BIRTHDAY, VIP, REVIEW_REQUEST, CUSTOM
@@ -547,7 +547,7 @@ model SmsMarketingRule {
 model CustomerPromo {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
   clientId    String
   client      Client    @relation(fields: [clientId], references: [id])
 
@@ -781,7 +781,7 @@ model ExpansionRequest {
 
   // The franchise brand they want to expand (which Brand Franchisor owns)
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   // Request details
   proposedName    String // e.g., "McDonald's Austin"
@@ -1125,7 +1125,7 @@ model Client {
 model Appointment {
   id         String   @id @default(cuid())
   locationId String
-  location   Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   clientId String
   client   Client @relation(fields: [clientId], references: [id])
@@ -1156,7 +1156,7 @@ model Appointment {
 model Schedule {
   id         String   @id @default(cuid())
   locationId String
-  location   Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   employeeId String
   employee   User   @relation(fields: [employeeId], references: [id])
@@ -1219,6 +1219,7 @@ model ProductCategory {
   isEbtEligible Boolean @default(false) // If true, products in this category can be purchased with EBT
 
   products Product[]
+  promotionProducts PromotionProduct[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1231,7 +1232,7 @@ model ProductCategory {
 model Product {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   name            String
   description     String?
@@ -1295,6 +1296,9 @@ model Product {
   // Order templates
   orderTemplateItems OrderTemplateItem[]
 
+  // Promotion products (qualifying items for deals)
+  promotionProducts PromotionProduct[]
+
   // INDEXES for 100K+ SKU performance
   @@index([franchiseId])                    // Filter by franchise (most queries)
   @@index([barcode])                        // Fast barcode scan lookup
@@ -1335,7 +1339,7 @@ model Transaction {
   id            String    @id @default(cuid())
   invoiceNumber String?   @unique // Sequential invoice number for IRS compliance
   franchiseId   String
-  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   clientId String?
   client   Client? @relation(fields: [clientId], references: [id])
@@ -1398,7 +1402,7 @@ model Transaction {
 model TransactionLineItem {
   id            String      @id @default(cuid())
   transactionId String
-  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
   type String // SERVICE, PRODUCT
 
@@ -1438,7 +1442,7 @@ model RoyaltyConfig {
 model RoyaltyRecord {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   periodStart DateTime
   periodEnd   DateTime
@@ -1478,7 +1482,7 @@ model Terminal {
   serialNumber String   @unique
   model        String // e.g., "PAX A920"
   locationId   String
-  location     Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   status       String   @default("ONLINE") // ONLINE, OFFLINE, ERROR
   ipAddress    String?
   macAddress   String?
@@ -1497,7 +1501,7 @@ model Terminal {
 model SplitPayoutConfig {
   id          String    @id @default(cuid())
   franchiseId String    @unique
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   isEnabled        Boolean @default(false) // OPTIONAL as requested
   royaltyPercent   Decimal // e.g., 6.0
@@ -1516,7 +1520,7 @@ model SplitPayoutConfig {
 model MembershipPlan {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   name            String // e.g., "VIP Gold"
   price           Decimal
@@ -1535,9 +1539,9 @@ model MembershipPlan {
 model ClientMembership {
   id       String         @id @default(cuid())
   clientId String
-  client   Client         @relation(fields: [clientId], references: [id])
+  client   Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   planId   String
-  plan     MembershipPlan @relation(fields: [planId], references: [id])
+  plan     MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   status          String   @default("ACTIVE") // ACTIVE, CANCELLED, PAST_DUE
   startDate       DateTime @default(now())
@@ -1553,7 +1557,7 @@ model ClientMembership {
 model Supplier {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   name        String
   contactName String?
@@ -1584,9 +1588,9 @@ model ProductSupplier {
 model PurchaseOrder {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
   locationId  String
-  location    Location  @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   supplierId  String
   supplier    Supplier  @relation(fields: [supplierId], references: [id])
 
@@ -1622,7 +1626,7 @@ model StockAdjustment {
   productId  String
   product    Product  @relation(fields: [productId], references: [id])
   locationId String
-  location   Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   quantity Int // Positive (add) or Negative (remove)
   reason   String // "SALE", "RESTOCK", "DAMAGE", "THEFT", "TRANSFER"
@@ -1644,7 +1648,7 @@ model TimeEntry {
   userId     String
   user       User     @relation(fields: [userId], references: [id])
   locationId String
-  location   Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   clockIn       DateTime
   clockOut      DateTime?
@@ -1660,7 +1664,7 @@ model TimeEntry {
 model CommissionRule {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   name           String // e.g., "Senior Stylist Tier"
   servicePercent Decimal // e.g., 40.0
@@ -1689,7 +1693,7 @@ model GiftCard {
   id          String    @id @default(cuid())
   code        String    @unique
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   initialAmount  Decimal
   currentBalance Decimal
@@ -1709,7 +1713,7 @@ model GiftCard {
 model CashDrawerSession {
   id         String   @id @default(cuid())
   locationId String
-  location   Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   employeeId String
   employee   User     @relation(fields: [employeeId], references: [id])
 
@@ -1755,7 +1759,7 @@ model CashDrop {
 model Discount {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   name  String
   code  String? // Optional promo code
@@ -1848,12 +1852,16 @@ model PromotionProduct {
 
   // Can link to category OR specific product (one or the other)
   categoryId String? // ProductCategory ID
+  category   ProductCategory? @relation(fields: [categoryId], references: [id])
   productId  String? // Product ID
+  product    Product? @relation(fields: [productId], references: [id])
 
   // Exclusion flag - if true, this item is EXCLUDED from the deal
   isExcluded Boolean @default(false)
 
   @@index([promotionId])
+  @@index([productId])
+  @@index([categoryId])
 }
 
 // ============ COMMUNITY & AUTH ============
@@ -1921,7 +1929,7 @@ model UserBadge {
 model Review {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   clientId String
   client   Client @relation(fields: [clientId], references: [id])
@@ -2414,7 +2422,7 @@ model DrawerActivity {
   shiftId       String?
   shift         CashDrawerSession? @relation(fields: [shiftId], references: [id])
   locationId    String
-  location      Location           @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   transactionId String? // Related transaction if any
   transaction   Transaction?       @relation(fields: [transactionId], references: [id])
 
@@ -2497,7 +2505,7 @@ model WaitlistEntry {
   seatedAt      DateTime?
   notifiedAt    DateTime?
 
-  location Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   service  Service? @relation(fields: [serviceId], references: [id])
 
   createdAt DateTime @default(now())
@@ -2631,6 +2639,9 @@ model LoyaltyMember {
   enrolledAt   DateTime @default(now())
   lastActivity DateTime @default(now())
 
+  // Points transaction history for this member
+  transactions PointsTransaction[]
+
   @@unique([programId, phone])
   @@index([phone])
   @@index([masterAccountId])
@@ -2666,6 +2677,8 @@ model PointsTransaction {
   program         LoyaltyProgram?       @relation(fields: [programId], references: [id])
   masterAccountId String?
   masterAccount   LoyaltyMasterAccount? @relation(fields: [masterAccountId], references: [id])
+  memberId        String?
+  member          LoyaltyMember?        @relation(fields: [memberId], references: [id])
 
   type        String // EARN, REDEEM, ADJUST, LINK_TRANSFER
   points      Int // Positive for earn, negative for redeem
@@ -2673,12 +2686,14 @@ model PointsTransaction {
 
   // Reference to sale transaction
   transactionId String?
-  franchiseId   String? // Which location the transaction occurred at
+  locationId    String? // Which location the transaction occurred at
+  franchiseId   String?
 
   createdAt DateTime @default(now())
 
   @@index([programId, createdAt])
   @@index([masterAccountId, createdAt])
+  @@index([memberId])
 }
 
 // ============ SERVICE INDUSTRY FEATURES ============
@@ -2687,7 +2702,7 @@ model PointsTransaction {
 model ServicePackage {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   name        String // "5 Massage Bundle"
   description String?
@@ -2738,7 +2753,7 @@ model PackageUsage {
 model Resource {
   id         String   @id @default(cuid())
   locationId String
-  location   Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   name        String // "Chair 1", "Room A", "Laser Machine"
   type        String  @default("CHAIR") // CHAIR, ROOM, EQUIPMENT
@@ -2790,7 +2805,7 @@ model ClientNote {
 model RecurringAppointment {
   id         String   @id @default(cuid())
   locationId String
-  location   Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   clientId   String
   client     Client  @relation(fields: [clientId], references: [id])
@@ -2824,7 +2839,7 @@ model CheckIn {
   clientId    String
   client      Client   @relation(fields: [clientId], references: [id])
   locationId  String
-  location    Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   status      String   @default("WAITING") // WAITING, SERVED, CANCELLED
   checkedInAt DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -2839,7 +2854,7 @@ model CheckIn {
 model LotteryGame {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   gameName    String
   gameNumber  String // State game number
@@ -2860,7 +2875,7 @@ model LotteryPack {
   gameId     String
   game       LotteryGame @relation(fields: [gameId], references: [id])
   locationId String
-  location   Location    @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   packNumber  String // Pack/book number
   ticketCount Int // Total tickets in pack
@@ -2883,9 +2898,9 @@ model LotteryPack {
 model LotteryTransaction {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
   locationId  String
-  location    Location  @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   packId String?
   pack   LotteryPack? @relation(fields: [packId], references: [id])
@@ -2912,9 +2927,9 @@ model LotteryTransaction {
 model TobaccoScanSubmission {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
   locationId  String
-  location    Location  @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   manufacturer  String // ALTRIA, RJR, ITG
   weekStartDate DateTime
@@ -2943,7 +2958,7 @@ model TobaccoScanSubmission {
 model ManufacturerConfig {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   manufacturer String // ALTRIA, RJR, ITG
 
@@ -2973,7 +2988,7 @@ model ManufacturerConfig {
 model TobaccoDeal {
   id          String    @id @default(cuid())
   franchiseId String
-  franchise   Franchise @relation(fields: [franchiseId], references: [id])
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   manufacturer String // ALTRIA, RJR, ITG, ALL
   dealName     String // "Buy 2 Get $0.50 Off", "Loyalty Bonus"
@@ -3222,7 +3237,7 @@ model TransferItem {
 model CashCount {
   id         String   @id @default(cuid())
   locationId String
-  location   Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   // Type: OPEN, MID_SHIFT, CLOSE
   type String
@@ -3259,7 +3274,7 @@ model CashCount {
 model SafeDrop {
   id         String   @id @default(cuid())
   locationId String
-  location   Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   // Employee
   employeeId   String
@@ -3282,7 +3297,7 @@ model SafeDrop {
 model DepositLog {
   id         String   @id @default(cuid())
   locationId String
-  location   Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   // Expected vs Actual
   expectedAmount  Decimal
@@ -3320,7 +3335,7 @@ model AuditEvent {
 
   // Where
   locationId  String
-  location    Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   franchiseId String
 
   // Who
@@ -3366,7 +3381,7 @@ model StoreException {
 
   // Where
   locationId  String
-  location    Location @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   franchiseId String
 
   // Type: LOW_STOCK, CASH_VARIANCE, VOID_SPIKE, REFUND_SPIKE, 
@@ -4079,7 +4094,7 @@ model LocationProduct {
   stock      Int      @default(0)      // Location-specific stock count
   
   // Relations (SQLite compatible - no cascade delete)
-  // location   Location @relation(fields: [locationId], references: [id])
+  // location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   // product    Product  @relation(fields: [productId], references: [id])
   
   createdAt  DateTime @default(now())
@@ -4088,4 +4103,40 @@ model LocationProduct {
   @@unique([locationId, productId])  // One entry per product per location
   @@index([locationId])
   @@index([productId])
+}
+
+// ============ ID SCAN LOGGING ============
+// Track age verification scans and overrides
+
+model IDScanLog {
+  id            String   @id @default(cuid())
+  locationId    String
+  franchiseId   String
+  
+  transactionId String?
+  employeeId    String?
+  employeeName  String?
+  
+  type          String   // SCANNED, OVERRIDE
+  customerDOB   DateTime?
+  items         String?  // JSON list of age-restricted items
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([locationId])
+  @@index([franchiseId])
+  @@index([createdAt])
+}
+
+// ============ IDEMPOTENCY SUPPORT ============
+
+model IdempotencyKey {
+  id          String   @id @default(cuid())
+  key         String
+  franchiseId String
+  response    String?
+  createdAt   DateTime @default(now())
+
+  @@unique([key, franchiseId])
+  @@index([createdAt])
 }

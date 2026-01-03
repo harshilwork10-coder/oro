@@ -130,11 +130,18 @@ export async function PUT(request: NextRequest) {
 
         const totalCost = orderItems.reduce((sum, item) => sum + item.totalCost, 0)
 
+        // Validate supplier exists
+        if (!template.supplierId) {
+            return NextResponse.json({
+                error: 'Template must have a supplier to create a purchase order'
+            }, { status: 400 })
+        }
+
         // Create purchase order
         const purchaseOrder = await prisma.purchaseOrder.create({
             data: {
                 franchiseId: user.franchiseId,
-                supplierId: template.supplierId || undefined,
+                supplierId: template.supplierId,
                 locationId,
                 status: 'DRAFT',
                 totalCost,

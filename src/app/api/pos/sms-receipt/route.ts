@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
             transaction = await prisma.transaction.findUnique({
                 where: { id: transactionId },
                 include: {
-                    items: { include: { item: { select: { name: true } } } },
+                    itemLineItems: { include: { item: { select: { name: true } } } },
                     cashDrawerSession: {
-                        include: { location: { select: { name: true, address: true, phone: true } } }
+                        include: { location: { select: { name: true, address: true } } }
                     }
                 }
             })

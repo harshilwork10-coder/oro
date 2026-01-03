@@ -21,7 +21,11 @@ export async function POST(request: NextRequest) {
                 franchise: {
                     select: {
                         id: true,
-                        storeLogo: true,
+                        settings: {
+                            select: {
+                                storeLogo: true
+                            }
+                        },
                         franchisor: {
                             select: {
                                 id: true,
@@ -47,7 +51,7 @@ export async function POST(request: NextRequest) {
                 id: franchisor?.id || location.franchiseId,
                 name: franchisor?.name || 'Business',
                 industryType: franchisor?.industryType || 'RETAIL',
-                logo: location.franchise?.storeLogo || null
+                logo: location.franchise?.settings?.storeLogo || null
             },
             location: {
                 id: location.id,

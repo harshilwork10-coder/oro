@@ -182,6 +182,7 @@ export type ConsentType =
     | 'ANALYTICS'
     | 'PERSONALIZATION'
     | 'THIRD_PARTY_SHARING'
+    | 'PUSH_NOTIFICATIONS'
 
 export interface ConsentRecord {
     id: string

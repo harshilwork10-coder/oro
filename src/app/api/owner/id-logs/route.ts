@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         const transactions = await prisma.transaction.findMany({
             where: transactionWhere,
             include: {
-                items: {
+                itemLineItems: {
                     include: {
                         item: {
                             select: {
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
                         }
                     }
                 },
-                user: { select: { id: true, name: true } },
+                employee: { select: { id: true, name: true } },
                 cashDrawerSession: {
                     select: { location: { select: { id: true, name: true } } }
                 }
@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
 
         // Filter to only transactions with age-restricted items
         const ageRestrictedTx = transactions.filter(tx =>
-            tx.items?.some(item =>
-                item.item?.ageRestricted || item.item?.isAlcohol || item.item?.isTobacco
+            tx.itemLineItems?.some((lineItem: { item: { ageRestricted?: boolean; isAlcohol?: boolean; isTobacco?: boolean } }) =>
+                lineItem.item?.ageRestricted || lineItem.item?.isAlcohol || lineItem.item?.isTobacco
             )
         )
 
@@ -91,25 +91,25 @@ export async function GET(request: NextRequest) {
         const logs = ageRestrictedTx.map((tx, i) => {
             // Simulate: 80% scanned, 20% override
             const wasScanned = Math.random() > 0.2
-            const restrictedItems = tx.items?.filter(item =>
-                item.item?.ageRestricted || item.item?.isAlcohol || item.item?.isTobacco
+            const restrictedItems = tx.itemLineItems?.filter((lineItem: { item: { ageRestricted?: boolean; isAlcohol?: boolean; isTobacco?: boolean } }) =>
+                lineItem.item?.ageRestricted || lineItem.item?.isAlcohol || lineItem.item?.isTobacco
             ) || []
 
             return {
                 id: tx.id,
                 transactionId: tx.id,
                 timestamp: tx.createdAt,
-                employee: tx.user?.name || 'Unknown',
-                employeeId: tx.user?.id || null,
+                employee: tx.employee?.name || 'Unknown',
+                employeeId: tx.employee?.id || null,
                 location: tx.cashDrawerSession?.location?.name || 'Unknown',
                 locationId: tx.cashDrawerSession?.location?.id || null,
                 type: wasScanned ? 'SCANNED' : 'OVERRIDE',
                 itemCount: restrictedItems.length,
-                items: restrictedItems.map(item => ({
-                    name: item.item?.name,
-                    isAlcohol: item.item?.isAlcohol,
-                    isTobacco: item.item?.isTobacco,
-                    minimumAge: item.item?.minimumAge || 21
+                items: restrictedItems.map((lineItem: { item: { name?: string; isAlcohol?: boolean; isTobacco?: boolean; minimumAge?: number | null } }) => ({
+                    name: lineItem.item?.name,
+                    isAlcohol: lineItem.item?.isAlcohol,
+                    isTobacco: lineItem.item?.isTobacco,
+                    minimumAge: lineItem.item?.minimumAge || 21
                 })),
                 total: Number(tx.total)
             }

@@ -54,7 +54,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
       </head>
-      <body className={outfit.className}>
+      <body className={outfit.className} suppressHydrationWarning>
         <Providers>{children}</Providers>
         {/* Service Worker Registration */}
         <script

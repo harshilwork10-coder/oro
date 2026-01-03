@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
                     ...(franchiseId ? { cashDrawerSession: { location: { franchiseId } } } : {})
                 },
                 include: {
-                    items: {
+                    itemLineItems: {
                         include: {
                             item: { select: { category: { select: { name: true } } } }
                         }
@@ -112,11 +112,11 @@ export async function GET(request: NextRequest) {
 
             const byCategory: Record<string, { quantity: number, revenue: number }> = {}
             for (const tx of transactions) {
-                for (const item of tx.items || []) {
-                    const cat = item.item?.category?.name || 'Uncategorized'
+                for (const lineItem of tx.itemLineItems || []) {
+                    const cat = lineItem.item?.category?.name || 'Uncategorized'
                     if (!byCategory[cat]) byCategory[cat] = { quantity: 0, revenue: 0 }
-                    byCategory[cat].quantity += item.quantity
-                    byCategory[cat].revenue += Number(item.subtotal)
+                    byCategory[cat].quantity += lineItem.quantity
+                    byCategory[cat].revenue += Number(lineItem.total)
                 }
             }
 
@@ -148,14 +148,14 @@ export async function GET(request: NextRequest) {
                     ...(franchiseId ? { cashDrawerSession: { location: { franchiseId } } } : {})
                 },
                 include: {
-                    user: { select: { id: true, name: true } }
+                    employee: { select: { id: true, name: true } }
                 }
             })
 
             const byEmployee: Record<string, { name: string, transactions: number, sales: number }> = {}
             for (const tx of transactions) {
-                const empId = tx.user?.id || 'unknown'
-                const empName = tx.user?.name || 'Unknown'
+                const empId = tx.employee?.id || 'unknown'
+                const empName = tx.employee?.name || 'Unknown'
                 if (!byEmployee[empId]) byEmployee[empId] = { name: empName, transactions: 0, sales: 0 }
                 byEmployee[empId].transactions++
                 byEmployee[empId].sales += Number(tx.total)
