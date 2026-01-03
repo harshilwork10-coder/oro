@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Search, MoreVertical, Shield, User, Mail, Calendar, DollarSign, Key, X, Eye, EyeOff } from 'lucide-react'
+import { Plus, Search, MoreVertical, Shield, User, Mail, Calendar, DollarSign, Key, X, Eye, EyeOff, Hash } from 'lucide-react'
 import EmployeeModal from '@/components/employees/EmployeeModal'
 
 export default function EmployeesPage() {
@@ -15,6 +15,9 @@ export default function EmployeesPage() {
     const [newPassword, setNewPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
     const [resetting, setResetting] = useState(false)
+    const [pinModal, setPinModal] = useState<{ open: boolean; employee: any | null }>({ open: false, employee: null })
+    const [newPin, setNewPin] = useState('')
+    const [settingPin, setSettingPin] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
 
     const fetchEmployees = async () => {
@@ -105,6 +108,32 @@ export default function EmployeesPage() {
             console.error('Error resetting password:', error)
         } finally {
             setResetting(false)
+        }
+    }
+
+    const handleSetPIN = async () => {
+        if (!pinModal.employee) return
+        if (newPin.length !== 4 || !/^\d+$/.test(newPin)) {
+            return
+        }
+        setSettingPin(true)
+        try {
+            const res = await fetch(`/api/franchise/employees/${pinModal.employee.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pin: newPin })
+            })
+            if (res.ok) {
+                setPinModal({ open: false, employee: null })
+                setNewPin('')
+            } else {
+                const data = await res.json()
+                console.error(data.error || 'Failed to set PIN')
+            }
+        } catch (error) {
+            console.error('Error setting PIN:', error)
+        } finally {
+            setSettingPin(false)
         }
     }
 
@@ -210,6 +239,17 @@ export default function EmployeesPage() {
                                             >
                                                 <Key className="h-4 w-4 text-amber-400" />
                                                 Reset Password
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setOpenMenuId(null)
+                                                    setPinModal({ open: true, employee })
+                                                }}
+                                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-stone-800 transition-colors flex items-center gap-3"
+                                                style={{ color: '#e7e5e4' }}
+                                            >
+                                                <Hash className="h-4 w-4 text-emerald-400" />
+                                                Set PIN
                                             </button>
                                             <div style={{ borderTop: '1px solid #292524', margin: '4px 0' }} />
                                             <button
@@ -329,6 +369,68 @@ export default function EmployeesPage() {
                                 style={{ backgroundColor: newPassword.length >= 8 ? '#ea580c' : '#44403c' }}
                             >
                                 {resetting ? 'Resetting...' : 'Reset Password'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Set PIN Modal */}
+            {pinModal.open && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+                    <div className="w-full max-w-md rounded-2xl p-6" style={{ backgroundColor: '#0c0a09', border: '1px solid #292524' }}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-white">Set PIN</h3>
+                            <button
+                                onClick={() => {
+                                    setPinModal({ open: false, employee: null })
+                                    setNewPin('')
+                                }}
+                                className="p-2 hover:bg-stone-800 rounded-lg text-stone-400"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <p className="text-stone-400 mb-4">
+                            Enter a 4-digit PIN for <span className="text-white font-medium">{pinModal.employee?.name}</span>
+                        </p>
+                        <p className="text-sm text-stone-500 mb-4">
+                            This PIN will be used for quick login at the POS.
+                        </p>
+                        <div className="relative mb-4">
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={4}
+                                value={newPin}
+                                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                placeholder="Enter 4-digit PIN"
+                                className="w-full px-4 py-4 rounded-xl text-white text-center text-3xl font-mono tracking-[0.5em] placeholder-stone-500 focus:ring-2 focus:ring-emerald-500 outline-none"
+                                style={{ backgroundColor: '#1c1917', border: '1px solid #292524' }}
+                                autoFocus
+                            />
+                        </div>
+                        {newPin.length > 0 && newPin.length < 4 && (
+                            <p className="text-amber-400 text-sm mb-4">PIN must be 4 digits</p>
+                        )}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setPinModal({ open: false, employee: null })
+                                    setNewPin('')
+                                }}
+                                className="flex-1 px-4 py-3 rounded-xl text-stone-300 hover:bg-stone-800 transition-colors"
+                                style={{ border: '1px solid #292524' }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSetPIN}
+                                disabled={newPin.length !== 4 || settingPin}
+                                className="flex-1 px-4 py-3 rounded-xl text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ backgroundColor: newPin.length === 4 ? '#059669' : '#44403c' }}
+                            >
+                                {settingPin ? 'Setting...' : 'Set PIN'}
                             </button>
                         </div>
                     </div>
