@@ -139,6 +139,41 @@ export default function ReceiptModal({ isOpen, onClose, transactionData, onCompl
                             <X className="h-6 w-6" />
                         </button>
                     </div>
+
+                    {/* Invoice Number & Barcode for Refunds */}
+                    {(transactionData?.invoiceNumber || transactionData?.transactionId) && (
+                        <div className="mt-4 pt-3 border-t border-emerald-400/30">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-emerald-200 uppercase tracking-wider">Invoice</span>
+                                <span className="font-mono text-lg text-white font-bold">
+                                    #{transactionData?.invoiceNumber || transactionData?.transactionId?.slice(-8)}
+                                </span>
+                            </div>
+                            {/* Visual Barcode Representation */}
+                            <div className="mt-2 py-2 px-3 bg-white rounded-lg">
+                                <div className="flex items-center justify-center gap-px h-8">
+                                    {/* Generate pseudo-barcode pattern from invoice number */}
+                                    {(transactionData?.invoiceNumber || transactionData?.transactionId || '00000000')
+                                        .toString()
+                                        .padStart(8, '0')
+                                        .split('')
+                                        .flatMap((char: string, i: number) => {
+                                            const num = parseInt(char) || 0
+                                            return [
+                                                <div key={`${i}a`} className="bg-black" style={{ width: (num % 3) + 1, height: '100%' }} />,
+                                                <div key={`${i}b`} className="bg-white" style={{ width: ((num + 1) % 2) + 1 }} />,
+                                                <div key={`${i}c`} className="bg-black" style={{ width: ((num + 2) % 3) + 1, height: '100%' }} />,
+                                                <div key={`${i}d`} className="bg-white" style={{ width: 2 }} />
+                                            ]
+                                        })}
+                                </div>
+                                <p className="text-center text-xs text-stone-500 mt-1 font-mono">
+                                    {transactionData?.invoiceNumber || transactionData?.transactionId?.slice(-8)}
+                                </p>
+                            </div>
+                            <p className="text-xs text-emerald-200/70 text-center mt-1">Scan for easy returns</p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Content */}
@@ -254,9 +289,9 @@ export default function ReceiptModal({ isOpen, onClose, transactionData, onCompl
                                     (selectedOption === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress))
                                 }
                                 className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${selectedOption === 'sms' ? 'bg-emerald-600 hover:bg-emerald-500' :
-                                        selectedOption === 'email' ? 'bg-purple-600 hover:bg-purple-500' :
-                                            selectedOption === 'print' ? 'bg-blue-600 hover:bg-blue-500' :
-                                                'bg-stone-700 hover:bg-stone-600'
+                                    selectedOption === 'email' ? 'bg-purple-600 hover:bg-purple-500' :
+                                        selectedOption === 'print' ? 'bg-blue-600 hover:bg-blue-500' :
+                                            'bg-stone-700 hover:bg-stone-600'
                                     }`}
                             >
                                 {sending ? (
