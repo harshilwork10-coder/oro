@@ -1,45 +1,82 @@
-import { NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { ApiResponse } from '@/lib/api-response'
+import { parsePaginationParams } from '@/lib/pagination'
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const user = session?.user as { franchiseId?: string; role?: string }
 
         if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return ApiResponse.unauthorized()
         }
 
-        const { searchParams } = new URL(req.url)
+        const searchParams = req.nextUrl.searchParams
+        const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
         const franchiseId = searchParams.get('franchiseId')
+        const isActive = searchParams.get('isActive')
+        const search = searchParams.get('search')
 
         // Security: Use session franchiseId or verify ownership
         const targetFranchiseId = franchiseId || user.franchiseId
         if (targetFranchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
-            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+            return ApiResponse.forbidden()
         }
 
-        const giftCards = await prisma.giftCard.findMany({
-            where: { franchiseId: targetFranchiseId },
-            orderBy: { createdAt: 'desc' }
-        })
+        // Build where clause
+        const whereClause: Record<string, unknown> = {
+            franchiseId: targetFranchiseId
+        }
 
-        return NextResponse.json(giftCards)
+        if (isActive !== null && isActive !== undefined) {
+            whereClause.isActive = isActive === 'true'
+        }
+
+        if (search) {
+            whereClause.code = { contains: search }
+        }
+
+        // Build query with pagination
+        const queryArgs: Record<string, unknown> = {
+            where: whereClause,
+            take: (take || 50) + 1,
+            orderBy: orderBy || { createdAt: 'desc' }
+        }
+
+        if (cursor) {
+            queryArgs.cursor = { id: cursor }
+            queryArgs.skip = 1
+        }
+
+        const giftCards = await prisma.giftCard.findMany(
+            queryArgs as Parameters<typeof prisma.giftCard.findMany>[0]
+        )
+
+        const hasMore = giftCards.length > (take || 50)
+        const data = hasMore ? giftCards.slice(0, take || 50) : giftCards
+        const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
+
+        return ApiResponse.paginated(data, {
+            nextCursor,
+            hasMore,
+            total: data.length
+        })
     } catch (error) {
         console.error('Error fetching gift cards:', error)
-        return NextResponse.json({ error: 'Failed to fetch gift cards' }, { status: 500 })
+        return ApiResponse.serverError('Failed to fetch gift cards')
     }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const user = session?.user as { franchiseId?: string; role?: string }
 
         if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return ApiResponse.unauthorized()
         }
 
         const body = await req.json()
@@ -48,11 +85,11 @@ export async function POST(req: Request) {
         // Security: Use session franchiseId or verify ownership
         const targetFranchiseId = franchiseId || user.franchiseId
         if (targetFranchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
-            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+            return ApiResponse.forbidden()
         }
 
         if (!initialAmount) {
-            return NextResponse.json({ error: 'Initial amount required' }, { status: 400 })
+            return ApiResponse.validationError('Initial amount required')
         }
 
         // Generate unique code
@@ -72,10 +109,9 @@ export async function POST(req: Request) {
 
         console.log(`✅ Gift card created: ${code} - $${initialAmount}`)
 
-        return NextResponse.json(giftCard)
+        return ApiResponse.created(giftCard)
     } catch (error) {
         console.error('Error creating gift card:', error)
-        return NextResponse.json({ error: 'Failed to create gift card' }, { status: 500 })
+        return ApiResponse.serverError('Failed to create gift card')
     }
 }
-

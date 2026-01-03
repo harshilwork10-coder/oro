@@ -1,26 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { ApiResponse } from '@/lib/api-response'
+import { parsePaginationParams } from '@/lib/pagination'
 
-// GET - List all departments for franchise
+// GET - List all departments for franchise with pagination
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return ApiResponse.unauthorized()
         }
 
-        const user = session.user as any
+        const user = session.user as { franchiseId?: string }
         if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
+            return ApiResponse.error('No franchise associated', 400)
         }
 
-        const departments = await prisma.department.findMany({
-            where: {
-                franchiseId: user.franchiseId,
-                isActive: true
-            },
+        const searchParams = request.nextUrl.searchParams
+        const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
+        const search = searchParams.get('search')
+        const includeInactive = searchParams.get('includeInactive') === 'true'
+
+        // Build where clause
+        const whereClause: Record<string, unknown> = {
+            franchiseId: user.franchiseId
+        }
+
+        if (!includeInactive) {
+            whereClause.isActive = true
+        }
+
+        if (search) {
+            whereClause.name = { contains: search }
+        }
+
+        // Build query with pagination
+        const queryArgs: Record<string, unknown> = {
+            where: whereClause,
+            take: (take || 50) + 1,
             include: {
                 categories: {
                     where: { isActive: true },
@@ -34,13 +53,30 @@ export async function GET(request: NextRequest) {
                     orderBy: { sortOrder: 'asc' }
                 }
             },
-            orderBy: { sortOrder: 'asc' }
-        })
+            orderBy: orderBy || { sortOrder: 'asc' }
+        }
 
-        return NextResponse.json({ departments })
+        if (cursor) {
+            queryArgs.cursor = { id: cursor }
+            queryArgs.skip = 1
+        }
+
+        const departments = await prisma.department.findMany(
+            queryArgs as Parameters<typeof prisma.department.findMany>[0]
+        )
+
+        const hasMore = departments.length > (take || 50)
+        const data = hasMore ? departments.slice(0, take || 50) : departments
+        const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
+
+        return ApiResponse.paginated(data, {
+            nextCursor,
+            hasMore,
+            total: data.length
+        })
     } catch (error) {
         console.error('[DEPARTMENTS_GET]', error)
-        return NextResponse.json({ error: 'Failed to fetch departments' }, { status: 500 })
+        return ApiResponse.serverError('Failed to fetch departments')
     }
 }
 
@@ -49,27 +85,25 @@ export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return ApiResponse.unauthorized()
         }
 
-        const user = session.user as any
+        const user = session.user as { franchiseId?: string; role?: string; canManageInventory?: boolean }
         if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
+            return ApiResponse.error('No franchise associated', 400)
         }
 
-        // Check permission
         if (user.role === 'EMPLOYEE' && !user.canManageInventory) {
-            return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+            return ApiResponse.forbidden('Permission denied')
         }
 
         const body = await request.json()
-        const { name, description, icon, color, ageRestricted, minimumAge } = body
+        const { name, description, icon, color } = body
 
         if (!name?.trim()) {
-            return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+            return ApiResponse.validationError('Name is required')
         }
 
-        // Get max sortOrder for new department
         const maxSort = await prisma.department.aggregate({
             where: { franchiseId: user.franchiseId },
             _max: { sortOrder: true }
@@ -84,65 +118,56 @@ export async function POST(request: NextRequest) {
                 sortOrder: (maxSort._max.sortOrder || 0) + 1,
                 franchiseId: user.franchiseId
             },
-            include: {
-                categories: true
-            }
+            include: { categories: true }
         })
 
-        return NextResponse.json({ department })
+        return ApiResponse.created(department)
     } catch (error) {
         console.error('[DEPARTMENTS_POST]', error)
-        return NextResponse.json({ error: 'Failed to create department' }, { status: 500 })
+        return ApiResponse.serverError('Failed to create department')
     }
 }
 
-// DELETE - Delete department (soft delete by setting isActive = false)
+// DELETE - Delete department (soft delete)
 export async function DELETE(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return ApiResponse.unauthorized()
         }
 
-        const user = session.user as any
+        const user = session.user as { franchiseId?: string; role?: string; canManageInventory?: boolean }
         if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
+            return ApiResponse.error('No franchise associated', 400)
         }
 
-        // Check permission
         if (user.role === 'EMPLOYEE' && !user.canManageInventory) {
-            return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+            return ApiResponse.forbidden('Permission denied')
         }
 
-        const { searchParams } = new URL(request.url)
+        const searchParams = request.nextUrl.searchParams
         const id = searchParams.get('id')
 
         if (!id) {
-            return NextResponse.json({ error: 'Department ID required' }, { status: 400 })
+            return ApiResponse.validationError('Department ID required')
         }
 
-        // Verify department belongs to franchise
         const department = await prisma.department.findFirst({
-            where: {
-                id,
-                franchiseId: user.franchiseId
-            }
+            where: { id, franchiseId: user.franchiseId }
         })
 
         if (!department) {
-            return NextResponse.json({ error: 'Department not found' }, { status: 404 })
+            return ApiResponse.notFound('Department')
         }
 
-        // Soft delete - set isActive to false
         await prisma.department.update({
             where: { id },
             data: { isActive: false }
         })
 
-        return NextResponse.json({ success: true })
+        return ApiResponse.success({ deleted: true })
     } catch (error) {
         console.error('[DEPARTMENTS_DELETE]', error)
-        return NextResponse.json({ error: 'Failed to delete department' }, { status: 500 })
+        return ApiResponse.serverError('Failed to delete department')
     }
 }
-

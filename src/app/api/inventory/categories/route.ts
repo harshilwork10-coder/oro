@@ -1,44 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { ApiResponse } from '@/lib/api-response'
+import { parsePaginationParams } from '@/lib/pagination'
 
-// GET - List all product categories for franchise
+// GET - List all product categories for franchise with pagination
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return ApiResponse.unauthorized()
         }
 
-        const user = session.user as any
+        const user = session.user as { franchiseId?: string }
         if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
+            return ApiResponse.error('No franchise associated', 400)
         }
 
-        // Check if any categories exist
-        let categories = await prisma.productCategory.findMany({
-            where: {
-                franchiseId: user.franchiseId,
-                isActive: true
-            },
-            select: {
-                id: true,
-                name: true,
-                description: true,
-                ageRestricted: true,
-                minimumAge: true,
-                isEbtEligible: true,
-                sortOrder: true,
-                _count: {
-                    select: { products: true }
-                }
-            },
-            orderBy: { sortOrder: 'asc' }
+        const searchParams = request.nextUrl.searchParams
+        const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
+        const search = searchParams.get('search')
+        const departmentId = searchParams.get('departmentId')
+        const ageRestricted = searchParams.get('ageRestricted')
+        const isEbtEligible = searchParams.get('isEbtEligible')
+
+        // Check if any categories exist, create defaults if not
+        const existingCount = await prisma.productCategory.count({
+            where: { franchiseId: user.franchiseId, isActive: true }
         })
 
-        // If no categories exist, create default ones
-        if (categories.length === 0) {
+        if (existingCount === 0) {
             const defaultCategories = [
                 { name: 'Liquor', ageRestricted: true, minimumAge: 21, isEbtEligible: false, sortOrder: 1 },
                 { name: 'Beer', ageRestricted: true, minimumAge: 21, isEbtEligible: false, sortOrder: 2 },
@@ -53,37 +45,73 @@ export async function GET(request: NextRequest) {
             await prisma.productCategory.createMany({
                 data: defaultCategories.map(cat => ({
                     ...cat,
-                    franchiseId: user.franchiseId,
+                    franchiseId: user.franchiseId!,
                     isActive: true
                 }))
             })
-
-            // Re-fetch the newly created categories
-            categories = await prisma.productCategory.findMany({
-                where: {
-                    franchiseId: user.franchiseId,
-                    isActive: true
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    description: true,
-                    ageRestricted: true,
-                    minimumAge: true,
-                    isEbtEligible: true,
-                    sortOrder: true,
-                    _count: {
-                        select: { products: true }
-                    }
-                },
-                orderBy: { sortOrder: 'asc' }
-            })
         }
 
-        return NextResponse.json({ categories })
+        // Build where clause
+        const whereClause: Record<string, unknown> = {
+            franchiseId: user.franchiseId,
+            isActive: true
+        }
+
+        if (search) {
+            whereClause.name = { contains: search }
+        }
+
+        if (departmentId) {
+            whereClause.departmentId = departmentId
+        }
+
+        if (ageRestricted !== null && ageRestricted !== undefined) {
+            whereClause.ageRestricted = ageRestricted === 'true'
+        }
+
+        if (isEbtEligible !== null && isEbtEligible !== undefined) {
+            whereClause.isEbtEligible = isEbtEligible === 'true'
+        }
+
+        // Build query with pagination
+        const queryArgs: Record<string, unknown> = {
+            where: whereClause,
+            take: (take || 50) + 1,
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                ageRestricted: true,
+                minimumAge: true,
+                isEbtEligible: true,
+                sortOrder: true,
+                departmentId: true,
+                _count: { select: { products: true } }
+            },
+            orderBy: orderBy || { sortOrder: 'asc' }
+        }
+
+        if (cursor) {
+            queryArgs.cursor = { id: cursor }
+            queryArgs.skip = 1
+        }
+
+        const categories = await prisma.productCategory.findMany(
+            queryArgs as Parameters<typeof prisma.productCategory.findMany>[0]
+        )
+
+        const hasMore = categories.length > (take || 50)
+        const data = hasMore ? categories.slice(0, take || 50) : categories
+        const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
+
+        return ApiResponse.paginated(data, {
+            nextCursor,
+            hasMore,
+            total: data.length
+        })
     } catch (error) {
         console.error('[CATEGORIES_GET]', error)
-        return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 })
+        return ApiResponse.serverError('Failed to fetch categories')
     }
 }
 
@@ -92,22 +120,21 @@ export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return ApiResponse.unauthorized()
         }
 
-        const user = session.user as any
+        const user = session.user as { franchiseId?: string }
         if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
+            return ApiResponse.error('No franchise associated', 400)
         }
 
         const body = await request.json()
         const { name, description, ageRestricted, minimumAge, departmentId, isEbtEligible } = body
 
         if (!name?.trim()) {
-            return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+            return ApiResponse.validationError('Name is required')
         }
 
-        // Get max sortOrder for new category
         const maxSort = await prisma.productCategory.aggregate({
             where: { franchiseId: user.franchiseId },
             _max: { sortOrder: true }
@@ -122,14 +149,13 @@ export async function POST(request: NextRequest) {
                 isEbtEligible: isEbtEligible || false,
                 sortOrder: (maxSort._max.sortOrder || 0) + 1,
                 franchiseId: user.franchiseId,
-                departmentId: departmentId || null  // Link to parent department
+                departmentId: departmentId || null
             }
         })
 
-        return NextResponse.json({ category })
+        return ApiResponse.created(category)
     } catch (error) {
         console.error('[CATEGORIES_POST]', error)
-        return NextResponse.json({ error: 'Failed to create category' }, { status: 500 })
+        return ApiResponse.serverError('Failed to create category')
     }
 }
-

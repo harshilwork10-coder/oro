@@ -1,68 +1,95 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { ApiResponse } from '@/lib/api-response'
 
-// GET - Search products by name, barcode, or SKU
+// GET - Search products by name, barcode, or SKU with standardized response
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return ApiResponse.unauthorized()
         }
 
-        const user = session.user as any
+        const user = session.user as { franchiseId?: string }
         if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
+            return ApiResponse.error('No franchise associated', 400)
         }
 
-        const { searchParams } = new URL(request.url)
+        const searchParams = request.nextUrl.searchParams
         const query = searchParams.get('q')
+        const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
+        const categoryId = searchParams.get('categoryId')
+        const inStockOnly = searchParams.get('inStockOnly') === 'true'
 
         if (!query || query.length < 2) {
-            return NextResponse.json({ error: 'Query must be at least 2 characters' }, { status: 400 })
+            return ApiResponse.validationError('Query must be at least 2 characters')
         }
 
-        // Search by name, SKU, or category
-        // Note: barcode field will work after prisma generate is run
+        // Build where clause
+        const whereClause: Record<string, unknown> = {
+            franchiseId: user.franchiseId,
+            isActive: true,
+            OR: [
+                { name: { contains: query } },
+                { sku: { contains: query } },
+                { category: { contains: query } },
+                { barcode: { contains: query } }
+            ]
+        }
+
+        if (categoryId) {
+            whereClause.categoryId = categoryId
+        }
+
+        if (inStockOnly) {
+            whereClause.stock = { gt: 0 }
+        }
+
         const products = await prisma.product.findMany({
-            where: {
-                franchiseId: user.franchiseId,
-                isActive: true,
-                OR: [
-                    { name: { contains: query } },
-                    { sku: { contains: query } },
-                    { category: { contains: query } }
-                ]
-            },
+            where: whereClause,
             select: {
                 id: true,
                 name: true,
                 price: true,
                 sku: true,
+                barcode: true,
                 stock: true,
-                category: true
+                category: true,
+                productCategory: {
+                    select: {
+                        ageRestricted: true,
+                        minimumAge: true
+                    }
+                },
+                unitsPerCase: true,
+                casePrice: true,
+                sellByCase: true
             },
-            take: 50,
+            take: limit,
             orderBy: { name: 'asc' }
         })
 
-        // Add placeholder fields for barcode/age until prisma is regenerated
+        // Transform for retail fields
         const productsWithRetailFields = products.map(p => ({
-            ...p,
-            barcode: (p as any).barcode || null,
-            ageRestricted: (p as any).ageRestricted || false,
-            minimumAge: (p as any).minimumAge || null,
-            // Case break fields
-            unitsPerCase: (p as any).unitsPerCase || null,
-            casePrice: (p as any).casePrice || null,
-            sellByCase: (p as any).sellByCase || false
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            sku: p.sku,
+            barcode: p.barcode,
+            stock: p.stock,
+            category: p.category,
+            ageRestricted: p.productCategory?.ageRestricted || false,
+            minimumAge: p.productCategory?.minimumAge || null,
+            unitsPerCase: p.unitsPerCase,
+            casePrice: p.casePrice,
+            sellByCase: p.sellByCase
         }))
 
-        return NextResponse.json(productsWithRetailFields)
+        return ApiResponse.success(productsWithRetailFields)
     } catch (error) {
         console.error('[RETAIL_SEARCH]', error)
-        return NextResponse.json({ error: 'Failed to search products' }, { status: 500 })
+        return ApiResponse.serverError('Failed to search products')
     }
 }
-
