@@ -4,16 +4,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-// Route segment config - Allow larger body size for file uploads
-export const config = {
-    api: {
-        bodyParser: false, // Disable built-in body parser
-        responseLimit: false,
-    },
-}
-
-// Increase body size limit for Next.js App Router
+// Route segment config for Next.js App Router
 export const maxDuration = 60 // 60 seconds timeout for large files
+export const dynamic = 'force-dynamic'
 
 // File upload limits
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB (increased from 5MB)

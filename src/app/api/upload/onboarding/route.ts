@@ -4,16 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { uploadToS3 } from '@/lib/s3'
 import { prisma } from '@/lib/prisma'
 
-// Route segment config - Allow larger body size for file uploads
-export const config = {
-    api: {
-        bodyParser: false,
-        responseLimit: false,
-    },
-}
-
-// Increase timeout for large files
-export const maxDuration = 60
+// Route segment config for Next.js App Router
+export const maxDuration = 60 // 60 seconds timeout for large files
+export const dynamic = 'force-dynamic'
 
 // File upload limits
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
