@@ -52,8 +52,10 @@ export default function ProviderClientsPage() {
         try {
             const response = await fetch('/api/admin/franchisors');
             if (response.ok) {
-                const data = await response.json();
-                const transformed: Client[] = data.map((f: any) => ({
+                const result = await response.json();
+                // API returns paginated response: { success, data: [...], pagination }
+                const franchisors = result.data || result || [];
+                const transformed: Client[] = franchisors.map((f: any) => ({
                     id: f.id,
                     name: f.owner?.name || f.name || 'Unknown',
                     businessName: f.businessName || f.name || 'Unknown Business',
