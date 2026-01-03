@@ -44,6 +44,7 @@ import Toast from '@/components/ui/Toast'
 import IDCheckModal from '@/components/modals/IDCheckModal'
 import CheckoutModal from '@/components/pos/CheckoutModal'
 import QuickAddModal from '@/components/modals/QuickAddModal'
+import ScanQuickAddModal from '@/components/modals/ScanQuickAddModal'
 import TransactionDiscountModal from '@/components/modals/TransactionDiscountModal'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 import EndOfDayWizard from '@/components/pos/EndOfDayWizard'
@@ -128,6 +129,8 @@ export default function RetailPOSPage() {
     const [showAgeVerification, setShowAgeVerification] = useState(false)
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [showQuickAddModal, setShowQuickAddModal] = useState(false)
+    const [showScanQuickAddModal, setShowScanQuickAddModal] = useState(false)
+    const [pendingScanBarcode, setPendingScanBarcode] = useState<string>('')
     const [showTransactionDiscountModal, setShowTransactionDiscountModal] = useState(false)
     const [transactionDiscount, setTransactionDiscount] = useState<{ type: 'PERCENT' | 'AMOUNT'; value: number } | null>(null)
     const [showPriceCheckModal, setShowPriceCheckModal] = useState(false)
@@ -669,7 +672,9 @@ export default function RetailPOSPage() {
                     }
                 }
             } else {
-                setToast({ message: `Product not found: ${code}`, type: 'error' })
+                // Product not found - trigger quick add modal with UPC lookup
+                setPendingScanBarcode(code)
+                setShowScanQuickAddModal(true)
             }
         } catch (error) {
             console.error('Lookup error:', error)
@@ -1974,6 +1979,103 @@ export default function RetailPOSPage() {
                         setShowQuickAddModal(false)
                     }}
                     onClose={() => setShowQuickAddModal(false)}
+                />
+            )}
+
+            {/* Scan Quick Add Modal - Auto-triggers on unknown barcode */}
+            {showScanQuickAddModal && pendingScanBarcode && (
+                <ScanQuickAddModal
+                    barcode={pendingScanBarcode}
+                    onAdd={async (product) => {
+                        let taxRate = config?.taxRate || 0
+                        let isEbt = false
+
+                        if (product.taxType === 'NO_TAX') taxRate = 0
+                        if (product.taxType === 'HIGH_TAX') taxRate = config?.taxRate || 8.25
+                        if (product.taxType === 'LOW_TAX') taxRate = 2.25
+                        if (product.taxType === 'EBT') {
+                            taxRate = 0
+                            isEbt = true
+                        }
+
+                        // If save to inventory requested, create the product first
+                        if (product.saveToInventory) {
+                            try {
+                                const res = await fetch('/api/inventory/products', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        name: product.name,
+                                        price: product.price,
+                                        barcode: product.barcode,
+                                        sku: product.barcode,
+                                        taxRate: taxRate,
+                                        isEbtEligible: isEbt,
+                                        stock: 100, // Default stock
+                                        isActive: true
+                                    })
+                                })
+
+                                if (res.ok) {
+                                    const savedProduct = await res.json()
+                                    // Add the saved product to cart
+                                    addToCart({
+                                        id: savedProduct.id || savedProduct.product?.id,
+                                        name: product.name,
+                                        price: product.price,
+                                        barcode: product.barcode,
+                                        taxRate: taxRate,
+                                        isEbtEligible: isEbt,
+                                        quantity: 1
+                                    })
+                                    setToast({ message: `Saved "${product.name}" to inventory`, type: 'success' })
+                                } else {
+                                    // Save failed, add as quick item anyway
+                                    addToCart({
+                                        id: `scan-${Date.now()}`,
+                                        name: product.name,
+                                        price: product.price,
+                                        barcode: product.barcode,
+                                        taxRate: taxRate,
+                                        isEbtEligible: isEbt,
+                                        category: 'QUICK_ADD',
+                                        quantity: 1
+                                    })
+                                    setToast({ message: `Added but save failed`, type: 'error' })
+                                }
+                            } catch (error) {
+                                console.error('Failed to save product:', error)
+                                addToCart({
+                                    id: `scan-${Date.now()}`,
+                                    name: product.name,
+                                    price: product.price,
+                                    taxRate: taxRate,
+                                    isEbtEligible: isEbt,
+                                    category: 'QUICK_ADD',
+                                    quantity: 1
+                                })
+                            }
+                        } else {
+                            // Just add to cart without saving
+                            addToCart({
+                                id: `scan-${Date.now()}`,
+                                name: product.name,
+                                price: product.price,
+                                barcode: product.barcode,
+                                taxRate: taxRate,
+                                isEbtEligible: isEbt,
+                                category: 'QUICK_ADD',
+                                quantity: 1
+                            })
+                        }
+
+                        setShowScanQuickAddModal(false)
+                        setPendingScanBarcode('')
+                    }}
+                    onClose={() => {
+                        setShowScanQuickAddModal(false)
+                        setPendingScanBarcode('')
+                    }}
                 />
             )}
 

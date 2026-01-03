@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from "next-auth/react"
 import { redirect } from "next/navigation"
 import {
@@ -55,6 +55,9 @@ export default function LotteryPage() {
     const [showAddPackModal, setShowAddPackModal] = useState(false)
     const [showQuickAddModal, setShowQuickAddModal] = useState(false)
     const [selectedGameId, setSelectedGameId] = useState('')
+    const [scanInput, setScanInput] = useState('')
+    const [scanToast, setScanToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+    const scanInputRef = useRef<HTMLInputElement>(null)
 
     // Form state
     const [newGame, setNewGame] = useState({
@@ -190,6 +193,56 @@ export default function LotteryPage() {
         }
     }
 
+    // Scan-to-Activate: instantly activate pack by scanning barcode
+    const handleScanActivate = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && scanInput.trim()) {
+            e.preventDefault()
+            const barcode = scanInput.trim()
+            setScanInput('')
+
+            try {
+                const res = await fetch('/api/lottery/packs/activate-by-scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ barcode })
+                })
+
+                const data = await res.json()
+
+                if (res.ok && data.data) {
+                    setScanToast({
+                        message: `✓ Pack #${barcode} activated (${data.data.gameName})`,
+                        type: 'success'
+                    })
+                    fetchData() // Refresh the pack list
+                } else {
+                    setScanToast({
+                        message: data.error?.message || 'Failed to activate pack',
+                        type: 'error'
+                    })
+                }
+            } catch (error) {
+                console.error('Scan activation failed:', error)
+                setScanToast({ message: 'Scan activation failed', type: 'error' })
+            }
+
+            // Clear toast after 3 seconds
+            setTimeout(() => setScanToast(null), 3000)
+        }
+    }
+
+    // Keep focus on scan input for instant scanning
+    useEffect(() => {
+        const focusScan = () => {
+            if (!showAddGameModal && !showAddPackModal && !showQuickAddModal) {
+                scanInputRef.current?.focus()
+            }
+        }
+        focusScan()
+        const interval = setInterval(focusScan, 2000)
+        return () => clearInterval(interval)
+    }, [showAddGameModal, showAddPackModal, showQuickAddModal])
+
     const formatCurrency = (value: string | number) => {
         const num = typeof value === 'string' ? parseFloat(value) : value
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num || 0)
@@ -213,6 +266,28 @@ export default function LotteryPage() {
 
     return (
         <div className="p-6 space-y-6">
+            {/* Hidden Barcode Scanner for Instant Pack Activation */}
+            <input
+                ref={scanInputRef}
+                type="text"
+                value={scanInput}
+                onChange={(e) => setScanInput(e.target.value)}
+                onKeyDown={handleScanActivate}
+                className="sr-only"
+                placeholder="Scan pack barcode..."
+                aria-label="Pack barcode scanner"
+            />
+
+            {/* Scan Toast Notification */}
+            {scanToast && (
+                <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-xl shadow-2xl border ${scanToast.type === 'success'
+                        ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-100'
+                        : 'bg-red-900/90 border-red-500/50 text-red-100'
+                    } animate-in slide-in-from-top-5 backdrop-blur-sm`}>
+                    <p className="font-medium">{scanToast.message}</p>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
