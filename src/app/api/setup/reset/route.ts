@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { hash } from 'bcrypt'
+import { hashSync } from 'bcryptjs'
 
 // One-time password reset - DELETE AFTER USE!
 export async function POST(request: NextRequest) {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Update password
-        const hashedPassword = await hash(newPassword, 10)
+        const hashedPassword = hashSync(newPassword, 10)
         await prisma.user.update({
             where: { email },
             data: { password: hashedPassword }

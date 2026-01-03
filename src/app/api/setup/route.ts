@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { hash } from 'bcrypt'
+import { hashSync } from 'bcryptjs'
 
 // One-time setup endpoint to create initial provider user
 // DELETE THIS FILE AFTER FIRST USE!
@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Create Provider user
-        const hashedPassword = await hash(password || 'Admin@123', 10)
-        const hashedPin = await hash('1111', 10)
+        const hashedPassword = hashSync(password || 'Admin@123', 10)
+        const hashedPin = hashSync('1111', 10)
 
         const provider = await prisma.user.create({
             data: {
