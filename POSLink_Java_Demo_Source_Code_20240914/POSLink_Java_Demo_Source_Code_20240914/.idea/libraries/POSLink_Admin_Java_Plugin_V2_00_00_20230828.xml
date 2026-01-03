@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="POSLink_Admin_Java_Plugin_V2.00.00_20230828">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/src/libs/POSLink_Admin_Java_Plugin_V2.00.00_20230828.jar!/" />
+      <root url="jar://$PROJECT_DIR$/src/libs/POSLink_Core_Java_V2.00.00_20230828.jar!/" />
+      <root url="jar://$PROJECT_DIR$/src/libs/POSLink_Semi_Java_Plugin_V2.00.00_20230828.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

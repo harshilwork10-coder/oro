@@ -1,0 +1,214 @@
+
+[2025-12-03T04:36:49.164Z] Error: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].user.update()` invocation in
+C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\[root-of-the-server]__8c03b022._.js:159:149
+
+  156 console.log('Password hashed successfully');
+  157 // 3. Update User (Password & Terms)
+  158 console.log('Step 3: Updating user...');
+→ 159 await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].user.update({
+        where: {
+          id: "cmipif9x9000094z1p989kczm"
+        },
+        data: {
+          password: "$2b$10$5vRart9k72QhAw8WoKMOJu4I3xjuePoIIdc7zWiyLrmUHDFrmuNCO",
+          role: "FRANCHISOR",
+          acceptedTermsAt: new Date("2025-12-03T04:36:49.139Z"),
+          ~~~~~~~~~~~~~~~
+          acceptedTermsVersion: "1.0",
+      ?   id?: String | StringFieldUpdateOperationsInput,
+      ?   name?: String | NullableStringFieldUpdateOperationsInput | Null,
+      ?   email?: String | StringFieldUpdateOperationsInput,
+      ?   pin?: String | NullableStringFieldUpdateOperationsInput | Null,
+      ?   image?: String | NullableStringFieldUpdateOperationsInput | Null,
+      ?   customPermissions?: String | NullableStringFieldUpdateOperationsInput | Null,
+      ?   createdAt?: DateTime | DateTimeFieldUpdateOperationsInput,
+      ?   updatedAt?: DateTime | DateTimeFieldUpdateOperationsInput,
+      ?   canAddServices?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canAddProducts?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canManageInventory?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canViewReports?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canProcessRefunds?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canManageSchedule?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canManageEmployees?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canManageShifts?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canClockIn?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canClockOut?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   franchise?: FranchiseUpdateOneWithoutUsersNestedInput,
+      ?   location?: LocationUpdateOneWithoutUsersNestedInput,
+      ?   franchisor?: FranchisorUpdateOneWithoutOwnerNestedInput,
+      ?   magicLinks?: MagicLinkUpdateManyWithoutUserNestedInput,
+      ?   appointments?: AppointmentUpdateManyWithoutEmployeeNestedInput,
+      ?   schedules?: ScheduleUpdateManyWithoutEmployeeNestedInput,
+      ?   posts?: PostUpdateManyWithoutAuthorNestedInput,
+      ?   comments?: CommentUpdateManyWithoutAuthorNestedInput,
+      ?   votes?: VoteUpdateManyWithoutUserNestedInput,
+      ?   badges?: UserBadgeUpdateManyWithoutUserNestedInput,
+      ?   processedTransactions?: TransactionUpdateManyWithoutEmployeeNestedInput,
+      ?   performedServices?: TransactionLineItemUpdateManyWithoutStaffNestedInput,
+      ?   activeCart?: ActiveCartUpdateOneWithoutUserNestedInput,
+      ?   timeEntries?: TimeEntryUpdateManyWithoutUserNestedInput,
+      ?   commissionRule?: CommissionRuleUpdateOneWithoutUsersNestedInput,
+      ?   cashDrawerSessions?: CashDrawerSessionUpdateManyWithoutEmployeeNestedInput,
+      ?   globalServices?: GlobalServiceUpdateManyWithoutUserNestedInput,
+      ?   globalProducts?: GlobalProductUpdateManyWithoutUserNestedInput
+        }
+      })
+
+Unknown argument `acceptedTermsAt`. Available options are marked with ?.
+Stack: PrismaClientValidationError: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].user.update()` invocation in
+C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\[root-of-the-server]__8c03b022._.js:159:149
+
+  156 console.log('Password hashed successfully');
+  157 // 3. Update User (Password & Terms)
+  158 console.log('Step 3: Updating user...');
+→ 159 await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].user.update({
+        where: {
+          id: "cmipif9x9000094z1p989kczm"
+        },
+        data: {
+          password: "$2b$10$5vRart9k72QhAw8WoKMOJu4I3xjuePoIIdc7zWiyLrmUHDFrmuNCO",
+          role: "FRANCHISOR",
+          acceptedTermsAt: new Date("2025-12-03T04:36:49.139Z"),
+          ~~~~~~~~~~~~~~~
+          acceptedTermsVersion: "1.0",
+      ?   id?: String | StringFieldUpdateOperationsInput,
+      ?   name?: String | NullableStringFieldUpdateOperationsInput | Null,
+      ?   email?: String | StringFieldUpdateOperationsInput,
+      ?   pin?: String | NullableStringFieldUpdateOperationsInput | Null,
+      ?   image?: String | NullableStringFieldUpdateOperationsInput | Null,
+      ?   customPermissions?: String | NullableStringFieldUpdateOperationsInput | Null,
+      ?   createdAt?: DateTime | DateTimeFieldUpdateOperationsInput,
+      ?   updatedAt?: DateTime | DateTimeFieldUpdateOperationsInput,
+      ?   canAddServices?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canAddProducts?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canManageInventory?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canViewReports?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canProcessRefunds?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canManageSchedule?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canManageEmployees?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canManageShifts?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canClockIn?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   canClockOut?: Boolean | BoolFieldUpdateOperationsInput,
+      ?   franchise?: FranchiseUpdateOneWithoutUsersNestedInput,
+      ?   location?: LocationUpdateOneWithoutUsersNestedInput,
+      ?   franchisor?: FranchisorUpdateOneWithoutOwnerNestedInput,
+      ?   magicLinks?: MagicLinkUpdateManyWithoutUserNestedInput,
+      ?   appointments?: AppointmentUpdateManyWithoutEmployeeNestedInput,
+      ?   schedules?: ScheduleUpdateManyWithoutEmployeeNestedInput,
+      ?   posts?: PostUpdateManyWithoutAuthorNestedInput,
+      ?   comments?: CommentUpdateManyWithoutAuthorNestedInput,
+      ?   votes?: VoteUpdateManyWithoutUserNestedInput,
+      ?   badges?: UserBadgeUpdateManyWithoutUserNestedInput,
+      ?   processedTransactions?: TransactionUpdateManyWithoutEmployeeNestedInput,
+      ?   performedServices?: TransactionLineItemUpdateManyWithoutStaffNestedInput,
+      ?   activeCart?: ActiveCartUpdateOneWithoutUserNestedInput,
+      ?   timeEntries?: TimeEntryUpdateManyWithoutUserNestedInput,
+      ?   commissionRule?: CommissionRuleUpdateOneWithoutUsersNestedInput,
+      ?   cashDrawerSessions?: CashDrawerSessionUpdateManyWithoutEmployeeNestedInput,
+      ?   globalServices?: GlobalServiceUpdateManyWithoutUserNestedInput,
+      ?   globalProducts?: GlobalProductUpdateManyWithoutUserNestedInput
+        }
+      })
+
+Unknown argument `acceptedTermsAt`. Available options are marked with ?.
+    at wn (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\@prisma\client\runtime\library.js:29:1363)
+    at $n.handleRequestError (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\@prisma\client\runtime\library.js:121:6958)
+    at $n.handleAndLogRequestError (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\@prisma\client\runtime\library.js:130:9633)
+    at async POST (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\[root-of-the-server]__8c03b022._.js:159:9)
+    at async AppRouteRouteModule.do (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js:5:37789)
+    at async AppRouteRouteModule.handle (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js:5:45045)
+    at async responseGenerator (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\node_modules_next_ccf820d9._.js:14333:38)
+    at async AppRouteRouteModule.handleResponse (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js:1:187851)
+    at async handleResponse (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\node_modules_next_ccf820d9._.js:14395:32)
+    at async handler (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\node_modules_next_ccf820d9._.js:14448:13)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\base-server.js:1413:9)
+    at async DevServer.renderPageComponent (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\base-server.js:1465:24)
+    at async DevServer.renderToResponseImpl (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\base-server.js:1515:32)
+    at async DevServer.pipeImpl (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\base-server.js:1021:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\next-server.js:394:17)
+    at async DevServer.handleRequestImpl (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\base-server.js:912:17)
+    at async C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\dev\next-dev-server.js:382:20
+    at async Span.traceAsyncFn (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\trace\trace.js:157:20)
+    at async DevServer.handleRequest (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\dev\next-dev-server.js:378:24)
+    at async invokeRender (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\lib\router-server.js:240:21)
+    at async handleRequest (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\lib\router-server.js:436:24)
+    at async requestHandlerImpl (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\lib\router-server.js:484:13)
+    at async Server.requestListener (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\lib\start-server.js:226:13)
+
+[2025-12-03T04:38:32.203Z] Error: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].magicLink.update()` invocation in
+C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\[root-of-the-server]__8c03b022._.js:216:154
+
+  213 }
+  214 // 5. Mark Magic Link as Completed
+  215 console.log('Step 5: Marking magic link as completed...');
+→ 216 await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].magicLink.update({
+        where: {
+          id: "cmipif9xi000494z1kn6e8e6b"
+        },
+        data: {
+          completedAt: new Date("2025-12-03T04:38:32.152Z"),
+          ~~~~~~~~~~~
+      ?   id?: String | StringFieldUpdateOperationsInput,
+      ?   email?: String | StringFieldUpdateOperationsInput,
+      ?   token?: String | StringFieldUpdateOperationsInput,
+      ?   expiresAt?: DateTime | DateTimeFieldUpdateOperationsInput,
+      ?   createdAt?: DateTime | DateTimeFieldUpdateOperationsInput,
+      ?   user?: UserUpdateOneWithoutMagicLinksNestedInput
+        }
+      })
+
+Unknown argument `completedAt`. Available options are marked with ?.
+Stack: PrismaClientValidationError: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].magicLink.update()` invocation in
+C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\[root-of-the-server]__8c03b022._.js:216:154
+
+  213 }
+  214 // 5. Mark Magic Link as Completed
+  215 console.log('Step 5: Marking magic link as completed...');
+→ 216 await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].magicLink.update({
+        where: {
+          id: "cmipif9xi000494z1kn6e8e6b"
+        },
+        data: {
+          completedAt: new Date("2025-12-03T04:38:32.152Z"),
+          ~~~~~~~~~~~
+      ?   id?: String | StringFieldUpdateOperationsInput,
+      ?   email?: String | StringFieldUpdateOperationsInput,
+      ?   token?: String | StringFieldUpdateOperationsInput,
+      ?   expiresAt?: DateTime | DateTimeFieldUpdateOperationsInput,
+      ?   createdAt?: DateTime | DateTimeFieldUpdateOperationsInput,
+      ?   user?: UserUpdateOneWithoutMagicLinksNestedInput
+        }
+      })
+
+Unknown argument `completedAt`. Available options are marked with ?.
+    at wn (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\@prisma\client\runtime\library.js:29:1363)
+    at $n.handleRequestError (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\@prisma\client\runtime\library.js:121:6958)
+    at $n.handleAndLogRequestError (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\@prisma\client\runtime\library.js:130:9633)
+    at async POST (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\[root-of-the-server]__8c03b022._.js:216:9)
+    at async AppRouteRouteModule.do (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js:5:37789)
+    at async AppRouteRouteModule.handle (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js:5:45045)
+    at async responseGenerator (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\node_modules_next_ccf820d9._.js:14333:38)
+    at async AppRouteRouteModule.handleResponse (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js:1:187851)
+    at async handleResponse (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\node_modules_next_ccf820d9._.js:14395:32)
+    at async handler (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\.next\dev\server\chunks\node_modules_next_ccf820d9._.js:14448:13)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\base-server.js:1413:9)
+    at async DevServer.renderPageComponent (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\base-server.js:1465:24)
+    at async DevServer.renderToResponseImpl (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\base-server.js:1515:32)
+    at async DevServer.pipeImpl (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\base-server.js:1021:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\next-server.js:394:17)
+    at async DevServer.handleRequestImpl (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\base-server.js:912:17)
+    at async C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\dev\next-dev-server.js:382:20
+    at async Span.traceAsyncFn (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\trace\trace.js:157:20)
+    at async DevServer.handleRequest (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\dev\next-dev-server.js:378:24)
+    at async invokeRender (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\lib\router-server.js:240:21)
+    at async handleRequest (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\lib\router-server.js:436:24)
+    at async requestHandlerImpl (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\lib\router-server.js:484:13)
+    at async Server.requestListener (C:\Users\PATH\.gemini\antigravity\scratch\franchise-pos-system\node_modules\next\dist\server\lib\start-server.js:226:13)
