@@ -51,6 +51,7 @@ import EndOfDayWizard from '@/components/pos/EndOfDayWizard'
 import LotteryModal from '@/components/pos/LotteryModal'
 import LotteryPayoutModal from '@/components/pos/LotteryPayoutModal'
 import ReceiptModal from '@/components/pos/ReceiptModal'
+import UniversalSearch from '@/components/pos/UniversalSearch'
 import {
     printReceipt,
     openCashDrawer,
@@ -125,7 +126,7 @@ export default function RetailPOSPage() {
     const [showDiscountModal, setShowDiscountModal] = useState(false)
     const [showQuantityModal, setShowQuantityModal] = useState(false)
     const [showPriceModal, setShowPriceModal] = useState(false)
-    const [showSearchModal, setShowSearchModal] = useState(false)
+    const [showUniversalSearch, setShowUniversalSearch] = useState(false)
     const [showAgeVerification, setShowAgeVerification] = useState(false)
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [showQuickAddModal, setShowQuickAddModal] = useState(false)
@@ -213,6 +214,19 @@ export default function RetailPOSPage() {
         checkScreenSize()
         window.addEventListener('resize', checkScreenSize)
         return () => window.removeEventListener('resize', checkScreenSize)
+    }, [])
+
+    // F3 Keyboard Shortcut for Universal Search
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // F3 or Ctrl+F to open universal search
+            if (e.key === 'F3' || (e.ctrlKey && e.key === 'f')) {
+                e.preventDefault()
+                setShowUniversalSearch(true)
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
     }, [])
 
     // ===== KIOSK MODE FEATURES =====
@@ -559,14 +573,14 @@ export default function RetailPOSPage() {
     // Keep focus on barcode input
     useEffect(() => {
         const focusBarcode = () => {
-            if (!showDiscountModal && !showQuantityModal && !showPriceModal && !showSearchModal && !showAgeVerification && !showQuickAddModal) {
+            if (!showDiscountModal && !showQuantityModal && !showPriceModal && !showUniversalSearch && !showAgeVerification && !showQuickAddModal) {
                 barcodeInputRef.current?.focus()
             }
         }
         focusBarcode()
         const interval = setInterval(focusBarcode, 1000)
         return () => clearInterval(interval)
-    }, [showDiscountModal, showQuantityModal, showPriceModal, showSearchModal, showAgeVerification, showQuickAddModal])
+    }, [showDiscountModal, showQuantityModal, showPriceModal, showUniversalSearch, showAgeVerification, showQuickAddModal])
 
     // Check for applicable promotions when cart changes
     useEffect(() => {
@@ -1401,7 +1415,7 @@ export default function RetailPOSPage() {
 
                 {/* 1. Search Button */}
                 <button
-                    onClick={() => setShowSearchModal(true)}
+                    onClick={() => setShowUniversalSearch(true)}
                     className="px-3 py-2 bg-stone-800 hover:bg-stone-700 rounded-lg flex items-center gap-2 transition-colors flex-shrink-0"
                 >
                     <Search className="h-5 w-5" />
@@ -2166,16 +2180,15 @@ export default function RetailPOSPage() {
                 />
             )}
 
-            {/* Search Modal */}
-            {showSearchModal && (
-                <SearchModal
-                    onSelect={(product) => {
-                        addToCart(product)
-                        setShowSearchModal(false)
-                    }}
-                    onClose={() => setShowSearchModal(false)}
-                />
-            )}
+            {/* Universal Search Modal (F3 or Search button) */}
+            <UniversalSearch
+                isOpen={showUniversalSearch}
+                onClose={() => setShowUniversalSearch(false)}
+                onAddToCart={(product) => {
+                    addToCart(product)
+                    setShowUniversalSearch(false)
+                }}
+            />
 
             {/* Price Check Input Modal */}
             {showPriceCheckInputModal && (
