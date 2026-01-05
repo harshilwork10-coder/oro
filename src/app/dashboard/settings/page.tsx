@@ -2,14 +2,19 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { CreditCard, DollarSign, Users, Shield, Save, AlertCircle, FileText, Printer, Settings } from 'lucide-react'
+import { redirect } from 'next/navigation'
+import { CreditCard, DollarSign, Users, Shield, Save, AlertCircle, FileText, Printer, Settings, Lock, Phone } from 'lucide-react'
 import Link from 'next/link'
 
 export default function SettingsPage() {
-    const { data: session } = useSession()
+    const { data: session, status } = useSession()
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [message, setMessage] = useState('')
+
+    // Provider controls all settings - Owners see read-only view
+    const isProvider = session?.user?.role === 'PROVIDER'
+    const canEdit = isProvider
 
     // Pricing Settings
     const [pricingModel, setPricingModel] = useState('DUAL_PRICING')
@@ -169,6 +174,28 @@ export default function SettingsPage() {
             <h1 className="text-3xl font-bold mb-8 bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
                 Franchise Settings
             </h1>
+
+            {/* Provider-Managed Settings Notice for Owners */}
+            {!canEdit && (
+                <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30">
+                    <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 bg-blue-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Lock className="h-5 w-5 text-blue-400" />
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-blue-200">Settings Managed by Your Provider</h3>
+                            <p className="text-sm text-stone-400 mt-1">
+                                Your account settings are configured by our support team to ensure optimal setup for your business.
+                                Need changes? Contact support and we'll handle it for you.
+                            </p>
+                            <a href="tel:+18005551234" className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
+                                <Phone className="h-4 w-4" />
+                                Contact Support
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {message && (
                 <div className={`mb-6 p-4 rounded-lg ${message.includes('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
@@ -533,17 +560,19 @@ export default function SettingsPage() {
                 </div>
             </div>
 
-            {/* Save All Settings Button */}
-            <div className="mb-8">
-                <button
-                    onClick={saveSettings}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 shadow-lg"
-                >
-                    <Save className="h-6 w-6" />
-                    {saving ? 'Saving...' : 'Save All Settings'}
-                </button>
-            </div>
+            {/* Save All Settings Button - Provider Only */}
+            {canEdit && (
+                <div className="mb-8">
+                    <button
+                        onClick={saveSettings}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 shadow-lg"
+                    >
+                        <Save className="h-6 w-6" />
+                        {saving ? 'Saving...' : 'Save All Settings'}
+                    </button>
+                </div>
+            )}
 
             {/* Employee Permissions */}
             <div className="bg-white rounded-2xl shadow-lg p-6">
