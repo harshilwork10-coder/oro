@@ -257,32 +257,21 @@ export default function BusinessSettingsPage() {
                     <div className="pt-4 border-t border-stone-800 mt-2">
                         <h3 className="text-sm font-medium text-stone-400 mb-3">Tax Configuration</h3>
                         <div className="grid gap-3">
-                            <div className="bg-stone-900 p-4 rounded-xl border border-stone-800 flex items-center justify-between">
+                            <a
+                                href="/dashboard/settings/taxes"
+                                className="bg-stone-900 p-4 rounded-xl border border-stone-800 flex items-center justify-between hover:border-orange-500/50 transition-colors group"
+                            >
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-stone-800 rounded-lg text-emerald-400">
+                                    <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg text-white">
                                         <Percent className="h-5 w-5" />
                                     </div>
                                     <div>
-                                        <h3 className="font-semibold text-white">Tax Rate</h3>
-                                        <p className="text-sm text-stone-400">Global tax percentage</p>
+                                        <h3 className="font-semibold text-white group-hover:text-orange-400 transition-colors">Tax Settings</h3>
+                                        <p className="text-sm text-stone-400">State, county, city taxes, bottle deposits, category rates</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="number"
-                                        value={formData.taxRate ? (formData.taxRate * 100).toFixed(2) : '0.00'}
-                                        onChange={(e) => {
-                                            const val = parseFloat(e.target.value)
-                                            setFormData(prev => ({ ...prev, taxRate: isNaN(val) ? 0 : val / 100 }))
-                                        }}
-                                        className="bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-white w-24 text-right focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                                        step="0.01"
-                                        min="0"
-                                        max="100"
-                                    />
-                                    <span className="text-stone-400">%</span>
-                                </div>
-                            </div>
+                                <div className="text-stone-500 group-hover:text-orange-400 transition-colors">→</div>
+                            </a>
 
                             <FeatureCheckbox
                                 icon={Briefcase}
