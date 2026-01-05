@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react"
 import { redirect, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Building2, Plus, Search, MoreVertical, Eye, Trash2, Download, Settings, AlertTriangle, X, CheckCircle, Clock, XCircle, Key, EyeOff, Pause, Play, Ban, ChevronDown, ChevronUp, MapPin, FileCheck, FileX } from "lucide-react"
+import { Building2, Plus, Search, MoreVertical, Eye, Trash2, Download, Settings, AlertTriangle, X, CheckCircle, Clock, XCircle, Key, EyeOff, Pause, Play, Ban, ChevronDown, ChevronUp, MapPin, FileCheck, FileX, Package } from "lucide-react"
 import AddFranchisorModal from "@/components/modals/AddFranchisorModal"
 import AddLocationModal from "@/components/modals/AddLocationModal"
 import Toast from "@/components/ui/Toast"
@@ -440,6 +440,19 @@ export default function MyClientsPage() {
                                         >
                                             <Settings className="h-4 w-4" />
                                             Manage
+                                        </button>
+
+                                        {/* Import Inventory - Migration */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                router.push(`/dashboard/inventory/import?franchiseId=${client.id}`)
+                                                setActiveMenu(null)
+                                            }}
+                                            className="w-full px-4 py-2 text-left hover:bg-stone-700 transition-colors flex items-center gap-2 text-emerald-400"
+                                        >
+                                            <Package className="h-4 w-4" />
+                                            Import Inventory
                                         </button>
 
                                         {/* Reset Password */}
