@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
         const codeMap = new Map(locationCodes.map(l => [l.id, l.pulseStoreCode]))
 
         // Transform to include config and integrations from JSON fields
-        const transformedData = franchisors.map(f => ({
+        const transformedData = (franchisors as any[]).map((f: any) => ({
             id: f.id,
             name: f.name,
             businessName: f.name || f.businessType,
@@ -99,16 +99,16 @@ export async function GET(request: NextRequest) {
             approvalStatus: f.approvalStatus,
             businessType: f.businessType,
             owner: f.owner,
-            franchises: f.franchises.map(fr => ({
+            franchises: (f.franchises || []).map((fr: any) => ({
                 id: fr.id,
                 name: fr.name,
-                locations: fr.locations.map((loc: { id: string; name: string; slug: string; address: string; stations?: { id: string; name: string; pairingCode?: string; isActive: boolean }[] }) => ({
+                locations: (fr.locations || []).map((loc: any) => ({
                     id: loc.id,
                     name: loc.name,
                     slug: loc.slug,
                     address: loc.address,
                     pulseStoreCode: codeMap.get(loc.id) || null,
-                    stations: (loc.stations || []).map((s) => ({
+                    stations: (loc.stations || []).map((s: any) => ({
                         id: s.id,
                         name: s.name,
                         pairingCode: s.pairingCode || null,

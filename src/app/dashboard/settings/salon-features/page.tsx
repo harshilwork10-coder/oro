@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import {
     Calendar, CreditCard, MessageSquare, Users, Sparkles, Eye,
     DollarSign, Clock, Star, Bell, Loader2, Check, AlertCircle,
@@ -131,27 +130,27 @@ export default function SalonFeaturesPage() {
 
     if (status === 'loading' || loading) {
         return (
-            <DashboardLayout>
+            <>
                 <div className="flex items-center justify-center min-h-[60vh]">
                     <Loader2 className="h-8 w-8 animate-spin text-violet-500" />
                 </div>
-            </DashboardLayout>
+            </>
         )
     }
 
     if (!settings) {
         return (
-            <DashboardLayout>
+            <>
                 <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
                     <AlertCircle className="h-12 w-12 text-red-500" />
                     <p className="text-stone-400">Failed to load settings</p>
                 </div>
-            </DashboardLayout>
+            </>
         )
     }
 
     return (
-        <DashboardLayout>
+        <>
             <div className="max-w-4xl mx-auto p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
@@ -374,6 +373,6 @@ export default function SalonFeaturesPage() {
                     </div>
                 </section>
             </div>
-        </DashboardLayout>
+        </>
     )
 }

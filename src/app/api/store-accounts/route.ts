@@ -88,23 +88,24 @@ export async function GET(request: NextRequest) {
         const hasMore = clients.length > (take || 50)
         const data = hasMore ? clients.slice(0, take || 50) : clients
 
-        const accounts = data.map((c) => ({
+        const accounts = (data as any[]).map((c: any) => ({
             id: c.id,
             name: `${c.firstName} ${c.lastName}`,
             phone: c.phone || '',
             email: c.email || '',
             balance: Number(c.storeAccountBalance),
             limit: Number(c.storeAccountLimit),
-            transactionCount: c._count.storeAccountTransactions,
+            transactionCount: c._count?.storeAccountTransactions || 0,
             approvedAt: c.storeAccountApprovedAt
         }))
 
         const nextCursor = hasMore && accounts.length > 0 ? accounts[accounts.length - 1].id : null
 
-        return ApiResponse.paginated(
-            { accounts, totals: { totalAccounts: totalCount, totalOutstanding: 0, accountsWithBalance: outstandingCount } },
-            { nextCursor, hasMore, total: totalCount }
-        )
+        return ApiResponse.success({
+            accounts,
+            totals: { totalAccounts: totalCount, totalOutstanding: 0, accountsWithBalance: outstandingCount },
+            pagination: { nextCursor, hasMore, total: totalCount }
+        })
     } catch (error) {
         console.error('Error:', error)
         return ApiResponse.serverError('Failed to fetch store accounts')

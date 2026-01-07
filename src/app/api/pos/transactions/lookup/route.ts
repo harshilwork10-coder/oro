@@ -61,13 +61,7 @@ export async function GET(request: NextRequest) {
                 ? `${transaction.client.firstName} ${transaction.client.lastName}`
                 : null,
             customerPhone: transaction.client?.phone || null,
-            items: transaction.lineItems.map((item: {
-                id: string;
-                name: string | null;
-                quantity: number;
-                price: unknown;
-                discount: unknown;
-            }) => ({
+            items: (transaction.lineItems as any[]).map((item: any) => ({
                 id: item.id,
                 name: item.name || 'Unknown',
                 quantity: item.quantity,
