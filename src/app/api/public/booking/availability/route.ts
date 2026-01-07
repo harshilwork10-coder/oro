@@ -44,6 +44,72 @@ export async function GET(request: NextRequest) {
             }
         })
 
+        // Get time blocks for the staff member (if specified)
+        let timeBlocks: { startTime: Date; endTime: Date }[] = []
+        if (staffId) {
+            const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
+
+            const blocks = await prisma.timeBlock.findMany({
+                where: {
+                    userId: staffId,
+                    OR: [
+                        // One-time blocks on this date
+                        {
+                            isRecurring: false,
+                            startTime: { gte: dateStart, lte: dateEnd }
+                        },
+                        // Recurring blocks (check day of week)
+                        {
+                            isRecurring: true
+                        }
+                    ]
+                },
+                select: {
+                    startTime: true,
+                    endTime: true,
+                    isRecurring: true,
+                    recurringDays: true,
+                    recurringUntil: true
+                }
+            })
+
+            timeBlocks = blocks.filter(block => {
+                if (!block.isRecurring) {
+                    return true // One-time block, already filtered by date
+                }
+
+                // Check if recurring block applies to this day
+                if (block.recurringUntil && new Date(date) > block.recurringUntil) {
+                    return false // Recurring ended
+                }
+
+                if (block.recurringDays) {
+                    try {
+                        const days = JSON.parse(block.recurringDays) as string[]
+                        if (!days.includes(dayOfWeek)) {
+                            return false // Doesn't apply to this day
+                        }
+                    } catch {
+                        return false
+                    }
+                }
+
+                return true
+            }).map(block => {
+                if (block.isRecurring) {
+                    // Adjust recurring block time to this date
+                    const blockStart = new Date(block.startTime)
+                    const blockEnd = new Date(block.endTime)
+                    const adjustedStart = new Date(date)
+                    adjustedStart.setHours(blockStart.getHours(), blockStart.getMinutes(), 0, 0)
+                    const adjustedEnd = new Date(date)
+                    adjustedEnd.setHours(blockEnd.getHours(), blockEnd.getMinutes(), 0, 0)
+                    return { startTime: adjustedStart, endTime: adjustedEnd }
+                }
+                return { startTime: new Date(block.startTime), endTime: new Date(block.endTime) }
+            })
+        }
+
         // Generate available slots (9 AM - 6 PM)
         const slots: { time: string; available: boolean }[] = []
         const startHour = 9
@@ -59,17 +125,23 @@ export async function GET(request: NextRequest) {
                     continue
                 }
 
-                // Check if slot conflicts with existing appointments
                 const slotEnd = new Date(slotTime.getTime() + duration * 60000)
-                const isConflict = appointments.some(apt => {
+
+                // Check if slot conflicts with existing appointments
+                const isAppointmentConflict = appointments.some(apt => {
                     const aptStart = new Date(apt.startTime)
                     const aptEnd = new Date(apt.endTime)
                     return (slotTime < aptEnd && slotEnd > aptStart)
                 })
 
+                // Check if slot conflicts with time blocks
+                const isBlockConflict = timeBlocks.some(block => {
+                    return (slotTime < block.endTime && slotEnd > block.startTime)
+                })
+
                 slots.push({
                     time: slotTime.toISOString(),
-                    available: !isConflict
+                    available: !isAppointmentConflict && !isBlockConflict
                 })
             }
         }

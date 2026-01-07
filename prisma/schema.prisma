@@ -235,6 +235,16 @@ model User {
 
   // Web Push Subscriptions (for PWA notifications)
   pushSubscriptions PushSubscription[]
+
+  // Staff Profile (for individual booking links)
+  staffSlug      String?  @unique // e.g. "john-smith" for /book/salon/john-smith
+  bio            String?  // "Master barber with 10 years experience"
+  specialties    String?  // JSON array: ["Fades", "Beard Trim", "Hot Towel Shave"]
+  profilePhotoUrl String? // Custom profile photo for public booking page
+  acceptingClients Boolean @default(true) // Can toggle off when fully booked
+
+  // Time Blocking (block personal time)
+  timeBlocks TimeBlock[]
 }
 
 model Franchise {
@@ -4139,4 +4149,54 @@ model IdempotencyKey {
 
   @@unique([key, franchiseId])
   @@index([createdAt])
+}
+
+// ============ SALON: TIME BLOCKING ============
+// Staff can block personal time (lunch, vacation, appointments outside system)
+
+model TimeBlock {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  locationId String?
+
+  title     String?  // "Lunch Break", "Vacation", "Personal"
+  startTime DateTime
+  endTime   DateTime
+
+  // Recurring blocks (every Monday 12-1pm)
+  isRecurring     Boolean @default(false)
+  recurringDays   String? // JSON: ["MON", "TUE"] or null for one-time
+  recurringUntil  DateTime? // Optional end date for recurring
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([startTime])
+}
+
+// ============ SALON: BOOTH RENTAL ============
+// Track chair/booth renters and their payments
+
+model BoothRental {
+  id          String    @id @default(cuid())
+  franchiseId String
+  locationId  String?
+  userId      String    // The barber/stylist renting
+
+  boothNumber String?   // "Chair 3", "Station B"
+  weeklyRate  Float     @default(0)
+  dueDay      Int       @default(1) // Day of week (0=Sun, 1=Mon, etc.)
+  
+  startDate   DateTime  @default(now())
+  endDate     DateTime? // If they leave
+
+  isActive    Boolean   @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([franchiseId])
+  @@index([userId])
 }
