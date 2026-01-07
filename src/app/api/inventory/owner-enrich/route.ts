@@ -3,6 +3,101 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// Industry-standard department mapping
+const STANDARD_DEPARTMENTS: { [key: string]: { keywords: string[], category: string } } = {
+    'Beverages': {
+        keywords: ['cola', 'pepsi', 'coke', 'sprite', 'fanta', 'dr pepper', '7up', 'mountain dew', 'soda', 'pop', 'soft drink', 'energy drink', 'red bull', 'monster', 'gatorade', 'powerade', 'water', 'juice', 'tea', 'coffee', 'lemonade', 'drink'],
+        category: 'Beverages'
+    },
+    'Beer': {
+        keywords: ['beer', 'lager', 'ale', 'ipa', 'stout', 'pilsner', 'budweiser', 'bud light', 'miller', 'coors', 'corona', 'heineken', 'modelo', 'michelob', 'busch', 'natural light', 'keystone', 'pabst', 'stella'],
+        category: 'Beer'
+    },
+    'Wine': {
+        keywords: ['wine', 'cabernet', 'merlot', 'chardonnay', 'pinot', 'sauvignon', 'riesling', 'moscato', 'champagne', 'prosecco', 'rose', 'zinfandel', 'shiraz', 'malbec'],
+        category: 'Wine'
+    },
+    'Spirits': {
+        keywords: ['vodka', 'whiskey', 'whisky', 'bourbon', 'rum', 'gin', 'tequila', 'brandy', 'cognac', 'scotch', 'liquor', 'liqueur', 'hennessy', 'jack daniels', 'crown royal', 'patron', 'grey goose', 'absolut', 'smirnoff', 'bacardi', 'captain morgan', 'jameson', 'johnnie walker'],
+        category: 'Spirits'
+    },
+    'Tobacco': {
+        keywords: ['cigarette', 'cigar', 'tobacco', 'marlboro', 'camel', 'newport', 'american spirit', 'parliament', 'pall mall', 'winston', 'kool', 'salem', 'virginia slims', 'swisher', 'black mild', 'backwoods', 'dutch', 'white owl', 'game', 'vape', 'juul', 'elf bar', 'disposable'],
+        category: 'Tobacco'
+    },
+    'Snacks': {
+        keywords: ['chip', 'chips', 'doritos', 'lays', 'cheetos', 'pringles', 'fritos', 'ruffles', 'tostitos', 'popcorn', 'pretzel', 'cracker', 'cookie', 'oreo', 'candy', 'chocolate', 'snack', 'nut', 'peanut', 'almond', 'cashew', 'beef jerky', 'slim jim', 'granola', 'trail mix'],
+        category: 'Snacks'
+    },
+    'Candy': {
+        keywords: ['candy', 'gum', 'mint', 'skittles', 'starburst', 'snickers', 'twix', 'kit kat', 'reeses', 'hershey', 'm&m', 'milky way', '3 musketeers', 'butterfinger', 'sour patch', 'gummy', 'lollipop', 'mentos', 'tic tac', 'orbit', 'trident', 'extra'],
+        category: 'Candy'
+    },
+    'Dairy': {
+        keywords: ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'ice cream', 'egg', 'eggs'],
+        category: 'Dairy'
+    },
+    'Grocery': {
+        keywords: ['bread', 'cereal', 'soup', 'pasta', 'rice', 'beans', 'canned', 'sauce', 'flour', 'sugar', 'oil', 'condiment', 'ketchup', 'mustard', 'mayo', 'salad', 'dressing'],
+        category: 'Grocery'
+    },
+    'Frozen': {
+        keywords: ['frozen', 'ice', 'pizza', 'hot pocket', 'ice cream', 'popsicle'],
+        category: 'Frozen'
+    },
+    'Health & Beauty': {
+        keywords: ['shampoo', 'soap', 'toothpaste', 'deodorant', 'lotion', 'medicine', 'pain', 'vitamin', 'bandage', 'first aid', 'aspirin', 'tylenol', 'advil', 'ibuprofen'],
+        category: 'Health & Beauty'
+    },
+    'Household': {
+        keywords: ['paper towel', 'toilet paper', 'tissue', 'cleaning', 'detergent', 'bleach', 'trash bag', 'garbage bag', 'battery', 'batteries', 'light bulb', 'charger'],
+        category: 'Household'
+    },
+    'Lottery': {
+        keywords: ['lottery', 'lotto', 'scratch', 'powerball', 'mega millions'],
+        category: 'Lottery'
+    },
+    'Auto': {
+        keywords: ['motor oil', 'antifreeze', 'coolant', 'windshield', 'air freshener', 'car'],
+        category: 'Auto'
+    },
+    'Pet': {
+        keywords: ['dog food', 'cat food', 'pet', 'puppy', 'kitten'],
+        category: 'Pet'
+    }
+}
+
+// Auto-detect industry-standard category from product name
+function standardizeCategory(productName: string, upcCategory?: string): string {
+    if (!productName && !upcCategory) return 'General'
+
+    const searchText = `${productName || ''} ${upcCategory || ''}`.toLowerCase()
+
+    // Check each department's keywords
+    for (const [dept, config] of Object.entries(STANDARD_DEPARTMENTS)) {
+        for (const keyword of config.keywords) {
+            if (searchText.includes(keyword.toLowerCase())) {
+                return config.category
+            }
+        }
+    }
+
+    // If UPC category exists, try to map it
+    if (upcCategory) {
+        const lowerCat = upcCategory.toLowerCase()
+        if (lowerCat.includes('beverage') || lowerCat.includes('drink')) return 'Beverages'
+        if (lowerCat.includes('snack') || lowerCat.includes('chip')) return 'Snacks'
+        if (lowerCat.includes('candy') || lowerCat.includes('confection')) return 'Candy'
+        if (lowerCat.includes('tobacco') || lowerCat.includes('cigarette')) return 'Tobacco'
+        if (lowerCat.includes('beer') || lowerCat.includes('wine') || lowerCat.includes('liquor')) return lowerCat.includes('beer') ? 'Beer' : lowerCat.includes('wine') ? 'Wine' : 'Spirits'
+        if (lowerCat.includes('dairy') || lowerCat.includes('milk')) return 'Dairy'
+        if (lowerCat.includes('frozen')) return 'Frozen'
+        if (lowerCat.includes('health') || lowerCat.includes('beauty') || lowerCat.includes('personal')) return 'Health & Beauty'
+    }
+
+    return 'General'
+}
+
 // POST - Enrich items using UPC database lookup AND add to master DB
 export async function POST(request: NextRequest) {
     try {
@@ -32,12 +127,14 @@ export async function POST(request: NextRequest) {
 
         for (const item of items) {
             if (!item.upc || lookupCount >= MAX_LOOKUPS) {
-                // No UPC or hit limit - keep original
+                // No UPC or hit limit - auto-categorize from name
+                const standardDept = standardizeCategory(item.originalName, undefined)
                 enrichedItems.push({
                     ...item,
                     enrichedName: item.originalName,
                     brand: extractBrand(item.originalName),
                     size: extractSize(item.originalName),
+                    category: standardDept, // Use standardized category
                     needsEnrichment: false,
                     enrichmentSource: 'original'
                 })
@@ -52,13 +149,14 @@ export async function POST(request: NextRequest) {
             })
 
             if (masterProduct) {
-                // Found in master DB - use it
+                // Found in master DB - use standardized category
+                const standardDept = standardizeCategory(masterProduct.name || '', masterProduct.category || '')
                 enrichedItems.push({
                     ...item,
                     enrichedName: masterProduct.name || item.originalName,
                     brand: masterProduct.brand || extractBrand(item.originalName),
                     size: masterProduct.size || extractSize(masterProduct.name || item.originalName),
-                    category: masterProduct.category || item.department,
+                    category: standardDept, // Use standardized category
                     needsEnrichment: false,
                     enrichmentSource: 'upc_database'
                 })
@@ -71,6 +169,8 @@ export async function POST(request: NextRequest) {
 
             if (upcData) {
                 // Found in external API - save to master DB for future use
+                const standardDept = standardizeCategory(upcData.title || '', upcData.category || '')
+
                 try {
                     await prisma.masterUpcProduct.create({
                         data: {
@@ -78,7 +178,7 @@ export async function POST(request: NextRequest) {
                             name: upcData.title || 'Unknown Product',
                             brand: upcData.brand || null,
                             description: upcData.description || null,
-                            category: upcData.category || null,
+                            category: standardDept, // Save standardized category
                             size: upcData.size || null
                         }
                     })
@@ -92,18 +192,20 @@ export async function POST(request: NextRequest) {
                     enrichedName: upcData.title || item.originalName,
                     brand: upcData.brand || extractBrand(item.originalName),
                     size: upcData.size || extractSize(upcData.title || item.originalName),
-                    category: upcData.category || item.department,
+                    category: standardDept, // Use standardized category
                     imageUrl: upcData.image,
                     needsEnrichment: false,
                     enrichmentSource: 'upc_database'
                 })
             } else {
-                // UPC not found anywhere - use original with extracted data
+                // UPC not found anywhere - auto-categorize from name
+                const standardDept = standardizeCategory(item.originalName, undefined)
                 enrichedItems.push({
                     ...item,
                     enrichedName: item.originalName,
                     brand: extractBrand(item.originalName),
                     size: extractSize(item.originalName),
+                    category: standardDept, // Use standardized category
                     needsEnrichment: false,
                     enrichmentSource: 'not_found'
                 })
@@ -192,3 +294,4 @@ function extractBrand(text: string): string | null {
     }
     return null
 }
+
