@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { Calendar, Clock, User, MapPin, Check, ArrowLeft, ArrowRight, Loader2, Star, Phone, Mail, Sparkles, FileText, Shield, ChevronRight, Zap, Heart, CheckCircle2 } from 'lucide-react'
+import { Calendar, Clock, User, Users, MapPin, Check, ArrowLeft, ArrowRight, Loader2, Star, Phone, Mail, Sparkles, FileText, Shield, ChevronRight, Zap, Heart, CheckCircle2 } from 'lucide-react'
 
 interface Service {
     id: string
@@ -27,6 +27,13 @@ interface Location {
 interface TimeSlot {
     time: string
     available: boolean
+}
+
+interface GroupMember {
+    id: string
+    name: string
+    service: Service | null
+    addons: Service[]
 }
 
 type Step = 'service' | 'addons' | 'datetime' | 'details' | 'waiver' | 'confirm' | 'success'
@@ -58,6 +65,10 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
     const [notes, setNotes] = useState('')
     const [selectedAddons, setSelectedAddons] = useState<Service[]>([])
     const [confirmation, setConfirmation] = useState<any>(null)
+
+    // Group booking state
+    const [isGroupBooking, setIsGroupBooking] = useState(false)
+    const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
 
     // Waiver state
     const [waiverText, setWaiverText] = useState('')
@@ -405,15 +416,15 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                                                     }
                                                 }}
                                                 className={`w-full group relative border rounded-2xl p-4 text-left transition-all duration-300 ${isSelected
-                                                        ? 'bg-violet-500/20 border-violet-500/50 shadow-lg shadow-violet-500/20'
-                                                        : 'bg-white/[0.03] hover:bg-white/[0.08] border-white/10 hover:border-violet-500/30'
+                                                    ? 'bg-violet-500/20 border-violet-500/50 shadow-lg shadow-violet-500/20'
+                                                    : 'bg-white/[0.03] hover:bg-white/[0.08] border-white/10 hover:border-violet-500/30'
                                                     }`}
                                             >
                                                 <div className="flex items-center gap-4">
                                                     {/* Checkbox */}
                                                     <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected
-                                                            ? 'bg-violet-500 border-violet-500'
-                                                            : 'border-stone-600 group-hover:border-violet-400'
+                                                        ? 'bg-violet-500 border-violet-500'
+                                                        : 'border-stone-600 group-hover:border-violet-400'
                                                         }`}>
                                                         {isSelected && <Check className="h-4 w-4 text-white" />}
                                                     </div>
@@ -591,6 +602,116 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                                         />
                                     </div>
                                 </div>
+
+                                {/* Group Booking Section */}
+                                <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="font-semibold text-white flex items-center gap-2">
+                                            <Users className="h-5 w-5 text-violet-400" />
+                                            Group Booking
+                                        </h3>
+                                        <button
+                                            onClick={() => {
+                                                const newMember: GroupMember = {
+                                                    id: Date.now().toString(),
+                                                    name: '',
+                                                    service: null,
+                                                    addons: []
+                                                }
+                                                setGroupMembers([...groupMembers, newMember])
+                                                setIsGroupBooking(true)
+                                            }}
+                                            className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-sm rounded-lg font-medium transition-all"
+                                        >
+                                            + Add Person
+                                        </button>
+                                    </div>
+
+                                    {groupMembers.length === 0 ? (
+                                        <p className="text-sm text-violet-300/70">
+                                            Booking with family or friends? Add more people to your appointment.
+                                        </p>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {groupMembers.map((member, index) => (
+                                                <div key={member.id} className="bg-stone-900/50 border border-stone-700 rounded-lg p-3">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="text-violet-400 text-sm font-medium">Person {index + 2}</span>
+                                                        <button
+                                                            onClick={() => setGroupMembers(groupMembers.filter(m => m.id !== member.id))}
+                                                            className="ml-auto text-red-400 hover:text-red-300 text-xs"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        value={member.name}
+                                                        onChange={(e) => {
+                                                            const updated = groupMembers.map(m =>
+                                                                m.id === member.id ? { ...m, name: e.target.value } : m
+                                                            )
+                                                            setGroupMembers(updated)
+                                                        }}
+                                                        placeholder="Name"
+                                                        className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white text-sm placeholder-stone-500 outline-none focus:border-violet-500 mb-2"
+                                                    />
+                                                    <select
+                                                        value={member.service?.id || ''}
+                                                        onChange={(e) => {
+                                                            const service = services.find(s => s.id === e.target.value) || null
+                                                            const updated = groupMembers.map(m =>
+                                                                m.id === member.id ? { ...m, service } : m
+                                                            )
+                                                            setGroupMembers(updated)
+                                                        }}
+                                                        className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-violet-500"
+                                                    >
+                                                        <option value="">Select service...</option>
+                                                        {services.map(s => (
+                                                            <option key={s.id} value={s.id}>
+                                                                {s.name} - ${s.price}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Booking Summary */}
+                                {(selectedService || groupMembers.length > 0) && (
+                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+                                        <h4 className="font-semibold text-emerald-300 mb-2">Booking Summary</h4>
+                                        <div className="space-y-1 text-sm">
+                                            <div className="flex justify-between text-stone-300">
+                                                <span>{customerName || 'You'}: {selectedService?.name}</span>
+                                                <span>${selectedService?.price || 0}</span>
+                                            </div>
+                                            {selectedAddons.map(addon => (
+                                                <div key={addon.id} className="flex justify-between text-stone-400">
+                                                    <span>+ {addon.name}</span>
+                                                    <span>${addon.price}</span>
+                                                </div>
+                                            ))}
+                                            {groupMembers.filter(m => m.service).map(member => (
+                                                <div key={member.id} className="flex justify-between text-stone-300">
+                                                    <span>{member.name || 'Guest'}: {member.service?.name}</span>
+                                                    <span>${member.service?.price || 0}</span>
+                                                </div>
+                                            ))}
+                                            <div className="border-t border-emerald-500/20 pt-2 mt-2 flex justify-between font-semibold text-emerald-300">
+                                                <span>Total</span>
+                                                <span>
+                                                    ${(selectedService?.price || 0) +
+                                                        selectedAddons.reduce((sum, a) => sum + a.price, 0) +
+                                                        groupMembers.reduce((sum, m) => sum + (m.service?.price || 0), 0)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <button
                                     onClick={() => {
