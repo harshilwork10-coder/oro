@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { auditLog } from '@/lib/audit'
 
 // GET - Get feature toggle settings
 export async function GET(request: NextRequest) {
@@ -125,6 +126,17 @@ export async function PUT(request: NextRequest) {
                 franchiseId: user.franchiseId,
                 ...updateData
             }
+        })
+
+        // Audit log the setting changes
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'SETTINGS_CHANGE',
+            entityType: 'FeatureSettings',
+            franchiseId: user.franchiseId,
+            metadata: { changedFields: Object.keys(updateData), values: updateData }
         })
 
         return NextResponse.json({ success: true, settings })
