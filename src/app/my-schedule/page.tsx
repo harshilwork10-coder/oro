@@ -6,8 +6,9 @@ import { redirect } from 'next/navigation'
 import {
     Calendar, Clock, User, MapPin, ChevronLeft, ChevronRight,
     Share2, Copy, Check, DollarSign, Users, Link2, Menu,
-    CheckCircle, XCircle, Phone, Play, Loader2, Bell, AlertCircle
+    CheckCircle, XCircle, Phone, Play, Loader2, Bell, AlertCircle, CalendarOff
 } from 'lucide-react'
+import TimeBlockModal from '@/components/modals/TimeBlockModal'
 
 interface RebookingSuggestion {
     client: {
@@ -54,6 +55,7 @@ export default function MySchedulePage() {
     const [copied, setCopied] = useState(false)
     const [stats, setStats] = useState({ today: 0, week: 0, earnings: 0 })
     const [rebookingSuggestions, setRebookingSuggestions] = useState<RebookingSuggestion[]>([])
+    const [showTimeBlockModal, setShowTimeBlockModal] = useState(false)
 
     const fetchAppointments = useCallback(async () => {
         if (!user?.id) return
@@ -194,13 +196,22 @@ export default function MySchedulePage() {
                                 <p className="text-xs text-stone-400">{user?.role || 'Barber'}</p>
                             </div>
                         </div>
-                        <button
-                            onClick={shareLink}
-                            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-full text-sm font-medium transition-all"
-                        >
-                            {copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
-                            {copied ? 'Copied!' : 'Share Link'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowTimeBlockModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white rounded-full text-sm font-medium transition-all border border-stone-600"
+                            >
+                                <CalendarOff className="h-4 w-4" />
+                                Block Time
+                            </button>
+                            <button
+                                onClick={shareLink}
+                                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-full text-sm font-medium transition-all"
+                            >
+                                {copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+                                {copied ? 'Copied!' : 'Share Link'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -385,6 +396,13 @@ export default function MySchedulePage() {
                     Powered by Oronex
                 </div>
             </div>
+
+            {/* Time Block Modal */}
+            <TimeBlockModal
+                isOpen={showTimeBlockModal}
+                onClose={() => setShowTimeBlockModal(false)}
+                onBlockCreated={() => fetchAppointments()}
+            />
         </div>
     )
 }
