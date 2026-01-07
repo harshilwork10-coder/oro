@@ -1195,6 +1195,10 @@ model Appointment {
   status    String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED, NO_SHOW
   notes     String?
 
+  // Group booking - links multiple appointments made together
+  groupBookingId String?  // Shared ID for all appointments in a group
+  groupPosition  Int?     // 1=primary booker, 2+=group members
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

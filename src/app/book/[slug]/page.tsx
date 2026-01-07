@@ -186,12 +186,23 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                     customerName,
                     customerEmail,
                     customerPhone,
-                    notes
+                    notes,
+                    // Pass group members with their service selection
+                    groupMembers: groupMembers.filter(m => m.name && m.service).map(m => ({
+                        name: m.name,
+                        serviceId: m.service!.id
+                    }))
                 })
             })
             const data = await res.json()
             if (res.ok) {
-                setConfirmation(data.appointment)
+                // Store full response including group members
+                setConfirmation({
+                    ...data.appointment,
+                    groupMembers: data.groupMembers || [],
+                    totalPrice: data.totalPrice,
+                    totalPeople: data.totalPeople
+                })
                 animateToStep('success')
             } else {
                 alert(data.error || 'Failed to book appointment')
