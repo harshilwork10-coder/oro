@@ -6,8 +6,20 @@ import { redirect } from 'next/navigation'
 import {
     Calendar, Clock, User, MapPin, ChevronLeft, ChevronRight,
     Share2, Copy, Check, DollarSign, Users, Link2, Menu,
-    CheckCircle, XCircle, Phone, Play, Loader2
+    CheckCircle, XCircle, Phone, Play, Loader2, Bell, AlertCircle
 } from 'lucide-react'
+
+interface RebookingSuggestion {
+    client: {
+        id: string
+        firstName: string
+        lastName: string
+        phone: string | null
+    }
+    daysSinceVisit: number
+    isOverdue: boolean
+    preferredService: { name: string } | null
+}
 
 interface Appointment {
     id: string
@@ -41,6 +53,7 @@ export default function MySchedulePage() {
     const [loading, setLoading] = useState(true)
     const [copied, setCopied] = useState(false)
     const [stats, setStats] = useState({ today: 0, week: 0, earnings: 0 })
+    const [rebookingSuggestions, setRebookingSuggestions] = useState<RebookingSuggestion[]>([])
 
     const fetchAppointments = useCallback(async () => {
         if (!user?.id) return
@@ -84,6 +97,23 @@ export default function MySchedulePage() {
     useEffect(() => {
         fetchStats()
     }, [appointments, fetchStats])
+
+    // Fetch rebooking suggestions
+    useEffect(() => {
+        const fetchRebooking = async () => {
+            if (!user?.id) return
+            try {
+                const res = await fetch(`/api/clients/rebooking?staffId=${user.id}&limit=5`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setRebookingSuggestions(data.suggestions || [])
+                }
+            } catch (error) {
+                console.error('Failed to fetch rebooking suggestions:', error)
+            }
+        }
+        fetchRebooking()
+    }, [user?.id])
 
     const navigateDate = (direction: 'prev' | 'next') => {
         const date = new Date(selectedDate)
@@ -193,6 +223,56 @@ export default function MySchedulePage() {
                     <p className="text-xs text-stone-400">Earned</p>
                 </div>
             </div>
+
+            {/* Rebooking Suggestions */}
+            {rebookingSuggestions.length > 0 && (
+                <div className="px-4 pb-2">
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Bell className="h-5 w-5 text-amber-400" />
+                            <h2 className="font-semibold text-white">Clients Due for Visit</h2>
+                            <span className="ml-auto px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full">
+                                {rebookingSuggestions.length}
+                            </span>
+                        </div>
+                        <div className="space-y-2">
+                            {rebookingSuggestions.slice(0, 3).map((suggestion) => (
+                                <div
+                                    key={suggestion.client.id}
+                                    className="flex items-center gap-3 p-2 bg-stone-900/50 rounded-xl"
+                                >
+                                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold">
+                                        {suggestion.client.firstName.charAt(0)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-white truncate">
+                                            {suggestion.client.firstName} {suggestion.client.lastName}
+                                        </p>
+                                        <p className="text-xs text-stone-400">
+                                            {suggestion.isOverdue ? (
+                                                <span className="text-red-400">
+                                                    <AlertCircle className="h-3 w-3 inline mr-1" />
+                                                    {suggestion.daysSinceVisit} days overdue
+                                                </span>
+                                            ) : (
+                                                `Last visit ${suggestion.daysSinceVisit} days ago`
+                                            )}
+                                        </p>
+                                    </div>
+                                    {suggestion.client.phone && (
+                                        <a
+                                            href={`sms:${suggestion.client.phone}`}
+                                            className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs rounded-lg font-medium"
+                                        >
+                                            Text
+                                        </a>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Date Navigation */}
             <div className="px-4 py-2">
