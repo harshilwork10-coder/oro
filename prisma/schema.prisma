@@ -1101,6 +1101,9 @@ model Service {
 
   // Location-specific overrides
   locationOverrides LocationItemOverride[]
+  
+  // Add-on service flag (for upselling during booking)
+  isAddOn Boolean @default(false)
 }
 
 model Client {

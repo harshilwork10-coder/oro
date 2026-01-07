@@ -29,9 +29,9 @@ interface TimeSlot {
     available: boolean
 }
 
-type Step = 'service' | 'datetime' | 'details' | 'waiver' | 'confirm' | 'success'
+type Step = 'service' | 'addons' | 'datetime' | 'details' | 'waiver' | 'confirm' | 'success'
 
-const STEPS = ['service', 'datetime', 'details', 'waiver', 'confirm'] as const
+const STEPS = ['service', 'addons', 'datetime', 'details', 'waiver', 'confirm'] as const
 
 export default function BookingPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params)
@@ -41,6 +41,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
     const [franchise, setFranchise] = useState<any>(null)
     const [services, setServices] = useState<Service[]>([])
+    const [addons, setAddons] = useState<Service[]>([])
     const [staff, setStaff] = useState<Staff[]>([])
     const [locations, setLocations] = useState<Location[]>([])
     const [slots, setSlots] = useState<TimeSlot[]>([])
@@ -55,6 +56,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
     const [customerEmail, setCustomerEmail] = useState('')
     const [customerPhone, setCustomerPhone] = useState('')
     const [notes, setNotes] = useState('')
+    const [selectedAddons, setSelectedAddons] = useState<Service[]>([])
     const [confirmation, setConfirmation] = useState<any>(null)
 
     // Waiver state
@@ -85,6 +87,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
             const data = await res.json()
             setFranchise(data.franchise)
             setServices(data.services)
+            setAddons(data.addons || [])
             setStaff(data.staff)
             setLocations(data.locations)
             if (data.locations.length === 1) {
@@ -312,9 +315,12 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                                                 key={service.id}
                                                 onClick={() => {
                                                     setSelectedService(service)
+                                                    setSelectedAddons([])
                                                     if (selectedLocation || locations.length === 1) {
                                                         if (!selectedLocation && locations.length === 1) setSelectedLocation(locations[0])
-                                                        setTimeout(() => animateToStep('datetime'), 200)
+                                                        // Go to addons step if addons available, otherwise datetime
+                                                        const nextStep = addons.length > 0 ? 'addons' : 'datetime'
+                                                        setTimeout(() => animateToStep(nextStep), 200)
                                                     }
                                                 }}
                                                 className="w-full group relative bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-violet-500/50 rounded-2xl p-5 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-violet-500/10"
@@ -361,6 +367,97 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* Step 1.5: Add-on Services */}
+                        {step === 'addons' && (
+                            <div className="space-y-4">
+                                {/* Selected Service Card */}
+                                <div className="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/20 rounded-2xl p-4 flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center text-white font-bold">
+                                        {selectedService?.name.charAt(0)}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-white">{selectedService?.name}</p>
+                                        <p className="text-sm text-violet-300">{selectedService?.duration} min • ${selectedService?.price}</p>
+                                    </div>
+                                    <button onClick={() => animateToStep('service')} className="text-violet-400 hover:text-white text-sm">Change</button>
+                                </div>
+
+                                <div className="text-center mb-2">
+                                    <h2 className="text-xl font-bold text-white mb-1">Enhance Your Experience</h2>
+                                    <p className="text-violet-300/70">Add extras to your visit (optional)</p>
+                                </div>
+
+                                {/* Add-on options */}
+                                <div className="space-y-3">
+                                    {addons.map((addon) => {
+                                        const isSelected = selectedAddons.some(a => a.id === addon.id)
+                                        return (
+                                            <button
+                                                key={addon.id}
+                                                onClick={() => {
+                                                    if (isSelected) {
+                                                        setSelectedAddons(selectedAddons.filter(a => a.id !== addon.id))
+                                                    } else {
+                                                        setSelectedAddons([...selectedAddons, addon])
+                                                    }
+                                                }}
+                                                className={`w-full group relative border rounded-2xl p-4 text-left transition-all duration-300 ${isSelected
+                                                        ? 'bg-violet-500/20 border-violet-500/50 shadow-lg shadow-violet-500/20'
+                                                        : 'bg-white/[0.03] hover:bg-white/[0.08] border-white/10 hover:border-violet-500/30'
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    {/* Checkbox */}
+                                                    <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected
+                                                            ? 'bg-violet-500 border-violet-500'
+                                                            : 'border-stone-600 group-hover:border-violet-400'
+                                                        }`}>
+                                                        {isSelected && <Check className="h-4 w-4 text-white" />}
+                                                    </div>
+
+                                                    {/* Info */}
+                                                    <div className="flex-1">
+                                                        <h3 className="font-semibold text-white">{addon.name}</h3>
+                                                        {addon.description && (
+                                                            <p className="text-sm text-violet-300/70">{addon.description}</p>
+                                                        )}
+                                                        <div className="flex items-center gap-2 mt-1 text-xs text-violet-300/50">
+                                                            <Clock className="h-3 w-3" />
+                                                            <span>+{addon.duration} min</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Price */}
+                                                    <span className="text-lg font-bold text-violet-300">+${addon.price}</span>
+                                                </div>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+
+                                {/* Summary */}
+                                {selectedAddons.length > 0 && (
+                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-emerald-300">{selectedAddons.length} add-on{selectedAddons.length > 1 ? 's' : ''} selected</span>
+                                            <span className="text-emerald-400 font-semibold">
+                                                +${selectedAddons.reduce((sum, a) => sum + a.price, 0)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Continue Button */}
+                                <button
+                                    onClick={() => animateToStep('datetime')}
+                                    className="w-full py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold rounded-2xl transition-all shadow-lg shadow-violet-500/30 flex items-center justify-center gap-2"
+                                >
+                                    {selectedAddons.length > 0 ? 'Continue with Add-ons' : 'Skip Add-ons'}
+                                    <ArrowRight className="h-5 w-5" />
+                                </button>
                             </div>
                         )}
 

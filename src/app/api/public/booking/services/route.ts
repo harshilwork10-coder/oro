@@ -51,6 +51,10 @@ export async function GET(request: NextRequest) {
             }
         })
 
+        // Separate main services from add-ons
+        const mainServices = services.filter(s => !s.isAddOn)
+        const addonServices = services.filter(s => s.isAddOn)
+
         return NextResponse.json({
             franchise: {
                 id: franchise.id,
@@ -58,7 +62,15 @@ export async function GET(request: NextRequest) {
                 slug: franchise.slug
             },
             locations: franchise.locations,
-            services: services.map(s => ({
+            services: mainServices.map(s => ({
+                id: s.id,
+                name: s.name,
+                description: s.description,
+                duration: s.duration,
+                price: Number(s.price),
+                category: s.serviceCategory?.name || null
+            })),
+            addons: addonServices.map(s => ({
                 id: s.id,
                 name: s.name,
                 description: s.description,
