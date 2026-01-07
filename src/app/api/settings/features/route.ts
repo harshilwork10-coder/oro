@@ -89,9 +89,9 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        // Only owners/managers can change feature settings
-        if (!['OWNER', 'MANAGER', 'PROVIDER'].includes(user.role)) {
-            return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+        // OWNER only - feature toggles affect entire franchise behavior
+        if (!['OWNER', 'PROVIDER'].includes(user.role)) {
+            return NextResponse.json({ error: 'Only the owner can change feature settings' }, { status: 403 })
         }
 
         if (!user.franchiseId) {
