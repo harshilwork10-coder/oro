@@ -400,6 +400,39 @@ model FranchiseSettings {
   receiptPrintMode  String  @default("ALL") // ALL, CARD_ONLY, EBT_ONLY, CARD_AND_EBT, NONE
   openDrawerOnCash  Boolean @default(true) // Open cash drawer on cash transactions
 
+  // ========== SALON FEATURE TOGGLES (Squire-level) ==========
+  
+  // Booking Features
+  enableOnlineBooking    Boolean @default(true)  // Public booking page
+  enableAddOnServices    Boolean @default(true)  // Upsell add-ons during booking
+  enableGroupBooking     Boolean @default(false) // Book multiple people at once
+  enableWaitlist         Boolean @default(true)  // Waitlist when fully booked
+  enableWaitlistAutoFill Boolean @default(false) // Auto-text waitlist on cancellation
+  
+  // Payment & Protection
+  enablePrepayment       Boolean @default(false) // Require payment at booking
+  prepaymentType         String  @default("FULL") // FULL, DEPOSIT, PERCENTAGE
+  prepaymentAmount       Decimal @default(0) // Deposit amount or percentage
+  enableNoShowCharge     Boolean @default(false) // Charge card for no-shows
+  noShowFeeType          String  @default("FLAT") // FLAT, PERCENTAGE
+  noShowFeeAmount        Decimal @default(25) // Fee amount
+  
+  // Communication
+  enableSmsReminders     Boolean @default(false) // SMS appointment reminders
+  enableReviewBooster    Boolean @default(false) // Auto-request Google reviews
+  enableMarketingCampaigns Boolean @default(false) // Text/email campaigns
+  
+  // Staff & Payroll
+  enableAutoPayroll      Boolean @default(false) // Auto-calculate barber payouts
+  enableRentCollection   Boolean @default(false) // Auto-charge booth renters
+  
+  // AI Features
+  enableSmartRebooking   Boolean @default(false) // AI-powered rebooking suggestions
+  
+  // Visibility
+  enableBarberProfiles   Boolean @default(true)  // Public barber profiles
+  enableIndividualLinks  Boolean @default(true)  // Barber-specific booking links
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
