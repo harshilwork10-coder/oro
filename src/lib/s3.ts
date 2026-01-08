@@ -12,12 +12,12 @@ const isS3Configured = Boolean(
 
 console.log(`[S3] Configuration status: ${isS3Configured ? 'CONFIGURED' : 'NOT CONFIGURED'}`)
 if (isS3Configured) {
-    console.log(`[S3] Bucket: ${process.env.AWS_S3_BUCKET}, Region: ${process.env.AWS_REGION || 'us-east-1'}`)
+    console.log(`[S3] Bucket: ${process.env.AWS_S3_BUCKET}, Region: ${process.env.AWS_REGION || 'us-east-2'}`)
 }
 
 // Initialize S3 Client (only if configured)
 const s3Client = isS3Configured ? new S3Client({
-    region: process.env.AWS_REGION || 'us-east-1',
+    region: process.env.AWS_REGION || 'us-east-2',
     credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
