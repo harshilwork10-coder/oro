@@ -1,0 +1,17 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="POSLinkJavaDemo:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/POSLinkJavaDemo_jar</output-path>
+    <root id="archive" name="POSLinkJavaDemo.jar">
+      <element id="module-output" name="POSLinkJavaDemo" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/src/libs/okio-2.8.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/src/libs/PaxLog_1.0.11_20220921.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/src/libs/json-20220924.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/src/libs/okhttp-4.9.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/src/libs/POSLink_Admin_Java_Plugin_V2.00.00_20230828.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/src/libs/POSLink_Core_Java_V2.00.00_20230828.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/src/libs/POSLink_Semi_Java_Plugin_V2.00.00_20230828.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/src/libs/jSerialComm-2.6.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/src/libs/gson-2.9.0.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>

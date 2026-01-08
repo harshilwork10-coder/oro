@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<head>
+<title>PAX</title>
+<meta charset="utf8">
+<link rel="stylesheet" type="text/css" href="css/pax.css"/>
+<link rel="stylesheet" type="text/css" href="css/jquery-ui.theme.css"/>
+<link rel="stylesheet" type="text/css" href="css/jquery-ui.min.css"/>
+<script src="js/lib/jquery-2.1.4.min.js"></script>
+<script src="js/lib/jquery-ui.min.js"></script>
+<!-- <script src="js/Pax/pax.js"></script> -->
+
+</head>
+<body>
+	<!-- <iframe id="iframe" src="http://www.poslink.com/ws/process2.asmx" style="display:none;"></iframe> -->
+	<div class="mask"><div id="loading"></div></div>
+	<div id="tabs">
+	  <ul>
+	    <li><a href="#Commands">Commands</a></li>
+	    <li><a href="#Settings">Settings</a></li>
+	  </ul>
+	  <div id="Commands">
+	    <div class="command">
+			<div data-command="Initialize">
+				<button class="Initialize ui-button">Initialize</button>
+				<input type="text" step="0.1" name="Version" placeHolder="Version(Default:1.28)" title="Version"/>
+			</div>
+			<div data-command="GetSignature">
+				<button class="GetSignature ui-button">GetSignature</button>
+				<input type="text" step="0.1" name="Version" value="" placeHolder="Version(Default:1.28)" title="Version"/>
+				<input type="number" name="Offset" value="" placeHolder="Offset" title="Offset"/>
+				<input type="number" name="RequestLen" value="" placeHolder="RequestLen" title="RequestLen"/>
+			</div>
+			<div data-command="DoSignature">
+				<button class="DoSignature ui-button">DoSignature</button>
+				<input type="text" step="0.1" name="Version" value="" placeHolder="Version(Default:1.28)" title="Version"/>
+				<select name="UploadFlag">
+					<option value="0">UploadFlag(Default:0)</option>
+					<option value="0">0 (doesn't need upload to host)</option>
+					<option value="1">1 (need upload to host)</option>
+				</select>
+				<select name="EdcType">
+					<option value="00">EdcType(Default:ALL)</option>
+					<option value="00">ALL</option>
+					<option value="01">CREDIT</option>
+					<option value="02">DEBIT</option>
+					<option value="03">EBT</option>
+					<option value="04">GIFT</option>
+					<option value="05">LOYALTY</option>
+					<option value="06">CASH</option>
+					<option value="07">CHECK</option>
+				</select>
+				<input type="number" name="HRefNum" value="" placeHolder="HRefNum" title="HRefNum" />
+				<input type="number" name="Timeout" value="" placeHolder="Timeout(15s)" title="Timeout(unit: s)" />
+			</div>
+			<div data-command="DoCredit">
+				<button class="DoCredit ui-button">DoCredit</button>
+				<div class="requestParams">
+					<input type="text" step="0.1" name="Version" value="" placeHolder="Version(Default:1.28)" title="Version"/>
+					<select name="TransType">
+						<option value='01'>TransType(Default:None)</option>
+						<option value="00">Menu</option>
+						<option value="01">SALE</option>
+						<option value="02">RETURN</option>
+						<option value="03">AUTH</option>
+						<option value="04">POSTAUTH</option>
+						<option value="05">FORCED</option>
+						<option value="06">ADJUST</option>
+						<option value="07">WITHDRAWAL</option>
+						<option value="08">ACTIVATE</option>
+						<option value="09">ISSUE</option>
+						<option value="10">ADD</option>
+						<option value="11">CASHOUT</option>
+						<option value="12">DEACTIVATE</option>
+						<option value="13">REPLACE</option>
+						<option value="14">MERGE</option>
+						<option value="15">REPORTLOST</option>
+						<option value="16">VOID</option>
+						<option value="17">V/SALE</option>
+						<option value="18">V/RTRN</option>
+						<option value="19">V/AUTH</option>
+						<option value="20">V/POST</option>
+						<option value="21">V/FRCD</option>
+						<option value="22">V/WITHDRAW</option>
+						<option value="23">BALANCE</option>
+						<option value="24">VERIFY</option>
+						<option value="25">REACTIVATE</option>
+						<option value="26">FORCED ISSUE</option>
+						<option value="27">FORCED ADD</option>
+						<option value="28">UNLOAD</option>
+						<option value="29">RENEW</option>
+						<option value="30">GET CONVERT DETAIL</option>
+						<option value="31">CONVERT</option>
+						<option value="32">TOKENIZE</option>
+						<option value="33">INCREMENTAL AUTH</option>
+						<option value="34">BALANCE with LOCK</option>
+						<option value="35">REDEMPTION with UNLOCK</option>
+						<option value="99">REVERSAL</option>
+					</select>
+					<button class="Configure ui-button">Configure ExtData</button>
+					
+				</div>
+			</div>
+		</div>
+	  </div>
+	  <div id="Settings">
+	  	<div class="setting">
+	  		<div class="getDeviceLocalIP" data-command="getDeviceLocalIP">
+		   		<!-- <div>
+			   		<label for="TerminalId">TerminalId: </label>
+			   		<input type="number" name="TerminalId" placeHolder="TerminalId"/>
+			   	</div>
+		   		<div>
+			   		<label for="Token">Token: </label>
+			   		<input type="number" name="Token" placeHolder="Token"/>
+			   	</div> -->
+			   	<div>
+			   		<label for="SerialNo">SerialNo: </label>
+			   		<input type="text" name="SerialNo" placeHolder="SerialNo" title="SerialNo" />
+			   		<button class="Retrieve ui-button">Retrieve</button>
+			   	</div>
+		   		<div>
+		   			<label for="ip">Service IP: </label>
+			   		<input type="text" name="ip" placeHolder="127.0.0.1" title="Service IP" />
+			   		<label for="port">Service Port: </label>
+			   		<input type="number" name="port" placeHolder="10009" title="Service Port" />
+			   		<button class="HostSetting ui-button">Set</button>
+		   		</div>
+		   	</div>
+
+		   	<div class="timeout" data-command="timeout">
+			   	<div>
+					<label for="Timeout">Timeout: </label>
+					<input type="number" name="TimeOut" placeHolder="120s" title="timeout(unit: s)"/>	
+					<button class="TimeoutSetting ui-button">Set</button>
+			   	</div>
+			</div>
+		</div>
+	  </div>
+	</div>
+	<div id="ConfigureTabs">
+	  <ul>
+	    <li><a href="#AmountInfo">AmountInfo</a></li>
+	    <li><a href="#AccountInfo">AccountInfo</a></li>
+	    <li><a href="#TraceInfo">TraceInfo</a></li>
+	    <li><a href="#AvsInfo">AvsInfo</a></li>
+	    <li><a href="#CashierInfo">CashierInfo</a></li>
+	    <li><a href="#CommercialInfo">CommercialInfo</a></li>
+	    <li><a href="#MotoEco">MotoEco</a></li>
+	    <li><a href="#AdditionalInfo">AdditionalInfo</a></li>
+	    <li><a href="#POSEchoData">POSEchoData</a></li>
+	  </ul>
+	  <div id="AmountInfo">
+	  	<input type="text" name="TransactionAmount" placeHolder="TransactionAmount" title="TransactionAmount"/>
+	  	<input type="text" name="TipAmount" placeHolder="TipAmount" title="TipAmount"/>
+	  	<input type="text" name="CashBackAmount" placeHolder="Cash Back Amount" title="Cash Back Amount"/>
+	  	<input type="text" name="MerchantFee" placeHolder="Merchant Fee" title="Merchant Fee"/>
+	  	<input type="text" name="TaxAmount" placeHolder="Tax Amount" title="Tax Amount"/>
+	  	<input type="text" name="FuelAmount" placeHolder="Fuel Amount" title="Fuel Amount"/>
+	  </div>
+	  <div id="AccountInfo">
+	  	<input type="number" name="Account" placeHolder="Account" class="input64" title="Account"/>
+	  	<input type="number" name="EXPD" placeHolder="EXPD" title="EXPD"/>
+	  	<input type="number" name="CVVCode" placeHolder="CVV Code" title="CVV Code"/>
+	  	<select name="EBTtype">
+	  		<option value="">EBTtype(Default:None)</option>
+			<option value="C">Cash benefits</option>
+			<option value="F">Food stamp</option>
+			<option value="V">Voucher</option>
+		</select>
+		<!-- <input type="text" name="EBTtype" placeHolder="EBTtype"/> -->
+	  	<input type="text" name="VoucherNumber" placeHolder="Voucher number" title="Voucher number"/>
+	  	<select name="Force">
+	  		<option value="">Force(Default:None)</option>
+			<option value="1">T</option>
+		</select>
+	  	<input type="text" name="FirstName" placeHolder="First Name" class="input32" title="First Name"/>
+	  	<input type="text" name="LastName" placeHolder="Last Name" class="input32" title="Last Name"/>
+	  	<input type="text" name="CountryCode" placeHolder="Country Code" title="Country Code"/>
+	  	<input type="text" name="State_ProvinceCode" placeHolder="State/Province Code" title="State/Province Code"/>
+	  	<input type="text" name="CityName" placeHolder="City Name" class="input32" title="City Name"/>
+	  	<input type="text" name="EmailAddress" placeHolder="Email Address" class="input64" title="Email Address"/>
+	  </div>
+	  <div id="TraceInfo">
+	  	<input type="text" name="ReferenceNumber" placeHolder="Reference Number(Default:1)"  title="Reference Number"/>
+	  	<input type="text" name="InvoiceNumber" placeHolder="Invoice number" title="Invoice number"/>
+	  	<input type="text" name="AuthCode" placeHolder="Auth Code" title="Auth Code"/>
+	  	<input type="number" name="TransactionNumber" placeHolder="Transaction Number" title="Transaction Number"/>
+	  	<input type="number" name="TimeStamp" placeHolder="Time Stamp" title="Time Stamp"/>
+	  	<input type="number" name="ECRTransID" placeHolder="ECR TransID" title="ECR TransID"/>
+	  </div>
+	  <div id="AvsInfo">
+	  	<input type="number" name="ZipCode" placeHolder="Zip Code" title="Zip Code"/>
+	  	<input type="text" name="Address" placeHolder="Address" class="input32" title="Address"/>
+	  	<input type="text" name="Address2" placeHolder="Address 2" class="input32" title="Address 2"/>
+	  </div>
+	  <div id="CashierInfo">
+	  	<input type="text" name="ClerkID" placeHolder="Clerk ID" title="Clerk ID"/>
+	  	<input type="number" name="ShiftID" placeHolder="Shift ID" title="Shift ID"/>
+	  </div>
+	  <div id="CommercialInfo">
+	  	<input type="text" name="PONumber" placeHolder="PO Number" class="input32" title="PO Number"/>
+	  	<input type="text" name="CustomerCode" placeHolder="Customer Code" class="input32" title="Customer Code"/>
+	  	<select name="TaxExempt">
+	  		<option value="">TaxExempt(Default:None)</option>
+	  		<option value="0">0 (not exempt)</option>
+	  		<option value="1">1 (exempt)</option>
+	  	</select>
+	  	<input type="text" name="TaxExemptID" placeHolder="Tax Exempt ID" title="Tax Exempt ID"/>
+	  	<input type="text" name="MerchantTaxID" placeHolder="Merchant Tax ID" title="Merchant Tax ID"/>
+	  	<input type="number" name="DestinationZipCode" placeHolder="Destination Zip Code" title="Destination Zip Code"/>
+	  	<input type="text" name="ProductDescription" placeHolder="Product Description" class="input64" title="Product Description"/>
+	  </div>
+	  <div id="MotoEco">
+		<select name="MOTO_E_CommerceMode">
+		  	<option value="">MOTO_E_CommerceMode(Default:None)</option>
+		  	<option value="M">M (means Mail order mode)</option>
+		  	<option value="T">T (means Tele order mode)</option>
+		  	<option value="E">E (means e-commerce mode)</option>
+		</select>
+		<select name="TransactionType">
+			<option value="">TransactionType(Default:None)</option>
+			<option value="S">S (means single transaction)</option>
+			<option value="T">T (means installment)</option>
+			<option value="R">R (means recurring transaction)</option>
+		</select>
+		<select name="SecureType">
+			<option value="">SecureType(Default:None)</option>
+			<option value="N">N (means non secure)</option>
+			<option value="S">S (means secure transaction)</option>
+		</select>
+	  	<input type="text" name="OrderNumber" placeHolder="Order Number" title="Order Number"/>
+	  	<input type="number" name="Installments" placeHolder="Installments" title="Installments"/>
+	  	<input type="number" name="CurrentInstallment" placeHolder="Current Installment" title="Current Installment"/>
+	  </div>
+	  <div id="AdditionalInfo">
+	  	<input type="number" name="TableNum" placeHolder="TableNum" title="TableNum"/>
+	  	<input type="number" name="GuestNum" placeHolder="GuestNum" title="GuestNum"/>
+	  	<select name="SignatureCapture">
+			<option value="">SignatureCapture(Default:0)</option>
+			<option value="0">0 (not capture)</option>
+			<option value="1">1 (capture)</option>
+		</select>
+	  	<input type="text" name="TicketNum" placeHolder="TicketNum" title="TicketNum"/>
+	  	<input type="text" name="HRefNum" placeHolder="HRefNum" class="input32" title="HRefNum"/>
+	  	<select name="TipRequest">
+			<option value="">TipRequest(Default:None)</option>
+			<option value="0">0 (not need enter tip on terminal)</option>
+			<option value="1">1 (need enter tip on terminal)</option>
+		</select>
+		<select name="SignUploadFlag">
+			<option value="">SignUploadFlag(Default:None)</option>
+			<option value="0">0 (not to upload)</option>
+			<option value="1">1 (to upload)</option>
+		</select>
+		<select name="ReportStatus">
+			<option value="">ReportStatus(Default:None)</option>
+			<option value="0">0 (not to report)</option>
+			<option value="1">1 (to report)</option>
+		</select>
+		<select name="TokenRequest">
+			<option value="">TokenRequest(Default:0)</option>
+			<option value="0">0 (means NO)</option>
+			<option value="1">1 (means YES)</option>
+		</select>
+	  	<input type="text" name="Token" placeHolder="Token" class="input64" title="Token" />
+	  	<select name="CardType">
+			<option value="">CardType(Default:None)</option>
+			<option value="01">Visa</option>
+			<option value="02">MasterCard</option>
+			<option value="03">AMEX</option>
+			<option value="04">Discover</option>
+			<option value="05">Diner Club</option>
+			<option value="06">enRoute</option>
+			<option value="07">JCB</option>
+			<option value="08">RevolutionCard</option>
+			<option value="09">VisaFleet</option>
+			<option value="10">MasterCardFleet</option>
+			<option value="11">FleetOne</option>
+			<option value="12">Fleetwide</option>
+			<option value="13">Fuelman</option>
+			<option value="14">Gascard</option>
+			<option value="15">Voyager</option>
+			<option value="16">WrightExpress</option>
+			<option value="99">OTHER</option>
+		</select>
+	  	<input type="text" name="CardTypeBitmap" placeHolder="CardTypeBitmap" class="input32" title="CardTypeBitmap"/>
+	  	<input type="text" name="PassThruDat" placeHolder="PassThruDat" class="input256" title="PassThruDat"/>
+	  	<select name="ReturnReason">
+			<option value="">ReturnReason(Default:0)</option>
+			<option value="0">0 (means general return)</option>
+			<option value="1">1 (means adjustment)</option>
+		</select>
+	  	<input type="number" name="Origtransdate" placeHolder="Origtransdate" title="Origtransdate"/>
+	  	<input type="number" name="Origpan" placeHolder="Origpan" title="Origpan"/>
+	  	<input type="number" name="OrigExpiryDate" placeHolder="OrigExpiryDate" title="OrigExpiryDate"/>
+	  	<input type="number" name="OrigTransTime" placeHolder="OrigTransTime" title="OrigTransTime"/>
+	  	<input type="number" name="DisProgPromPts" placeHolder="DisProgPromPts" title="DisProgPromPts"/>
+	  	<input type="text" name="GateWayID" placeHolder="GateWayID" class="input64" title="GateWayID"/>
+	  	<select name="GetSign">
+			<option value="">GetSign(Default:0)</option>
+			<option value="0">0 (not to upload)</option>
+			<option value="1">1 (to get)</option>
+		</select>
+	  	<input type="number" name="EntryModeBitmap" placeHolder="EntryModeBitmap" title="EntryModeBitmap"/>
+	  	<select name="ReceiptPrint">
+			<option value="">ReceiptPrint(Default:0)</option>
+			<option value="0">0 (no receipt)</option>
+			<option value="1">1 (merchant only)</option>
+			<option value="2">2 (customer only)</option>
+			<option value="3">3 (Both merchant /customer copy)</option>
+		</select>
+		<select name="CPMode">
+			<option value="">CPMode(Default:0)</option>
+			<option value="0">0 (Use terminal's card present setting)</option>
+			<option value="1">1 (Don't prompt, assume card present)</option>
+			<option value="2">2 (Don't prompt, assume card not present)</option>
+			<option value="3">3 (Prompt for use to select)</option>
+		</select>
+	  	<input type="text" name="Odometer" placeHolder="Odometer" title="Odometer"/>
+	  	<input type="text" name="VehicleNo" placeHolder="VehicleNo" title="VehicleNo"/>
+	  	<input type="text" name="JobNo" placeHolder="JobNo" title="JobNo"/>
+	  	<input type="text" name="DriverID" placeHolder="DriverID" title="DriverID"/>
+	  	<input type="text" name="EmployeeNo" placeHolder="EmployeeNo" title="EmployeeNo"/>
+	  	<input type="text" name="LicenseNo" placeHolder="LicenseNo" title="LicenseNo"/>
+	  	<input type="text" name="JobID" placeHolder="JobID" title="JobID"/>
+	  	<input type="text" name="DepartmentNo" placeHolder="DepartmentNo" title="DepartmentNo"/>
+	  	<input type="text" name="CustomerData" placeHolder="CustomerData" title="CustomerData"/>
+	  	<input type="text" name="UserID" placeHolder="UserID" title="UserID"/>
+	  	<input type="text" name="VehicleID" placeHolder="VehicleID" title="VehicleID"/>
+	  	
+	  </div>
+	  <div id="POSEchoData">
+	  	<input type="text" name="POSEchoData" placeHolder="POS Echo Data" title="POS Echo Data" class="input256"/>
+	  </div>
+	</div>  
+<!-- <script src="js/validate.js"></script>
+<script src="js/hintDialog.js"></script>
+<script src="js/displayHandler.js"></script>
+<script src="js/localData.js"></script> -->
+<!-- <script src="js/paxPage.js"></script> -->
+<script data-main="js/main.js" src="js/lib/require.js"></script>
+</body>
+</html>
