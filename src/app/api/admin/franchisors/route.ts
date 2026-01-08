@@ -15,6 +15,9 @@ function parseIntegrations(integrationsStr: string | null): Record<string, boole
     }
 }
 
+// Force dynamic
+export const dynamic = 'force-dynamic'
+
 // GET all franchisors (clients) - for Account Configs page with pagination
 export async function GET(request: NextRequest) {
     try {

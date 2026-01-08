@@ -11,6 +11,9 @@ const TIER_LIMITS = {
     ENTERPRISE: { maxLocations: 999, maxUsers: 999, pulseSeatCount: 999 }
 }
 
+// Force dynamic
+export const dynamic = 'force-dynamic'
+
 // GET: Get subscription info for a franchisor
 export async function GET(request: NextRequest) {
     try {
