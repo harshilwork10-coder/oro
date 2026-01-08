@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// Force dynamic to prevents static generation attempt during build
+export const dynamic = 'force-dynamic'
+
 // GET - Get current account status for logged-in user
 export async function GET() {
     try {
