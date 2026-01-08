@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// Force dynamic
+export const dynamic = 'force-dynamic'
+
 // GET: Fetch franchise settings
 export async function GET() {
     const session = await getServerSession(authOptions)

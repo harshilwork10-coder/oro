@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateStoreCode, generateStationCode } from '@/lib/codeGenerator'
 
+// Force dynamic
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/admin/backfill-codes
  * Backfill codes for existing locations and stations
