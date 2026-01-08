@@ -135,7 +135,7 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
                 const response = await fetch('/api/upload/onboarding', { method: 'POST', body: uploadFormData })
                 if (!response.ok) {
                     const errorData = await response.json()
-                    throw new Error(errorData.error || 'Upload failed')
+                    throw new Error(errorData.error + (errorData.details ? `: ${errorData.details}` : '') || 'Upload failed')
                 }
                 const data = await response.json()
 
