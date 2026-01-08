@@ -5,6 +5,9 @@ import { authOptions } from '@/lib/auth'
 // STUB: License management feature not yet implemented in current schema
 // The License model does not exist in the Prisma schema
 
+// Force dynamic
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
     const session = await getServerSession(authOptions)
     if (!session?.user || !['PROVIDER', 'ADMIN'].includes(session.user.role)) {

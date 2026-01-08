@@ -5,6 +5,9 @@ import { authOptions } from '@/lib/auth'
 // STUB: Sales agent tracking feature not yet implemented in current schema
 // The salesAgentId and deletedAt fields don't exist on Franchisor
 
+// Force dynamic
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
     const session = await getServerSession(authOptions)
 

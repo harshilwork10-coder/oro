@@ -5,6 +5,9 @@ import { authOptions } from '@/lib/auth'
 // STUB: Shipping pending feature not yet implemented in current schema
 // The licenseRequest model doesn't exist in the Prisma schema
 
+// Force dynamic
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
     const session = await getServerSession(authOptions)
 

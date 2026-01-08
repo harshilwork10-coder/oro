@@ -14,6 +14,9 @@ async function checkPermission() {
     return session
 }
 
+// Force dynamic
+export const dynamic = 'force-dynamic'
+
 // GET: List all Provider Team Members
 export async function GET() {
     const session = await getServerSession(authOptions)
