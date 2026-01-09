@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { hash } from 'bcrypt'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,23 +20,29 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Email required' }, { status: 400 })
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email }
-        })
+        // Hash a default password (e.g. "password")
+        const hashedPassword = await hash('password', 10)
 
-        if (!user) {
-            return NextResponse.json({ error: 'User not found in this database' }, { status: 404 })
-        }
-
-        const updated = await prisma.user.update({
+        // UPSERT: Create if doesn't exist, Update if does
+        const user = await prisma.user.upsert({
             where: { email },
-            data: { role: 'PROVIDER' }
+            update: {
+                role: 'PROVIDER'
+            },
+            create: {
+                email,
+                name: 'Admin User',
+                role: 'PROVIDER',
+                password: hashedPassword,
+                // Add required default fields if any
+            }
         })
 
         return NextResponse.json({
             success: true,
-            message: `User ${updated.email} is now a ${updated.role} (Admin).`,
-            nextStep: 'Please logout and login again to see all data.'
+            message: `User ${user.email} is now a ${user.role} (Admin).`,
+            details: user.createdAt === user.updatedAt ? 'Account was RE-CREATED.' : 'Account was UPDATED.',
+            nextStep: 'Please logout and login again (Password if reset: "password").'
         })
 
     } catch (error: any) {
