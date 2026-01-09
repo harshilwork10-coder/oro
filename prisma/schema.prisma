@@ -6,15 +6,47 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// NOTE: SQLite doesn't support enums. These values are documented here for reference:
-// UserRole: PROVIDER, ADMIN, FRANCHISOR, FRANCHISEE, MANAGER, SHIFT_SUPERVISOR, EMPLOYEE
-// TransactionStatus: PENDING, COMPLETED, REFUNDED, VOIDED, PARTIALLY_REFUNDED
-// PaymentMethod: CASH, CREDIT_CARD, DEBIT_CARD, SPLIT, GIFT_CARD
-// AppointmentStatus: SCHEDULED, CONFIRMED, CHECKED_IN, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW
+// Enums (PostgreSQL supports native enums)
+enum UserRole {
+  PROVIDER
+  ADMIN
+  FRANCHISOR
+  FRANCHISEE
+  OWNER
+  MANAGER
+  SHIFT_SUPERVISOR
+  EMPLOYEE
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  VOIDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  SPLIT
+  GIFT_CARD
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CHECKED_IN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
 
 // ============ PROVIDER (TOP-LEVEL TENANT) ============
 // This is THE single Oronex provider - the root of all hierarchy
