@@ -86,10 +86,13 @@ export async function GET(request: NextRequest) {
             queryArgs as Parameters<typeof prisma.franchisor.findMany>[0]
         )
 
-        // Get location codes via raw SQL since Prisma types are stale
-        const locationCodes = await prisma.$queryRaw<Array<{ id: string, pulseStoreCode: string | null }>>`
-            SELECT id, pulseStoreCode FROM Location
-        `
+        // Get location codes using Prisma (safer than raw SQL)
+        const locationCodes = await prisma.location.findMany({
+            select: {
+                id: true,
+                pulseStoreCode: true
+            }
+        })
         const codeMap = new Map(locationCodes.map(l => [l.id, l.pulseStoreCode]))
 
         // Transform to include config and integrations from JSON fields
