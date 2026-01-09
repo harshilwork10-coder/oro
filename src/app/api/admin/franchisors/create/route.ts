@@ -36,6 +36,10 @@ function sanitizeInput(input: string): string {
     return input.trim().replace(/[<>"']/g, '')
 }
 
+
+// Force dynamic
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
