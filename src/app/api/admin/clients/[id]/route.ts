@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateCuid, applyRateLimit, logSuccess, logFailure, RATE_LIMITS } from '@/lib/security'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
