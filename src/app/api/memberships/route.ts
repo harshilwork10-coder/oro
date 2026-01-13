@@ -62,7 +62,7 @@ export async function POST(req: Request) {
             }
         })
 
-        console.log(`✅ Membership plan created: ${name} - $${price}`)
+        // Debug log removed
 
         return NextResponse.json(plan)
     } catch (error) {

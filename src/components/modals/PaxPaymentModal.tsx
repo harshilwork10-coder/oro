@@ -124,7 +124,7 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
                     })
                 } catch (e) {
                     // Non-critical, don't fail the payment
-                    console.log('Failed to report terminal:', e)
+                    // Debug log removed
                 }
 
                 setTimeout(() => {
@@ -195,7 +195,7 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
             <div className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                 <div className="p-6 border-b border-stone-800 flex items-center justify-between">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                        <Monitor className="h-6 w-6 text-emerald-500" />
+                        <Monitor className="h-6 w-6 text-orange-500" />
                         PAX Terminal
                     </h2>
                     <button
@@ -217,19 +217,19 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
                     <div className={`rounded-xl p-6 border flex flex-col items-center justify-center gap-3 text-center min-h-[160px] transition-colors ${status === 'IDLE' ? 'bg-stone-950 border-stone-800' :
                         status === 'PROCESSING' ? 'bg-blue-900/20 border-blue-500/30' :
                             status === 'CANCELLING' ? 'bg-amber-900/20 border-amber-500/30' :
-                                status === 'SUCCESS' ? 'bg-emerald-900/20 border-emerald-500/30' :
+                                status === 'SUCCESS' ? 'bg-orange-900/20 border-orange-500/30' :
                                     'bg-red-900/20 border-red-500/30'
                         }`}>
                         {status === 'IDLE' && <Monitor className="h-12 w-12 text-stone-600" />}
                         {status === 'PROCESSING' && <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />}
                         {status === 'CANCELLING' && <XCircle className="h-12 w-12 text-amber-500 animate-pulse" />}
-                        {status === 'SUCCESS' && <CheckCircle className="h-12 w-12 text-emerald-500" />}
+                        {status === 'SUCCESS' && <CheckCircle className="h-12 w-12 text-orange-500" />}
                         {status === 'ERROR' && <AlertCircle className="h-12 w-12 text-red-500" />}
 
                         <p className={`font-medium ${status === 'IDLE' ? 'text-stone-400' :
                             status === 'PROCESSING' ? 'text-blue-200' :
                                 status === 'CANCELLING' ? 'text-amber-200' :
-                                    status === 'SUCCESS' ? 'text-emerald-200' :
+                                    status === 'SUCCESS' ? 'text-orange-200' :
                                         'text-red-200'
                             }`}>
                             {message}
@@ -249,18 +249,13 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
                         </button>
                     )}
 
-                    {/* Show terminal info when loaded */}
-                    {settingsLoaded && (status === 'IDLE' || status === 'ERROR') && (
-                        <div className="text-center text-xs text-stone-500">
-                            Terminal: {terminalIp}:{terminalPort}
-                        </div>
-                    )}
+
 
                     {/* Action Button */}
                     {(status === 'IDLE' || status === 'ERROR') && settingsLoaded && (
                         <button
                             onClick={() => handleProcessPayment()}
-                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all shadow-lg shadow-emerald-900/20"
+                            className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-xl font-bold text-lg transition-all shadow-lg shadow-orange-900/20"
                         >
                             Process Payment
                         </button>

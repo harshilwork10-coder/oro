@@ -27,10 +27,10 @@ export async function GET(request: Request) {
                 totalCard: Number(cart.total), // Same as cash - no surcharge
                 customerName: cart.customerName,
                 status: cart.status || 'ACTIVE',
-                showTipPrompt: (cart as any).showTipPrompt || false,
-                tipAmount: Number((cart as any).tipAmount || 0),
-                tipType: (cart as any).tipType || 'PERCENT',
-                tipSuggestions: (cart as any).tipSuggestions || '[15,20,25]',
+                showTipPrompt: false,
+                tipAmount: 0,
+                tipType: 'PERCENT',
+                tipSuggestions: '[15,20,25]',
                 empty: false
             })
         }
@@ -60,10 +60,10 @@ export async function GET(request: Request) {
             totalCard: Number(activeCart.total), // Same as cash - no surcharge
             customerName: activeCart.customerName,
             status: activeCart.status || 'ACTIVE',
-            showTipPrompt: (activeCart as any).showTipPrompt || false,
-            tipAmount: Number((activeCart as any).tipAmount || 0),
-            tipType: (activeCart as any).tipType || 'PERCENT',
-            tipSuggestions: (activeCart as any).tipSuggestions || '[15,20,25]',
+            showTipPrompt: false,
+            tipAmount: 0,
+            tipType: 'PERCENT',
+            tipSuggestions: '[15,20,25]',
             empty: false
         })
     } catch (error) {
@@ -99,12 +99,8 @@ export async function POST(request: Request) {
                 tax,
                 total,
                 customerName,
-                status: status || 'ACTIVE',
-                showTipPrompt: showTipPrompt ?? undefined,
-                tipAmount: tipAmount ?? undefined,
-                tipType: tipType ?? undefined,
-                tipSuggestions: tipSuggestions ?? undefined
-            } as any,
+                status: status || 'ACTIVE'
+            },
             create: {
                 userId: user.id,
                 items: JSON.stringify(items),
@@ -112,12 +108,8 @@ export async function POST(request: Request) {
                 tax,
                 total,
                 customerName,
-                status: status || 'ACTIVE',
-                showTipPrompt: showTipPrompt ?? false,
-                tipAmount: tipAmount ?? 0,
-                tipType: tipType ?? 'PERCENT',
-                tipSuggestions: tipSuggestions ?? '[15,20,25]'
-            } as any
+                status: status || 'ACTIVE'
+            }
         })
 
         return NextResponse.json({ success: true })

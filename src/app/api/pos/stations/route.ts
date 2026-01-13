@@ -40,7 +40,6 @@ export async function GET(request: NextRequest) {
             })
             if (anyLocation) {
                 locationId = anyLocation.id
-                console.log('[STATIONS_GET] PROVIDER accessing location:', anyLocation.name)
             }
         }
 
@@ -60,9 +59,7 @@ export async function GET(request: NextRequest) {
             orderBy: { name: 'asc' }
         })
 
-        // Auto-create default station if none exist (for easier onboarding)
         if (stations.length === 0) {
-            console.log('[STATIONS_GET] No stations found, auto-creating Register 1')
             try {
                 const newStation = await prisma.station.create({
                     data: {

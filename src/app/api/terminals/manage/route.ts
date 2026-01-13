@@ -12,11 +12,19 @@ export async function GET() {
         }
 
         // Get all locations with their terminal configurations
+        // Only include locations that belong to franchises with valid franchisors
         const locations = await prisma.location.findMany({
             include: {
                 franchise: {
                     select: {
-                        name: true
+                        name: true,
+                        franchisorId: true,
+                        franchisor: {
+                            select: {
+                                id: true,
+                                name: true
+                            }
+                        }
                     }
                 }
             },
@@ -25,24 +33,26 @@ export async function GET() {
             }
         })
 
-        // Format as terminals
-        const terminals = locations.map(location => ({
-            id: location.id,
-            locationId: location.id,
-            location: {
+        // Filter only locations with valid franchisors and format as terminals
+        const terminals = locations
+            .filter(location => location.franchise?.franchisorId && location.franchise?.franchisor)
+            .map(location => ({
                 id: location.id,
-                name: location.name,
-                franchise: {
-                    name: location.franchise.name
-                }
-            },
-            paxTerminalIP: location.paxTerminalIP,
-            paxTerminalPort: location.paxTerminalPort,
-            processorName: location.processorName,
-            processorMID: location.processorMID,
-            processorTID: location.processorTID,
-            updatedAt: location.updatedAt
-        }))
+                locationId: location.id,
+                location: {
+                    id: location.id,
+                    name: location.name,
+                    franchise: {
+                        name: location.franchise.name
+                    }
+                },
+                paxTerminalIP: location.paxTerminalIP,
+                paxTerminalPort: location.paxTerminalPort,
+                processorName: location.processorName,
+                processorMID: location.processorMID,
+                processorTID: location.processorTID,
+                updatedAt: location.updatedAt
+            }))
 
         return NextResponse.json(terminals)
     } catch (error) {

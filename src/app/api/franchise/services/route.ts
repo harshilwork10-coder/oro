@@ -67,9 +67,9 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json()
-        const { name, description, duration, price, category, categoryId, franchiseId } = body
+        const { name, description, duration, price, cashPrice, category, categoryId, franchiseId } = body
 
-        if (!name || !price || !duration) {
+        if (!name || (!price && !cashPrice) || !duration) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
@@ -106,15 +106,40 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
         }
 
+        // Get franchise config for dual pricing settings
+        const franchise = await prisma.franchise.findUnique({
+            where: { id: finalFranchiseId },
+            include: {
+                franchisor: {
+                    include: { config: true }
+                }
+            }
+        })
+
+        // Determine cash price (use cashPrice if provided, else fall back to price)
+        const baseCashPrice = parseFloat(cashPrice ?? price) || 0
+
+        // Calculate card price if dual pricing is enabled
+        let calculatedCardPrice: number | null = null
+        const config = franchise?.franchisor?.config as any
+        if (config?.pricingModel === 'DUAL_PRICING') {
+            const percentage = parseFloat(String(config.cardSurcharge)) || 0
+            // Formula: cardPrice = cashPrice × (1 + percentage/100)
+            calculatedCardPrice = baseCashPrice * (1 + percentage / 100)
+        }
+
         const service = await prisma.service.create({
+            // Cast data as any since Prisma types may be stale after schema changes
             data: {
                 name,
                 description,
                 duration: parseInt(duration),
-                price: parseFloat(price),
+                price: baseCashPrice, // Legacy field - keep in sync with cashPrice
+                cashPrice: baseCashPrice,
+                cardPrice: calculatedCardPrice,
                 categoryId: categoryId || category || null,  // Accept either field from frontend
                 franchiseId: finalFranchiseId,
-            },
+            } as any,
             include: { serviceCategory: true }
         })
 
@@ -142,10 +167,32 @@ export async function PUT(request: Request) {
 
     try {
         const body = await request.json()
-        const { id, name, description, duration, price, category, categoryId } = body
+        const { id, name, description, duration, price, cashPrice, category, categoryId } = body
 
-        if (!id || !name || !price || !duration) {
+        if (!id || !name || (!price && !cashPrice) || !duration) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+        }
+
+        // Get franchise config for dual pricing settings
+        const franchise = await prisma.franchise.findUnique({
+            where: { id: user.franchiseId },
+            include: {
+                franchisor: {
+                    include: { config: true }
+                }
+            }
+        })
+
+        // Determine cash price (use cashPrice if provided, else fall back to price)
+        const baseCashPrice = parseFloat(cashPrice ?? price) || 0
+
+        // Calculate card price if dual pricing is enabled
+        let calculatedCardPrice: number | null = null
+        const config = franchise?.franchisor?.config as any
+        if (config?.pricingModel === 'DUAL_PRICING') {
+            const percentage = parseFloat(String(config.cardSurcharge)) || 0
+            // Formula: cardPrice = cashPrice × (1 + percentage/100)
+            calculatedCardPrice = baseCashPrice * (1 + percentage / 100)
         }
 
         const service = await prisma.service.updateMany({
@@ -153,13 +200,16 @@ export async function PUT(request: Request) {
                 id,
                 franchiseId: user.franchiseId // Security: can only update own franchise services
             },
+            // Cast data as any since Prisma types may be stale after schema changes
             data: {
                 name,
                 description,
                 duration: parseInt(duration),
-                price: parseFloat(price),
+                price: baseCashPrice, // Legacy field - keep in sync with cashPrice
+                cashPrice: baseCashPrice,
+                cardPrice: calculatedCardPrice,
                 categoryId: categoryId || category || null,  // Accept either field from frontend
-            }
+            } as any
         })
 
         if (service.count === 0) {
@@ -184,8 +234,8 @@ export async function DELETE(request: Request) {
         include: { franchise: true }
     })
 
-    if (!user?.franchiseId) {
-        return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+    if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     try {
@@ -196,18 +246,49 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: 'Missing service ID' }, { status: 400 })
         }
 
-        const service = await prisma.service.deleteMany({
-            where: {
-                id,
-                franchiseId: user.franchiseId // Security: can only delete own franchise services
+        // Handle FRANCHISOR users who own multiple franchises
+        if (user.role === 'FRANCHISOR') {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: user.id },
+                include: { franchises: { select: { id: true } } }
+            })
+
+            if (!franchisor) {
+                return NextResponse.json({ error: 'Franchisor profile not found' }, { status: 403 })
             }
-        })
 
-        if (service.count === 0) {
-            return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+            // Get franchise IDs this user owns
+            const franchiseIds = franchisor.franchises.map(f => f.id)
+
+            const service = await prisma.service.deleteMany({
+                where: {
+                    id,
+                    franchiseId: { in: franchiseIds }
+                }
+            })
+
+            if (service.count === 0) {
+                return NextResponse.json({ error: 'Service not found or not authorized' }, { status: 404 })
+            }
+
+            return NextResponse.json({ success: true })
+        } else if (user.franchiseId) {
+            // Regular users can only delete their own franchise's services
+            const service = await prisma.service.deleteMany({
+                where: {
+                    id,
+                    franchiseId: user.franchiseId
+                }
+            })
+
+            if (service.count === 0) {
+                return NextResponse.json({ error: 'Service not found or not authorized' }, { status: 404 })
+            }
+
+            return NextResponse.json({ success: true })
+        } else {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
-
-        return NextResponse.json({ success: true })
     } catch (error) {
         console.error('Error deleting service:', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

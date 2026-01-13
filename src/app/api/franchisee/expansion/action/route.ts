@@ -66,16 +66,12 @@ export async function POST(req: NextRequest) {
                 }
             })
 
-            console.log(`[Expansion Approved] Created ${request.proposedName} for ${request.franchisee.name}`)
-
             return NextResponse.json({
                 success: true,
                 message: 'Expansion request approved! New location created.',
                 location
             })
         }
-
-        console.log(`[Expansion Rejected] ${request.proposedName} by ${request.franchisee.name}`)
 
         return NextResponse.json({
             success: true,

@@ -61,7 +61,7 @@ export async function POST(req: Request) {
             }
         })
 
-        console.log(`✅ Commission rule created: ${name}`)
+        // Debug log removed
 
         return NextResponse.json(rule)
     } catch (error) {

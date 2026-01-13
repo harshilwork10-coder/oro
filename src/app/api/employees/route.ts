@@ -15,8 +15,9 @@ export async function GET() {
 
         // PROVIDER sees all non-provider users
         // FRANCHISOR only sees users in their franchises (via Franchisor record)
+        // For booking purposes, we only want actual EMPLOYEE role (stylists)
         let whereClause: any = {
-            role: { not: 'PROVIDER' }
+            role: 'EMPLOYEE'  // Only show actual stylists, not owners/managers
         }
 
         if (session.user.role === 'FRANCHISOR') {

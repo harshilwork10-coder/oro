@@ -70,7 +70,7 @@ export async function POST(
             }
         })
 
-        console.log(`✅ Gift card redeemed: ${code} - $${amount} (Remaining: $${updated.currentBalance})`)
+        // Debug log removed`)
 
         return NextResponse.json(updated)
     } catch (error) {

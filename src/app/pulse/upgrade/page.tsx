@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Lock, Zap, CheckCircle, Phone, Mail } from 'lucide-react'
-import OroLogo from '@/components/ui/OroLogo'
 
 export default function PulseUpgradePage() {
     const router = useRouter()
@@ -41,10 +40,9 @@ export default function PulseUpgradePage() {
                 {/* Header */}
                 <div className="text-center mb-8">
                     <div className="flex items-center justify-center gap-2 mb-4">
-                        <OroLogo size={48} showText={false} />
+                        <img src="/ORO9.png" alt="ORO 9" className="w-12 h-12 object-contain" />
                         <div>
                             <h1 className="text-2xl font-bold flex items-center gap-2">
-                                <span className="text-orange-500">OroNext</span>
                                 <span className="text-gray-300">Pulse</span>
                                 <Zap className="w-5 h-5 text-yellow-400" />
                             </h1>
@@ -63,7 +61,7 @@ export default function PulseUpgradePage() {
                 <div className="text-center mb-8">
                     <h2 className="text-xl font-bold mb-2">Upgrade Required</h2>
                     <p className="text-gray-400">
-                        Oronex Pulse is a premium feature that lets you monitor your business from anywhere on your phone.
+                        ORO 9 Pulse is a premium feature that lets you monitor your business from anywhere on your phone.
                     </p>
                 </div>
 

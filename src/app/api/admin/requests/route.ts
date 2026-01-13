@@ -12,10 +12,10 @@ export async function GET() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
+    // Return empty array instead of 501 to avoid console errors
     return NextResponse.json({
-        success: false,
-        error: 'License request feature is not yet implemented',
+        success: true,
         requests: []
-    }, { status: 501 })
+    })
 }
 

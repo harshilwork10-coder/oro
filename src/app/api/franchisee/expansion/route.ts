@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
             }
         })
 
-        console.log(`[Expansion Request] ${user.name} requested new location: ${proposedName}`)
+        // Debug log removed
 
         return NextResponse.json({
             success: true,

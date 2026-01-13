@@ -9,7 +9,7 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id } = await params
-    console.log(`[GET] Request for ID: ${id}`)
+    // Debug log removed
     try {
         const session = await getServerSession(authOptions)
 
@@ -130,7 +130,7 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id } = await params
-    console.log(`[DELETE] Request for ID: ${id}`)
+    // Debug log removed
 
     try {
         // 1. Input Validation
@@ -171,7 +171,7 @@ export async function DELETE(
         }
 
 
-        console.log(`🗑️  Deleting franchisor: ${franchisor.name}`)
+        // Debug log removed
 
         // 1. Gather all Franchise IDs and Location IDs to target related data
         const franchises = await prisma.franchise.findMany({
@@ -186,39 +186,39 @@ export async function DELETE(
         })
         const locationIds = locations.map(l => l.id)
 
-        console.log(`   Found ${franchiseIds.length} franchises and ${locationIds.length} locations to clean up.`)
+        // Debug log removed
 
         // 2. Delete Transaction Data (Deepest dependencies)
         // TransactionLineItems depend on Transactions
         await prisma.transactionLineItem.deleteMany({
             where: { transaction: { franchiseId: { in: franchiseIds } } }
         })
-        console.log('   ✓ Deleted transaction line items')
+        // Debug log removed
 
         // Transactions depend on Franchises
         await prisma.transaction.deleteMany({
             where: { franchiseId: { in: franchiseIds } }
         })
-        console.log('   ✓ Deleted transactions')
+        // Debug log removed
 
         // 3. Delete Operational Data
         // Appointments depend on Locations
         await prisma.appointment.deleteMany({
             where: { locationId: { in: locationIds } }
         })
-        console.log('   ✓ Deleted appointments')
+        // Debug log removed
 
         // Schedules depend on Locations
         await prisma.schedule.deleteMany({
             where: { locationId: { in: locationIds } }
         })
-        console.log('   ✓ Deleted schedules')
+        // Debug log removed
 
         // TimeEntries depend on Locations
         await prisma.timeEntry.deleteMany({
             where: { locationId: { in: locationIds } }
         })
-        console.log('   ✓ Deleted time entries')
+        // Debug log removed
 
         // Cash Management
         await prisma.cashDrop.deleteMany({
@@ -227,7 +227,7 @@ export async function DELETE(
         await prisma.cashDrawerSession.deleteMany({
             where: { locationId: { in: locationIds } }
         })
-        console.log('   ✓ Deleted cash management data')
+        // Debug log removed
 
         // Inventory & Supply Chain
         await prisma.stockAdjustment.deleteMany({
@@ -245,7 +245,7 @@ export async function DELETE(
         await prisma.supplier.deleteMany({
             where: { franchiseId: { in: franchiseIds } }
         })
-        console.log('   ✓ Deleted inventory & supply chain data')
+        // Debug log removed
 
         // 4. Delete Customer Data
         // First, delete all Client-related tables that reference Client
@@ -289,7 +289,7 @@ export async function DELETE(
         await prisma.client.deleteMany({
             where: { franchiseId: { in: franchiseIds } }
         })
-        console.log('   ✓ Deleted customer data')
+        // Debug log removed
 
         // 5. Delete Franchise Configuration
         await prisma.giftCard.deleteMany({
@@ -316,7 +316,7 @@ export async function DELETE(
         await prisma.serviceCategory.deleteMany({
             where: { franchiseId: { in: franchiseIds } }
         })
-        console.log('   ✓ Deleted franchise configuration')
+        // Debug log removed
 
         // 6. Delete Hardware & Users
         await prisma.terminal.deleteMany({
@@ -383,7 +383,7 @@ export async function DELETE(
                 ]
             }
         })
-        console.log('   ✓ Deleted employees and terminals')
+        // Debug log removed
 
         // 7. Delete Franchise-level settings and Locations & Franchises
         // Delete optional relations that don't have cascade
@@ -397,7 +397,7 @@ export async function DELETE(
         await prisma.franchise.deleteMany({
             where: { franchisorId: id }
         })
-        console.log('   ✓ Deleted locations and franchises')
+        // Debug log removed
 
         // 8. Delete Franchisor Level Data
         // Lead and Territory models were removed from schema
@@ -407,13 +407,13 @@ export async function DELETE(
         // BusinessConfig has cascade delete from Franchisor usually, but let's be safe
         await prisma.businessConfig.deleteMany({ where: { franchisorId: id } })
 
-        console.log('   ✓ Deleted franchisor level data')
+        // Debug log removed
 
         // 9. Delete Franchisor & Owner
         await prisma.franchisor.delete({
             where: { id }
         })
-        console.log('   ✓ Deleted franchisor record')
+        // Debug log removed
 
         // Delete magic links for owner
         await prisma.magicLink.deleteMany({
@@ -448,7 +448,7 @@ export async function DELETE(
         await prisma.user.delete({
             where: { id: franchisor.ownerId }
         })
-        console.log('   ✓ Deleted owner account')
+        // Debug log removed
 
         // Audit Log - Success
         await logSuccess({
@@ -464,7 +464,7 @@ export async function DELETE(
             }
         })
 
-        console.log('✅ Client deleted successfully!')
+        // Debug log removed
         return NextResponse.json({ success: true })
 
     } catch (error: any) {

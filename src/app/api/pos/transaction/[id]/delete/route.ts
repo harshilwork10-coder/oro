@@ -36,7 +36,7 @@ export async function POST(
         }
 
         // Log deletion
-        console.log(`[DELETE_TRANSACTION] User: ${session.user.name} (${session.user.id}) deleting transaction ${transactionId}. Reason: ${reason}`)
+        // Debug log removed deleting transaction ${transactionId}. Reason: ${reason}`)
 
         // Delete line items first (due to foreign key constraint)
         await prisma.transactionLineItem.deleteMany({

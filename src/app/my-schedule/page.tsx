@@ -393,7 +393,7 @@ export default function MySchedulePage() {
             {/* Install Prompt (for PWA) */}
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-stone-950 to-transparent pointer-events-none">
                 <div className="text-center text-stone-500 text-xs">
-                    Powered by Oronex
+                    Powered by Oro 9
                 </div>
             </div>
 

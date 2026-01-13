@@ -6,7 +6,15 @@ import { generateInvoiceNumber } from '@/lib/invoice'
 import { logActivity, ActionTypes } from '@/lib/auditLog'
 import { checkIdempotency, storeIdempotencyKey, getIdempotencyKey } from '@/lib/api/idempotency'
 import { z } from 'zod'
+import {
+    calculateTransactionPayouts,
+    getBusinessDate,
+    DEFAULT_PAYOUT_CONFIG,
+    type LineItemInput
+} from '@/lib/payoutEngine'
 import { validateBody, unauthorizedResponse, badRequestResponse } from '@/lib/validation'
+import fs from 'fs'
+import path from 'path'
 
 // Request validation schema
 const transactionRequestSchema = z.object({
@@ -15,12 +23,24 @@ const transactionRequestSchema = z.object({
         type: z.enum(['SERVICE', 'PRODUCT']),
         name: z.string(),
         price: z.union([z.number(), z.string()]).transform(v => Number(v)),
+        // Dual pricing line item fields
+        cashPrice: z.union([z.number(), z.string()]).optional().transform(v => v !== undefined ? Number(v) : undefined),
+        cardPrice: z.union([z.number(), z.string()]).optional().transform(v => v !== undefined ? Number(v) : undefined),
         quantity: z.union([z.number(), z.string()]).transform(v => Number(v)),
         discount: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
+        barberId: z.string().optional().nullable(), // ID of barber who performed the service
+        promotionId: z.string().optional().nullable(), // For validating auto-applied system deals
     })).min(1, 'At least one item required'),
     subtotal: z.union([z.number(), z.string()]).transform(v => Number(v)),
     tax: z.union([z.number(), z.string()]).transform(v => Number(v)),
     total: z.union([z.number(), z.string()]).transform(v => Number(v)),
+    // Dual pricing totals
+    subtotalCash: z.union([z.number(), z.string()]).optional().transform(v => v !== undefined ? Number(v) : undefined),
+    subtotalCard: z.union([z.number(), z.string()]).optional().transform(v => v !== undefined ? Number(v) : undefined),
+    taxCash: z.union([z.number(), z.string()]).optional().transform(v => v !== undefined ? Number(v) : undefined),
+    taxCard: z.union([z.number(), z.string()]).optional().transform(v => v !== undefined ? Number(v) : undefined),
+    totalCash: z.union([z.number(), z.string()]).optional().transform(v => v !== undefined ? Number(v) : undefined),
+    totalCard: z.union([z.number(), z.string()]).optional().transform(v => v !== undefined ? Number(v) : undefined),
     paymentMethod: z.enum(['CASH', 'CREDIT_CARD', 'DEBIT_CARD', 'SPLIT', 'GIFT_CARD', 'EBT']),
     cashDrawerSessionId: z.string().optional().nullable(),
     clientId: z.string().optional().nullable(),
@@ -43,7 +63,22 @@ export async function POST(req: Request) {
     const validation = await validateBody(req, transactionRequestSchema)
     if ('error' in validation) return validation.error
 
-    const { items, subtotal, tax, total, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType, tip } = validation.data
+    const { items, subtotal, tax, total, subtotalCash, subtotalCard, taxCash, taxCard, totalCash, totalCard, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType, tip } = validation.data
+
+    // Enforce Open Shift Rule
+    if (!cashDrawerSessionId) {
+        return badRequestResponse('No open shift. Transaction rejected.')
+    }
+    const sessionCheck = await prisma.cashDrawerSession.findUnique({
+        where: { id: cashDrawerSessionId }
+    })
+    if (!sessionCheck || sessionCheck.endTime) {
+        return badRequestResponse('Shift is closed or invalid. Cannot process transaction.')
+    }
+
+    // Determine chargedMode based on payment method
+    // CASH payment = use cash prices, CARD payment = use card prices
+    const chargedMode = paymentMethod === 'CASH' ? 'CASH' : 'CARD'
 
     // ===== IDEMPOTENCY CHECK =====
     // Prevents duplicate transaction processing (double-charge protection)
@@ -51,15 +86,12 @@ export async function POST(req: Request) {
     if (idempotencyKey) {
         const idempotencyResult = await checkIdempotency(idempotencyKey, session.user.franchiseId)
         if (idempotencyResult.isDuplicate) {
-            console.log(`[POS_TRANSACTION] Duplicate request detected, returning cached response`)
             return NextResponse.json(idempotencyResult.cachedResponse)
         }
     }
     // ===== END IDEMPOTENCY CHECK =====
 
     try {
-        // Security: Log minimal info only
-        console.log(`[POS_TRANSACTION] Processing ${paymentMethod} transaction for ${items?.length || 0} items`)
 
         // Validate split payment
         if (paymentMethod === 'SPLIT') {
@@ -81,6 +113,15 @@ export async function POST(req: Request) {
             subtotal: subtotal.toString(),
             tax: tax.toString(),
             total: total.toString(),
+            // === DUAL PRICING TOTALS (NEVER null after transaction) ===
+            // If dual pricing values not provided, default to standard totals
+            subtotalCash: (subtotalCash ?? subtotal).toString(),
+            subtotalCard: (subtotalCard ?? subtotal).toString(),
+            taxCash: (taxCash ?? tax).toString(),
+            taxCard: (taxCard ?? tax).toString(),
+            totalCash: (totalCash ?? total).toString(),
+            totalCard: (totalCard ?? total).toString(),
+            chargedMode: chargedMode || 'CASH', // Default to CASH if not specified
             paymentMethod: paymentMethod,
             cashAmount: (paymentMethod === 'SPLIT' ? cashAmount : (paymentMethod === 'CASH' ? total : 0)).toString(),
             cardAmount: (paymentMethod === 'SPLIT' ? cardAmount : (['CREDIT_CARD', 'EBT'].includes(paymentMethod) ? total : 0)).toString(),
@@ -91,28 +132,186 @@ export async function POST(req: Request) {
             tip: (tip || 0).toString(),
             status: 'COMPLETED',
             cashDrawerSessionId: cashDrawerSessionId || null,
-            lineItems: {
-                create: items.map((item: any) => {
-                    const itemSubtotal = item.price * item.quantity
-                    const discountAmount = itemSubtotal * ((item.discount || 0) / 100)
-                    const itemTotal = itemSubtotal - discountAmount
+            lineItems: (() => {
+                // ===== PAYOUT ENGINE SNAPSHOT CALCULATION =====
+                // Generate immutable snapshot fields for reporting accuracy
+                const businessDate = getBusinessDate()
 
-                    return {
-                        type: item.type,
-                        // Only set IDs if they are valid CUIDs (real database records)
-                        // Skip mock data (starts with 's' or 'p') and custom items (starts with 'custom-')
-                        serviceId: (item.type === 'SERVICE' && item.id && !item.id.startsWith('s') && !item.id.startsWith('custom')) ? item.id : null,
-                        productId: (item.type === 'PRODUCT' && item.id && !item.id.startsWith('p') && !item.id.startsWith('custom')) ? item.id : null,
-                        quantity: parseInt(item.quantity.toString()),
-                        price: item.price.toString(),
-                        discount: (item.discount || 0).toString(),
-                        total: itemTotal.toString()
-                    }
-                })
-            }
+                // Prepare line item inputs for payout engine
+                const lineItemInputs: LineItemInput[] = items.map((item: any) => ({
+                    type: item.type as 'SERVICE' | 'PRODUCT',
+                    price: Number(item.price),
+                    quantity: Number(item.quantity),
+                    discount: Number(item.discount || 0),
+                    serviceId: item.type === 'SERVICE' ? item.id : null,
+                    serviceName: item.type === 'SERVICE' ? item.name : null,
+                    productId: item.type === 'PRODUCT' ? item.id : null,
+                    productName: item.type === 'PRODUCT' ? item.name : null,
+                    barberId: item.barberId || null
+                }))
+
+                // Calculate payouts using central engine (50% default commission)
+                const payoutResult = calculateTransactionPayouts(
+                    lineItemInputs,
+                    Number(tip || 0),
+                    { ...DEFAULT_PAYOUT_CONFIG, taxRate: 0 }, // TODO: Pass actual tax rate
+                    businessDate
+                )
+
+                // Create line items with snapshot fields
+                return {
+                    create: items.map((item: any, index: number) => {
+                        const snapshot = payoutResult.lineItemSnapshots[index]
+                        const itemSubtotal = item.price * item.quantity
+                        const discountAmount = itemSubtotal * ((item.discount || 0) / 100)
+                        const itemTotal = itemSubtotal - discountAmount
+
+                        // === HARD GUARD: Resolve item name (MUST never be null) ===
+                        const resolvedName =
+                            snapshot.serviceNameSnapshot ||
+                            snapshot.productNameSnapshot ||
+                            item.name
+
+                        if (!resolvedName) {
+                            throw new Error(`Item at index ${index} has no name. Cannot create transaction.`)
+                        }
+
+                        // Dual Pricing line item fields
+                        const cashUnitPrice = item.cashPrice !== undefined ? Number(item.cashPrice) : Number(item.price)
+                        const cardUnitPrice = item.cardPrice !== undefined ? Number(item.cardPrice) : null
+                        const cashLineTotal = cashUnitPrice * Number(item.quantity)
+                        const cardLineTotal = cardUnitPrice !== null ? cardUnitPrice * Number(item.quantity) : null
+
+                        const lineItemData = {
+                            type: item.type,
+                            // Only set IDs if they are valid CUIDs (real database records)
+                            serviceId: (item.type === 'SERVICE' && item.id && !item.id.startsWith('s') && !item.id.startsWith('custom') && !item.id.startsWith('open')) ? item.id : null,
+                            productId: (item.type === 'PRODUCT' && item.id && !item.id.startsWith('p') && !item.id.startsWith('custom') && !item.id.startsWith('open')) ? item.id : null,
+                            staffId: item.barberId || null,
+                            quantity: parseInt(item.quantity.toString()),
+                            price: item.price.toString(),
+                            discount: (item.discount || 0).toString(),
+                            total: itemTotal.toString(),
+                            // Dual Pricing Line Fields
+                            cashUnitPrice: cashUnitPrice.toString(),
+                            cardUnitPrice: cardUnitPrice !== null ? cardUnitPrice.toString() : null,
+                            cashLineTotal: cashLineTotal.toString(),
+                            cardLineTotal: cardLineTotal !== null ? cardLineTotal.toString() : null,
+                            lineChargedMode: chargedMode, // "CASH" or "CARD"
+                            // === SNAPSHOT FIELDS (immutable after checkout) ===
+                            // Store name in correct field based on type (NEVER null)
+                            serviceNameSnapshot: item.type === 'SERVICE' ? resolvedName : null,
+                            productNameSnapshot: item.type === 'PRODUCT' ? resolvedName : null,
+                            priceCharged: snapshot.priceCharged.toString(),
+                            discountAllocated: snapshot.discountAllocated.toString(),
+                            taxAllocated: snapshot.taxAllocated.toString(),
+                            tipAllocated: snapshot.tipAllocated.toString(),
+                            commissionSplitUsed: snapshot.commissionSplitUsed.toString(),
+                            commissionAmount: snapshot.commissionAmount.toString(),
+                            ownerAmount: snapshot.ownerAmount.toString(),
+                            businessDate: snapshot.businessDate,
+                            lineItemStatus: snapshot.lineItemStatus
+                        }
+
+                        return lineItemData
+                    })
+                }
+            })()
         }
 
-        console.log('[POS_TRANSACTION_POST] Creating transaction atomically')
+        // ===== SECURITY: VALIDATE PRICES & STOCK =====
+        // Fetch authoritative data to prevent client-side price manipulation
+        const productIds = items
+            .filter((i: any) => i.type === 'PRODUCT' && i.id && !i.id.startsWith('custom') && !i.id.startsWith('open'))
+            .map((i: any) => i.id)
+
+        const serviceIds = items
+            .filter((i: any) => i.type === 'SERVICE' && i.id && !i.id.startsWith('custom') && !i.id.startsWith('open'))
+            .map((i: any) => i.id)
+
+        const [dbProducts, dbServices] = await Promise.all([
+            productIds.length > 0 ? prisma.product.findMany({ where: { id: { in: productIds } } }) : [],
+            serviceIds.length > 0 ? prisma.service.findMany({ where: { id: { in: serviceIds } } }) : []
+        ])
+
+        const productMap = new Map(dbProducts.map(p => [p.id, p]))
+        const serviceMap = new Map(dbServices.map(s => [s.id, s]))
+
+        // Validate each item
+        for (const item of items) {
+            if (item.id && !item.id.startsWith('custom') && !item.id.startsWith('open')) {
+                let dbPrice = 0
+
+                if (item.type === 'PRODUCT') {
+                    const product = productMap.get(item.id)
+                    if (!product) {
+                        return badRequestResponse(`Product not found: ${item.name} (${item.id})`)
+                    }
+                    // Use cashPrice if available (dual pricing), otherwise legacy price
+                    // We treat the "price" submitted as the base price before discount
+                    dbPrice = product.cashPrice ? Number(product.cashPrice) : Number(product.price)
+                } else if (item.type === 'SERVICE') {
+                    const service = serviceMap.get(item.id)
+                    if (!service) {
+                        return badRequestResponse(`Service not found: ${item.name} (${item.id})`)
+                    }
+                    dbPrice = Number(service.price)
+                }
+
+                // Security Check: manual discounts vs System Promotions
+
+                // 1. Check if this is a System Promotion
+                if (item.promotionId) {
+                    const promotion = await prisma.promotion.findUnique({
+                        where: { id: item.promotionId, isActive: true }
+                    })
+
+                    if (!promotion) {
+                        return badRequestResponse(`Invalid or expired promotion applied to ${item.name}.`)
+                    }
+
+                    // Valid promotion - skip price validation for this item
+                    continue
+                }
+
+                // Price Validation (non-promo items): Reject if client price differs from DB by more than $0.05
+                if (Math.abs(item.price - dbPrice) > 0.05) {
+                    console.error(`[SECURITY] Price manipulation detected for ${item.name}. Client: ${item.price}, DB: ${dbPrice}`)
+                    return badRequestResponse(`Price mismatch for ${item.name}. Please refresh menu.`)
+                }
+
+                // Employee Permission Check for MANUAL discounts
+                // Employees cannot apply manual discounts unless explicitly authorized with limits
+                if (item.discount > 0 && session.user.role === 'EMPLOYEE') {
+                    // Fetch fresh user permissions
+                    const employee = await prisma.user.findUnique({
+                        where: { id: session.user.id },
+                        select: { canApplyDiscounts: true, maxDiscountPercent: true, maxDiscountAmount: true }
+                    })
+
+                    if (!employee || !employee.canApplyDiscounts) {
+                        return badRequestResponse(`Permission Denied: You are not authorized to apply discounts.`)
+                    }
+
+                    // Validate Percent Limit
+                    if (employee.maxDiscountPercent > 0 && item.discount > employee.maxDiscountPercent) {
+                        return badRequestResponse(`Permission Denied: Discount (${item.discount}%) exceeds your limit of ${employee.maxDiscountPercent}%.`)
+                    }
+
+                    // Validate Amount Limit
+                    if (Number(employee.maxDiscountAmount) > 0) {
+                        // Calculate absolute discount amount
+                        const originalTotal = dbPrice * item.quantity
+                        const discountAmount = originalTotal * (item.discount / 100)
+
+                        if (discountAmount > Number(employee.maxDiscountAmount)) {
+                            return badRequestResponse(`Permission Denied: Discount amount ($${discountAmount.toFixed(2)}) exceeds your limit of $${Number(employee.maxDiscountAmount).toFixed(2)}.`)
+                        }
+                    }
+                }
+            }
+        }
+        // ===== END SECURITY CHECK =====
 
         // ===== ATOMIC TRANSACTION BLOCK =====
         // All sale operations wrapped for rollback safety
@@ -121,18 +320,54 @@ export async function POST(req: Request) {
             const newTransaction = await tx.transaction.create({
                 data: transactionData,
                 include: {
-                    lineItems: true,
-                    client: true
+                    // === EXPLICIT SELECT: Ensure all fields required for printing ===
+                    lineItems: {
+                        select: {
+                            id: true,
+                            type: true,
+                            quantity: true,
+                            price: true,
+                            total: true,
+                            // Name snapshots (NEVER null after Phase 1 fix)
+                            serviceNameSnapshot: true,
+                            productNameSnapshot: true,
+                            // Dual pricing fields
+                            cashUnitPrice: true,
+                            cardUnitPrice: true,
+                            cashLineTotal: true,
+                            cardLineTotal: true,
+                            lineChargedMode: true,
+                            // Additional fields for reports
+                            priceCharged: true,
+                            discount: true,
+                            staffId: true,
+                            serviceId: true,
+                            productId: true
+                        }
+                    },
+                    client: {
+                        select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            phone: true,
+                            email: true
+                        }
+                    }
                 }
             })
 
             // Decrement inventory for product items
             for (const item of items) {
-                if (item.type === 'PRODUCT' && item.id && !item.id.startsWith('p') && !item.id.startsWith('custom')) {
-                    await tx.product.update({
-                        where: { id: item.id },
-                        data: { stock: { decrement: item.quantity } }
-                    })
+                if (item.type === 'PRODUCT' && item.id && !item.id.startsWith('p') && !item.id.startsWith('custom') && !item.id.startsWith('open')) {
+                    // Prevent selling tracking items if they don't exist (double check)
+                    const product = productMap.get(item.id)
+                    if (product) {
+                        await tx.product.update({
+                            where: { id: item.id },
+                            data: { stock: { decrement: item.quantity } }
+                        })
+                    }
                 }
             }
 
@@ -175,9 +410,20 @@ export async function POST(req: Request) {
         // Log detailed error server-side only
         console.error('[POS_TRANSACTION_POST] Error:', error.code, error.message)
 
+        try {
+            const logPath = path.join(process.cwd(), 'transaction_error.log')
+            const logEntry = `\n[${new Date().toISOString()}] Transaction Failed:\nCode: ${error.code}\nMessage: ${error.message}\nMeta: ${JSON.stringify(error.meta)}\nStack: ${error.stack}\n`
+            fs.appendFileSync(logPath, logEntry)
+        } catch (logError) {
+            console.error('Failed to write to error log', logError)
+        }
+
         // Return generic error to client (don't expose internal details)
         return NextResponse.json({
-            error: 'Transaction failed. Please try again.'
+            error: 'Transaction failed. Please try again.',
+            details: error.message,
+            code: error.code,
+            meta: error.meta
         }, { status: 500 })
     }
 }

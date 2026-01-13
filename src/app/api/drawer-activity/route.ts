@@ -198,7 +198,7 @@ async function checkNoSaleAlerts(locationId: string, employeeId: string) {
             // Create alert notification
             const alertLevel = noSaleCount >= CRITICAL_THRESHOLD ? 'CRITICAL' : 'WARNING'
 
-            console.log(`🚨 DRAWER ALERT [${alertLevel}]: Location ${location?.name} has ${noSaleCount} no-sale drawer opens today`)
+            // Debug log removed
 
             // TODO: Send email/push notification to franchisor
             // TODO: Create in-app alert/notification

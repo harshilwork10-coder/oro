@@ -27,28 +27,28 @@ export default function Toast({ message, type = 'info', onClose, duration = 3000
     }
 
     const styles = {
-        success: 'bg-green-50 border-green-200 text-green-800',
-        error: 'bg-red-50 border-red-200 text-red-800',
-        warning: 'bg-amber-50 border-amber-200 text-amber-800',
-        info: 'bg-blue-50 border-blue-200 text-blue-800',
+        success: 'bg-emerald-600 text-white shadow-emerald-900/30',
+        error: 'bg-red-600 text-white shadow-red-900/30',
+        warning: 'bg-amber-600 text-white shadow-amber-900/30',
+        info: 'bg-blue-600 text-white shadow-blue-900/30',
     }
 
     const iconColors = {
-        success: 'text-green-500',
-        error: 'text-red-500',
-        warning: 'text-amber-500',
-        info: 'text-blue-500',
+        success: 'text-emerald-200',
+        error: 'text-red-200',
+        warning: 'text-amber-200',
+        info: 'text-blue-200',
     }
 
     return (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${styles[type]} animate-slide-in`}>
+        <div className={`fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl ${styles[type]} animate-slide-in`}>
             <div className={iconColors[type]}>
                 {icons[type]}
             </div>
             <p className="font-medium">{message}</p>
             <button
                 onClick={onClose}
-                className="ml-2 hover:opacity-70 transition-opacity"
+                className="ml-2 text-white/70 hover:text-white transition-opacity"
             >
                 <X className="h-4 w-4" />
             </button>

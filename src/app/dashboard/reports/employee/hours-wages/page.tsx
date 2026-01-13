@@ -7,9 +7,11 @@ import {
     ArrowLeft,
     Calendar,
     RefreshCw,
-    User
+    User,
+    FileDown
 } from 'lucide-react'
 import Link from 'next/link'
+import jsPDF from 'jspdf'
 
 interface TimeEntry {
     id: string
@@ -53,6 +55,58 @@ export default function HoursWagesPage() {
 
     const totalHours = entries.reduce((sum, e) => sum + e.hoursWorked, 0)
 
+    const exportCSV = () => {
+        const headers = ['Employee', 'Date', 'Clock In', 'Clock Out', 'Hours']
+        const csvContent = [
+            headers.join(','),
+            ...entries.map(e => [
+                `"${e.employeeName}"`,
+                e.date,
+                e.clockIn,
+                e.clockOut || 'Active',
+                e.hoursWorked.toFixed(2)
+            ].join(','))
+        ].join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `hours_wages_${startDate}_${endDate}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+    }
+
+    const exportToPDF = () => {
+        const doc = new jsPDF()
+        let yPos = 20
+        doc.setFontSize(18)
+        doc.text('Hours & Wages Report', 20, yPos)
+        yPos += 10
+        doc.setFontSize(10)
+        doc.text(`Period: ${startDate} to ${endDate}`, 20, yPos)
+        yPos += 10
+
+        const headers = ['Employee', 'Date', 'In', 'Out', 'Hours']
+        const xPos = [20, 60, 90, 110, 140]
+        doc.setFont('helvetica', 'bold')
+        headers.forEach((h, i) => doc.text(h, xPos[i], yPos))
+        yPos += 7
+        doc.line(20, yPos - 5, 190, yPos - 5)
+
+        doc.setFont('helvetica', 'normal')
+        entries.forEach(e => {
+            if (yPos > 270) { doc.addPage(); yPos = 20; }
+            doc.text(e.employeeName.substring(0, 20), xPos[0], yPos)
+            doc.text(e.date, xPos[1], yPos)
+            doc.text(e.clockIn, xPos[2], yPos)
+            doc.text(e.clockOut || '-', xPos[3], yPos)
+            doc.text(e.hoursWorked.toFixed(2), xPos[4], yPos)
+            yPos += 7
+        })
+        doc.save(`hours_wages_${startDate}_${endDate}.pdf`)
+    }
+
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
@@ -71,10 +125,18 @@ export default function HoursWagesPage() {
                         <p className="text-gray-400 mt-1">Employee time entries</p>
                     </div>
                 </div>
-                <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg">
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={exportToPDF} className="p-2 bg-red-600 hover:bg-red-500 rounded-lg text-white" title="Export PDF">
+                        <FileDown className="w-4 h-4" />
+                    </button>
+                    <button onClick={exportCSV} className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white" title="Export Excel">
+                        <FileDown className="w-4 h-4" />
+                    </button>
+                    <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg">
+                        <RefreshCw className="w-4 h-4" />
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {/* Date Filter */}
@@ -138,4 +200,3 @@ export default function HoursWagesPage() {
         </div>
     )
 }
-

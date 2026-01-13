@@ -1,24 +1,51 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Users, Shield, MoreHorizontal, Search } from 'lucide-react';
 
 type UsersTab = 'users' | 'roles';
 
-const MOCK_USERS = [
-    { id: 1, name: 'Admin User', email: 'admin@brand.com', role: 'Admin', status: 'active', lastLogin: '1h ago' },
-    { id: 2, name: 'Support Lead', email: 'support@brand.com', role: 'Support', status: 'active', lastLogin: '3h ago' },
-    { id: 3, name: 'Reports Viewer', email: 'reports@brand.com', role: 'Viewer', status: 'active', lastLogin: '1d ago' },
-];
-
 export default function UsersPage() {
     const [activeTab, setActiveTab] = useState<UsersTab>('users');
     const [searchQuery, setSearchQuery] = useState('');
+    const [users, setUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    // Fetch users from database
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const res = await fetch('/api/admin/users')
+                if (res.ok) {
+                    const data = await res.json()
+                    const usersArray = Array.isArray(data) ? data : (data.users || data.data || [])
+                    setUsers(usersArray.map((u: any) => ({
+                        id: u.id,
+                        name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Unknown',
+                        email: u.email || '',
+                        role: u.role || 'User',
+                        status: u.isActive === false ? 'inactive' : 'active',
+                        lastLogin: u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : 'Never'
+                    })))
+                }
+            } catch (err) {
+                console.error('Failed to fetch users:', err)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchUsers()
+    }, [])
 
     const tabs: { id: UsersTab; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
         { id: 'users', label: 'Users', icon: Users },
         { id: 'roles', label: 'Roles', icon: Shield },
     ];
+
+    const filteredUsers = users.filter(u =>
+        u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.email.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     return (
         <div>
@@ -37,8 +64,8 @@ export default function UsersPage() {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${activeTab === tab.id
-                                ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
-                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                             }`}
                     >
                         <tab.icon size={16} />
@@ -75,20 +102,26 @@ export default function UsersPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {MOCK_USERS.map((user) => (
-                                <tr key={user.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)]">
-                                    <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{user.name}</td>
-                                    <td className="px-4 py-3 text-[var(--text-secondary)]">{user.email}</td>
-                                    <td className="px-4 py-3">
-                                        <span className="px-2 py-0.5 bg-[var(--surface-hover)] rounded text-xs">{user.role}</span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400 capitalize">{user.status}</span>
-                                    </td>
-                                    <td className="px-4 py-3 text-[var(--text-muted)] text-xs">{user.lastLogin}</td>
-                                    <td className="px-4 py-3"><MoreHorizontal size={16} className="text-[var(--text-muted)]" /></td>
+                            {filteredUsers.length === 0 && !loading ? (
+                                <tr>
+                                    <td colSpan={6} className="px-4 py-8 text-center text-[var(--text-muted)]">No users found</td>
                                 </tr>
-                            ))}
+                            ) : (
+                                filteredUsers.map((user) => (
+                                    <tr key={user.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)]">
+                                        <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{user.name}</td>
+                                        <td className="px-4 py-3 text-[var(--text-secondary)]">{user.email}</td>
+                                        <td className="px-4 py-3">
+                                            <span className="px-2 py-0.5 bg-[var(--surface-hover)] rounded text-xs">{user.role}</span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400 capitalize">{user.status}</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-[var(--text-muted)] text-xs">{user.lastLogin}</td>
+                                        <td className="px-4 py-3"><MoreHorizontal size={16} className="text-[var(--text-muted)]" /></td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

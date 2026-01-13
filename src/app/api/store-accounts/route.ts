@@ -15,10 +15,22 @@ export async function GET(request: NextRequest) {
 
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: { franchiseId: true }
+            select: { id: true, role: true, franchiseId: true }
         })
 
-        if (!user?.franchiseId) {
+        let franchiseId = user?.franchiseId
+
+        if (user?.role === 'FRANCHISOR' && !franchiseId) {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: user.id },
+                include: { franchises: { take: 1, select: { id: true } } }
+            })
+            if (franchisor?.franchises[0]) {
+                franchiseId = franchisor.franchises[0].id
+            }
+        }
+
+        if (!franchiseId) {
             return ApiResponse.success({ accounts: [], totals: { totalAccounts: 0, totalOutstanding: 0, accountsWithBalance: 0 } })
         }
 
@@ -29,7 +41,7 @@ export async function GET(request: NextRequest) {
 
         // Build where clause
         const whereClause: Record<string, unknown> = {
-            franchiseId: user.franchiseId,
+            franchiseId: franchiseId,
             hasStoreAccount: true
         }
 
@@ -78,10 +90,10 @@ export async function GET(request: NextRequest) {
         // Get totals (separate query for accurate counts)
         const [totalCount, outstandingCount] = await Promise.all([
             prisma.client.count({
-                where: { franchiseId: user.franchiseId, hasStoreAccount: true }
+                where: { franchiseId: franchiseId, hasStoreAccount: true }
             }),
             prisma.client.count({
-                where: { franchiseId: user.franchiseId, hasStoreAccount: true, storeAccountBalance: { gt: 0 } }
+                where: { franchiseId: franchiseId, hasStoreAccount: true, storeAccountBalance: { gt: 0 } }
             })
         ])
 
@@ -147,7 +159,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (existingClient.franchiseId !== user.franchiseId) {
-            console.warn(`[SECURITY] IDOR attempt: User ${session.user.id} tried to modify client ${clientId}`)
+            console.error(`[SECURITY] IDOR attempt: User ${session.user.id} tried to modify client ${clientId}`)
             return ApiResponse.forbidden('Access denied')
         }
 

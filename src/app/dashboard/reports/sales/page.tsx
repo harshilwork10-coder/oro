@@ -16,7 +16,11 @@ import {
     Download,
     Calendar,
     ChevronRight,
-    Search
+    Search,
+    Scissors,
+    Users,
+    Clock,
+    Star
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -27,14 +31,49 @@ const salesReports = [
         description: 'End of day sales summary with all transactions',
         icon: FileText,
         href: '/dashboard/reports/z-report',
-        status: 'available'
+        status: 'available',
+        priority: true
     },
     {
-        id: 'weekly-summary',
-        name: 'Weekly Summary',
-        description: 'Week over week comparison and trends',
-        icon: TrendingUp,
-        href: '/dashboard/reports/revenue',
+        id: 'cash-card',
+        name: 'Cash vs Card Breakdown',
+        description: 'Revenue split by payment method with tip breakdown',
+        icon: CreditCard,
+        href: '/dashboard/reports/sales/cash-card',
+        status: 'available',
+        priority: true
+    },
+    {
+        id: 'sales-by-employee',
+        name: 'Sales by Employee',
+        description: 'Revenue and transaction count per employee',
+        icon: Users,
+        href: '/dashboard/reports/employee/sales',
+        status: 'available',
+        priority: true
+    },
+    {
+        id: 'service-sales',
+        name: 'Service Sales Report',
+        description: 'Sales breakdown by service category',
+        icon: Scissors,
+        href: '/dashboard/reports/sales/services',
+        status: 'coming-soon'
+    },
+    {
+        id: 'appointment-revenue',
+        name: 'Appointment Revenue',
+        description: 'Revenue from appointments vs walk-ins',
+        icon: Calendar,
+        href: '/dashboard/reports/sales/appointments',
+        status: 'coming-soon'
+    },
+    {
+        id: 'commission-report',
+        name: 'Commission Payouts',
+        description: 'Stylist commissions and payout history',
+        icon: DollarSign,
+        href: '/dashboard/reports/employee/payouts',
         status: 'available'
     },
     {
@@ -46,21 +85,12 @@ const salesReports = [
         status: 'available'
     },
     {
-        id: 'payment-breakdown',
-        name: 'Payment Type Breakdown',
-        description: 'Cash vs card vs other payment methods',
-        icon: DollarSign,
-        href: '/dashboard/reports/sales/payment-breakdown',
-        status: 'available'
-    },
-    {
         id: 'cc-batch',
         name: 'Credit Card Batch Report',
-        description: 'Transaction time, auth code, last 4, amount - for processor disputes',
+        description: 'Transaction time, auth code - for disputes',
         icon: CreditCard,
         href: '/dashboard/reports/sales/cc-batch',
-        status: 'available',
-        priority: true
+        status: 'coming-soon'
     },
     {
         id: 'refunds-voids',
@@ -76,14 +106,22 @@ const salesReports = [
         description: 'Sold, redeemed, outstanding balance',
         icon: Gift,
         href: '/dashboard/reports/sales/gift-cards',
-        status: 'available'
+        status: 'coming-soon'
     },
     {
-        id: 'cogs',
-        name: 'Cost of Goods Sold (COGS)',
-        description: 'Product cost vs revenue analysis',
+        id: 'product-sales',
+        name: 'Product Sales Report',
+        description: 'Retail product sales and top sellers',
         icon: Receipt,
-        href: '/dashboard/reports/cogs',
+        href: '/dashboard/reports/sales/products',
+        status: 'coming-soon'
+    },
+    {
+        id: 'tips-report',
+        name: 'Tips Report',
+        description: 'Tips collected by stylist/employee',
+        icon: DollarSign,
+        href: '/dashboard/reports/tips',
         status: 'available'
     },
     {
@@ -123,7 +161,7 @@ export default function SalesReportsPage() {
                             </div>
                             Sales Reports
                         </h1>
-                        <p className="text-gray-400 mt-1">9 reports available</p>
+                        <p className="text-gray-400 mt-1">13 reports available</p>
                     </div>
                 </div>
 

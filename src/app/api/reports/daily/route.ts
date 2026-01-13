@@ -291,7 +291,7 @@ export async function GET(request: NextRequest) {
         ` : ''}
 
         <div class="footer">
-            <p>Generated: ${new Date().toLocaleString()} • OroNext POS</p>
+            <p>Generated: ${new Date().toLocaleString()} • ORO 9 POS</p>
         </div>
     </div>
     

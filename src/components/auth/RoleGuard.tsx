@@ -41,7 +41,7 @@ export default function RoleGuard({
 
         // If authenticated but role not allowed, redirect to dashboard
         if (userRole && !allowedRoles.includes(userRole)) {
-            console.warn(`[RoleGuard] Access denied for role ${userRole} - redirecting`)
+            console.error(`[RoleGuard] Access denied for role ${userRole} - redirecting`)
             router.replace(fallbackUrl)
         }
     }, [status, userRole, allowedRoles, router, fallbackUrl])

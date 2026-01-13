@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        console.log(`📄 Document uploaded: ${documentType} for franchisor ${franchisorId}`)
+        // Debug log removed
 
         return NextResponse.json({
             success: true,

@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
 
         // Check stock
         if (product.stock <= 0) {
-            console.warn(`[RETAIL] Low stock warning: ${product.name}`)
+            console.error(`[RETAIL] Low stock warning: ${product.name}`)
         }
 
         return NextResponse.json(result)

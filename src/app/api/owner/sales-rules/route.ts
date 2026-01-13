@@ -90,12 +90,7 @@ export async function PUT(request: NextRequest) {
 
         // In production, save these to a LocationSettings or SalesRestrictions table
         // For now, we'll log the intent
-        console.log('Sales restrictions updated:', {
-            locationId,
-            restrictions,
-            applyToAll,
-            updatedBy: user.id
-        })
+        // Debug log removed
 
         // Create audit event for the change
         const franchiseId = user.franchiseId

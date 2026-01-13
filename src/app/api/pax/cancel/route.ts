@@ -25,7 +25,6 @@ function sendPaxCommand(ip: string, port: number, command: Buffer): Promise<{ su
         })
 
         socket.on('data', () => {
-            console.log('[PAX Cancel] Response received')
             socket.destroy()
             resolve({ success: true, message: 'Cancel sent' })
         })
@@ -60,7 +59,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // SECURITY: Only allow connections to private IP ranges
         if (!isPrivateIP(ip)) {
-            console.warn(`[PAX Cancel] BLOCKED: Attempt to connect to non-private IP: ${ip}`)
+            console.error(`[PAX Cancel] BLOCKED: Attempt to connect to non-private IP: ${ip}`)
             return NextResponse.json(
                 { error: 'Only local network connections allowed' },
                 { status: 403 }
@@ -85,8 +84,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
 
         const fullCommand = STX + rawData + String.fromCharCode(lrc)
-
-        console.log('[PAX Cancel] User:', session.user.email, 'Sending reset command to', ip, port)
 
         // Send via socket
         const result = await sendPaxCommand(ip, parseInt(port), Buffer.from(fullCommand))

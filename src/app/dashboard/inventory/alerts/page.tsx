@@ -27,7 +27,7 @@ export default function InventoryAlertsPage() {
     const [alerts, setAlerts] = useState<Alert[]>([])
     const [loading, setLoading] = useState(true)
 
-    const locationId = 'your-location-id' // TODO: Get from session
+    const locationId = 'your-location-id' // Replace with session.user.locationId
 
     useEffect(() => {
         if (status === 'authenticated') {

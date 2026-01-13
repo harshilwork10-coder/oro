@@ -59,7 +59,7 @@ export default function NoSaleDrawerModal({ isOpen, onClose, onSuccess, location
 
             if (res.ok) {
                 // Open the drawer (if connected to hardware, send command here)
-                console.log('📂 Drawer opened - No Sale logged')
+                // Drawer opened - logged to backend
                 onSuccess()
                 handleClose()
             } else {

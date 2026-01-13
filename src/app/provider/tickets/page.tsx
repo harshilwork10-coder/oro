@@ -34,6 +34,7 @@ interface Conversation {
         name: string;
         email: string;
     };
+    isTicket?: boolean; // Flag to distinguish support tickets from chat
 }
 
 type TicketTab = 'open' | 'resolved' | 'all';
@@ -49,7 +50,7 @@ export default function TicketsPage() {
     const [activeTab, setActiveTab] = useState<TicketTab>('open');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Fetch conversations
+    // Fetch conversations and support tickets
     useEffect(() => {
         fetchConversations();
         const interval = setInterval(fetchConversations, 5000); // Poll every 5 seconds
@@ -63,17 +64,58 @@ export default function TicketsPage() {
 
     const fetchConversations = async () => {
         try {
-            const res = await fetch('/api/chat/conversations');
-            if (res.ok) {
-                const data = await res.json();
-                setConversations(data);
+            // Fetch chat conversations
+            const chatRes = await fetch('/api/chat/conversations');
+            let chatData: Conversation[] = [];
+            if (chatRes.ok) {
+                chatData = await chatRes.json();
+            }
 
-                // Update selected conversation if it exists
-                if (selectedConversation) {
-                    const updated = data.find((c: Conversation) => c.id === selectedConversation.id);
-                    if (updated) {
-                        setSelectedConversation(updated);
-                    }
+            // Fetch support tickets
+            const ticketRes = await fetch('/api/provider/tickets');
+            let ticketData: any[] = [];
+            if (ticketRes.ok) {
+                ticketData = await ticketRes.json();
+            }
+
+            // Convert tickets to conversation format
+            const ticketConversations: Conversation[] = ticketData.map((t: any) => ({
+                id: t.id,
+                customerName: t.subject,
+                customerEmail: t.franchise?.franchisor?.owner?.email || '',
+                customerPhone: '',
+                status: t.status === 'OPEN' ? 'OPEN' : 'RESOLVED',
+                lastMessageAt: t.updatedAt,
+                unreadCount: 0,
+                createdAt: t.createdAt,
+                messages: t.messages?.map((m: any) => ({
+                    id: m.id,
+                    senderType: m.isInternal ? 'STAFF' : 'CUSTOMER',
+                    content: m.message,
+                    createdAt: m.createdAt,
+                    sender: m.authorUser ? { name: m.authorUser.name } : undefined
+                })) || [],
+                client: {
+                    firstName: t.location?.name || t.franchise?.businessName || 'Support Ticket',
+                    lastName: '',
+                    email: ''
+                },
+                assignedTo: t.assignedToUser ? {
+                    name: t.assignedToUser.name,
+                    email: t.assignedToUser.email
+                } : undefined,
+                isTicket: true // Mark as support ticket
+            }));
+
+            // Combine both sources
+            const allConversations = [...ticketConversations, ...chatData];
+            setConversations(allConversations);
+
+            // Update selected conversation if it exists
+            if (selectedConversation) {
+                const updated = allConversations.find((c: Conversation) => c.id === selectedConversation.id);
+                if (updated) {
+                    setSelectedConversation(updated);
                 }
             }
         } catch (error) {
@@ -113,23 +155,37 @@ export default function TicketsPage() {
 
         setIsSending(true);
         try {
-            const res = await fetch('/api/chat/messages', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    conversationId: selectedConversation.id,
-                    content: newMessage,
-                    senderType: 'STAFF'
-                })
-            });
+            if (selectedConversation.isTicket) {
+                // Use ticket message API
+                const res = await fetch(`/api/provider/tickets/${selectedConversation.id}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: newMessage })
+                });
 
-            if (res.ok) {
-                setNewMessage('');
-                // Refresh conversation
-                const convRes = await fetch(`/api/chat/conversations/${selectedConversation.id}`);
-                if (convRes.ok) {
-                    const data = await convRes.json();
-                    setSelectedConversation(data);
+                if (res.ok) {
+                    setNewMessage('');
+                    fetchConversations();
+                }
+            } else {
+                // Use chat API for chat conversations
+                const res = await fetch('/api/chat/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        conversationId: selectedConversation.id,
+                        content: newMessage,
+                        senderType: 'STAFF'
+                    })
+                });
+
+                if (res.ok) {
+                    setNewMessage('');
+                    const convRes = await fetch(`/api/chat/conversations/${selectedConversation.id}`);
+                    if (convRes.ok) {
+                        const data = await convRes.json();
+                        setSelectedConversation(data);
+                    }
                 }
             }
         } catch (error) {
@@ -141,16 +197,33 @@ export default function TicketsPage() {
 
     const updateStatus = async (conversationId: string, status: string) => {
         try {
-            await fetch(`/api/chat/conversations/${conversationId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            });
+            const conv = conversations.find(c => c.id === conversationId);
+
+            if (conv?.isTicket) {
+                // Use ticket API
+                await fetch(`/api/provider/tickets/${conversationId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+            } else {
+                // Use chat API
+                await fetch(`/api/chat/conversations/${conversationId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+            }
             fetchConversations();
+            // Clear selected if it was the one updated
+            if (selectedConversation?.id === conversationId) {
+                setSelectedConversation(null);
+            }
         } catch (error) {
             console.error('Failed to update status:', error);
         }
     };
+
 
     const filteredConversations = conversations.filter(c => {
         // Tab filter

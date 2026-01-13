@@ -24,7 +24,7 @@ function KioskContent() {
         if (isSupported) {
             setTimeout(() => {
                 enterFullscreen().catch(err => {
-                    console.log('Fullscreen requires user interaction')
+                    // Fullscreen requires user interaction - silent
                 })
             }, 1000)
         }

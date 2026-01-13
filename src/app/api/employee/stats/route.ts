@@ -15,33 +15,36 @@ export async function GET(req: NextRequest) {
         const todayStart = startOfDay(new Date())
         const todayEnd = endOfDay(new Date())
 
-        // Fetch today's transactions for this employee
-        const transactions = await prisma.transaction.findMany({
+        // Fetch today's line items where THIS employee performed the service
+        // This is more accurate than transaction.employeeId (who processed the sale)
+        const lineItems = await prisma.transactionLineItem.findMany({
             where: {
-                employeeId,
-                createdAt: {
-                    gte: todayStart,
-                    lte: todayEnd,
-                },
-                status: 'COMPLETED',
+                staffId: employeeId,
+                transaction: {
+                    createdAt: {
+                        gte: todayStart,
+                        lte: todayEnd,
+                    },
+                    status: 'COMPLETED',
+                }
             },
             select: {
                 total: true,
-                tip: true,
-                subtotal: true,
+                priceCharged: true,
+                commissionAmount: true,
+                tipAllocated: true,
             }
         })
 
-        // Calculate stats
-        const totalRevenue = transactions.reduce((acc, curr) => acc + Number(curr.subtotal), 0)
-        const totalTips = transactions.reduce((acc, curr) => acc + Number(curr.tip), 0)
+        // Calculate stats from line items
+        const totalRevenue = lineItems.reduce((acc: number, item) => acc + Number(item.priceCharged || item.total || 0), 0)
+        const totalTips = lineItems.reduce((acc: number, item) => acc + Number(item.tipAllocated || 0), 0)
+        const estimatedCommission = lineItems.reduce((acc: number, item) => acc + Number(item.commissionAmount || 0), 0)
 
-        // Simple commission calculation (e.g., 40% flat for now, or fetch from CommissionRule)
-        // In a real app, we'd fetch the user's commission rule. 
-        // For this MVP, we'll assume a standard 40% commission on service revenue.
-        const estimatedCommission = totalRevenue * 0.40
+        // If there's no commission calculated, fallback to 50% of revenue
+        const finalCommission = estimatedCommission > 0 ? estimatedCommission : totalRevenue * 0.50
 
-        const totalEarnings = estimatedCommission + totalTips
+        const totalEarnings = finalCommission + totalTips
 
         // Fetch appointment counts
         const appointmentCount = await prisma.appointment.count({

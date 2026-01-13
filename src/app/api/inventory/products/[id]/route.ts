@@ -86,20 +86,49 @@ export async function PUT(
             }
         }
 
+        // Get franchise config for dual pricing settings
+        const franchise = await prisma.franchise.findUnique({
+            where: { id: user.franchiseId },
+            include: {
+                franchisor: {
+                    include: { config: true }
+                }
+            }
+        })
+
+        // Determine cash price (use cashPrice if provided, else fall back to price, else existing)
+        const baseCashPrice = body.cashPrice !== undefined
+            ? parseFloat(body.cashPrice)
+            : body.price !== undefined
+                ? parseFloat(body.price)
+                : Number(existing.price)
+
+        // Calculate card price if dual pricing is enabled
+        let calculatedCardPrice: number | null = null
+        const config = franchise?.franchisor?.config as any
+        if (config?.pricingModel === 'DUAL_PRICING') {
+            const percentage = parseFloat(String(config.cardSurcharge)) || 0
+            // Formula: cardPrice = cashPrice × (1 + percentage/100)
+            calculatedCardPrice = baseCashPrice * (1 + percentage / 100)
+        }
+
         const product = await prisma.product.update({
             where: { id },
+            // Cast data as any since Prisma types may be stale after schema changes
             data: {
                 name: body.name?.trim() || existing.name,
                 barcode: body.barcode?.trim() || null,
                 sku: body.sku?.trim() || null,
-                price: body.price !== undefined ? parseFloat(body.price) : existing.price,
+                price: baseCashPrice, // Legacy field - keep in sync with cashPrice
+                cashPrice: baseCashPrice,
+                cardPrice: calculatedCardPrice,
                 cost: body.cost !== undefined ? (body.cost ? parseFloat(body.cost) : null) : existing.cost,
-                stock: body.stock !== undefined ? parseInt(body.stock) : existing.stock,
+                stock: body.stock !== undefined ? parseInt(body.stock) : Number(existing.stock),
                 reorderPoint: body.reorderPoint !== undefined ? (body.reorderPoint ? parseInt(body.reorderPoint) : null) : existing.reorderPoint,
                 categoryId: body.categoryId !== undefined ? (body.categoryId || null) : existing.categoryId,
                 vendor: body.vendor !== undefined ? (body.vendor?.trim() || null) : existing.vendor,
                 isActive: body.isActive !== undefined ? body.isActive : existing.isActive
-            },
+            } as any,
             include: {
                 productCategory: {
                     select: {

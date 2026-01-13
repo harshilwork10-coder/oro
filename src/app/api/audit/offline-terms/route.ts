@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
             }
         });
 
-        console.log(`[Audit] ${action} by ${ownerName} at ${storeName}`);
+        // Debug log removed;
 
         return NextResponse.json({
             success: true,

@@ -41,7 +41,7 @@ export async function POST(
             })
 
             // Log the action
-            console.log(`[ACCOUNT_SUSPEND] Franchise ${franchise.name} (${id}) suspended by ${session.user.email}. Reason: ${reason}`)
+            // Debug log removed suspended by ${session.user.email}. Reason: ${reason}`)
 
             return NextResponse.json({
                 success: true,
@@ -62,7 +62,7 @@ export async function POST(
                 }
             })
 
-            console.log(`[ACCOUNT_UNSUSPEND] Franchise ${franchise.name} (${id}) reactivated by ${session.user.email}`)
+            // Debug log removed reactivated by ${session.user.email}`)
 
             return NextResponse.json({
                 success: true,

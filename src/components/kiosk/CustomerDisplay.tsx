@@ -29,9 +29,9 @@ export default function CustomerDisplay({
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-4 text-center animate-in fade-in duration-500">
                 <div className="mb-6">
-                    <img src="/oronext-logo.jpg" alt="OroNext" className="h-20 md:h-24 object-contain" />
+                    <img src="/ORO9.png" alt="ORO 9" className="h-20 md:h-24 object-contain" />
                 </div>
-                <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-4">Welcome to OroNext</h1>
+                <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-4">Welcome to ORO 9</h1>
                 <p className="text-lg md:text-xl text-gray-500">We're ready when you are.</p>
             </div>
         )
@@ -50,7 +50,7 @@ export default function CustomerDisplay({
             {/* Header - Fixed at top */}
             <div className="bg-stone-900 py-3 px-4 shadow-sm flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center">
-                    <img src="/oronext-logo.jpg" alt="OroNext" className="h-10 md:h-12 object-contain" />
+                    <img src="/ORO9.png" alt="ORO 9" className="h-10 md:h-12 object-contain" />
                 </div>
                 {cart.customerName && (
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-700 rounded-full font-medium text-sm">
@@ -114,12 +114,27 @@ export default function CustomerDisplay({
                                         </span>
                                     )}
 
-                                    {/* Price - use displayPrice if available, fallback to calculated */}
-                                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1 flex-shrink-0">
-                                        <span className="text-sm font-bold text-emerald-700">
-                                            ${(item.displayPrice || item.cashPrice || (item.price * (item.quantity || 1) * (1 - (item.discount || 0) / 100)) || 0).toFixed(2)}
-                                        </span>
-                                    </div>
+                                    {/* Price - Show dual pricing if enabled */}
+                                    {cart.showDualPricing ? (
+                                        <div className="flex gap-1 flex-shrink-0">
+                                            <div className="bg-green-50 border border-green-200 rounded-lg px-2 py-1">
+                                                <span className="text-xs font-bold text-green-700">
+                                                    💵 ${(item.cashPrice || item.displayPrice || (item.price * (item.quantity || 1) * (1 - (item.discount || 0) / 100)) || 0).toFixed(2)}
+                                                </span>
+                                            </div>
+                                            <div className="bg-blue-50 border border-blue-200 rounded-lg px-2 py-1">
+                                                <span className="text-xs font-bold text-blue-700">
+                                                    💳 ${(item.cardPrice || (item.displayPrice || item.price * (item.quantity || 1) * (1 - (item.discount || 0) / 100)) * 1.04 || 0).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1 flex-shrink-0">
+                                            <span className="text-sm font-bold text-emerald-700">
+                                                ${(item.displayPrice || item.cashPrice || (item.price * (item.quantity || 1) * (1 - (item.discount || 0) / 100)) || 0).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             )
                         })}
@@ -138,11 +153,24 @@ export default function CustomerDisplay({
                         </div>
                     </div>
 
-                    {/* Right: Grand Total - Big & Bold */}
-                    <div className="text-right">
-                        <span className="text-orange-100 text-xs uppercase tracking-wider">Grand Total</span>
-                        <div className="text-3xl md:text-4xl font-bold">${displayTotal.toFixed(2)}</div>
-                    </div>
+                    {/* Right: Grand Total - Show Dual Pricing if enabled */}
+                    {cart.showDualPricing ? (
+                        <div className="flex gap-6">
+                            <div className="text-center">
+                                <span className="text-green-200 text-xs uppercase tracking-wider">💵 Cash</span>
+                                <div className="text-2xl md:text-3xl font-bold text-green-100">${(cart.cashTotal ?? displayTotal).toFixed(2)}</div>
+                            </div>
+                            <div className="text-center">
+                                <span className="text-blue-200 text-xs uppercase tracking-wider">💳 Card</span>
+                                <div className="text-2xl md:text-3xl font-bold text-blue-100">${(cart.cardTotal ?? displayTotal).toFixed(2)}</div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-right">
+                            <span className="text-orange-100 text-xs uppercase tracking-wider">Grand Total</span>
+                            <div className="text-3xl md:text-4xl font-bold">${displayTotal.toFixed(2)}</div>
+                        </div>
+                    )}
                 </div>
             </div>
 

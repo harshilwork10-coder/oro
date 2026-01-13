@@ -1,7 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, DollarSign, TrendingUp, CreditCard, Printer, Loader2, FileText } from 'lucide-react'
+import {
+    Calendar,
+    DollarSign,
+    TrendingUp,
+    CreditCard,
+    Printer,
+    Loader2,
+    FileText,
+    ArrowLeft,
+    FileDown
+} from 'lucide-react'
+import Link from 'next/link'
 import { WithReportPermission } from '@/components/reports/WithReportPermission'
 
 function ZReportPageContent() {
@@ -30,6 +41,43 @@ function ZReportPageContent() {
 
     const handlePrint = () => {
         window.print()
+    }
+
+    const exportCSV = () => {
+        if (!reportData) return
+
+        const csvContent = [
+            'SUMMARY',
+            `Total Sales,${reportData.summary.totalSales.toFixed(2)}`,
+            `Cash Sales,${reportData.summary.cashSales.toFixed(2)}`,
+            `Card Sales,${reportData.summary.cardSales.toFixed(2)}`,
+            `Transactions,${reportData.summary.totalTransactions}`,
+            '',
+            'CASH RECONCILIATION',
+            `Opening Cash,${reportData.cashReconciliation.opening.toFixed(2)}`,
+            `Cash Sales,${reportData.cashReconciliation.sales.toFixed(2)}`,
+            `Expected Closing,${reportData.cashReconciliation.expected.toFixed(2)}`,
+            `Actual Closing,${reportData.cashReconciliation.actual !== null ? reportData.cashReconciliation.actual.toFixed(2) : ''}`,
+            `Variance,${reportData.cashReconciliation.variance.toFixed(2)}`,
+            '',
+            'TAX SUMMARY',
+            `Subtotal,${reportData.taxSummary.subtotal.toFixed(2)}`,
+            `Tax Collected,${reportData.taxSummary.tax.toFixed(2)}`,
+            `Total with Tax,${reportData.taxSummary.total.toFixed(2)}`,
+            '',
+            'TOP SELLING ITEMS',
+            'Item,Qty,Sales',
+            ...reportData.topItems.map((item: any) => `"${item.name}",${item.quantity},${item.sales.toFixed(2)}`)
+        ].join('\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `z_report_${selectedDate}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
     }
 
     if (loading) {
@@ -71,9 +119,14 @@ function ZReportPageContent() {
             <div className="max-w-5xl mx-auto space-y-8 print:hidden">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-white tracking-tight">Z Report (End of Shift)</h1>
-                        <p className="text-stone-400 mt-1">Shift closing summary and cash reconciliation</p>
+                    <div className="flex items-center gap-4">
+                        <Link href="/dashboard/reports/employee" className="p-2 rounded-lg bg-stone-800 hover:bg-stone-700 transition-colors">
+                            <ArrowLeft className="w-5 h-5 text-stone-400" />
+                        </Link>
+                        <div>
+                            <h1 className="text-3xl font-bold text-white tracking-tight">Z Report (End of Shift)</h1>
+                            <p className="text-stone-400 mt-1">Shift closing summary and cash reconciliation</p>
+                        </div>
                     </div>
                     <div className="flex items-center gap-3">
                         <div className="relative">
@@ -86,11 +139,19 @@ function ZReportPageContent() {
                             />
                         </div>
                         <button
+                            onClick={exportCSV}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors shadow-sm font-medium"
+                            title="Export Excel"
+                        >
+                            <FileDown className="h-4 w-4" />
+                            Excel
+                        </button>
+                        <button
                             onClick={handlePrint}
                             className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg transition-colors shadow-sm font-medium"
                         >
                             <Printer className="h-4 w-4" />
-                            Print Z Report
+                            Print
                         </button>
                     </div>
                 </div>
@@ -127,7 +188,7 @@ function ZReportPageContent() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Cash Reconciliation */}
-                    <div className="glass-panel rounded-xl p-6">
+                    <div className="glass-panel rounded-xl p-6 border border-stone-800 bg-stone-900/50">
                         <h3 className="font-bold text-white mb-6">Cash Reconciliation</h3>
                         <div className="space-y-4">
                             <div className="flex justify-between p-3 bg-stone-900/50 rounded-lg">
@@ -160,7 +221,7 @@ function ZReportPageContent() {
                     </div>
 
                     {/* Top Items */}
-                    <div className="glass-panel rounded-xl p-6">
+                    <div className="glass-panel rounded-xl p-6 border border-stone-800 bg-stone-900/50">
                         <h3 className="font-bold text-white mb-4">Top Selling Items</h3>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
@@ -186,7 +247,7 @@ function ZReportPageContent() {
                 </div>
 
                 {/* Tax Summary */}
-                <div className="glass-panel rounded-xl p-6">
+                <div className="glass-panel rounded-xl p-6 border border-stone-800 bg-stone-900/50">
                     <h3 className="font-bold text-white mb-4">Tax Summary</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="p-4 bg-stone-900/50 rounded-lg">
@@ -313,7 +374,7 @@ function SummaryCard({ title, value, subtext, icon: Icon, color }: any) {
     }
 
     return (
-        <div className="glass-panel rounded-xl p-6 print:shadow-none print:border-gray-300">
+        <div className="glass-panel rounded-xl p-6 print:shadow-none print:border-gray-300 border border-stone-800 bg-stone-900/50">
             <div className="flex items-start justify-between mb-4">
                 <div>
                     <p className="text-sm font-medium text-stone-400">{title}</p>
@@ -337,4 +398,3 @@ export default function ZReportPage() {
         </WithReportPermission>
     )
 }
-

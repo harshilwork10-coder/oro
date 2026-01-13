@@ -10,6 +10,7 @@ import { logActivity, ActionTypes } from '@/lib/auditLog'
 const voidRequestSchema = z.object({
     transactionId: z.string().min(1, 'Transaction ID required'),
     reason: z.string().min(3, 'Void reason required (min 3 chars)').optional(),
+    cashDrawerSessionId: z.string().optional()
 })
 
 export async function POST(req: Request) {
@@ -24,7 +25,18 @@ export async function POST(req: Request) {
     const validation = await validateBody(req, voidRequestSchema)
     if ('error' in validation) return validation.error
 
-    const { transactionId, reason } = validation.data
+    const { transactionId, reason, cashDrawerSessionId } = validation.data
+
+    // Enforce Open Shift Rule
+    if (!cashDrawerSessionId) {
+        return badRequestResponse('No open shift. Void rejected.')
+    }
+    const sessionCheck = await prisma.cashDrawerSession.findUnique({
+        where: { id: cashDrawerSessionId }
+    })
+    if (!sessionCheck || sessionCheck.endTime) {
+        return badRequestResponse('Shift is closed. Cannot void transaction.')
+    }
 
     try {
 
@@ -50,21 +62,38 @@ export async function POST(req: Request) {
             }, { status: 400 })
         }
 
-        // Update transaction status to VOIDED with audit trail
-        const voidedTransaction = await prisma.transaction.update({
-            where: { id: transactionId },
-            data: {
-                status: 'VOIDED',
-                voidedById: user.id,
-                voidedAt: new Date(),
-                voidReason: reason || null
-            },
-            include: {
-                employee: {
-                    select: { name: true, email: true }
+        // ===== ATOMIC VOID BLOCK =====
+        // Update status AND restock inventory atomically
+        const voidedTransaction = await prisma.$transaction(async (tx) => {
+            // 1. Update Transaction Status
+            const updatedTx = await tx.transaction.update({
+                where: { id: transactionId },
+                data: {
+                    status: 'VOIDED',
+                    voidedById: user.id,
+                    voidedAt: new Date(),
+                    voidReason: reason || null
+                },
+                include: {
+                    employee: {
+                        select: { name: true, email: true }
+                    }
+                }
+            })
+
+            // 2. Restock Inventory
+            for (const item of transaction.lineItems) {
+                if (item.type === 'PRODUCT' && item.productId) {
+                    await tx.product.update({
+                        where: { id: item.productId },
+                        data: { stock: { increment: item.quantity } }
+                    })
                 }
             }
+
+            return updatedTx
         })
+        // ===== END ATOMIC VOID BLOCK =====
 
         // ===== AUDIT LOG - Record void for legal protection =====
         await logActivity({

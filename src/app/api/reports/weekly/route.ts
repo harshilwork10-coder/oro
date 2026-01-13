@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
         </div>
 
         <div class="footer">
-            Generated: ${new Date().toLocaleString()} • OroNext POS
+            Generated: ${new Date().toLocaleString()} • ORO 9 POS
         </div>
     </div>
 </body>

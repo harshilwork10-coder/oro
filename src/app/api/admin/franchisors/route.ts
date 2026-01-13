@@ -15,6 +15,8 @@ function parseIntegrations(integrationsStr: string | null): Record<string, boole
     }
 }
 
+
+
 // GET all franchisors (clients) - for Account Configs page with pagination
 export async function GET(request: NextRequest) {
     try {
@@ -85,7 +87,7 @@ export async function GET(request: NextRequest) {
 
         // Get location codes via raw SQL since Prisma types are stale
         const locationCodes = await prisma.$queryRaw<Array<{ id: string, pulseStoreCode: string | null }>>`
-            SELECT id, pulseStoreCode FROM Location
+            SELECT id, "pulseStoreCode" FROM "Location"
         `
         const codeMap = new Map(locationCodes.map(l => [l.id, l.pulseStoreCode]))
 
@@ -120,6 +122,7 @@ export async function GET(request: NextRequest) {
             config: f.config || {},
             integrations: parseIntegrations(f.integrations),
             createdAt: f.createdAt,
+            processingType: f.processingType || 'POS_AND_PROCESSING',
             documents: {
                 voidCheck: !!(f as { voidCheckUrl?: string }).voidCheckUrl,
                 driverLicense: !!(f as { driverLicenseUrl?: string }).driverLicenseUrl,

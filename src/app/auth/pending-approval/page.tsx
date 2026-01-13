@@ -12,6 +12,7 @@ export default function PendingApprovalPage() {
     const [status, setStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING')
     const [documents, setDocuments] = useState<{ voidCheck: boolean, dl: boolean, feinLetter: boolean }>({ voidCheck: false, dl: false, feinLetter: false })
     const [needToDiscuss, setNeedToDiscuss] = useState(false)
+    const [processingType, setProcessingType] = useState<string>('POS_AND_PROCESSING')
     const [uploading, setUploading] = useState<string | null>(null)
 
     useEffect(() => {
@@ -33,6 +34,7 @@ export default function PendingApprovalPage() {
                 setStatus(data.status)
                 setDocuments(data.documents || {})
                 setNeedToDiscuss(data.needToDiscussProcessing)
+                setProcessingType(data.processingType || 'POS_AND_PROCESSING')
 
                 if (data.status === 'APPROVED') {
                     // Use window.location.href to force full page reload and session refresh
@@ -81,6 +83,21 @@ export default function PendingApprovalPage() {
         }
     }
 
+    // Determine if all required documents are uploaded based on processingType
+    const isPosOnly = processingType === 'POS_ONLY'
+    const allDocsComplete = isPosOnly
+        ? documents.voidCheck
+        : documents.voidCheck && documents.dl && documents.feinLetter
+
+    // Build document list based on processingType
+    const requiredDocs = isPosOnly
+        ? [{ id: 'voidCheck', label: 'Voided Check', done: documents.voidCheck }]
+        : [
+            { id: 'voidCheck', label: 'Voided Check', done: documents.voidCheck },
+            { id: 'dl', label: "Driver's License", done: documents.dl },
+            { id: 'feinLetter', label: 'FEIN Letter', done: documents.feinLetter },
+        ]
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-stone-50">
@@ -92,7 +109,7 @@ export default function PendingApprovalPage() {
     return (
         <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-4">
             <div className="mb-8">
-                <img src="/oronext-logo.jpg" alt="OroNext" className="h-24 object-contain" />
+                <img src="/ORO9.png" alt="ORO 9" className="h-24 object-contain" />
             </div>
 
             <div className="bg-white rounded-2xl shadow-xl border border-stone-200 max-w-lg w-full overflow-hidden">
@@ -130,18 +147,14 @@ export default function PendingApprovalPage() {
 
                 {status === 'PENDING' && (
                     <div className="p-8 bg-stone-50/50">
-                        {!needToDiscuss && (!documents.voidCheck || !documents.dl || !documents.feinLetter) ? (
+                        {!needToDiscuss && !allDocsComplete ? (
                             <div className="space-y-4">
                                 <div className="flex items-center gap-3 p-4 bg-blue-50 text-blue-800 rounded-xl text-sm mb-6">
                                     <AlertCircle className="h-5 w-5 shrink-0" />
                                     <p>To speed up approval, please complete your document uploads.</p>
                                 </div>
 
-                                {[
-                                    { id: 'voidCheck', label: 'Voided Check', done: documents.voidCheck },
-                                    { id: 'dl', label: "Driver's License", done: documents.dl },
-                                    { id: 'feinLetter', label: 'FEIN Letter', done: documents.feinLetter },
-                                ].map(doc => (
+                                {requiredDocs.map(doc => (
                                     <div key={doc.id} className="flex items-center justify-between p-4 bg-white border border-stone-200 rounded-xl shadow-sm">
                                         <div className="flex items-center gap-3">
                                             <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${doc.done ? 'bg-emerald-100 text-emerald-600' : 'bg-stone-100 text-stone-400'}`}>

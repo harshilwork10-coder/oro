@@ -7,8 +7,10 @@ import {
     ArrowLeft,
     RefreshCw,
     Search,
-    User
+    User,
+    FileDown
 } from 'lucide-react'
+import jsPDF from 'jspdf'
 import Link from 'next/link'
 
 interface LoyaltyCustomer {
@@ -51,6 +53,56 @@ export default function LoyaltyPointsPage() {
 
     const totalPoints = customers.reduce((sum, c) => sum + c.pointsBalance, 0)
 
+    const exportCSV = () => {
+        const headers = ['Customer', 'Phone', 'Current Balance', 'Lifetime Points']
+        const csvContent = [
+            headers.join(','),
+            ...filtered.map(c => [
+                `"${c.name}"`,
+                `"${c.phone || ''}"`,
+                c.pointsBalance,
+                c.lifetimePoints
+            ].join(','))
+        ].join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `loyalty_points_${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+    }
+
+    const exportToPDF = () => {
+        const doc = new jsPDF()
+        let yPos = 20
+        doc.setFontSize(18)
+        doc.text('Loyalty Points Report', 20, yPos)
+        yPos += 10
+        doc.setFontSize(10)
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 20, yPos)
+        yPos += 10
+
+        const headers = ['Customer', 'Phone', 'Balance', 'Lifetime']
+        const xPos = [20, 80, 130, 170]
+        doc.setFont('helvetica', 'bold')
+        headers.forEach((h, i) => doc.text(h, xPos[i], yPos))
+        yPos += 7
+        doc.line(20, yPos - 5, 190, yPos - 5)
+
+        doc.setFont('helvetica', 'normal')
+        filtered.forEach(c => {
+            if (yPos > 270) { doc.addPage(); yPos = 20; }
+            doc.text(c.name.substring(0, 25), xPos[0], yPos)
+            doc.text(c.phone || '-', xPos[1], yPos)
+            doc.text(String(c.pointsBalance), xPos[2], yPos)
+            doc.text(String(c.lifetimePoints), xPos[3], yPos)
+            yPos += 7
+        })
+        doc.save(`loyalty_points_${new Date().toISOString().split('T')[0]}.pdf`)
+    }
+
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
@@ -69,10 +121,18 @@ export default function LoyaltyPointsPage() {
                         <p className="text-gray-400 mt-1">Customer points balances</p>
                     </div>
                 </div>
-                <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg">
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={exportToPDF} className="p-2 bg-red-600 hover:bg-red-500 rounded-lg text-white" title="Export PDF">
+                        <FileDown className="w-4 h-4" />
+                    </button>
+                    <button onClick={exportCSV} className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white" title="Export Excel">
+                        <FileDown className="w-4 h-4" />
+                    </button>
+                    <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg">
+                        <RefreshCw className="w-4 h-4" />
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {/* Search & Summary */}
@@ -124,4 +184,3 @@ export default function LoyaltyPointsPage() {
         </div>
     )
 }
-

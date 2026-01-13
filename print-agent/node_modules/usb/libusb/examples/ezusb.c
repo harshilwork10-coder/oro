@@ -20,9 +20,6 @@
  *    along with this program; if not, write to the Free Software
  *    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  */
-
-#include <config.h>
-
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -31,6 +28,9 @@
 
 #include "libusb.h"
 #include "ezusb.h"
+
+extern void logerror(const char *format, ...)
+	__attribute__ ((format(printf, 1, 2)));
 
 /*
  * This file contains functions for uploading firmware into Cypress
@@ -139,11 +139,7 @@ static int ezusb_write(libusb_device_handle *device, const char *label,
 		else
 			logerror("%s ==> %d\n", label, status);
 	}
-	if (status < 0) {
-		errno = EIO;
-		return -1;
-	}
-	return 0;
+	return (status < 0) ? -EIO : 0;
 }
 
 /*
@@ -166,11 +162,7 @@ static int ezusb_read(libusb_device_handle *device, const char *label,
 		else
 			logerror("%s ==> %d\n", label, status);
 	}
-	if (status < 0) {
-		errno = EIO;
-		return -1;
-	}
-	return 0;
+	return (status < 0) ? -EIO : 0;
 }
 
 /*
@@ -203,7 +195,7 @@ static bool ezusb_cpucs(libusb_device_handle *device, uint32_t addr, bool doRun)
 }
 
 /*
- * Send an FX3 jump to address command
+ * Send an FX3 jumpt to address command
  * Returns false on error.
  */
 static bool ezusb_fx3_jump(libusb_device_handle *device, uint32_t addr)
@@ -522,8 +514,7 @@ static int ram_poke(void *context, uint32_t addr, bool external,
 		if (external) {
 			logerror("can't write %u bytes external memory at 0x%08x\n",
 				(unsigned)len, addr);
-			errno = EINVAL;
-			return -1;
+			return -EINVAL;
 		}
 		break;
 	case skip_internal:		/* CPU must be running */
@@ -547,8 +538,7 @@ static int ram_poke(void *context, uint32_t addr, bool external,
 	case _undef:
 	default:
 		logerror("bug\n");
-		errno = EDOM;
-		return -1;
+		return -EDOM;
 	}
 
 	ctx->total += len;

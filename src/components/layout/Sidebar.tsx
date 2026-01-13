@@ -45,6 +45,7 @@ import {
 import clsx from 'clsx'
 import { hasPermission, Role } from '@/lib/permissions'
 import { useBusinessConfig } from '@/hooks/useBusinessConfig'
+import { useCompensationSettings } from '@/hooks/useCompensationSettings'
 import { Sparkles, Armchair, Ticket, Cigarette, Store, TrendingUp, Tag, Zap } from 'lucide-react'
 
 // Type for sidebar link
@@ -72,6 +73,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     const role = session?.user?.role
 
     const businessType = session?.user?.businessType
+
+    // Get compensation settings for employees (controls My Prices & Clock In/Out visibility)
+    const { settings: compSettings } = useCompensationSettings()
 
     // State for collapsed/expanded groups (Provider sidebar)
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Clients']))
@@ -145,11 +149,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     // BRAND FRANCHISOR: Sells franchises
     const brandFranchisorLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Franchisees', href: '/dashboard/franchisees', icon: Building2 },
+        { name: 'Franchisees', href: '/dashboard/brand/sub-franchisees', icon: Users },
         { name: 'Services Catalog', href: '/dashboard/services/catalog', icon: Briefcase },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText },
         { name: 'Compliance', href: '/dashboard/compliance', icon: Shield },
         { name: 'Documents', href: '/dashboard/documents', icon: FileText },
+        { name: 'Brand Settings', href: '/dashboard/brand/settings', icon: Settings },
     ]
 
 
@@ -263,6 +268,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         // Permission: canAddServices - Service management (service businesses)
         { name: 'Services', href: '/dashboard/services', icon: Briefcase, permission: 'canAddServices' as const, industry: ['SERVICE'] as const },
 
+        // My Services & Prices - For barbers to set their own prices (only if canSetOwnPrices)
+        { name: 'My Prices', href: '/my-services', icon: DollarSign, industry: ['SERVICE'] as const, compensationFlag: 'canSetOwnPrices' as const },
+
+        // Clock In/Out - For employees who need time tracking (only if requiresTimeClock)
+        { name: 'Clock In/Out', href: '/dashboard/timesheet', icon: Clock, compensationFlag: 'requiresTimeClock' as const },
+
         // Customer access - if they can view reports (usually means trusted employee)
         { name: 'Customers', href: '/dashboard/customers', icon: Users, permission: 'canViewReports' as const },
 
@@ -273,16 +284,21 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones, always: true },
     ]
 
-    // Filter employee links based on permissions AND industry type
+    // Filter employee links based on permissions, industry type, AND compensation settings
     const employeeLinks = employeeLinksBase.filter(link => {
         // Check industry-specific filter first
         if (link.industry && !(link.industry as readonly string[]).includes(industryType)) return false
+        // Check compensation flags (canSetOwnPrices, requiresTimeClock)
+        if (link.compensationFlag) {
+            const flagValue = compSettings?.[link.compensationFlag]
+            if (!flagValue) return false
+        }
         if (link.always) return true
         if (!link.permission) return true
         // Check if user has the specific permission
         const user = session?.user as any
         return user?.[link.permission] === true
-    }).map(({ always, permission, industry, ...link }) => link)
+    }).map(({ always, permission, industry, compensationFlag, ...link }) => link)
 
     // SUPPORT_STAFF: Support team members - only see support inbox
     const supportStaffLinks = [
@@ -324,7 +340,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <div className="flex h-20 xl:h-28 items-center justify-center border-b border-stone-800/50 px-4 bg-gradient-to-r from-stone-900/50 to-transparent">
                     <div className="flex items-center justify-center group">
                         <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
-                            <img src="/oronext-logo.jpg" alt="OroNext" className="h-12 xl:h-16 object-contain" />
+                            <img src="/ORO9.png" alt="ORO 9" className="h-12 xl:h-16 object-contain" />
                         </div>
                     </div>
                     <button
@@ -494,14 +510,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                         </div>
                     </div>
 
-                    {/* OroNext Pulse App - For Owners/Managers */}
+                    {/* ORO 9 Pulse App - For Owners/Managers */}
                     {(role === 'FRANCHISOR' || role === 'FRANCHISEE' || role === 'MANAGER') && (
                         <Link
                             href="/pulse"
                             className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 px-3 py-2 mb-2 text-xs xl:text-sm font-medium text-orange-300 hover:from-orange-500/20 hover:to-amber-500/20 hover:text-orange-200 transition-all duration-200 group"
                         >
                             <Zap className="h-4 w-4 text-orange-400" />
-                            <span>OroNext Pulse</span>
+                            <span>ORO 9 Pulse</span>
                             <span className="text-[9px] bg-orange-500/30 px-1.5 py-0.5 rounded text-orange-200">App</span>
                         </Link>
                     )}

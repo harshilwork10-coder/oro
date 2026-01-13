@@ -1,59 +1,78 @@
 @echo off
-title Oro Print Agent Installer
-color 0A
+REM ========================================
+REM ORO Print Agent - Installation Script
+REM ========================================
+REM 
+REM IMPORTANT: Before running this script, you must:
+REM 1. Download Zadig from https://zadig.akeo.ie/
+REM 2. Run Zadig as Administrator
+REM 3. Options -> List All Devices
+REM 4. Select your thermal printer
+REM 5. Select WinUSB driver and click Replace Driver
+REM
+REM ========================================
 
+echo.
 echo ========================================
-echo    ORO PRINT AGENT INSTALLER
+echo    ORO Print Agent Installer
 echo ========================================
 echo.
 
-:: Check for admin rights
+REM Check for admin rights
 net session >nul 2>&1
-if %errorLevel% NEQ 0 (
-    echo ERROR: Please run as Administrator
-    echo Right-click this file and select "Run as administrator"
+if %errorLevel% neq 0 (
+    echo ERROR: This script requires Administrator privileges.
+    echo Right-click and select "Run as administrator"
     pause
     exit /b 1
 )
 
-:: Create installation directory
-set INSTALL_DIR=C:\OroPos\PrintAgent
-echo Creating installation folder: %INSTALL_DIR%
-if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
+echo [1/5] Creating installation directory...
+if not exist "C:\OroPos\PrintAgent" mkdir "C:\OroPos\PrintAgent"
 
-:: Copy files
-echo Copying print agent...
-copy /Y "print-agent.exe" "%INSTALL_DIR%\print-agent.exe"
+echo [2/5] Copying files...
+copy /Y "%~dp0print-agent.exe" "C:\OroPos\PrintAgent\print-agent.exe" >nul 2>&1
+if %errorLevel% neq 0 (
+    echo ERROR: Could not copy print-agent.exe
+    echo Make sure print-agent.exe is in the same folder as this script.
+    pause
+    exit /b 1
+)
 
-:: Create startup shortcut
-echo Adding to Windows Startup...
+echo [3/5] Adding to Windows Startup...
 set STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
-echo Set oWS = WScript.CreateObject("WScript.Shell") > CreateShortcut.vbs
-echo sLinkFile = "%STARTUP%\OroAgent.lnk" >> CreateShortcut.vbs
-echo Set oLink = oWS.CreateShortcut(sLinkFile) >> CreateShortcut.vbs
-echo oLink.TargetPath = "%INSTALL_DIR%\print-agent.exe" >> CreateShortcut.vbs
-echo oLink.WorkingDirectory = "%INSTALL_DIR%" >> CreateShortcut.vbs
-echo oLink.Description = "Oro POS Print Agent" >> CreateShortcut.vbs
-echo oLink.Save >> CreateShortcut.vbs
-cscript CreateShortcut.vbs
-del CreateShortcut.vbs
+echo Set WshShell = WScript.CreateObject("WScript.Shell") > "%TEMP%\shortcut.vbs"
+echo Set oShellLink = WshShell.CreateShortcut("%STARTUP%\OroPos PrintAgent.lnk") >> "%TEMP%\shortcut.vbs"
+echo oShellLink.TargetPath = "C:\OroPos\PrintAgent\print-agent.exe" >> "%TEMP%\shortcut.vbs"
+echo oShellLink.WorkingDirectory = "C:\OroPos\PrintAgent" >> "%TEMP%\shortcut.vbs"
+echo oShellLink.Save >> "%TEMP%\shortcut.vbs"
+cscript //nologo "%TEMP%\shortcut.vbs"
+del "%TEMP%\shortcut.vbs"
 
-:: Create firewall rule
-echo Adding firewall rule for port 9100...
-netsh advfirewall firewall add rule name="Oro Print Agent" dir=in action=allow protocol=TCP localport=9100 >nul 2>&1
+echo [4/5] Configuring Windows Firewall...
+netsh advfirewall firewall delete rule name="ORO Print Agent" >nul 2>&1
+netsh advfirewall firewall add rule name="ORO Print Agent" dir=in action=allow protocol=TCP localport=9100 >nul 2>&1
 
-:: Start the agent now
-echo Starting Print Agent...
-start "" "%INSTALL_DIR%\print-agent.exe"
+echo [5/5] Starting Print Agent...
+start "" "C:\OroPos\PrintAgent\print-agent.exe"
 
 echo.
 echo ========================================
-echo    INSTALLATION COMPLETE!
+echo    Installation Complete!
 echo ========================================
 echo.
-echo Print Agent installed to: %INSTALL_DIR%
-echo It will start automatically on Windows boot.
+echo Print Agent is now running on: http://localhost:9100
 echo.
-echo Open http://localhost:9100/status to verify.
+echo NEXT STEPS:
+echo -----------
+echo If you haven't already:
+echo 1. Download Zadig from https://zadig.akeo.ie/
+echo 2. Run Zadig as Administrator
+echo 3. Options -^> List All Devices
+echo 4. Select your thermal printer (e.g., BIXOLON SRP-350plusIII)
+echo 5. Select WinUSB driver and click "Replace Driver"
+echo 6. Restart this computer
+echo.
+echo The Print Agent will start automatically on next boot.
 echo.
 pause

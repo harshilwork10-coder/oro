@@ -6,21 +6,15 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
 
-    console.log('[API_MENU_DEBUG] Session User:', JSON.stringify(session?.user, null, 2))
-
     if (!session?.user) {
-        console.log('[API_MENU_DEBUG] No session user found')
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const franchiseId = session.user.franchiseId
 
     if (!franchiseId) {
-        console.log('[API_MENU_DEBUG] No franchiseId found')
         return NextResponse.json({ error: 'No franchise associated' }, { status: 403 })
     }
-
-    console.log('[API_MENU_DEBUG] Using Franchise ID:', franchiseId)
 
     try {
         // Fetch real services from database
@@ -89,12 +83,6 @@ export async function GET(req: Request) {
             category: product.category || 'PRODUCTS',
             franchiseId: product.franchiseId
         }))
-
-        console.log('[API_MENU_DEBUG] Returning:', {
-            servicesCount: servicesFormatted.length,
-            productsCount: productsFormatted.length,
-            discountsCount: discounts.length
-        })
 
         return NextResponse.json({
             services: servicesFormatted,

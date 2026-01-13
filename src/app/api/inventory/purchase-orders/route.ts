@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
                 franchiseId: session.user.franchiseId,
                 supplierId,
                 locationId,
-                status: status || 'DRAFT',
+                status: (status === 'RECEIVED' ? 'DRAFT' : status) || 'DRAFT', // SECURITY: Prevent "RECEIVED" on create to ensure stock logic triggers via PUT
                 totalCost,
                 expectedDate: expectedDate ? new Date(expectedDate) : null,
                 items: {

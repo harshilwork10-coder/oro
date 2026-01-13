@@ -64,7 +64,6 @@ export async function POST(req: Request) {
         )
 
         if (!result.valid) {
-            console.log(`[MFA Verify] Failed attempt for user ${userId}`)
             return NextResponse.json(
                 { error: 'Invalid MFA code' },
                 { status: 401 }
@@ -78,7 +77,6 @@ export async function POST(req: Request) {
                 where: { id: userId },
                 data: { mfaBackupCodes: updatedBackupCodes }
             })
-            console.log(`[MFA Verify] Backup code used for user ${userId}`)
         }
 
         return NextResponse.json({

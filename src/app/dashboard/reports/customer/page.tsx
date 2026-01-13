@@ -19,7 +19,7 @@ const customerReports = [
         name: 'Customer List',
         description: 'All registered customers with contact info',
         icon: Users,
-        href: '/dashboard/clients',
+        href: '/dashboard/reports/customer/list',
         status: 'available'
     },
     {
@@ -44,6 +44,14 @@ const customerReports = [
         description: 'Customers with open balances and house accounts',
         icon: DollarSign,
         href: '/dashboard/reports/customer/ar-summary',
+        status: 'available'
+    },
+    {
+        id: 'retention',
+        name: 'Client Retention',
+        description: 'Track returning clients and rebooking rates',
+        icon: TrendingUp,
+        href: '/dashboard/reports/customer/retention',
         status: 'available'
     }
 ]

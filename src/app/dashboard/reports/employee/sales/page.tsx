@@ -8,9 +8,12 @@ import {
     Calendar,
     RefreshCw,
     User,
-    TrendingUp
+    TrendingUp,
+    FileDown
 } from 'lucide-react'
 import Link from 'next/link'
+import jsPDF from 'jspdf'
+import { WithReportPermission } from '@/components/reports/WithReportPermission'
 
 interface EmployeeSales {
     id: string
@@ -20,7 +23,7 @@ interface EmployeeSales {
     averageTicket: number
 }
 
-export default function SalesByEmployeePage() {
+function SalesByEmployeeContent() {
     const { data: session } = useSession()
     const [loading, setLoading] = useState(true)
     const [employees, setEmployees] = useState<EmployeeSales[]>([])
@@ -53,6 +56,56 @@ export default function SalesByEmployeePage() {
     const totalRevenue = employees.reduce((sum, e) => sum + e.revenue, 0)
     const totalTransactions = employees.reduce((sum, e) => sum + e.transactionCount, 0)
 
+    const exportCSV = () => {
+        const headers = ['Employee', 'Transactions', 'Revenue', 'Avg Ticket']
+        const csvContent = [
+            headers.join(','),
+            ...employees.map(e => [
+                `"${e.name}"`,
+                e.transactionCount,
+                e.revenue.toFixed(2),
+                e.averageTicket.toFixed(2)
+            ].join(','))
+        ].join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `sales_by_employee_${startDate}_${endDate}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+    }
+
+    const exportToPDF = () => {
+        const doc = new jsPDF()
+        let yPos = 20
+        doc.setFontSize(18)
+        doc.text('Sales by Employee Report', 20, yPos)
+        yPos += 10
+        doc.setFontSize(10)
+        doc.text(`Period: ${startDate} to ${endDate}`, 20, yPos)
+        yPos += 10
+
+        const headers = ['Employee', 'Txns', 'Revenue', 'Avg Ticket']
+        const xPos = [20, 80, 110, 150]
+        doc.setFont('helvetica', 'bold')
+        headers.forEach((h, i) => doc.text(h, xPos[i], yPos))
+        yPos += 7
+        doc.line(20, yPos - 5, 190, yPos - 5)
+
+        doc.setFont('helvetica', 'normal')
+        employees.forEach(e => {
+            if (yPos > 270) { doc.addPage(); yPos = 20; }
+            doc.text(e.name.substring(0, 25), xPos[0], yPos)
+            doc.text(String(e.transactionCount), xPos[1], yPos)
+            doc.text(`$${e.revenue.toFixed(2)}`, xPos[2], yPos)
+            doc.text(`$${e.averageTicket.toFixed(2)}`, xPos[3], yPos)
+            yPos += 7
+        })
+        doc.save(`sales_by_employee_${startDate}_${endDate}.pdf`)
+    }
+
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
@@ -71,10 +124,18 @@ export default function SalesByEmployeePage() {
                         <p className="text-gray-400 mt-1">Revenue and transactions per employee</p>
                     </div>
                 </div>
-                <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg">
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={exportToPDF} className="p-2 bg-red-600 hover:bg-red-500 rounded-lg text-white" title="Export PDF">
+                        <FileDown className="w-4 h-4" />
+                    </button>
+                    <button onClick={exportCSV} className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white" title="Export Excel">
+                        <FileDown className="w-4 h-4" />
+                    </button>
+                    <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg">
+                        <RefreshCw className="w-4 h-4" />
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {/* Date Filter */}
@@ -142,3 +203,10 @@ export default function SalesByEmployeePage() {
     )
 }
 
+export default function SalesByEmployeePage() {
+    return (
+        <WithReportPermission reportType="financial">
+            <SalesByEmployeeContent />
+        </WithReportPermission>
+    )
+}

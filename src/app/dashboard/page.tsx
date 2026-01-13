@@ -24,7 +24,7 @@ import TodayAppointments from "@/components/dashboard/employee/TodayAppointments
 import UpcomingAppointments from "@/components/dashboard/employee/UpcomingAppointments"
 import EmployeePerformanceStats from "@/components/dashboard/employee/EmployeePerformanceStats"
 import NextClientSpotlight from "@/components/dashboard/employee/NextClientSpotlight"
-import AIInsightsCard from "@/components/dashboard/AIInsightsCard"
+// import AIInsightsCard from "@/components/dashboard/AIInsightsCard" // Temporarily disabled
 import { useState, useEffect } from "react"
 
 type DashboardStats = {
@@ -87,150 +87,18 @@ export default function DashboardPage() {
 
     const role = session?.user?.role
 
-    // Provider Dashboard
+    // Provider Dashboard - redirect to provider portal
     if (role === 'PROVIDER') {
-        return (
-            <div className="p-4 md:p-8 space-y-6 md:space-y-8">
-                {/* Header */}
-                <div>
-                    <h1 className="text-3xl font-bold text-stone-100">
-                        Welcome back, System Provider! 👋
-                    </h1>
-                    <p className="text-stone-400 mt-2">Here's what's happening with your business today.</p>
-                </div>
-
-                {/* Statistics Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {/* Total Franchises */}
-                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-stone-400">Total Franchisors</p>
-                                <p className="text-3xl font-bold text-stone-100 mt-2">
-                                    {loading ? '...' : stats?.totalFranchisors || 0}
-                                </p>
-                                <p className="text-sm text-stone-500 mt-2">
-                                    Clients in system
-                                </p>
-                            </div>
-                            <div className="h-14 w-14 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-orange-900/20">
-                                <Building2 className="h-7 w-7 text-white" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Total Locations */}
-                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-stone-400">Total Locations</p>
-                                <p className="text-3xl font-bold text-stone-100 mt-2">
-                                    {loading ? '...' : stats?.totalLocations || 0}
-                                </p>
-                                <p className="text-sm text-stone-500 mt-2">
-                                    Across all franchises
-                                </p>
-                            </div>
-                            <div className="h-14 w-14 bg-gradient-to-br from-stone-700 to-stone-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-stone-900/20">
-                                <MapPin className="h-7 w-7 text-white" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Total Employees */}
-                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-stone-400">Total Employees</p>
-                                <p className="text-3xl font-bold text-stone-100 mt-2">
-                                    {loading ? '...' : stats?.totalEmployees || 0}
-                                </p>
-                                <p className="text-sm text-stone-500 mt-2">
-                                    Active staff
-                                </p>
-                            </div>
-                            <div className="h-14 w-14 bg-gradient-to-br from-stone-700 to-stone-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-stone-900/20">
-                                <Users className="h-7 w-7 text-white" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Monthly Revenue */}
-                    <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-stone-400">Monthly Revenue</p>
-                                <p className="text-3xl font-bold text-stone-100 mt-2">
-                                    ${loading ? '...' : (stats?.monthlyRevenue ? `${(stats.monthlyRevenue / 1000).toFixed(0)}K` : '0')}
-                                </p>
-                                <p className="text-sm text-stone-500 mt-2">
-                                    Last 30 days
-                                </p>
-                            </div>
-                            <div className="h-14 w-14 bg-gradient-to-br from-emerald-600 to-teal-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-emerald-900/20">
-                                <DollarSign className="h-7 w-7 text-white" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Recent Activity & Action Items */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Recent Activity */}
-                    <div className="glass-panel p-6 rounded-2xl">
-                        <h2 className="text-xl font-bold text-stone-100 mb-6">Recent Activity</h2>
-                        {loading ? (
-                            <div className="flex items-center justify-center py-12">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-                            </div>
-                        ) : stats?.recentActivity && stats.recentActivity.length > 0 ? (
-                            <div className="space-y-4">
-                                {stats.recentActivity.slice(0, 3).map((activity) => (
-                                    <div key={activity.id} className="p-4 bg-stone-800/50 rounded-xl border border-stone-700 hover:border-orange-500/30 transition-all">
-                                        <div className="flex items-start gap-4">
-                                            <div className="h-12 w-12 bg-orange-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                                                <Building2 className="h-6 w-6 text-orange-500" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-base font-semibold text-stone-200 mb-1">{activity.title}</p>
-                                                <p className="text-sm text-stone-400">{activity.description}</p>
-                                                <p className="text-xs text-stone-500 mt-2">
-                                                    {new Date(activity.timestamp).toLocaleDateString()}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <div className="h-16 w-16 bg-stone-800/50 rounded-full flex items-center justify-center mb-4">
-                                    <Building2 className="h-8 w-8 text-stone-600" />
-                                </div>
-                                <p className="text-stone-400 font-medium">No recent activity</p>
-                                <p className="text-stone-600 text-sm mt-1">Activity will appear here when you add clients</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Action Items */}
-                    <div className="glass-panel p-6 rounded-2xl">
-                        <h2 className="text-xl font-bold text-stone-100 mb-6">Action Items</h2>
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="h-16 w-16 bg-stone-800/50 rounded-full flex items-center justify-center mb-4">
-                                <AlertCircle className="h-8 w-8 text-stone-600" />
-                            </div>
-                            <p className="text-stone-400 font-medium">No action items</p>
-                            <p className="text-stone-600 text-sm mt-1">You're all caught up!</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        )
+        redirect('/provider/home')
     }
 
     // Get businessType from session for FRANCHISOR users
     const businessType = (session?.user as any)?.businessType
+
+    // Brand Franchisor Dashboard (sells franchises)
+    if (role === 'FRANCHISOR' && businessType === 'BRAND_FRANCHISOR') {
+        redirect('/dashboard/brand')
+    }
 
     // Multi-Location Owner Dashboard (owns their own stores)
     if (role === 'FRANCHISOR' && businessType === 'MULTI_LOCATION_OWNER') {
@@ -362,8 +230,8 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* AI Insights */}
-                <AIInsightsCard />
+                {/* AI Insights - Temporarily disabled */}
+                {/* <AIInsightsCard /> */}
             </div>
         )
     }

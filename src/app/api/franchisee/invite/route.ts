@@ -91,9 +91,7 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        // TODO: Send actual invitation email
-        console.log(`[Email Mock] Invitation sent to ${email}`)
-        console.log(`[Email Mock] Temporary password: ${tempPassword}`)
+        // In production: Send invitation email with temporary password
 
         return NextResponse.json({
             success: true,

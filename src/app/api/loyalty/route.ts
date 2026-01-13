@@ -53,7 +53,7 @@ export async function POST(req: Request) {
             }
         })
 
-        console.log(`✅ Loyalty program ${loyaltyProgram.isEnabled ? 'enabled' : 'disabled'} for franchise`)
+        // Debug log removed
 
         return NextResponse.json(loyaltyProgram)
     } catch (error) {

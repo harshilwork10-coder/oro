@@ -32,7 +32,7 @@ export default function GiftCardsPage() {
         recipientEmail: ''
     })
 
-    const franchiseId = 'your-franchise-id' // TODO: Get from session/context
+    const franchiseId = 'your-franchise-id' // Replace with session.user.franchiseId
 
     useEffect(() => {
         if (status === 'authenticated') {

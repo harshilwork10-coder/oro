@@ -98,7 +98,7 @@ async function lookupUPC(upc: string): Promise<any | null> {
         })
 
         if (!res.ok) {
-            console.log(`UPC lookup failed for ${cleanUpc}: ${res.status}`)
+            // Debug log removed
             return null
         }
 

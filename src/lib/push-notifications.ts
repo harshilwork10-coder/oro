@@ -4,7 +4,7 @@ import webpush from 'web-push'
 // These should be generated once and stored as environment variables
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || ''
-const vapidEmail = process.env.VAPID_EMAIL || 'mailto:admin@oronext.com'
+const vapidEmail = process.env.VAPID_EMAIL || 'mailto:admin@ORO 9.com'
 
 // Configure web-push
 if (vapidPublicKey && vapidPrivateKey) {
@@ -50,7 +50,6 @@ export async function sendPushNotification(
     data?: Record<string, any>
 ) {
     if (!vapidPublicKey || !vapidPrivateKey) {
-        console.warn('[Push] VAPID keys not configured - skipping notification')
         return false
     }
 
@@ -66,14 +65,9 @@ export async function sendPushNotification(
 
     try {
         await webpush.sendNotification(subscription, payload)
-        console.log(`[Push] Sent ${type} notification`)
         return true
     } catch (error: any) {
         console.error('[Push] Failed to send:', error?.message)
-        // If subscription is invalid, we should remove it from DB
-        if (error?.statusCode === 410 || error?.statusCode === 404) {
-            console.log('[Push] Subscription expired - should remove from DB')
-        }
         return false
     }
 }
@@ -95,7 +89,6 @@ export async function notifyUser(
     })
 
     if (subscriptions.length === 0) {
-        console.log(`[Push] No subscriptions for user ${userId}`)
         return 0
     }
 
@@ -135,7 +128,6 @@ export async function notifyFranchiseOwners(
     })
 
     if (!franchise?.franchisor?.owner) {
-        console.log(`[Push] No owner found for franchise ${franchiseId}`)
         return 0
     }
 

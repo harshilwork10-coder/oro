@@ -13,6 +13,11 @@ export async function GET(request: NextRequest) {
 
         const user = session.user as any
 
+        // PROVIDER role doesn't have franchiseId - return empty for now
+        if (!user.franchiseId || user.role === 'PROVIDER') {
+            return NextResponse.json([])
+        }
+
         const conversations = await prisma.chatConversation.findMany({
             where: {
                 franchiseId: user.franchiseId

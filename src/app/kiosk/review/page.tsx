@@ -31,7 +31,7 @@ export default function KioskReviewPage() {
     }
 
     const handleDone = () => {
-        // TODO: Submit review to backend
+        // Review submission pending
 
         if (rating === 5) {
             // Redirect to Google Reviews (Placeholder URL)

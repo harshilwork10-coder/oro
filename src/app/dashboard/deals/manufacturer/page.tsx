@@ -63,7 +63,7 @@ export default function ManufacturerDealsPage() {
             } else {
                 const res = await fetch(`/api/reports/manufacturer-rebate?${params}`)
                 const data = await res.json()
-                console.log('Report:', data)
+                // Report data received
                 alert(`Report generated: ${data.data?.length || 0} rows, Total Rebate: $${data.totals?.totalRebate || 0}`)
             }
         } catch (error) {

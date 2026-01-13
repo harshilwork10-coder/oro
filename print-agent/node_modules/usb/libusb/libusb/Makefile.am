@@ -1,98 +1,101 @@
-AUTOMAKE_OPTIONS = subdir-objects
+all: libusb-1.0.la libusb-1.0.dll
 
-AM_CFLAGS += -fvisibility=hidden $(THREAD_CFLAGS)
-AM_CXXFLAGS += -fvisibility=hidden $(THREAD_CFLAGS)
+AUTOMAKE_OPTIONS = subdir-objects
 
 lib_LTLIBRARIES = libusb-1.0.la
 
-POSIX_PLATFORM_SRC = os/events_posix.h os/events_posix.c \
-		     os/threads_posix.h os/threads_posix.c
-WINDOWS_PLATFORM_SRC = os/events_windows.h os/events_windows.c \
-		       os/threads_windows.h os/threads_windows.c
+POSIX_POLL_SRC = os/poll_posix.h os/poll_posix.c
+POSIX_THREADS_SRC = os/threads_posix.h os/threads_posix.c
+WINDOWS_POLL_SRC = os/poll_windows.h os/poll_windows.c
+WINDOWS_THREADS_SRC = os/threads_windows.h os/threads_windows.c
+LINUX_USBFS_SRC = os/linux_usbfs.h os/linux_usbfs.c
+DARWIN_USB_SRC = os/darwin_usb.h os/darwin_usb.c
+OPENBSD_USB_SRC = os/openbsd_usb.c
+NETBSD_USB_SRC = os/netbsd_usb.c
+SUNOS_USB_SRC = os/sunos_usb.c os/sunos_usb.h
+WINDOWS_USB_SRC = libusb-1.0.def libusb-1.0.rc \
+		os/windows_common.h \
+		os/windows_nt_common.h os/windows_nt_common.c \
+		os/windows_nt_shared_types.h \
+		os/windows_usbdk.h os/windows_usbdk.c \
+		os/windows_winusb.h os/windows_winusb.c
+WINCE_USB_SRC = os/wince_usb.h os/wince_usb.c
+HAIKU_USB_SRC = os/haiku_usb.h os/haiku_usb_backend.cpp \
+		os/haiku_usb_raw.h os/haiku_usb_raw.cpp os/haiku_pollfs.cpp
 
-if PLATFORM_POSIX
-PLATFORM_SRC = $(POSIX_PLATFORM_SRC)
-else
-PLATFORM_SRC = $(WINDOWS_PLATFORM_SRC)
-endif
-
-OS_DARWIN_SRC = os/darwin_usb.h os/darwin_usb.c
-OS_HAIKU_SRC = os/haiku_usb.h os/haiku_usb_backend.cpp \
-	       os/haiku_pollfs.cpp os/haiku_usb_raw.h os/haiku_usb_raw.cpp
-OS_LINUX_SRC = os/linux_usbfs.h os/linux_usbfs.c
-OS_EMSCRIPTEN_SRC = os/emscripten_webusb.cpp
-OS_NETBSD_SRC = os/netbsd_usb.c
-OS_NULL_SRC = os/null_usb.c
-OS_OPENBSD_SRC = os/openbsd_usb.c
-OS_SUNOS_SRC = os/sunos_usb.h os/sunos_usb.c
-OS_WINDOWS_SRC = libusb-1.0.def libusb-1.0.rc \
-		 os/windows_common.h os/windows_common.c \
-		 os/windows_usbdk.h os/windows_usbdk.c \
-		 os/windows_winusb.h os/windows_winusb.c
-
-if OS_DARWIN
-OS_SRC = $(OS_DARWIN_SRC)
-endif
-
-noinst_LTLIBRARIES =
-
-if OS_HAIKU
-noinst_LTLIBRARIES += libusb_haiku.la
-libusb_haiku_la_SOURCES = $(OS_HAIKU_SRC)
-libusb_1_0_la_LIBADD = libusb_haiku.la
-endif
+EXTRA_DIST = $(POSIX_POLL_SRC) $(POSIX_THREADS_SRC) \
+	$(WINDOWS_POLL_SRC) $(WINDOWS_THREADS_SRC) \
+	$(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) \
+	$(OPENBSD_USB_SRC) $(NETBSD_USB_SRC) \
+	$(WINDOWS_USB_SRC) $(WINCE_USB_SRC) \
+	$(HAIKU_USB_SRC) \
+	os/linux_udev.c os/linux_netlink.c
 
 if OS_LINUX
-OS_SRC = $(OS_LINUX_SRC)
+
 if USE_UDEV
-OS_SRC += os/linux_udev.c
+OS_SRC = $(LINUX_USBFS_SRC) os/linux_udev.c
 else
-OS_SRC += os/linux_netlink.c
-endif
-endif
-
-if OS_EMSCRIPTEN
-noinst_LTLIBRARIES += libusb_emscripten.la
-libusb_emscripten_la_SOURCES = $(OS_EMSCRIPTEN_SRC)
-AM_CXXFLAGS += -std=c++20
-libusb_1_0_la_LIBADD = libusb_emscripten.la
+OS_SRC = $(LINUX_USBFS_SRC) os/linux_netlink.c
 endif
 
-if OS_NETBSD
-OS_SRC = $(OS_NETBSD_SRC)
 endif
 
-if OS_NULL
-OS_SRC = $(OS_NULL_SRC)
+if OS_DARWIN
+OS_SRC = $(DARWIN_USB_SRC)
+AM_CFLAGS_EXT = -no-cpp-precomp
 endif
 
 if OS_OPENBSD
-OS_SRC = $(OS_OPENBSD_SRC)
+OS_SRC = $(OPENBSD_USB_SRC)
+endif
+
+if OS_NETBSD
+OS_SRC = $(NETBSD_USB_SRC)
 endif
 
 if OS_SUNOS
-OS_SRC = $(OS_SUNOS_SRC)
+OS_SRC = $(SUNOS_USB_SRC)
+endif
+
+if OS_HAIKU
+noinst_LTLIBRARIES = libusb_haiku.la
+libusb_haiku_la_SOURCES = $(HAIKU_USB_SRC)
+libusb_1_0_la_LIBADD = libusb_haiku.la
 endif
 
 if OS_WINDOWS
-OS_SRC = $(OS_WINDOWS_SRC)
+OS_SRC = $(WINDOWS_USB_SRC)
 
-include Makefile.am.extra
+.rc.lo:
+	$(AM_V_GEN)$(LIBTOOL) $(AM_V_lt) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --tag=RC --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
 
-# Dependencies for compiling libusb-1.0.lo from libusb-1.0.rc
--include ./$(DEPDIR)/libusb-1.0.Plo
+libusb-1.0.rc: version.h version_nano.h
+endif
 
+libusb-1.0.dll: libusb-1.0.def libusb-1.0.la
 if CREATE_IMPORT_LIB
-all-local: .libs/libusb-1.0.dll.a
 # Rebuild the import lib from the .def so that MS and MinGW DLLs can be interchanged
-.libs/libusb-1.0.dll.a: libusb-1.0.def libusb-1.0.la
-	$(AM_V_DLLTOOL)$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def $< --dllname libusb-1.0.dll --output-lib $@
-endif
+	$(AM_V_GEN)$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def $(srcdir)/libusb-1.0.def --dllname $@ --output-lib .libs/$@.a
 endif
 
-libusb_1_0_la_LDFLAGS = $(LT_LDFLAGS) $(EXTRA_LDFLAGS)
-libusb_1_0_la_SOURCES = libusbi.h version.h version_nano.h \
-	core.c descriptor.c hotplug.c io.c strerror.c sync.c \
-	$(PLATFORM_SRC) $(OS_SRC)
+if OS_WINDOWS
+POLL_SRC = $(WINDOWS_POLL_SRC)
+else
+POLL_SRC = $(POSIX_POLL_SRC)
+endif
 
-pkginclude_HEADERS = libusb.h
+if THREADS_POSIX
+THREADS_SRC = $(POSIX_THREADS_SRC)
+else
+THREADS_SRC = $(WINDOWS_THREADS_SRC)
+endif
+
+libusb_1_0_la_CFLAGS = $(AM_CFLAGS)
+libusb_1_0_la_LDFLAGS = $(LTLDFLAGS)
+libusb_1_0_la_SOURCES = libusbi.h libusb.h version.h version_nano.h \
+	core.c descriptor.c hotplug.h hotplug.c io.c strerror.c sync.c \
+	$(POLL_SRC) $(THREADS_SRC) $(OS_SRC)
+
+hdrdir = $(includedir)/libusb-1.0
+hdr_HEADERS = libusb.h

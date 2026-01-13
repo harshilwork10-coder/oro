@@ -17,10 +17,22 @@ export async function GET(
         // SECURITY: Get user's franchiseId
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: { franchiseId: true }
+            select: { id: true, role: true, franchiseId: true }
         })
 
-        if (!user?.franchiseId) {
+        let franchiseId = user?.franchiseId
+
+        if (user?.role === 'FRANCHISOR' && !franchiseId) {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: user.id },
+                include: { franchises: { take: 1, select: { id: true } } }
+            })
+            if (franchisor?.franchises[0]) {
+                franchiseId = franchisor.franchises[0].id
+            }
+        }
+
+        if (!franchiseId) {
             return NextResponse.json({ error: 'No franchise assigned' }, { status: 403 })
         }
 
@@ -49,8 +61,8 @@ export async function GET(
         }
 
         // SECURITY: Verify client belongs to user's franchise
-        if (client.franchiseId !== user.franchiseId) {
-            console.warn(`[SECURITY] IDOR attempt: User ${session.user.id} tried to access client ${params.id}`)
+        if (client.franchiseId !== franchiseId) {
+            console.error(`[SECURITY] IDOR attempt: User ${session.user.id} tried to access client ${params.id}`)
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
@@ -96,10 +108,22 @@ export async function POST(
         // SECURITY: Get user's franchiseId
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: { franchiseId: true }
+            select: { id: true, role: true, franchiseId: true }
         })
 
-        if (!user?.franchiseId) {
+        let franchiseId = user?.franchiseId
+
+        if (user?.role === 'FRANCHISOR' && !franchiseId) {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: user.id },
+                include: { franchises: { take: 1, select: { id: true } } }
+            })
+            if (franchisor?.franchises[0]) {
+                franchiseId = franchisor.franchises[0].id
+            }
+        }
+
+        if (!franchiseId) {
             return NextResponse.json({ error: 'No franchise assigned' }, { status: 403 })
         }
 
@@ -129,8 +153,8 @@ export async function POST(
         }
 
         // SECURITY: Verify client belongs to user's franchise
-        if (client.franchiseId !== user.franchiseId) {
-            console.warn(`[SECURITY] IDOR attempt: User ${session.user.id} tried to modify client ${params.id}`)
+        if (client.franchiseId !== franchiseId) {
+            console.error(`[SECURITY] IDOR attempt: User ${session.user.id} tried to modify client ${params.id}`)
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 

@@ -183,7 +183,7 @@ export async function recordFailedLogin(email: string): Promise<LoginAttemptResu
         })
 
         if (shouldLock) {
-            console.log(`[SECURITY] Account locked: ${email} after ${newAttempts} failed attempts`)
+            console.error(`[SECURITY] Account locked: ${email} after ${newAttempts} failed attempts`)
             return {
                 allowed: false,
                 lockedUntil: lockoutUntil!,

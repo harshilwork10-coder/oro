@@ -3,6 +3,16 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// Helper to parse integrations JSON string
+function parseIntegrations(integrationsStr: string | null): Record<string, boolean> {
+    if (!integrationsStr) return {}
+    try {
+        return JSON.parse(integrationsStr)
+    } catch {
+        return {}
+    }
+}
+
 // Helper to check permissions
 async function checkPermission() {
     const session = await getServerSession(authOptions)
@@ -10,6 +20,92 @@ async function checkPermission() {
         return null
     }
     return session
+}
+
+// GET: Fetch Single Franchisor Details
+export async function GET(
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const session = await checkPermission()
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+
+    try {
+        const { id } = await params
+
+        const franchisor = await prisma.franchisor.findUnique({
+            where: { id },
+            include: {
+                owner: {
+                    select: { id: true, name: true, email: true }
+                },
+                franchises: {
+                    include: {
+                        locations: {
+                            include: { stations: true }
+                        },
+                        users: { select: { id: true } }
+                    }
+                },
+                config: true
+            }
+        })
+
+        if (!franchisor) {
+            return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+        }
+
+        // Get location codes via raw SQL (matching list route logic)
+        const locationCodes = await prisma.$queryRaw<Array<{ id: string, pulseStoreCode: string | null }>>`
+            SELECT id, "pulseStoreCode" FROM "Location"
+        `
+        const codeMap = new Map(locationCodes.map(l => [l.id, l.pulseStoreCode]))
+
+        // Transform data
+        const f = franchisor as any
+        const transformedData = {
+            id: f.id,
+            name: f.name,
+            businessName: f.name || f.businessType,
+            status: f.approvalStatus,
+            accountStatus: f.accountStatus,
+            approvalStatus: f.approvalStatus,
+            businessType: f.businessType,
+            owner: f.owner,
+            franchises: (f.franchises || []).map((fr: any) => ({
+                id: fr.id,
+                name: fr.name,
+                locations: (fr.locations || []).map((loc: any) => ({
+                    id: loc.id,
+                    name: loc.name,
+                    slug: loc.slug,
+                    address: loc.address,
+                    pulseStoreCode: codeMap.get(loc.id) || null,
+                    stations: (loc.stations || []).map((s: any) => ({
+                        id: s.id,
+                        name: s.name,
+                        pairingCode: s.pairingCode || null,
+                        isActive: s.isActive
+                    }))
+                })),
+                users: fr.users
+            })),
+            config: f.config || {},
+            integrations: parseIntegrations(f.integrations),
+            createdAt: f.createdAt,
+            documents: {
+                voidCheck: !!f.voidCheckUrl,
+                driverLicense: !!f.driverLicenseUrl,
+                feinLetter: !!f.feinLetterUrl,
+            }
+        }
+
+        return NextResponse.json(transformedData)
+
+    } catch (error) {
+        console.error('Error fetching franchisor details:', error)
+        return NextResponse.json({ error: 'Failed to fetch client details' }, { status: 500 })
+    }
 }
 
 // PUT: Update Franchisor Details

@@ -12,12 +12,16 @@ export async function GET(request: NextRequest) {
         }
 
         const user = session.user as any
-        const locationId = user.locationId
         const { searchParams } = new URL(request.url)
         const type = searchParams.get('type') // CHAIR, ROOM, EQUIPMENT
+        const queryLocationId = searchParams.get('locationId')
+
+        // Use query param locationId if provided (for FRANCHISOR managing multiple locations)
+        // Otherwise fall back to user's own locationId
+        const locationId = queryLocationId || user.locationId
 
         if (!locationId) {
-            return NextResponse.json({ error: 'No location associated' }, { status: 400 })
+            return NextResponse.json({ error: 'No location specified' }, { status: 400 })
         }
 
         const resources = await prisma.resource.findMany({

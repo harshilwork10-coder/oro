@@ -185,15 +185,7 @@ export async function POST(request: NextRequest) {
         // 4. Use SendGrid/SES for email
 
         // For now, we log and simulate
-        console.log('Notification queued:', {
-            title,
-            message,
-            audience,
-            locationId,
-            channel,
-            recipientCount,
-            sentBy: user.id
-        })
+        // Debug log removed
 
         // Create audit event
         if (franchiseId) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Search, Plus, Package, AlertTriangle, TrendingDown,
     MoreHorizontal, Download, Upload, X, DollarSign, Hash
@@ -9,7 +9,7 @@ import {
 type InventoryTab = 'all' | 'low-stock' | 'out-of-stock';
 
 interface InventoryItem {
-    id: number;
+    id: string;
     name: string;
     sku: string;
     category: string;
@@ -18,14 +18,6 @@ interface InventoryItem {
     price: number;
     status: string;
 }
-
-const INITIAL_INVENTORY: InventoryItem[] = [
-    { id: 1, name: 'Marlboro Gold', sku: 'MAR-001', category: 'Tobacco', stock: 45, minStock: 20, price: 12.99, status: 'in-stock' },
-    { id: 2, name: 'Bud Light 12pk', sku: 'BUD-012', category: 'Beer', stock: 5, minStock: 12, price: 14.99, status: 'low-stock' },
-    { id: 3, name: 'Red Bull 4pk', sku: 'RB-004', category: 'Energy', stock: 0, minStock: 10, price: 9.99, status: 'out-of-stock' },
-    { id: 4, name: 'Doritos Nacho', sku: 'DOR-001', category: 'Snacks', stock: 2, minStock: 8, price: 4.99, status: 'low-stock' },
-    { id: 5, name: 'Corona 6pk', sku: 'COR-006', category: 'Beer', stock: 24, minStock: 10, price: 11.99, status: 'in-stock' },
-];
 
 function StatusBadge({ status }: { status: string }) {
     const colors: Record<string, string> = {
@@ -54,7 +46,7 @@ function AddItemModal({ isOpen, onClose, onAdd }: {
     const [form, setForm] = useState({
         name: '',
         sku: '',
-        category: 'Beer',
+        category: 'General',
         stock: '',
         minStock: '',
         price: '',
@@ -82,7 +74,7 @@ function AddItemModal({ isOpen, onClose, onAdd }: {
                 minStock: parseInt(form.minStock),
                 price: parseFloat(form.price),
             });
-            setForm({ name: '', sku: '', category: 'Beer', stock: '', minStock: '', price: '' });
+            setForm({ name: '', sku: '', category: 'General', stock: '', minStock: '', price: '' });
             onClose();
         }
     };
@@ -109,7 +101,7 @@ function AddItemModal({ isOpen, onClose, onAdd }: {
                             onChange={(e) => setForm({ ...form, name: e.target.value })}
                             maxLength={100}
                             className={`w-full bg-[var(--background)] border rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${errors.name ? 'border-red-500' : 'border-[var(--border)]'}`}
-                            placeholder="Bud Light 12pk"
+                            placeholder="Product Name"
                         />
                         {errors.name && <p className="text-xs text-red-400 mt-1">{errors.name}</p>}
                     </div>
@@ -123,13 +115,12 @@ function AddItemModal({ isOpen, onClose, onAdd }: {
                                 type="text"
                                 value={form.sku}
                                 onChange={(e) => {
-                                    // Only allow alphanumeric and dashes, uppercase
                                     const filtered = e.target.value.replace(/[^A-Z0-9-]/gi, '').toUpperCase();
                                     setForm({ ...form, sku: filtered });
                                 }}
                                 maxLength={20}
                                 className={`w-full bg-[var(--background)] border rounded-lg py-2 pl-10 pr-3 text-[var(--text-primary)] font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${errors.sku ? 'border-red-500' : 'border-[var(--border)]'}`}
-                                placeholder="BUD-012"
+                                placeholder="SKU-001"
                             />
                         </div>
                         {errors.sku && <p className="text-xs text-red-400 mt-1">{errors.sku}</p>}
@@ -143,12 +134,10 @@ function AddItemModal({ isOpen, onClose, onAdd }: {
                             onChange={(e) => setForm({ ...form, category: e.target.value })}
                             className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                         >
-                            <option value="Beer">Beer</option>
-                            <option value="Wine">Wine</option>
-                            <option value="Spirits">Spirits</option>
-                            <option value="Tobacco">Tobacco</option>
-                            <option value="Snacks">Snacks</option>
-                            <option value="Energy">Energy Drinks</option>
+                            <option value="General">General</option>
+                            <option value="Hair Care">Hair Care</option>
+                            <option value="Skin Care">Skin Care</option>
+                            <option value="Tools">Tools</option>
                             <option value="Other">Other</option>
                         </select>
                     </div>
@@ -161,7 +150,6 @@ function AddItemModal({ isOpen, onClose, onAdd }: {
                                 type="number"
                                 value={form.stock}
                                 onChange={(e) => {
-                                    // Only allow digits
                                     const filtered = e.target.value.replace(/\D/g, '');
                                     setForm({ ...form, stock: filtered });
                                 }}
@@ -232,8 +220,43 @@ function AddItemModal({ isOpen, onClose, onAdd }: {
 export default function InventoryPage() {
     const [activeTab, setActiveTab] = useState<InventoryTab>('all');
     const [searchQuery, setSearchQuery] = useState('');
-    const [items, setItems] = useState<InventoryItem[]>(INITIAL_INVENTORY);
+    const [items, setItems] = useState<InventoryItem[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    // Fetch inventory from database
+    useEffect(() => {
+        const fetchInventory = async () => {
+            try {
+                const res = await fetch('/api/products')
+                if (res.ok) {
+                    const data = await res.json()
+                    const prodArray = Array.isArray(data) ? data : (data.products || data.data || [])
+                    const formatted = prodArray.map((p: any) => {
+                        const stock = p.quantity ?? p.stock ?? 0
+                        const minStock = p.minStock ?? p.reorderPoint ?? 10
+                        const status = stock === 0 ? 'out-of-stock' : stock <= minStock ? 'low-stock' : 'in-stock'
+                        return {
+                            id: p.id,
+                            name: p.name || 'Unknown',
+                            sku: p.sku || p.barcode || '',
+                            category: p.category || 'General',
+                            stock,
+                            minStock,
+                            price: Number(p.price) || 0,
+                            status
+                        }
+                    })
+                    setItems(formatted)
+                }
+            } catch (err) {
+                console.error('Failed to fetch inventory:', err)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchInventory()
+    }, [])
 
     const tabs: { id: InventoryTab; label: string; icon?: React.ComponentType<{ size?: number }> }[] = [
         { id: 'all', label: 'All Items' },
@@ -241,9 +264,21 @@ export default function InventoryPage() {
         { id: 'out-of-stock', label: 'Out of Stock', icon: AlertTriangle },
     ];
 
-    const handleAddItem = (newItem: Omit<InventoryItem, 'id' | 'status'>) => {
-        const status = newItem.stock === 0 ? 'out-of-stock' : newItem.stock <= newItem.minStock ? 'low-stock' : 'in-stock';
-        setItems([...items, { ...newItem, id: Date.now(), status }]);
+    const handleAddItem = async (newItem: Omit<InventoryItem, 'id' | 'status'>) => {
+        try {
+            const res = await fetch('/api/products', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newItem)
+            })
+            if (res.ok) {
+                const created = await res.json()
+                const status = newItem.stock === 0 ? 'out-of-stock' : newItem.stock <= newItem.minStock ? 'low-stock' : 'in-stock';
+                setItems([...items, { ...newItem, id: created.id, status }]);
+            }
+        } catch (err) {
+            console.error('Failed to add item:', err)
+        }
     };
 
     const filteredItems = items.filter(item => {

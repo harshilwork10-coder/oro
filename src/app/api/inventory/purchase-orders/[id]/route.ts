@@ -34,41 +34,45 @@ export async function PUT(
             return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
         }
 
-        // If marking as RECEIVED, update product stock
-        if (status === 'RECEIVED' && existingPO.status !== 'RECEIVED') {
-            // Update stock for each item
-            for (const item of existingPO.items) {
-                await prisma.product.update({
-                    where: { id: item.productId },
-                    data: {
-                        stock: { increment: item.quantity }
-                    }
-                })
+        // ===== ATOMIC RECEIVE BLOCK =====
+        const purchaseOrder = await prisma.$transaction(async (tx) => {
+            // If marking as RECEIVED, update product stock
+            if (status === 'RECEIVED' && existingPO.status !== 'RECEIVED') {
+                // Update stock for each item
+                for (const item of existingPO.items) {
+                    await tx.product.update({
+                        where: { id: item.productId },
+                        data: {
+                            stock: { increment: item.quantity }
+                        }
+                    })
 
-                // Create stock adjustment record
-                await prisma.stockAdjustment.create({
-                    data: {
-                        productId: item.productId,
-                        locationId: existingPO.locationId,
-                        quantity: item.quantity,
-                        reason: 'RESTOCK',
-                        notes: `Received from PO #${id.slice(-6).toUpperCase()}`,
-                        performedBy: session.user.id || session.user.email || 'system'
-                    }
-                })
-            }
-        }
-
-        const purchaseOrder = await prisma.purchaseOrder.update({
-            where: { id },
-            data: { status },
-            include: {
-                supplier: true,
-                items: {
-                    include: { product: true }
+                    // Create stock adjustment record
+                    await tx.stockAdjustment.create({
+                        data: {
+                            productId: item.productId,
+                            locationId: existingPO.locationId,
+                            quantity: item.quantity,
+                            reason: 'RESTOCK',
+                            notes: `Received from PO #${id.slice(-6).toUpperCase()}`,
+                            performedBy: session.user.id || session.user.email || 'system'
+                        }
+                    })
                 }
             }
+
+            return await tx.purchaseOrder.update({
+                where: { id },
+                data: { status },
+                include: {
+                    supplier: true,
+                    items: {
+                        include: { product: true }
+                    }
+                }
+            })
         })
+        // ===== END ATOMIC BLOCK =====
 
         return NextResponse.json({ purchaseOrder })
     } catch (error) {

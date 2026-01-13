@@ -284,7 +284,7 @@ function CustomerDisplayContent() {
                     </div>
 
                     <div className="absolute bottom-8 text-stone-600 text-sm">
-                        Powered by Oronex
+                        Powered by Oro 9
                     </div>
                 </div>
 

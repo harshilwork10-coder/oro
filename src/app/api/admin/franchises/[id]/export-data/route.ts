@@ -161,7 +161,7 @@ export async function GET(
             data: { dataExportedAt: new Date() }
         })
 
-        console.log(`[DATA_EXPORT] Franchise ${franchise.name} (${id}) data exported by ${session.user.email}`)
+        // Debug log removed data exported by ${session.user.email}`)
 
         // Return as downloadable JSON
         return new NextResponse(JSON.stringify(exportData, null, 2), {

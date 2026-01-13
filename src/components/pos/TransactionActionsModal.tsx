@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { X, RotateCcw, Ban, Trash2, CheckSquare, Square, Printer, CreditCard, Banknote, CheckCircle, AlertCircle } from 'lucide-react'
+import { X, RotateCcw, Ban, Trash2, CheckSquare, Square, Printer, CreditCard, Banknote, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { generateReceipt } from '@/lib/receipt-generator'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 import { useBranding } from '@/components/providers/BrandProvider'
+import { normalizeTransactionForPrint } from '@/lib/print-utils'
 
 interface TransactionLine {
     id: string
@@ -28,9 +29,12 @@ interface Transaction {
     client?: {
         firstName: string
         lastName: string
+        phone?: string
     }
     cardLast4?: string
     invoiceNumber?: string
+    totalCash?: number    // Cash price (for dual pricing)
+    totalCard?: number    // Card price (for dual pricing)
 }
 
 interface Props {
@@ -40,11 +44,12 @@ interface Props {
     canProcessRefunds?: boolean
     canVoid?: boolean
     canDelete?: boolean
+    cashDrawerSessionId?: string | null
 }
 
-type ActionType = 'none' | 'refund' | 'void' | 'delete'
+type ActionType = 'none' | 'refund' | 'void' | 'delete' | 'sms'
 
-export default function TransactionActionsModal({ transaction, onClose, onSuccess }: Props) {
+export default function TransactionActionsModal({ transaction, onClose, onSuccess, cashDrawerSessionId }: Props) {
     const [action, setAction] = useState<ActionType>('none')
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
     const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({})
@@ -55,15 +60,20 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
     const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null)
     const [voidReason, setVoidReason] = useState<string>('')
     const [refundReason, setRefundReason] = useState<string>('')
+    const [phoneNumber, setPhoneNumber] = useState<string>('')
     const { logoUrl, primaryColor } = useBranding()
 
     useEffect(() => {
+        if (transaction.client?.phone) { // NEW: Pre-fill phone number
+            setPhoneNumber(transaction.client.phone)
+        }
+
         if (transaction.paymentMethod === 'CARD') {
             setRefundMethod('CARD')
         } else {
             setRefundMethod('CASH')
         }
-    }, [transaction.paymentMethod])
+    }, [transaction.paymentMethod, transaction.client])
 
     // Auto-hide toast after 3 seconds
     useEffect(() => {
@@ -113,27 +123,41 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
 
     // ... (existing code)
 
-    const handlePrint = () => {
-        const receiptData = {
-            id: transaction.id,
-            total: transaction.total,
-            subtotal: transaction.subtotal,
-            tax: transaction.tax,
-            paymentMethod: transaction.paymentMethod,
-            createdAt: transaction.createdAt,
-            lineItems: transaction.lineItems.map((item: TransactionLine) => ({
-                name: item.service?.name || item.product?.name || 'Item',
-                quantity: item.quantity,
-                price: item.price,
-                discount: item.discount,
-                total: item.total
-            })),
-            branding: {
-                logoUrl,
-                primaryColor
+    const handlePrint = async () => {
+        try {
+            // Use print agent for thermal receipt printing
+            const { printReceipt, isPrintAgentAvailable } = await import('@/lib/print-agent')
+            const agentAvailable = await isPrintAgentAvailable()
+
+            if (!agentAvailable) {
+                showToast('error', 'Print Agent not running. Start ORO Print Agent on this computer.')
+                return
             }
+
+            // === USE SHARED NORMALIZER (single source of truth) ===
+            // This ensures reprint produces identical output to immediate print
+            const receiptData = normalizeTransactionForPrint(
+                transaction as any,
+                {
+                    showDualPricing: !!(transaction.totalCash && transaction.totalCard &&
+                        Number(transaction.totalCash) !== Number(transaction.totalCard)),
+                    storeName: 'Salon LLC', // TODO: Get from location settings
+                    storeAddress: '123 Main St, City, ST 12345',
+                    storePhone: '(555) 123-4567'
+                },
+                '' // Cashier name not available in this context
+            )
+
+            const result = await printReceipt(receiptData)
+            if (result.success) {
+                showToast('success', 'Receipt printed!')
+            } else {
+                showToast('error', result.error || 'Print failed')
+            }
+        } catch (error: any) {
+            console.error('[PRINT] Reprint error:', error)
+            showToast('error', 'Print failed: ' + (error.message || 'Unknown error'))
         }
-        generateReceipt(receiptData)
     }
 
     const handleRefund = async () => {
@@ -175,7 +199,8 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                     items: refundItems,
                     reason: refundReason,
                     refundMethod,
-                    cardLast4: paxResponse?.cardLast4
+                    cardLast4: paxResponse?.cardLast4,
+                    cashDrawerSessionId
                 })
             })
 
@@ -223,7 +248,8 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     transactionId: transaction.id,
-                    reason: voidReason || 'No reason provided'
+                    reason: voidReason || 'No reason provided',
+                    cashDrawerSessionId
                 })
             })
 
@@ -237,6 +263,38 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
         } catch (error) {
             console.error('Void error:', error)
             showToast('error', 'Failed to void transaction')
+        } finally {
+            setIsProcessing(false)
+        }
+    }
+
+    const handleSendSms = async () => {
+        if (!phoneNumber || phoneNumber.length < 10) {
+            showToast('error', 'Please enter a valid phone number')
+            return
+        }
+
+        setIsProcessing(true)
+        try {
+            const res = await fetch('/api/pos/sms-receipt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    transactionId: transaction.id,
+                    phone: phoneNumber
+                })
+            })
+
+            if (res.ok) {
+                showToast('success', '✓ SMS Receipt sent!')
+                setTimeout(() => { setAction('none') }, 1500)
+            } else {
+                const error = await res.json()
+                showToast('error', `Send failed: ${error.error || 'Unknown error'}`)
+            }
+        } catch (error) {
+            console.error('SMS error:', error)
+            showToast('error', 'Failed to send SMS')
         } finally {
             setIsProcessing(false)
         }
@@ -329,6 +387,14 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                                 >
                                     <Printer className="h-6 w-6 text-blue-400" />
                                     <span className="text-blue-400 font-medium">Print</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setAction('sms')}
+                                    className="flex flex-col items-center gap-2 p-4 bg-purple-900/20 hover:bg-purple-900/30 border border-purple-500/30 rounded-xl transition-colors"
+                                >
+                                    <MessageSquare className="h-6 w-6 text-purple-400" />
+                                    <span className="text-purple-400 font-medium">SMS</span>
                                 </button>
 
                                 <button
@@ -496,6 +562,69 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                         </div>
                     )}
 
+                    {action === 'sms' && (
+                        <div className="space-y-4 text-center">
+                            <div className="w-16 h-16 rounded-full bg-purple-500/20 mx-auto flex items-center justify-center">
+                                <MessageSquare className="h-8 w-8 text-purple-400" />
+                            </div>
+                            <h3 className="text-xl font-bold text-white">Send SMS Receipt</h3>
+
+                            <div className="bg-stone-950 rounded-xl p-6 border border-stone-800 max-w-sm mx-auto">
+                                <label className="block text-left text-stone-400 text-sm mb-2">Mobile Number</label>
+                                <input
+                                    type="tel"
+                                    value={phoneNumber}
+                                    onChange={(e) => setPhoneNumber(e.target.value)}
+                                    placeholder="(555) 555-5555"
+                                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-white text-lg text-center tracking-widest focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                />
+                                <p className="text-stone-500 text-xs mt-3">
+                                    Sends a digital receipt with itemized list
+                                </p>
+                            </div>
+
+                            {/* Numeric Keypad */}
+                            <div className="grid grid-cols-3 gap-3 max-w-sm mx-auto mt-4">
+                                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((key) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => {
+                                            if (phoneNumber.length < 10) {
+                                                setPhoneNumber(prev => prev + key)
+                                            }
+                                        }}
+                                        className="py-4 bg-stone-800 hover:bg-stone-700 text-white rounded-xl text-2xl font-bold transition-colors active:scale-95"
+                                    >
+                                        {key}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setPhoneNumber('')}
+                                    className="py-4 bg-stone-800 hover:bg-red-900/30 text-red-400 rounded-xl text-lg font-bold transition-colors active:scale-95"
+                                >
+                                    CLR
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (phoneNumber.length < 10) {
+                                            setPhoneNumber(prev => prev + '0')
+                                        }
+                                    }}
+                                    className="py-4 bg-stone-800 hover:bg-stone-700 text-white rounded-xl text-2xl font-bold transition-colors active:scale-95"
+                                >
+                                    0
+                                </button>
+                                <button
+                                    onClick={() => setPhoneNumber(prev => prev.slice(0, -1))}
+                                    className="py-4 bg-stone-800 hover:bg-stone-700 text-white rounded-xl flex items-center justify-center transition-colors active:scale-95"
+                                >
+                                    <MessageSquare className="h-6 w-6 rotate-180 hidden" /> {/* Buffer */}
+                                    <span className="text-xl">⌫</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {action === 'void' && (
                         <div className="space-y-4">
                             <div className="text-center">
@@ -575,6 +704,15 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                                 className="px-6 py-3 bg-orange-600 hover:bg-orange-500 disabled:bg-stone-800 disabled:text-stone-500 text-white rounded-xl font-bold transition-colors disabled:cursor-not-allowed"
                             >
                                 {isProcessing ? 'Processing...' : 'Void Transaction'}
+                            </button>
+                        )}
+                        {action === 'sms' && (
+                            <button
+                                onClick={handleSendSms}
+                                disabled={!phoneNumber || isProcessing}
+                                className="px-6 py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-stone-800 disabled:text-stone-500 text-white rounded-xl font-bold transition-colors disabled:cursor-not-allowed"
+                            >
+                                {isProcessing ? 'Sending...' : 'Send SMS'}
                             </button>
                         )}
                         {action === 'delete' && (

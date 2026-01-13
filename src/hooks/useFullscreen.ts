@@ -50,7 +50,7 @@ export function useFullscreen(): UseFullscreenReturn {
 
     const enterFullscreen = useCallback(async () => {
         if (!isSupported) {
-            console.warn('Fullscreen API is not supported')
+            console.error('Fullscreen API is not supported')
             return
         }
 

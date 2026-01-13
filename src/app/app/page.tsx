@@ -90,7 +90,7 @@ export default function OroPlus() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                () => console.log('Location access denied')
+                () => // Debug log removed
             )
         }
     }, [])

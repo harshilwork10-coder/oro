@@ -66,7 +66,7 @@ export default function OroLogo({ size = 'md', showText = true, className = '' }
                     }}
                 >
                     <span style={{ color: orange }}>O</span>
-                    <span style={{ color: lightGray }}>ro</span>
+                    <span style={{ color: lightGray }}>ro 9</span>
                 </span>
             )}
         </div>

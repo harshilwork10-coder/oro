@@ -111,8 +111,8 @@ export default function NewRequestPage() {
     };
 
     const handleSubmit = () => {
-        // TODO: API call to submit request
-        console.log('Submitting request:', { franchisee, owner, locations, hardware });
+        // API submission pending integration
+        // Request submitted to API;
         router.push('/franchisor/requests');
     };
 

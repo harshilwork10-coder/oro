@@ -70,6 +70,15 @@ export async function PATCH(
             }
         }
 
+        // Convert Decimal fields to proper format for Prisma
+        const decimalFields = ['cardSurcharge', 'cashDiscountPercent', 'taxRate']
+        for (const field of decimalFields) {
+            if (filteredUpdates[field] !== undefined) {
+                // Ensure it's a number and convert to Decimal-compatible format
+                filteredUpdates[field] = parseFloat(String(filteredUpdates[field])) || 0
+            }
+        }
+
         // Upsert the BusinessConfig
         const updatedConfig = await prisma.businessConfig.upsert({
             where: { franchisorId: id },
@@ -99,7 +108,7 @@ export async function PATCH(
             }
         })
 
-        console.log(`[CONFIG] Provider ${session.user.email} updated config for client ${id}:`, filteredUpdates)
+        // Debug log removed
 
         return NextResponse.json({
             success: true,
@@ -107,8 +116,9 @@ export async function PATCH(
         })
     } catch (error) {
         console.error('Error updating client config:', error)
+        console.error('Full error details:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
         return NextResponse.json(
-            { error: 'Failed to update configuration' },
+            { error: 'Failed to update configuration', details: String(error) },
             { status: 500 }
         )
     }

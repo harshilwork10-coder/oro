@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
         try {
             const offResponse = await fetch(
                 `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
-                { headers: { 'User-Agent': 'OroNext-POS/1.0' } }
+                { headers: { 'User-Agent': 'ORO 9-POS/1.0' } }
             )
 
             if (offResponse.ok) {
@@ -48,8 +48,8 @@ export async function GET(request: NextRequest) {
                     return ApiResponse.success(productInfo)
                 }
             }
-        } catch (error) {
-            console.log('[UPC_LOOKUP] Open Food Facts failed:', error)
+        } catch {
+            // Open Food Facts lookup failed, try fallback
         }
 
         // Try UPC Item DB as fallback (limited free tier)
@@ -77,8 +77,8 @@ export async function GET(request: NextRequest) {
                     })
                 }
             }
-        } catch (error) {
-            console.log('[UPC_LOOKUP] UPC Item DB failed:', error)
+        } catch {
+            // UPC Item DB lookup failed
         }
 
         // Neither API found the product

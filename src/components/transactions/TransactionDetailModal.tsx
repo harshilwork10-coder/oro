@@ -130,8 +130,8 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                             onClick={showConfirmation === 'delete' ? handleDelete : handleVoid}
                             disabled={processing}
                             className={`flex-1 px-4 py-2 rounded-lg text-white font-medium transition-colors flex items-center justify-center gap-2 ${showConfirmation === 'delete'
-                                    ? 'bg-red-600 hover:bg-red-700'
-                                    : 'bg-orange-600 hover:bg-orange-700'
+                                ? 'bg-red-600 hover:bg-red-700'
+                                : 'bg-orange-600 hover:bg-orange-700'
                                 }`}
                         >
                             {processing ? (
@@ -178,8 +178,8 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                                 <label
                                     key={item.id}
                                     className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedItems.includes(item.id)
-                                            ? 'border-blue-500 bg-blue-50'
-                                            : 'border-gray-200 hover:border-gray-300'
+                                        ? 'border-blue-500 bg-blue-50'
+                                        : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                 >
                                     <input
@@ -259,7 +259,18 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-white">Transaction Details</h2>
-                            <p className="text-gray-400 text-sm">#{transaction.id.slice(-8).toUpperCase()}</p>
+                            <p className="text-gray-400 text-sm">
+                                #{(() => {
+                                    const dateObj = new Date(transaction.createdAt)
+                                    const dateStr = dateObj.getFullYear().toString() +
+                                        (dateObj.getMonth() + 1).toString().padStart(2, '0') +
+                                        dateObj.getDate().toString().padStart(2, '0')
+                                    const sequenceStr = transaction.dailySequence
+                                        ? transaction.dailySequence.toString().padStart(3, '0')
+                                        : dateObj.getHours().toString().padStart(2, '0') + dateObj.getMinutes().toString().padStart(2, '0')
+                                    return `${dateStr}${sequenceStr}`
+                                })()}
+                            </p>
                         </div>
                     </div>
                     <button

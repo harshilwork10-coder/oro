@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
         const rateLimit = checkRateLimit(`pin:${clientIP}`, PIN_RATE_LIMIT)
 
         if (!rateLimit.allowed) {
-            console.warn(`[SECURITY] PIN rate limit exceeded for IP: ${clientIP}`)
+            console.error(`[SECURITY] PIN rate limit exceeded for IP: ${clientIP}`)
             return NextResponse.json({
                 success: false,
                 error: `Too many attempts. Try again after ${rateLimit.resetAt.toLocaleTimeString()}`
@@ -93,9 +93,7 @@ export async function POST(request: NextRequest) {
             if (user.pin) {
                 const isValid = await bcrypt.compare(pin, user.pin)
                 if (isValid) {
-                    // Log this access for security
-                    console.log(`[KIOSK EXIT] User ${user.email} (${user.role}) exited kiosk mode`)
-
+                    // Access verified - allow kiosk exit
                     return NextResponse.json({
                         success: true,
                         message: 'PIN verified',

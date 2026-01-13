@@ -28,7 +28,7 @@ export async function POST(request: Request) {
         }
 
         // Log the tip selection for now (actual persistence requires schema update)
-        console.log(`💵 Tip selected: $${tipAmount}${cartId ? ` for cart ${cartId}` : ''}`)
+        // Tip recorded
 
         return NextResponse.json({
             success: true,

@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
             //         amount: -amount // Negative = cash out
             //     }
             // })
-            console.log('Lottery payout recorded:', { type, amount: -amount })
+            // Debug log removed
         }
 
         return NextResponse.json({

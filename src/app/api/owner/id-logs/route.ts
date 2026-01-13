@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
                     }
                 })
             } catch (e) {
-                console.log('Could not create audit event:', e)
+                // Debug log removed
             }
         }
 

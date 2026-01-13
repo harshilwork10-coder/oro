@@ -51,7 +51,8 @@ export async function GET(
             franchisor: magicLink.user.franchisor ? {
                 name: magicLink.user.franchisor.name,
                 businessType: magicLink.user.franchisor.businessType,
-                approvalStatus: magicLink.user.franchisor.approvalStatus
+                approvalStatus: magicLink.user.franchisor.approvalStatus,
+                processingType: magicLink.user.franchisor.processingType || 'POS_AND_PROCESSING'
             } : null,
             franchise: magicLink.user.franchise ? {
                 id: magicLink.user.franchise.id,

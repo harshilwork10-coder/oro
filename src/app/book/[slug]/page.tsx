@@ -36,9 +36,10 @@ interface GroupMember {
     addons: Service[]
 }
 
-type Step = 'service' | 'addons' | 'datetime' | 'details' | 'waiver' | 'confirm' | 'success'
+type Step = 'service' | 'addons' | 'staff' | 'datetime' | 'details' | 'waiver' | 'confirm' | 'success'
 
-const STEPS = ['service', 'addons', 'datetime', 'details', 'waiver', 'confirm'] as const
+
+const STEPS = ['service', 'addons', 'staff', 'datetime', 'details', 'waiver', 'confirm'] as const
 
 export default function BookingPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params)
@@ -52,6 +53,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
     const [staff, setStaff] = useState<Staff[]>([])
     const [locations, setLocations] = useState<Location[]>([])
     const [slots, setSlots] = useState<TimeSlot[]>([])
+    const [staffPrices, setStaffPrices] = useState<Map<string, { price: number, duration: number }>>(new Map())
 
     const [step, setStep] = useState<Step>('service')
     const [selectedService, setSelectedService] = useState<Service | null>(null)
@@ -143,6 +145,37 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         }
     }
 
+    // Fetch staff-specific prices when staff is selected
+    useEffect(() => {
+        const fetchStaffPrices = async () => {
+            if (!selectedStaff?.id) {
+                setStaffPrices(new Map())
+                return
+            }
+
+            try {
+                const res = await fetch(`/api/employees/services?employeeId=${selectedStaff.id}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    const priceMap = new Map<string, { price: number, duration: number }>()
+                    if (data.services) {
+                        data.services.forEach((s: any) => {
+                            priceMap.set(s.serviceId, {
+                                price: Number(s.employeePrice),
+                                duration: s.employeeDuration
+                            })
+                        })
+                    }
+                    setStaffPrices(priceMap)
+                }
+            } catch (error) {
+                console.error('Error fetching staff prices:', error)
+            }
+        }
+
+        fetchStaffPrices()
+    }, [selectedStaff])
+
     const animateToStep = (newStep: Step) => {
         setIsTransitioning(true)
         setTimeout(() => {
@@ -196,9 +229,13 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
             })
             const data = await res.json()
             if (res.ok) {
+                // Format date and time on client side to use user's timezone
+                const appointmentTime = new Date(data.appointment.startTime)
                 // Store full response including group members
                 setConfirmation({
                     ...data.appointment,
+                    date: appointmentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+                    time: appointmentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
                     groupMembers: data.groupMembers || [],
                     totalPrice: data.totalPrice,
                     totalPeople: data.totalPeople
@@ -338,12 +375,13 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                                                 onClick={() => {
                                                     setSelectedService(service)
                                                     setSelectedAddons([])
-                                                    if (selectedLocation || locations.length === 1) {
-                                                        if (!selectedLocation && locations.length === 1) setSelectedLocation(locations[0])
-                                                        // Go to addons step if addons available, otherwise datetime
-                                                        const nextStep = addons.length > 0 ? 'addons' : 'datetime'
-                                                        setTimeout(() => animateToStep(nextStep), 200)
+                                                    // Auto-select first location if not already selected
+                                                    if (!selectedLocation && locations.length > 0) {
+                                                        setSelectedLocation(locations[0])
                                                     }
+                                                    // Go to addons if available, otherwise staff selection
+                                                    const nextStep = addons.length > 0 ? 'addons' : 'staff'
+                                                    setTimeout(() => animateToStep(nextStep), 200)
                                                 }}
                                                 className="w-full group relative bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-violet-500/50 rounded-2xl p-5 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-violet-500/10"
                                                 style={{ animationDelay: `${index * 100}ms` }}
@@ -402,7 +440,21 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                                     </div>
                                     <div className="flex-1">
                                         <p className="font-semibold text-white">{selectedService?.name}</p>
-                                        <p className="text-sm text-violet-300">{selectedService?.duration} min • ${selectedService?.price}</p>
+                                        {(() => {
+                                            const staffPrice = selectedService?.id ? staffPrices.get(selectedService.id) : null
+                                            const displayPrice = staffPrice?.price ?? selectedService?.price
+                                            const displayDuration = staffPrice?.duration ?? selectedService?.duration
+                                            const hasCustomPrice = !!staffPrice
+                                            return (
+                                                <p className="text-sm text-violet-300">
+                                                    {displayDuration} min •
+                                                    <span className={hasCustomPrice ? 'text-orange-400 font-semibold' : ''}>
+                                                        ${Number(displayPrice).toFixed(0)}
+                                                        {hasCustomPrice && ' ★'}
+                                                    </span>
+                                                </p>
+                                            )
+                                        })()}
                                     </div>
                                     <button onClick={() => animateToStep('service')} className="text-violet-400 hover:text-white text-sm">Change</button>
                                 </div>
@@ -474,7 +526,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
                                 {/* Continue Button */}
                                 <button
-                                    onClick={() => animateToStep('datetime')}
+                                    onClick={() => animateToStep('staff')}
                                     className="w-full py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold rounded-2xl transition-all shadow-lg shadow-violet-500/30 flex items-center justify-center gap-2"
                                 >
                                     {selectedAddons.length > 0 ? 'Continue with Add-ons' : 'Skip Add-ons'}
@@ -483,7 +535,84 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                             </div>
                         )}
 
-                        {/* Step 2: Date & Time */}
+                        {/* Step 2.5: Staff Selection */}
+                        {step === 'staff' && (
+                            <div className="space-y-4">
+                                <div className="text-center mb-6">
+                                    <h2 className="text-xl font-bold text-white mb-1">Choose Your Barber</h2>
+                                    <p className="text-violet-300/70">Select a stylist or let us pick for you</p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {/* Any Available Option */}
+                                    <button
+                                        onClick={() => {
+                                            setSelectedStaff(null)
+                                            setTimeout(() => animateToStep('datetime'), 200)
+                                        }}
+                                        className={`w-full group relative border rounded-2xl p-5 text-left transition-all duration-300 hover:scale-[1.02] ${selectedStaff === null
+                                            ? 'bg-violet-500/20 border-violet-500/50 shadow-lg shadow-violet-500/20'
+                                            : 'bg-white/[0.03] hover:bg-white/[0.08] border-white/10 hover:border-violet-500/30'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center">
+                                                <User className="h-7 w-7 text-white" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <h3 className="font-semibold text-white text-lg">Any Available</h3>
+                                                <p className="text-sm text-violet-300/70">We'll assign the next available stylist</p>
+                                            </div>
+                                            <ChevronRight className="h-5 w-5 text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
+                                    </button>
+
+                                    {/* Individual Staff Members */}
+                                    {staff.map((member) => (
+                                        <button
+                                            key={member.id}
+                                            onClick={() => {
+                                                setSelectedStaff(member)
+                                                setTimeout(() => animateToStep('datetime'), 200)
+                                            }}
+                                            className={`w-full group relative border rounded-2xl p-5 text-left transition-all duration-300 hover:scale-[1.02] ${selectedStaff?.id === member.id
+                                                ? 'bg-violet-500/20 border-violet-500/50 shadow-lg shadow-violet-500/20'
+                                                : 'bg-white/[0.03] hover:bg-white/[0.08] border-white/10 hover:border-violet-500/30'
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                {/* Staff Image */}
+                                                {member.image ? (
+                                                    <img
+                                                        src={member.image}
+                                                        alt={member.name}
+                                                        className="w-14 h-14 rounded-full object-cover border-2 border-violet-500/30"
+                                                    />
+                                                ) : (
+                                                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-500 to-pink-600 flex items-center justify-center text-white font-bold text-xl">
+                                                        {member.name.charAt(0)}
+                                                    </div>
+                                                )}
+                                                <div className="flex-1">
+                                                    <h3 className="font-semibold text-white text-lg group-hover:text-violet-200 transition-colors">
+                                                        {member.name}
+                                                    </h3>
+                                                    <p className="text-sm text-violet-300/70">Professional Stylist</p>
+                                                </div>
+                                                <ChevronRight className="h-5 w-5 text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Back button */}
+                                <button onClick={() => animateToStep(addons.length > 0 ? 'addons' : 'service')} className="flex items-center gap-2 text-violet-400 hover:text-white text-sm mt-4">
+                                    <ArrowLeft className="h-4 w-4" /> Back
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Step 3: Date & Time */}
                         {step === 'datetime' && (
                             <div className="space-y-6">
                                 {/* Selected Service Card */}
@@ -493,7 +622,21 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                                     </div>
                                     <div className="flex-1">
                                         <p className="font-semibold text-white">{selectedService?.name}</p>
-                                        <p className="text-sm text-violet-300">{selectedService?.duration} min • ${selectedService?.price}</p>
+                                        {(() => {
+                                            const staffPrice = selectedService?.id ? staffPrices.get(selectedService.id) : null
+                                            const displayPrice = staffPrice?.price ?? selectedService?.price
+                                            const displayDuration = staffPrice?.duration ?? selectedService?.duration
+                                            const hasCustomPrice = !!staffPrice
+                                            return (
+                                                <p className="text-sm text-violet-300">
+                                                    {displayDuration} min •
+                                                    <span className={hasCustomPrice ? 'text-orange-400 font-semibold' : ''}>
+                                                        ${Number(displayPrice).toFixed(0)}
+                                                        {hasCustomPrice && ' ★'}
+                                                    </span>
+                                                </p>
+                                            )
+                                        })()}
                                     </div>
                                     <button onClick={() => animateToStep('service')} className="text-violet-400 hover:text-white text-sm">Change</button>
                                 </div>
@@ -922,7 +1065,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
                 {/* Footer */}
                 <footer className="fixed bottom-0 left-0 right-0 py-4 text-center text-violet-400/40 text-xs bg-gradient-to-t from-[#0a0a0f] to-transparent">
-                    Powered by <span className="text-violet-400/60 font-medium">OroNext</span>
+                    Powered by <span className="text-violet-400/60 font-medium">ORO 9</span>
                 </footer>
             </div>
 

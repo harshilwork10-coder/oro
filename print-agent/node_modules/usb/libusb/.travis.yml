@@ -1,58 +1,49 @@
 language: c
 
-git:
-    depth: 1
-
 matrix:
     include:
         - os: linux
-          dist: focal
-          compiler: clang
-        - os: linux
-          dist: focal
+          dist: trusty
+          sudo: required
           compiler: gcc
         - os: linux
-          dist: bionic
+          dist: trusty
+          sudo: required
           compiler: clang
-        - os: linux
-          dist: bionic
-          compiler: gcc
-        - os: linux
-          dist: xenial
-          compiler: clang
-        - os: linux
-          dist: xenial
+        - os: osx
+          osx_image: xcode8
           compiler: gcc
         - os: osx
-          osx_image: xcode12.2
+          osx_image: xcode8
           compiler: clang
         - os: osx
-          osx_image: xcode11.3
+          osx_image: xcode7.1
+          compiler: gcc
+        - os: osx
+          osx_image: xcode7.1
           compiler: clang
         - os: osx
-          osx_image: xcode9.4
+          osx_image: beta-xcode6.2
+          compiler: gcc
+        - os: osx
+          osx_image: beta-xcode6.2
           compiler: clang
 
 addons:
+    homebrew:
+        update: true
+        brewfile: true
     apt:
         packages:
             - autoconf
             - automake
             - libtool
+            - m4
             - libudev-dev
-            - m4
-    homebrew:
-        packages:
-            - autoconf
-            - automake
-            - libtool
-            - m4
-
-before_script:
-    - ./bootstrap.sh
+        sources:
+            - ubuntu-toolchain-r-test
 
 script:
-    - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .private/ci-build.sh --build-dir build-netlink -- --disable-udev; fi
-    - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .private/ci-build.sh --build-dir build-udev -- --enable-udev; fi
-    - if [ "$TRAVIS_OS_NAME" = "osx" ]; then .private/ci-build.sh --build-dir build; fi
-    - if [ "$TRAVIS_OS_NAME" = "osx" ]; then cd Xcode && xcodebuild -project libusb.xcodeproj; fi
+    - ./autogen.sh && make clean && make
+    - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./travis-autogen.sh --disable-udev && make clean && make ; fi
+    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cd Xcode && xcodebuild -project libusb.xcodeproj ; fi

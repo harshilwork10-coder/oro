@@ -154,7 +154,7 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }: AddTe
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                     className="w-full pl-9 pr-4 py-3 bg-stone-900/50 border border-stone-700 rounded-xl text-stone-100 placeholder-stone-600 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                                    placeholder="john@oronex.com"
+                                    placeholder="john@oro9.com"
                                     required
                                 />
                             </div>

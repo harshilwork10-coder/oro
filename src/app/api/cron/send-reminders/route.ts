@@ -171,9 +171,7 @@ async function sendEmailReminder(appointment: any, settings: any, type: '24h' | 
         </div>
     `
 
-    // TODO: Integrate with email service (e.g., Resend, SendGrid, AWS SES)
-    console.log(`[EMAIL] Would send to: ${client.email}`)
-    console.log(`[EMAIL] Subject: ${subject}`)
+    // Integration with email service (Resend, SendGrid, AWS SES) goes here
 }
 
 async function sendSmsReminder(appointment: any, franchiseId: string, type: '24h' | '2h') {

@@ -280,7 +280,7 @@ export async function PUT(request: NextRequest) {
                             }
                         })
                     } catch (e) {
-                        console.log('Could not update item stock:', item.productId)
+                        // Debug log removed
                     }
                 }
 

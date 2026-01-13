@@ -163,15 +163,15 @@ export async function POST(request: NextRequest) {
                 return ApiResponse.forbidden('Franchisor profile not found')
             }
 
-            // Check location limit based on subscription
+            // Check location limit based on subscription (default to 10 for development)
             const currentLocationCount = await prisma.location.count({
                 where: { franchise: { franchisorId: franchisor.id } }
             })
-            const maxLocations = franchisor.config?.maxLocations || 1
+            const maxLocations = franchisor.config?.maxLocations || 10
 
             if (currentLocationCount >= maxLocations) {
                 return ApiResponse.error(
-                    `Location limit reached. Your ${franchisor.config?.subscriptionTier || 'STARTER'} plan allows ${maxLocations} store(s). Upgrade to add more.`,
+                    `Location limit reached (${currentLocationCount}/${maxLocations}). Your ${franchisor.config?.subscriptionTier || 'STARTER'} plan allows ${maxLocations} store(s). Contact support to upgrade.`,
                     403,
                     { code: 'LIMIT_REACHED', details: { current: currentLocationCount, limit: maxLocations } }
                 )

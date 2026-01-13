@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
             })
 
             // Log the per-location price intent (would need LocationPriceOverride model)
-            console.log('Per-location pricing requested:', { productId, updates })
+            // Debug log removed
         }
 
         // Update stock if provided

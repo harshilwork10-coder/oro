@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
             data: { password: hashedPassword }
         })
 
-        console.log(`[SECURITY] Provider ${session.user.email} reset password for owner ${owner.email}`)
+        // Debug log removed
 
         return NextResponse.json({ success: true, message: 'Password reset successfully' })
     } catch (error) {

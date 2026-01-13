@@ -38,7 +38,7 @@ export async function POST(
                 }
             })
 
-            console.log(`[PAYMENT_DUE] Franchise ${franchise.name} (${id}) marked as payment due by ${session.user.email}. Amount: $${amountDue}`)
+            // Debug log removed marked as payment due by ${session.user.email}. Amount: $${amountDue}`)
 
             return NextResponse.json({
                 success: true,
@@ -58,7 +58,7 @@ export async function POST(
                 }
             })
 
-            console.log(`[PAYMENT_RECEIVED] Franchise ${franchise.name} (${id}) payment received, access restored by ${session.user.email}`)
+            // Debug log removed payment received, access restored by ${session.user.email}`)
 
             return NextResponse.json({
                 success: true,

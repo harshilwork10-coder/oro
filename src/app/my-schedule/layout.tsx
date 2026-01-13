@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-    title: 'My Schedule | Oronex',
+    title: 'My Schedule | Oro 9',
     description: 'Your personal appointment schedule',
     manifest: '/api/pwa/manifest?role=barber'
 }

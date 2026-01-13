@@ -45,7 +45,7 @@ export function OfflineModeTermsModal({
                 })
             });
         } catch (e) {
-            console.log('[OfflineTerms] Could not log acceptance (offline)');
+            // Debug log removed');
         }
     };
 

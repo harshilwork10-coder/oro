@@ -78,7 +78,6 @@ class OfflineDB {
             request.onsuccess = () => {
                 this.db = request.result;
                 this.isReady = true;
-                console.log('[OfflineDB] Database ready');
                 resolve(true);
             };
 
@@ -116,8 +115,6 @@ class OfflineDB {
                     const priceStore = db.createObjectStore('priceSnapshots', { keyPath: 'productId' });
                     priceStore.createIndex('updatedAt', 'updatedAt', { unique: false });
                 }
-
-                console.log('[OfflineDB] Database schema created');
             };
         });
     }
@@ -142,10 +139,7 @@ class OfflineDB {
         }
 
         return new Promise((resolve, reject) => {
-            tx.oncomplete = () => {
-                console.log(`[OfflineDB] Saved ${products.length} products`);
-                resolve();
-            };
+            tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
         });
     }
@@ -209,10 +203,7 @@ class OfflineDB {
             const store = tx.objectStore('pendingTransactions');
             const request = store.put(transaction);
 
-            request.onsuccess = () => {
-                console.log(`[OfflineDB] Saved pending transaction ${transaction.id}`);
-                resolve();
-            };
+            request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
         });
     }

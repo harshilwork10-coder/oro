@@ -10,12 +10,10 @@ export default function TestTipPage() {
 
     const handleTipSelected = (amount: number) => {
         setTipAmount(amount)
-        console.log('Tip selected:', amount)
     }
 
     const handleClose = () => {
         setShowTipModal(false)
-        console.log('Final tip amount:', tipAmount)
     }
 
     const handleReset = () => {

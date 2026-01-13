@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
 
         // In production, create a MonthClose record
         // For now, log the action
-        console.log('Month closed:', { month, year, notes, closedBy: user.id })
+        // Debug log removed
 
         // Create audit event
         const franchiseId = user.franchiseId

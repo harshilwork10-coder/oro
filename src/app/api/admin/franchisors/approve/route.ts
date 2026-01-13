@@ -87,12 +87,9 @@ export async function POST(req: NextRequest) {
                     franchisorId: franchisor.id
                 }
             })
-
-            console.log(`[Auto-Setup] Created parent record for ${ownerName} - they can now add stores`)
         }
 
-        // Mock Email Notification
-        console.log(`[Email Mock] Sending ${status} email to ${franchisor.owner.email}`)
+        // In production: Send email notification
 
         return NextResponse.json({ success: true, franchisor })
 

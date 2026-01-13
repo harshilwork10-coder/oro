@@ -3,32 +3,26 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import {
-    ShoppingCart, Calendar, Clock, User, LogOut, Menu, X,
-    Store, Scissors, HelpCircle, CheckCircle
+    Calendar, Clock, LogOut, Menu, X,
+    Store, Scissors, HelpCircle, CheckCircle,
+    BarChart3, DollarSign, ClipboardList
 } from 'lucide-react';
 
-// Mock employee data - would come from auth in real app
-const MOCK_EMPLOYEE = {
-    id: 'emp_1',
-    name: 'Emma Wilson',
-    role: 'Stylist',
-    businessType: 'salon' as const, // retail | salon | both
-    shiftActive: true,
-    shiftStart: '9:00 AM',
-};
-
-function getNavItems(businessType: 'retail' | 'salon' | 'both') {
+function getNavItems(industryType: string) {
     const common = [
-        { name: 'POS', href: '/employee/pos', icon: ShoppingCart },
+        { name: 'My Reports', href: '/employee/my-reports', icon: BarChart3 },
+        { name: 'My Schedule', href: '/employee/availability', icon: Calendar },
+        { name: 'My Prices', href: '/employee/my-prices', icon: DollarSign },
         { name: 'Time Clock', href: '/employee/time-clock', icon: Clock },
         { name: 'Help', href: '/employee/help', icon: HelpCircle },
     ];
 
-    if (businessType === 'salon' || businessType === 'both') {
+    if (industryType === 'SALON' || industryType === 'SERVICE') {
         return [
             { name: 'Check-In', href: '/employee/check-in', icon: CheckCircle },
-            { name: 'Appointments', href: '/employee/appointments', icon: Calendar },
+            { name: 'Appointments', href: '/employee/appointments', icon: ClipboardList },
             ...common,
         ];
     }
@@ -39,9 +33,16 @@ function getNavItems(businessType: 'retail' | 'salon' | 'both') {
 export default function EmployeeLayout({ children }: { children: React.ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const pathname = usePathname();
-    const employee = MOCK_EMPLOYEE;
+    const { data: session } = useSession();
 
-    const navItems = getNavItems(employee.businessType);
+    // Get real employee data from session
+    const employeeName = session?.user?.name || 'Team Member';
+    const employeeRole = (session?.user as any)?.role === 'MANAGER' ? 'Manager' : 'Stylist';
+    const industryType = (session?.user as any)?.industryType || 'SERVICE';
+    const shiftActive = true; // Would check from shift API
+    const shiftStart = '9:00 AM';
+
+    const navItems = getNavItems(industryType);
 
     return (
         <div className="min-h-screen bg-[var(--background)]">
@@ -55,20 +56,20 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
                 </button>
 
                 <div className="flex items-center gap-2">
-                    {employee.businessType === 'salon' ? (
+                    {industryType === 'SALON' || industryType === 'SERVICE' ? (
                         <Scissors size={24} className="text-[var(--primary)]" />
                     ) : (
                         <Store size={24} className="text-[var(--primary)]" />
                     )}
-                    <span className="font-bold text-lg text-[var(--text-primary)]">OroNext</span>
+                    <span className="font-bold text-lg text-[var(--text-primary)]">ORO 9</span>
                 </div>
 
                 {/* Shift Status */}
                 <div className="flex-1 flex justify-center">
-                    {employee.shiftActive ? (
+                    {shiftActive ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
                             <Clock size={14} className="text-emerald-400" />
-                            <span className="text-sm text-emerald-400">On Shift since {employee.shiftStart}</span>
+                            <span className="text-sm text-emerald-400">On Shift since {shiftStart}</span>
                         </div>
                     ) : (
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-hover)]">
@@ -81,11 +82,11 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
                 {/* Employee Info */}
                 <div className="flex items-center gap-3">
                     <div className="text-right hidden sm:block">
-                        <p className="text-sm font-medium text-[var(--text-primary)]">{employee.name}</p>
-                        <p className="text-xs text-[var(--text-muted)]">{employee.role}</p>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">{employeeName}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{employeeRole}</p>
                     </div>
                     <div className="w-9 h-9 rounded-full bg-[var(--primary)] flex items-center justify-center text-white font-medium">
-                        {employee.name.split(' ').map(n => n[0]).join('')}
+                        {employeeName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </div>
                 </div>
             </header>
@@ -116,13 +117,13 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
 
                 {/* Logout */}
                 <div className="absolute bottom-0 left-0 right-0 p-2 border-t border-[var(--border)]">
-                    <Link
-                        href="/login"
-                        className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-red-400 transition-colors"
+                    <button
+                        onClick={() => signOut({ callbackUrl: '/login' })}
+                        className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-red-400 transition-colors"
                     >
                         <LogOut size={20} />
                         <span className={sidebarOpen ? '' : 'lg:hidden'}>Logout</span>
-                    </Link>
+                    </button>
                 </div>
             </aside>
 
@@ -144,4 +145,5 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
         </div>
     );
 }
+
 

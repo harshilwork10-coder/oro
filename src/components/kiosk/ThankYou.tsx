@@ -52,7 +52,7 @@ export default function ThankYou({ onComplete }: ThankYouProps) {
                             <button
                                 onClick={() => {
                                     // TODO: Open booking flow
-                                    console.log('Booking flow coming soon!')
+                                    // Booking flow pending
                                 }}
                                 className="py-4 px-6 bg-white text-orange-600 rounded-xl font-bold text-lg hover:bg-orange-50 transition-all flex items-center justify-center gap-2"
                             >

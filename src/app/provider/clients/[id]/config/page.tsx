@@ -27,12 +27,17 @@ interface ClientData {
     posMode: string;
     tipPercentages: number[];
     tipType: string;
+    // Dual Pricing Fields
+    pricingModel: 'STANDARD' | 'DUAL_PRICING';
+    showDualPricing: boolean;
     cardSurchargeType: string;
     cardSurchargeValue: number;
     acceptsCash: boolean;
     acceptsCard: boolean;
     acceptsEbt: boolean;
     acceptsChecks: boolean;
+    // Shift/Cash Drawer Settings
+    shiftRequirement: 'NONE' | 'CLOCK_IN_ONLY' | 'CASH_COUNT_ONLY' | 'BOTH';
     features: Record<string, boolean>;
     documents: { voidCheck: boolean; driverLicense: boolean; feinLetter: boolean };
     locations: LocationData[];
@@ -50,7 +55,7 @@ function parseTipSuggestions(tipSuggestions: string | undefined): number[] {
     }
 }
 
-type CategoryView = 'status' | 'sales' | 'features' | 'locations' | 'pricing' | 'tips' | 'payments' | 'documents' | 'branding' | null;
+type CategoryView = 'status' | 'sales' | 'features' | 'locations' | 'pricing' | 'shift' | 'tips' | 'payments' | 'documents' | 'branding' | null;
 
 export default function ProviderClientConfigPage() {
     const params = useParams();
@@ -67,10 +72,9 @@ export default function ProviderClientConfigPage() {
     // Fetch client data
     async function fetchClient() {
         try {
-            const response = await fetch('/api/admin/franchisors');
+            const response = await fetch(`/api/admin/franchisors/${clientId}`);
             if (response.ok) {
-                const data = await response.json();
-                const found = data.find((f: any) => f.id === clientId);
+                const found = await response.json();
                 if (found) {
                     setClient({
                         id: found.id,
@@ -83,12 +87,17 @@ export default function ProviderClientConfigPage() {
                         posMode: found.config?.posMode || 'RETAIL',
                         tipPercentages: parseTipSuggestions(found.config?.tipSuggestions),
                         tipType: found.config?.tipType || 'PERCENT',
-                        cardSurchargeType: found.config?.cashDiscountEnabled ? 'PERCENTAGE' : 'NONE',
-                        cardSurchargeValue: found.config?.cashDiscountPercent || 0,
+                        // Dual Pricing Fields
+                        pricingModel: found.config?.pricingModel || 'STANDARD',
+                        showDualPricing: found.config?.showDualPricing || false,
+                        cardSurchargeType: found.config?.cardSurchargeType || 'PERCENTAGE',
+                        cardSurchargeValue: found.config?.cardSurcharge || 0,
                         acceptsCash: true, // Always true, no DB field
                         acceptsCard: true, // Always true, no DB field
                         acceptsEbt: found.config?.acceptsEbt || false,
                         acceptsChecks: found.config?.acceptsChecks || false,
+                        // Shift/Cash Drawer Settings
+                        shiftRequirement: found.config?.shiftRequirement || 'BOTH',
                         features: {
                             usesInventory: found.config?.usesInventory || false,
                             usesAgeVerification: false, // Not in DB yet
@@ -176,7 +185,8 @@ export default function ProviderClientConfigPage() {
         { id: 'sales', label: 'Sales Config', value: client.posMode === 'SALON' ? 'Salon / Spa' : client.posMode === 'RETAIL' ? 'Retail Store' : client.posMode, icon: DollarSign, color: 'green' },
         { id: 'features', label: 'Features', value: '0/15 enabled', icon: Star, color: 'yellow' },
         { id: 'locations', label: 'Locations', value: `${client.locations.length} store${client.locations.length !== 1 ? 's' : ''}`, icon: MapPin, color: 'pink' },
-        { id: 'pricing', label: 'Pricing', value: 'Standard', icon: CreditCard, color: 'blue' },
+        { id: 'pricing', label: 'Pricing', value: client.pricingModel === 'DUAL_PRICING' ? `Dual (${client.cardSurchargeValue}%)` : 'Standard', icon: CreditCard, color: 'blue' },
+        { id: 'shift', label: 'Shift/Drawer', value: client.shiftRequirement === 'NONE' ? 'No Shift' : client.shiftRequirement === 'CLOCK_IN_ONLY' ? 'Clock-in Only' : client.shiftRequirement === 'CASH_COUNT_ONLY' ? 'Cash Count' : 'Full (Clock + Cash)', icon: Clock, color: 'amber' },
         { id: 'tips', label: 'Tips', value: client.tipPercentages.join(', '), icon: Gift, color: 'green' },
         { id: 'payments', label: 'Payments', value: [client.acceptsCash ? 'Cash' : '', client.acceptsCard ? 'Card' : ''].filter(Boolean).join(' & ') || 'None', icon: CreditCard, color: 'orange' },
         { id: 'documents', label: 'Documents', value: `${[client.documents.voidCheck, client.documents.driverLicense, client.documents.feinLetter].filter(Boolean).length}/3`, icon: FileText, color: 'emerald' },
@@ -519,10 +529,9 @@ export default function ProviderClientConfigPage() {
                                                             });
                                                         }}
                                                         disabled={saving}
-                                                        className={`p-3 rounded-lg border text-left transition-colors ${(model.id === 'DUAL_PRICING' && client.cardSurchargeType !== 'NONE') ||
-                                                                (model.id === 'STANDARD' && client.cardSurchargeType === 'NONE')
-                                                                ? 'border-orange-500 bg-orange-500/20 text-orange-400'
-                                                                : 'border-stone-700 hover:border-stone-600 text-stone-200'
+                                                        className={`p-3 rounded-lg border text-left transition-colors ${client.pricingModel === model.id
+                                                            ? 'border-orange-500 bg-orange-500/20 text-orange-400'
+                                                            : 'border-stone-700 hover:border-stone-600 text-stone-200'
                                                             }`}
                                                     >
                                                         <span className="font-medium">{model.label}</span>
@@ -554,21 +563,54 @@ export default function ProviderClientConfigPage() {
                                                 />
                                             </div>
                                             <p className="text-xs text-stone-500 mt-1">
-                                                For Dual Pricing: Card price = Cash price + surcharge
+                                                For Dual Pricing: Card price = Cash price × (1 + %)
                                             </p>
                                         </div>
 
+                                        {/* Show Dual Pricing Toggle */}
+                                        <div>
+                                            <label className="block text-sm text-stone-300 mb-2">Show Dual Pricing on POS</label>
+                                            <button
+                                                id="show-dual-pricing-toggle"
+                                                onClick={(e) => {
+                                                    const btn = e.currentTarget;
+                                                    const isOn = btn.getAttribute('data-on') === 'true';
+                                                    btn.setAttribute('data-on', (!isOn).toString());
+                                                    btn.className = !isOn
+                                                        ? 'w-full p-3 rounded-lg border flex items-center justify-between border-emerald-500/50 bg-emerald-500/10'
+                                                        : 'w-full p-3 rounded-lg border flex items-center justify-between border-stone-700';
+                                                    const span = btn.querySelector('span:last-child');
+                                                    if (span) span.textContent = !isOn ? '✓ Enabled' : 'Disabled';
+                                                }}
+                                                data-on={client.showDualPricing.toString()}
+                                                className={`w-full p-3 rounded-lg border flex items-center justify-between ${client.showDualPricing
+                                                    ? 'border-emerald-500/50 bg-emerald-500/10'
+                                                    : 'border-stone-700'
+                                                    }`}
+                                            >
+                                                <span className="text-stone-200">Display both Cash & Card prices</span>
+                                                <span className={client.showDualPricing ? 'text-emerald-400' : 'text-stone-500'}>
+                                                    {client.showDualPricing ? '✓ Enabled' : 'Disabled'}
+                                                </span>
+                                            </button>
+                                            <p className="text-xs text-stone-500 mt-1">
+                                                When enabled, POS shows both Cash and Card totals to customers
+                                            </p>
+                                        </div>
                                         {/* Save Button */}
                                         <button
                                             onClick={() => {
                                                 const typeSelect = document.getElementById('surcharge-type-select') as HTMLSelectElement;
                                                 const valueInput = document.getElementById('surcharge-value-input') as HTMLInputElement;
+                                                const dualPricingToggle = document.getElementById('show-dual-pricing-toggle');
                                                 const surchargeType = typeSelect?.value || 'PERCENTAGE';
                                                 const surchargeValue = parseFloat(valueInput?.value) || 3.99;
+                                                const showDualPricing = dualPricingToggle?.getAttribute('data-on') === 'true';
 
                                                 updateConfig({
                                                     cardSurchargeType: surchargeType,
                                                     cardSurcharge: surchargeValue,
+                                                    showDualPricing: showDualPricing,
                                                     cashDiscountEnabled: true,
                                                     cashDiscountPercent: surchargeValue
                                                 });
@@ -579,6 +621,43 @@ export default function ProviderClientConfigPage() {
                                         >
                                             {saving ? 'Saving...' : 'Save Pricing Settings'}
                                         </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {categoryView === 'shift' && (
+                                <div className="space-y-4">
+                                    <p className="text-stone-400">Configure shift opening requirements for employees</p>
+                                    <div className="space-y-3">
+                                        {[
+                                            { id: 'NONE', label: 'No Shift Required', desc: 'Employees can use POS without opening a shift' },
+                                            { id: 'CLOCK_IN_ONLY', label: 'Clock-in Only', desc: 'Simple clock-in button, no cash counting' },
+                                            { id: 'CASH_COUNT_ONLY', label: 'Cash Count Only', desc: 'Require starting cash drawer count' },
+                                            { id: 'BOTH', label: 'Full (Clock + Cash)', desc: 'Clock-in and cash drawer count required' },
+                                        ].map((option) => (
+                                            <button
+                                                key={option.id}
+                                                onClick={() => {
+                                                    updateConfig({ shiftRequirement: option.id });
+                                                    setCategoryView(null);
+                                                }}
+                                                disabled={saving}
+                                                className={`w-full p-4 rounded-lg border text-left transition-colors ${client.shiftRequirement === option.id
+                                                    ? 'border-amber-500 bg-amber-500/20 text-amber-400'
+                                                    : 'border-stone-700 hover:border-stone-600 text-stone-200'
+                                                    }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <span className="font-medium">{option.label}</span>
+                                                        <p className="text-stone-500 text-xs mt-1">{option.desc}</p>
+                                                    </div>
+                                                    {client.shiftRequirement === option.id && (
+                                                        <CheckCircle className="h-5 w-5 text-amber-400" />
+                                                    )}
+                                                </div>
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             )}

@@ -8,11 +8,49 @@ import {
     DollarSign,
     FileText,
     ChevronRight,
-    Search
+    Search,
+    Star,
+    Wallet,
+    Activity
 } from 'lucide-react'
 import Link from 'next/link'
 
 const employeeReports = [
+    {
+        id: 'earnings-statement',
+        name: 'Barber Earnings Statement',
+        description: 'Detailed breakdown of earnings per barber (services, commission, tips, refunds)',
+        icon: DollarSign,
+        href: '/dashboard/reports/employee/earnings',
+        status: 'available',
+        priority: true
+    },
+    {
+        id: 'payout-history',
+        name: 'Payout History',
+        description: 'Track all payouts to barbers/stylists with status',
+        icon: Wallet,
+        href: '/dashboard/reports/employee/payouts',
+        status: 'available',
+        priority: true
+    },
+    {
+        id: 'utilization',
+        name: 'Barber Utilization',
+        description: 'Chair efficiency: clocked hours vs services, revenue per hour, idle time',
+        icon: Activity,
+        href: '/dashboard/reports/employee/utilization',
+        status: 'available',
+        priority: true
+    },
+    {
+        id: 'stylist-performance',
+        name: 'Stylist Performance',
+        description: 'Revenue, client count, and average ticket by stylist',
+        icon: Star,
+        href: '/dashboard/reports/employee/sales',
+        status: 'available'
+    },
     {
         id: 'hours-wages',
         name: 'Hours & Wages',
@@ -25,7 +63,7 @@ const employeeReports = [
         id: 'sales-by-employee',
         name: 'Sales by Employee',
         description: 'Revenue and transaction count per employee',
-        icon: DollarSign,
+        icon: FileText,
         href: '/dashboard/reports/employee/sales',
         status: 'available'
     },
@@ -65,7 +103,7 @@ export default function EmployeeReportsPage() {
                             </div>
                             Employee Reports
                         </h1>
-                        <p className="text-gray-400 mt-1">3 reports available</p>
+                        <p className="text-gray-400 mt-1">7 reports available</p>
                     </div>
                 </div>
 

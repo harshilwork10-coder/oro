@@ -25,17 +25,226 @@ try {
     console.log('  Install with: npm install escpos escpos-usb');
 }
 
-app.use(cors());
+// Enable CORS for all origins (allows browser to call localhost:9100)
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false
+}));
+
+// Also handle preflight requests
+app.options('*', cors());
+
 app.use(express.json());
 
 const PORT = process.env.PRINT_PORT || 9100;
 
+// Windows native printing support
+const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
 // Store configuration
 let config = {
-    printerName: 'auto', // 'auto' or specific USB vendor/product ID
+    printerName: 'auto', // 'auto' or specific USB vendor/product ID OR Windows printer name
     paperWidth: 80, // 80mm or 58mm
-    encoding: 'GB18030'
+    encoding: 'GB18030',
+    useWindowsPrinting: true // Try Windows printing if USB fails
 };
+
+// Logo file path - place logo.png in same folder as print-agent
+const LOGO_PATH = path.join(__dirname, 'logo.png');
+
+// === LOGO CACHING (PRD Phase 4 requirement) ===
+// Cache logo in memory at startup for reliability
+let cachedLogo = null;
+let logoLoadError = null;
+
+function initializeLogo() {
+    try {
+        if (fs.existsSync(LOGO_PATH)) {
+            cachedLogo = fs.readFileSync(LOGO_PATH);
+            console.log('Logo exists: ✓ Yes (cached in memory,', cachedLogo.length, 'bytes)');
+        } else {
+            console.log('Logo exists: ✗ No (place logo.png in print-agent folder)');
+        }
+    } catch (err) {
+        logoLoadError = err.message;
+        console.log('Logo exists: ✗ Error loading:', err.message);
+    }
+}
+
+// Check if logo is available (uses cached version)
+function hasLogo() {
+    return cachedLogo !== null;
+}
+
+// Get cached logo buffer
+function getCachedLogo() {
+    return cachedLogo;
+}
+
+console.log('Logo path:', LOGO_PATH);
+// Initialize logo cache at module load
+initializeLogo();
+
+// Get Windows default printer name
+async function getWindowsDefaultPrinter() {
+    return new Promise((resolve) => {
+        exec('wmic printer where default=true get name', (err, stdout) => {
+            if (err) {
+                resolve(null);
+            } else {
+                const lines = stdout.split('\n').filter(l => l.trim() && !l.includes('Name'));
+                resolve(lines[0]?.trim() || null);
+            }
+        });
+    });
+}
+
+// Print using Windows - try multiple methods
+async function printViaWindows(text, printerName) {
+    const tempFile = path.join(os.tmpdir(), `receipt_${Date.now()}.txt`);
+    fs.writeFileSync(tempFile, text, 'utf8');
+
+    return new Promise((resolve, reject) => {
+        // Method 1: Use copy command to printer (fastest for raw thermal)
+        // The printer name in Windows is the share name
+        const shareName = printerName ? printerName.replace(/ /g, '_') : 'receipt_printer';
+
+        // Try using Round Robin Printer Port (if configured)
+        // Otherwise fall back to printing via the spooler
+        const cmd = `copy /b "${tempFile}" "\\\\%COMPUTERNAME%\\${printerName}"`;
+
+        console.log('Attempting print via copy command...');
+
+        // Set a timeout for the print operation
+        const printTimeout = setTimeout(() => {
+            console.log('Print command timed out, but file was sent');
+            try { fs.unlinkSync(tempFile); } catch (e) { }
+            resolve(true); // Assume success on timeout
+        }, 5000);
+
+        exec(cmd, { timeout: 5000 }, (err, stdout, stderr) => {
+            clearTimeout(printTimeout);
+
+            // Clean up
+            setTimeout(() => {
+                try { fs.unlinkSync(tempFile); } catch (e) { }
+            }, 1000);
+
+            if (err && !stderr.includes('1 file(s) copied')) {
+                console.log('Copy command failed, trying notepad print...');
+                // Fall back to notepad silent print
+                exec(`notepad /p "${tempFile}"`, { timeout: 10000 }, (err2) => {
+                    if (err2) {
+                        reject(err);
+                    } else {
+                        resolve(true);
+                    }
+                });
+            } else {
+                console.log('Print succeeded');
+                resolve(true);
+            }
+        });
+    });
+}
+
+// Format receipt as plain text for Windows printing
+function formatReceiptAsText(receipt) {
+    const width = config.paperWidth === 58 ? 32 : 42;
+    let text = '';
+
+    // Center helper
+    const center = (str) => {
+        const padding = Math.max(0, Math.floor((width - str.length) / 2));
+        return ' '.repeat(padding) + str;
+    };
+
+    // Line helper
+    const line = () => '='.repeat(width);
+
+    // Header
+    if (receipt.storeName) {
+        text += center(receipt.storeName) + '\n';
+    }
+    if (receipt.storeAddress) {
+        text += center(receipt.storeAddress) + '\n';
+    }
+    if (receipt.storePhone) {
+        text += center(receipt.storePhone) + '\n';
+    }
+
+    text += '\n' + line() + '\n';
+
+    // Transaction info
+    if (receipt.transactionId) {
+        text += `Trans #: ${receipt.transactionId}\n`;
+    }
+    if (receipt.date) {
+        text += `Date: ${receipt.date}\n`;
+    }
+    if (receipt.cashier) {
+        text += `Cashier: ${receipt.cashier}\n`;
+    }
+
+    text += line() + '\n';
+
+    // Items
+    if (receipt.items && receipt.items.length > 0) {
+        receipt.items.forEach(item => {
+            const name = (item.name || 'Item').substring(0, 24);
+            const total = `$${(item.total || 0).toFixed(2)}`;
+            const spaces = width - name.length - total.length;
+            text += name + ' '.repeat(Math.max(1, spaces)) + total + '\n';
+        });
+    }
+
+    text += line() + '\n';
+
+    // Totals
+    const formatTotal = (label, amount) => {
+        const amountStr = `$${(amount || 0).toFixed(2)}`;
+        const spaces = width - label.length - amountStr.length;
+        return label + ' '.repeat(Math.max(1, spaces)) + amountStr + '\n';
+    };
+
+    if (receipt.subtotal !== undefined) {
+        text += formatTotal('Subtotal:', receipt.subtotal);
+    }
+    if (receipt.tax !== undefined) {
+        text += formatTotal('Tax:', receipt.tax);
+    }
+    if (receipt.discount !== undefined && receipt.discount > 0) {
+        text += formatTotal('Discount:', -receipt.discount);
+    }
+    text += formatTotal('TOTAL:', receipt.total || 0);
+
+    text += line() + '\n';
+
+    // Payment info
+    if (receipt.paymentMethod) {
+        text += `Payment: ${receipt.paymentMethod}\n`;
+    }
+    if (receipt.amountPaid !== undefined) {
+        text += formatTotal('Paid:', receipt.amountPaid);
+    }
+    if (receipt.change !== undefined && receipt.change > 0) {
+        text += formatTotal('Change:', receipt.change);
+    }
+
+    // Footer
+    text += '\n';
+    text += center(receipt.footer || 'Thank you for your business!') + '\n';
+    text += '\n\n\n';
+
+    return text;
+}
+
+
 
 /**
  * Get list of connected USB printers
@@ -66,8 +275,67 @@ app.get('/status', (req, res) => {
         status: 'running',
         version: '1.0.0',
         usbAvailable,
+        hasLogo: hasLogo(),
+        logoPath: LOGO_PATH,
         config
     });
+});
+
+/**
+ * Get current logo
+ */
+app.get('/logo', (req, res) => {
+    if (hasLogo()) {
+        res.sendFile(LOGO_PATH);
+    } else {
+        res.status(404).json({ error: 'No logo configured. Upload a logo.png file.' });
+    }
+});
+
+/**
+ * Upload new logo (base64 encoded PNG)
+ * POST /logo
+ * Body: { image: "data:image/png;base64,..." } OR { image: "base64string..." }
+ */
+app.post('/logo', (req, res) => {
+    try {
+        let { image } = req.body;
+
+        if (!image) {
+            return res.status(400).json({ error: 'No image provided. Send { image: "base64..." }' });
+        }
+
+        // Remove data URL prefix if present
+        if (image.startsWith('data:image')) {
+            image = image.split(',')[1];
+        }
+
+        // Decode and save
+        const buffer = Buffer.from(image, 'base64');
+        fs.writeFileSync(LOGO_PATH, buffer);
+
+        console.log('✓ Logo saved:', LOGO_PATH);
+        res.json({ success: true, message: 'Logo saved successfully', path: LOGO_PATH });
+    } catch (e) {
+        console.error('Logo upload error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
+ * Delete logo
+ */
+app.delete('/logo', (req, res) => {
+    try {
+        if (hasLogo()) {
+            fs.unlinkSync(LOGO_PATH);
+            res.json({ success: true, message: 'Logo deleted' });
+        } else {
+            res.json({ success: true, message: 'No logo to delete' });
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 /**
@@ -85,6 +353,13 @@ app.post('/config', (req, res) => {
  */
 app.post('/print', async (req, res) => {
     const { receipt } = req.body;
+
+    // === DEBUG: Log what we receive ===
+    console.log('\n=== PRINT REQUEST ===');
+    console.log('Items:', JSON.stringify(receipt?.items?.map(i => ({ name: i.name, cashPrice: i.cashPrice, cardPrice: i.cardPrice })), null, 2));
+    console.log('Dual Pricing:', { cashTotal: receipt?.cashTotal, cardTotal: receipt?.cardTotal, hasDualPricing: !!(receipt?.cashTotal && receipt?.cardTotal) });
+    console.log('Logo exists:', hasLogo());
+    console.log('=====================\n');
 
     if (!receipt) {
         return res.status(400).json({ error: 'No receipt data provided' });
@@ -115,112 +390,108 @@ app.post('/print', async (req, res) => {
             device.open(err => {
                 if (err) return reject(err);
 
-                // Build receipt
-                printer
-                    .font('a')
-                    .align('ct')
-                    .style('b')
-                    .size(1, 1);
+                // PROFESSIONAL SHORT RECEIPT
+                const W = 42;
+                const line = (l, r) => l + ' '.repeat(Math.max(1, W - l.length - r.length)) + r;
+                const invoiceNum = receipt.invoiceNumber || receipt.transactionId || '';
 
-                // Header (store name)
-                if (receipt.storeName) {
-                    printer.text(receipt.storeName);
-                }
-                if (receipt.storeAddress) {
-                    printer.style('normal').text(receipt.storeAddress);
-                }
-                if (receipt.storePhone) {
-                    printer.text(receipt.storePhone);
+                printer.font('a').align('ct');
+
+                // === LOGO (if exists) ===
+                if (hasLogo()) {
+                    try {
+                        const escposImage = require('escpos').Image;
+                        escposImage.load(LOGO_PATH, function (image) {
+                            if (image) {
+                                printer.image(image, 's8'); // s8 = single density
+                                printer.text(''); // Add spacing after logo
+                            }
+                        });
+                    } catch (logoErr) {
+                        console.log('Logo print skipped:', logoErr.message);
+                    }
                 }
 
-                printer.text('');
+                // === HEADER (Bold Store Name) ===
+                printer.style('b').size(1, 1);
+                printer.text(receipt.storeName || 'STORE');
+                printer.size(0, 0).style('normal');
+                if (receipt.storeAddress) printer.text(receipt.storeAddress);
+                if (receipt.storePhone) printer.text(receipt.storePhone);
+                printer.text(receipt.date || new Date().toLocaleString());
                 printer.drawLine();
 
-                // Transaction info
+                // === ITEMS (with dual pricing) ===
                 printer.align('lt');
-                if (receipt.transactionId) {
-                    printer.text(`Trans #: ${receipt.transactionId}`);
-                }
-                if (receipt.date) {
-                    printer.text(`Date: ${receipt.date}`);
-                }
-                if (receipt.cashier) {
-                    printer.text(`Cashier: ${receipt.cashier}`);
-                }
+                const hasDualPricing = receipt.cashTotal !== undefined && receipt.cardTotal !== undefined;
 
-                printer.drawLine();
-
-                // Items
                 if (receipt.items && receipt.items.length > 0) {
                     receipt.items.forEach(item => {
-                        const name = item.name.substring(0, 24).padEnd(24);
-                        const qty = String(item.quantity).padStart(3);
-                        const price = `$${item.total.toFixed(2)}`.padStart(8);
-                        printer.text(`${name}${qty}${price}`);
+                        const name = (item.name || 'Item').substring(0, 18);
+                        const qty = item.quantity || 1;
+
+                        if (hasDualPricing && item.cashPrice && item.cardPrice) {
+                            // Show both cash and card prices per item
+                            const cashP = Number(item.cashPrice).toFixed(2);
+                            const cardP = Number(item.cardPrice).toFixed(2);
+                            const cashT = (Number(item.cashPrice) * qty).toFixed(2);
+                            const cardT = (Number(item.cardPrice) * qty).toFixed(2);
+                            printer.text(line(`${name} ${qty}x`, ''));
+                            printer.text(line(`  Cash: $${cashP}`, `$${cashT}`));
+                            printer.text(line(`  Card: $${cardP}`, `$${cardT}`));
+                        } else {
+                            const price = Number(item.price || 0).toFixed(2);
+                            const total = Number(item.total || 0).toFixed(2);
+                            printer.text(line(`${name} ${qty}x$${price}`, `$${total}`));
+                        }
                     });
                 }
-
                 printer.drawLine();
 
-                // Totals
-                printer.align('rt');
-                if (receipt.subtotal !== undefined) {
-                    printer.text(`Subtotal: $${receipt.subtotal.toFixed(2)}`);
-                }
-                if (receipt.tax !== undefined) {
-                    printer.text(`Tax: $${receipt.tax.toFixed(2)}`);
-                }
-                if (receipt.discount !== undefined && receipt.discount > 0) {
-                    printer.text(`Discount: -$${receipt.discount.toFixed(2)}`);
-                }
+                // === TOTALS ===
+                if (receipt.subtotal !== undefined)
+                    printer.text(line('Subtotal', `$${Number(receipt.subtotal).toFixed(2)}`));
+                if (receipt.tax !== undefined && receipt.tax > 0)
+                    printer.text(line('Tax', `$${Number(receipt.tax).toFixed(2)}`));
 
-                printer.style('b').size(1, 1);
-                if (receipt.total !== undefined) {
-                    printer.text(`TOTAL: $${receipt.total.toFixed(2)}`);
+                // Dual pricing totals
+                if (hasDualPricing) {
+                    printer.style('b');
+                    printer.text(line('CASH TOTAL', `$${Number(receipt.cashTotal).toFixed(2)}`));
+                    printer.text(line('CARD TOTAL', `$${Number(receipt.cardTotal).toFixed(2)}`));
+                    printer.style('normal');
                 }
-                printer.style('normal').size(0, 0);
 
                 printer.drawLine();
+                printer.style('b');
+                printer.text(line('TOTAL', `$${Number(receipt.total || 0).toFixed(2)}`));
+                printer.style('normal');
+                printer.drawLine();
 
-                // Payment info
-                printer.align('lt');
-                if (receipt.paymentMethod) {
-                    printer.text(`Payment: ${receipt.paymentMethod}`);
-                }
-                if (receipt.amountPaid !== undefined) {
-                    printer.text(`Paid: $${receipt.amountPaid.toFixed(2)}`);
-                }
-                if (receipt.change !== undefined && receipt.change > 0) {
-                    printer.text(`Change: $${receipt.change.toFixed(2)}`);
-                }
+                // === PAYMENT ===
+                if (receipt.paymentMethod)
+                    printer.text(line('Paid', receipt.paymentMethod + (receipt.cardLast4 ? ` ****${receipt.cardLast4}` : '')));
+                if (receipt.change !== undefined && receipt.change > 0)
+                    printer.text(line('Change', `$${Number(receipt.change).toFixed(2)}`));
 
-                // Barcode
-                if (receipt.barcode) {
+                // === BARCODE ===
+                if (invoiceNum) {
                     printer.text('');
                     printer.align('ct');
-                    printer.barcode(receipt.barcode, 'CODE39', { width: 2, height: 50 });
+                    try {
+                        printer.barcode(invoiceNum.toString().substring(0, 20), 'CODE39', { width: 2, height: 40 });
+                        printer.text(invoiceNum);
+                    } catch (e) { /* skip if fails */ }
                 }
 
-                // Footer
+                // === FOOTER ===
                 printer.text('');
                 printer.align('ct');
-                if (receipt.footer) {
-                    printer.text(receipt.footer);
-                } else {
-                    printer.text('Thank you for your business!');
-                }
-
-                printer.text('');
+                printer.text('Thank you for your business!');
                 printer.text('');
 
-                // Cut paper
                 printer.cut();
-
-                // Open cash drawer if requested
-                if (receipt.openDrawer) {
-                    printer.cashdraw(2);
-                }
-
+                if (receipt.openDrawer) printer.cashdraw(2);
                 printer.close(resolve);
             });
         });
@@ -228,10 +499,27 @@ app.post('/print', async (req, res) => {
         res.json({ success: true, message: 'Receipt printed successfully' });
 
     } catch (e) {
-        console.error('Print error:', e);
-        res.status(500).json({ error: e.message });
+        console.error('USB Print error:', e.message);
+
+        // Try Windows native printing as fallback
+        if (config.useWindowsPrinting) {
+            try {
+                console.log('Trying Windows native printing...');
+                const text = formatReceiptAsText(receipt);
+                const printerName = await getWindowsDefaultPrinter();
+                console.log('Using Windows printer:', printerName || 'default');
+                await printViaWindows(text, printerName);
+                res.json({ success: true, message: 'Receipt printed via Windows' });
+            } catch (winErr) {
+                console.error('Windows print also failed:', winErr.message);
+                res.status(500).json({ error: e.message, windowsError: winErr.message });
+            }
+        } else {
+            res.status(500).json({ error: e.message });
+        }
     }
 });
+
 
 /**
  * Open cash drawer

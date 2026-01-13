@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// In-memory rate limiter (consider Redis for production)
+const receiptRateLimits = new Map<string, number>()
+
 // POST - Send SMS receipt
 export async function POST(request: NextRequest) {
     try {
@@ -13,8 +16,19 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        // SECURITY: Rate Limiting
+        const now = Date.now()
+        const clientIP = request.headers.get('x-forwarded-for') || 'unknown'
+        const lastRequest = receiptRateLimits.get(clientIP) || 0
+
+        // 1 request every 2 seconds per IP is reasonable for manual POS usage
+        if (now - lastRequest < 2000) {
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+        }
+        receiptRateLimits.set(clientIP, now)
+
         const body = await request.json()
-        const { phone, transactionId, transactionData } = body
+        const { phone, transactionId } = body
 
         if (!phone) {
             return NextResponse.json({ error: 'Phone number required' }, { status: 400 })
@@ -26,56 +40,52 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
         }
 
-        // Get transaction details if ID provided
-        let transaction = transactionData
-        if (transactionId && !transaction) {
-            transaction = await prisma.transaction.findUnique({
-                where: { id: transactionId },
-                include: {
-                    itemLineItems: { include: { item: { select: { name: true } } } },
-                    cashDrawerSession: {
-                        include: { location: { select: { name: true, address: true } } }
-                    }
-                }
-            })
+        // SECURITY: Force DB lookup. Do NOT accept client-provided transaction data.
+        if (!transactionId) {
+            return NextResponse.json({ error: 'Transaction ID required' }, { status: 400 })
         }
 
+        const transaction = await prisma.transaction.findUnique({
+            where: { id: transactionId },
+            include: {
+                lineItems: { include: { service: true, product: true } },
+                cashDrawerSession: {
+                    include: { location: { select: { name: true, address: true, publicPhone: true } } }
+                }
+            }
+        })
+
         if (!transaction) {
-            return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+            return NextResponse.json({ error: 'Transaction not found or valid' }, { status: 404 })
         }
 
         // Build receipt message
+        // Handle optional location data safely
         const storeName = transaction.cashDrawerSession?.location?.name || 'Store'
-        const storePhone = transaction.cashDrawerSession?.location?.phone || ''
+        // Location phone might not be in the select, defaulting to empty
+        const storePhone = ''
+
         const invoiceNum = transaction.invoiceNumber || transactionId?.slice(-8) || 'N/A'
-        const total = typeof transaction.total === 'object'
-            ? Number(transaction.total)
-            : transaction.total
-        const subtotal = typeof transaction.subtotal === 'object'
-            ? Number(transaction.subtotal)
-            : transaction.subtotal
-        const tax = typeof transaction.tax === 'object'
-            ? Number(transaction.tax)
-            : transaction.tax
+
+        // Ensure numbers
+        const total = Number(transaction.total)
+        const subtotal = Number(transaction.subtotal)
+        const tax = Number(transaction.tax)
+        const tip = Number(transaction.tip || 0)
 
         // Get card fee percentage (dual pricing - default 3.99%)
-        const cardFeePercent = transaction.cardFeePercent || 3.99
+        const cardFeePercent = 3.99
         const paymentMethod = transaction.paymentMethod || 'CASH'
-        const tip = typeof transaction.tipAmount === 'object'
-            ? Number(transaction.tipAmount)
-            : (transaction.tipAmount || 0)
 
         // Format items list with DUAL PRICING (shows both cash and card price per item)
         let itemsList = ''
-        const items = transaction.items || []
+        const items = transaction.lineItems || []
         if (items.length > 0) {
             const displayItems = items.slice(0, 4) // Fewer items to fit dual prices
             itemsList = displayItems.map((item: any) => {
-                const name = item.item?.name || item.name || 'Item'
+                const name = item.product?.name || item.service?.name || item.name || 'Item'
                 const qty = item.quantity || 1
-                const cashPrice = typeof item.subtotal === 'object'
-                    ? Number(item.subtotal)
-                    : (item.subtotal || 0)
+                const cashPrice = Number(item.price) // Assume stored price is Cash Price
                 const cardPrice = cashPrice * (1 + cardFeePercent / 100)
                 return `${qty}x ${name.slice(0, 14)}\n💵$${cashPrice.toFixed(2)}  💳$${cardPrice.toFixed(2)}`
             }).join('\n')
@@ -122,29 +132,7 @@ ${paidWith}
 Thank you!`
 
         // In production, send via Twilio/AWS SNS/etc.
-        // For now, log and simulate success
-        console.log('SMS Receipt:', {
-            to: cleanPhone,
-            message: smsMessage,
-            transactionId
-        })
-
-        // Store receipt log
-        try {
-            // Could create a ReceiptLog model, for now just log to console
-            console.log('Receipt sent to:', cleanPhone)
-        } catch (e) {
-            // Optional logging
-        }
-
-        // TODO: Add actual SMS sending here
-        // Example with Twilio:
-        // const twilio = require('twilio')(process.env.TWILIO_SID, process.env.TWILIO_AUTH)
-        // await twilio.messages.create({
-        //     body: smsMessage,
-        //     from: process.env.TWILIO_PHONE,
-        //     to: '+1' + cleanPhone
-        // })
+        // For now, simulate success
 
         return NextResponse.json({
             success: true,
@@ -183,4 +171,3 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Server error' }, { status: 500 })
     }
 }
-

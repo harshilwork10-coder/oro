@@ -159,13 +159,7 @@ export default function ProductsPage() {
                     <p className="text-stone-400 mt-2">Manage inventory and stock levels</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Link
-                        href="/dashboard/ai-insights"
-                        className="px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg font-medium flex items-center gap-2"
-                    >
-                        <Brain className="h-5 w-5" />
-                        AI Insights
-                    </Link>
+                    {/* AI Insights button temporarily disabled */}
                     <button onClick={() => setShowModal(true)} className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold flex items-center gap-2">
                         <Plus className="h-5 w-5" />
                         Add Product
@@ -250,92 +244,28 @@ export default function ProductsPage() {
                             </button>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {/* AI SKU Lookup Section */}
-                            {!editingProduct && (
-                                <div className="p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-xl border border-purple-500/20 mb-4">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Brain className="w-5 h-5 text-purple-400" />
-                                        <span className="font-semibold text-white">AI SKU Lookup</span>
-                                        <span className="text-xs text-purple-400 bg-purple-500/20 px-2 py-0.5 rounded-full">Auto-fill</span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <div className="relative flex-1">
-                                            <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" />
-                                            <input
-                                                ref={barcodeInputRef}
-                                                type="text"
-                                                placeholder="Scan or enter barcode (UPC/EAN)"
-                                                value={barcodeInput}
-                                                onChange={(e) => setBarcodeInput(e.target.value)}
-                                                onKeyDown={handleBarcodeKeyDown}
-                                                className="w-full bg-stone-950 border border-stone-700 rounded-lg pl-10 pr-4 py-3 text-white placeholder:text-stone-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-                                            />
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleSKULookup(barcodeInput)}
-                                            disabled={lookingUpSKU || barcodeInput.length < 8}
-                                            className="px-4 py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-stone-700 disabled:text-stone-500 text-white rounded-lg font-medium flex items-center gap-2"
-                                        >
-                                            {lookingUpSKU ? (
-                                                <Loader2 className="w-5 h-5 animate-spin" />
-                                            ) : (
-                                                <Sparkles className="w-5 h-5" />
-                                            )}
-                                            Lookup
-                                        </button>
-                                    </div>
+                            {/* Simple product entry for salons */}
+                            <div>
+                                <label className="block text-sm font-medium text-stone-300 mb-2">Product Name *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white"
+                                    placeholder="e.g., Shampoo, Hair Gel, Conditioner"
+                                />
+                            </div>
 
-                                    {/* SKU Lookup Result */}
-                                    {skuLookupResult && (
-                                        <div className={`mt-3 p-3 rounded-lg ${skuLookupResult.found ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-yellow-500/10 border border-yellow-500/20'}`}>
-                                            {skuLookupResult.found ? (
-                                                <div className="flex items-start gap-3">
-                                                    {skuLookupResult.imageUrl && (
-                                                        <img
-                                                            src={skuLookupResult.imageUrl}
-                                                            alt={skuLookupResult.name}
-                                                            className="w-12 h-12 object-cover rounded bg-white"
-                                                        />
-                                                    )}
-                                                    <div className="flex-1">
-                                                        <div className="font-medium text-emerald-400 flex items-center gap-2">
-                                                            ✓ Found: {skuLookupResult.name}
-                                                            {skuLookupResult.size && (
-                                                                <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">
-                                                                    {skuLookupResult.size}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className="text-xs text-stone-400 mt-1">
-                                                            {skuLookupResult.brand && <span className="mr-2">Brand: {skuLookupResult.brand}</span>}
-                                                            {skuLookupResult.category && <span>Category: {skuLookupResult.category}</span>}
-                                                        </div>
-                                                        <div className="text-xs text-purple-400 mt-1">
-                                                            Source: {skuLookupResult.source?.replace(/_/g, ' ')}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="text-yellow-400 text-sm">
-                                                    {skuLookupResult.message || 'Product not found. Please fill in details manually.'}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Barcode field */}
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-stone-300 mb-2">Barcode (UPC)</label>
+                                    <label className="block text-sm font-medium text-stone-300 mb-2">Barcode <span className="text-stone-500 text-xs">(optional)</span></label>
                                     <input
                                         type="text"
                                         value={formData.barcode}
                                         onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
                                         className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white"
-                                        placeholder="Auto-filled from lookup"
+                                        placeholder="Scan or enter barcode"
                                     />
                                 </div>
                                 <div>
@@ -345,46 +275,60 @@ export default function ProductsPage() {
                                         value={formData.category}
                                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                                         className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white"
-                                        placeholder="e.g., Beverages, Snacks"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-stone-300 mb-2">
-                                        Size
-                                        <span className="text-purple-400 text-xs ml-1">(AI)</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.size}
-                                        onChange={(e) => setFormData({ ...formData, size: e.target.value })}
-                                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white"
-                                        placeholder="e.g., 12 oz, 2 Liter"
+                                        placeholder="e.g., Hair Care, Styling"
                                     />
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-stone-300 mb-2">Name</label>
-                                <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white" />
-                            </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-stone-300 mb-2">SKU</label>
-                                    <input type="text" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white" />
+                                    <label className="block text-sm font-medium text-stone-300 mb-2">Price *</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        required
+                                        value={formData.price}
+                                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white"
+                                        placeholder="0.00"
+                                    />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-stone-300 mb-2">Price</label>
-                                    <input type="number" step="0.01" required value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white" />
+                                    <label className="block text-sm font-medium text-stone-300 mb-2">Stock Quantity</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={formData.stock}
+                                        onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white"
+                                        placeholder="0"
+                                    />
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-stone-300 mb-2">Stock Quantity</label>
-                                <input type="number" min="0" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white" />
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-stone-300 mb-2">SKU <span className="text-stone-500 text-xs">(optional)</span></label>
+                                    <input
+                                        type="text"
+                                        value={formData.sku}
+                                        onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white"
+                                        placeholder="Auto-generated if empty"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-stone-300 mb-2">Description <span className="text-stone-500 text-xs">(optional)</span></label>
+                                    <input
+                                        type="text"
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white"
+                                        placeholder="Brief product description"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-stone-300 mb-2">Description</label>
-                                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} className="w-full bg-stone-950 border border-stone-800 rounded-lg px-4 py-3 text-white" />
-                            </div>
+
                             <div className="flex gap-3">
                                 <button type="button" onClick={() => { setShowModal(false); setEditingProduct(null); }} className="flex-1 px-6 py-3 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg">Cancel</button>
                                 <button type="submit" className="flex-1 px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg">Save</button>

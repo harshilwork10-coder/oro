@@ -29,13 +29,30 @@ export async function GET(request: Request) {
         include: { location: true }
     })
 
-    if (!user?.franchiseId) {
-        return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+    if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     try {
+        let franchiseId = user.franchiseId
+
+        // Handle FRANCHISOR users
+        if (user.role === 'FRANCHISOR' && !franchiseId) {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: user.id },
+                include: { franchises: { take: 1, select: { id: true } } }
+            })
+            if (franchisor?.franchises[0]) {
+                franchiseId = franchisor.franchises[0].id
+            }
+        }
+
+        if (!franchiseId) {
+            return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+        }
+
         const items = await prisma.product.findMany({
-            where: { franchiseId: user.franchiseId },
+            where: { franchiseId },
             orderBy: { name: 'asc' }
         })
 
@@ -57,8 +74,8 @@ export async function POST(request: Request) {
         include: { location: true }
     })
 
-    if (!user?.locationId) {
-        return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+    if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Validate request body
@@ -68,6 +85,22 @@ export async function POST(request: Request) {
     const { name, sku, barcode, price, stock, description, category, size } = validation.data
 
     try {
+        let franchiseId = user.franchiseId
+
+        // Handle FRANCHISOR users
+        if (user.role === 'FRANCHISOR' && !franchiseId) {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: user.id },
+                include: { franchises: { take: 1, select: { id: true } } }
+            })
+            if (franchisor?.franchises[0]) {
+                franchiseId = franchisor.franchises[0].id
+            }
+        }
+
+        if (!franchiseId) {
+            return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
+        }
 
         const item = await prisma.product.create({
             data: {
@@ -78,7 +111,7 @@ export async function POST(request: Request) {
                 stock: stock || 0,
                 description,
                 category: category || 'RETAIL',
-                franchiseId: user.franchiseId!,
+                franchiseId,
             }
         })
 
@@ -93,7 +126,7 @@ export async function POST(request: Request) {
                 description,
                 price: price,
                 userId: user.id,
-                franchiseId: user.franchiseId!
+                franchiseId
             }).catch(err => console.error('[PRODUCTS] Failed to save to shared DB:', err))
         }
 

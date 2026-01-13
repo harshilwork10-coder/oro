@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, User, Clock, CheckCircle, AlertCircle, Phone, X, Mail, Scissors } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, User, Clock, CheckCircle, AlertCircle, Phone, X, Mail, Scissors, Loader2, Play, AlertTriangle } from 'lucide-react';
+import { useToast } from '@/components/providers/ToastProvider';
 
 interface Appointment {
-    id: number;
+    id: string;
     time: string;
     client: string;
     phone: string;
@@ -13,15 +14,20 @@ interface Appointment {
     duration: number;
     status: string;
     arrived: boolean;
+    inProgress: boolean;
     arrivedAt?: string;
 }
 
-const INITIAL_APPOINTMENTS: Appointment[] = [
-    { id: 1, time: '10:00 AM', client: 'Sarah Miller', phone: '(555) 012-3456', service: 'Haircut & Color', duration: 60, status: 'scheduled', arrived: false },
-    { id: 2, time: '10:30 AM', client: 'John Davis', phone: '(555) 012-4567', service: "Men's Cut", duration: 30, status: 'arrived', arrived: true, arrivedAt: '10:25 AM' },
-    { id: 3, time: '11:00 AM', client: 'Lisa Kim', phone: '(555) 012-5678', service: 'Manicure', duration: 45, status: 'scheduled', arrived: false },
-    { id: 4, time: '11:30 AM', client: 'Mike Thompson', phone: '(555) 012-6789', service: 'Beard Trim', duration: 30, status: 'late', arrived: false },
-];
+// Helper to format time
+function formatTime(date: Date): string {
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+// Helper to check if appointment is late
+function isLate(startTime: Date): boolean {
+    const now = new Date();
+    return now > startTime;
+}
 
 // Phone formatter helper
 function formatPhone(value: string): string {
@@ -40,11 +46,66 @@ function formatPhone(value: string): string {
     return formatted;
 }
 
+// Confirmation Modal
+function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', confirmColor = 'red' }: {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    title: string;
+    message: string;
+    confirmText?: string;
+    confirmColor?: 'red' | 'blue' | 'green';
+}) {
+    if (!isOpen) return null;
+
+    const buttonColors = {
+        red: 'bg-red-500 hover:bg-red-600',
+        blue: 'bg-blue-500 hover:bg-blue-600',
+        green: 'bg-emerald-500 hover:bg-emerald-600'
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+                <div className="flex gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${confirmColor === 'red' ? 'bg-red-500/10 text-red-500' :
+                        confirmColor === 'blue' ? 'bg-blue-500/10 text-blue-500' :
+                            'bg-emerald-500/10 text-emerald-500'
+                        }`}>
+                        <AlertTriangle size={24} />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{title}</h3>
+                        <p className="text-[var(--text-secondary)]">{message}</p>
+                    </div>
+                </div>
+                <div className="flex gap-3 mt-6">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 py-2.5 px-4 bg-[var(--surface-secondary)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-xl font-medium transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={() => {
+                            onConfirm();
+                            onClose();
+                        }}
+                        className={`flex-1 py-2.5 px-4 ${buttonColors[confirmColor]} text-white rounded-xl font-medium transition-colors`}
+                    >
+                        {confirmText}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // Walk-In Client Modal
 function WalkInModal({ isOpen, onClose, onAdd }: {
     isOpen: boolean;
     onClose: () => void;
-    onAdd: (client: Omit<Appointment, 'id' | 'status' | 'arrived'>) => void;
+    onAdd: (client: Omit<Appointment, 'id' | 'status' | 'arrived' | 'inProgress'>) => void;
 }) {
     const [form, setForm] = useState({
         client: '',
@@ -209,17 +270,21 @@ function WalkInModal({ isOpen, onClose, onAdd }: {
 
 function AppointmentCard({
     appointment,
-    onCheckIn
+    onCheckIn,
+    onStartService
 }: {
     appointment: Appointment;
-    onCheckIn: (id: number) => void;
+    onCheckIn: (id: string) => void;
+    onStartService: (id: string) => void;
 }) {
     return (
-        <div className={`p-4 rounded-xl border transition-all ${appointment.arrived
-            ? 'border-emerald-500/30 bg-emerald-500/5'
-            : appointment.status === 'late'
-                ? 'border-amber-500/30 bg-amber-500/5'
-                : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/50'
+        <div className={`p-4 rounded-xl border transition-all ${appointment.inProgress
+            ? 'border-blue-500/30 bg-blue-500/5'
+            : appointment.arrived
+                ? 'border-emerald-500/30 bg-emerald-500/5'
+                : appointment.status === 'late'
+                    ? 'border-amber-500/30 bg-amber-500/5'
+                    : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/50'
             }`}>
             <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -243,7 +308,10 @@ function AppointmentCard({
             <div className="flex items-center justify-between">
                 <div>
                     <p className="text-sm text-[var(--text-secondary)]">{appointment.service}</p>
-                    {appointment.arrived && (
+                    {appointment.inProgress && (
+                        <p className="text-xs text-blue-400 mt-1">● In Progress</p>
+                    )}
+                    {appointment.arrived && !appointment.inProgress && (
                         <p className="text-xs text-emerald-400 mt-1">✓ Arrived at {appointment.arrivedAt}</p>
                     )}
                     {appointment.status === 'late' && (
@@ -251,7 +319,7 @@ function AppointmentCard({
                     )}
                 </div>
 
-                {!appointment.arrived ? (
+                {!appointment.arrived && !appointment.inProgress ? (
                     <button
                         onClick={() => onCheckIn(appointment.id)}
                         className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg text-sm font-medium transition-colors"
@@ -259,11 +327,31 @@ function AppointmentCard({
                         <CheckCircle size={16} />
                         Check In
                     </button>
-                ) : (
-                    <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm font-medium">
-                        <CheckCircle size={16} />
-                        Ready
+                ) : appointment.inProgress ? (
+                    <button
+                        disabled
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm font-medium cursor-default"
+                    >
+                        <Scissors size={16} />
+                        In Service
                     </button>
+                ) : (
+                    <div className="flex gap-2">
+                        <button
+                            disabled
+                            className="flex items-center gap-2 px-3 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm font-medium cursor-default opacity-60"
+                        >
+                            <CheckCircle size={16} />
+                            Ready
+                        </button>
+                        <button
+                            onClick={() => onStartService(appointment.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white rounded-lg text-sm font-medium transition-colors animate-pulse-subtle"
+                        >
+                            <Play size={16} fill="currentColor" />
+                            Start Service
+                        </button>
+                    </div>
                 )}
             </div>
         </div>
@@ -271,24 +359,151 @@ function AppointmentCard({
 }
 
 export default function CheckInPage() {
-    const [appointments, setAppointments] = useState<Appointment[]>(INITIAL_APPOINTMENTS);
+    const toast = useToast();
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [showWalkInModal, setShowWalkInModal] = useState(false);
 
-    const handleCheckIn = (id: number) => {
+    // Confirmation modal state
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        confirmText?: string;
+        confirmColor?: 'red' | 'blue' | 'green';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { }
+    });
+
+    // Fetch today's appointments on mount
+    useEffect(() => {
+        const fetchAppointments = async () => {
+            try {
+                // Get today's date range in local timezone
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+
+                // Use local midnight to local end of day (no timezone conversion)
+                const startDate = `${year}-${month}-${day}T00:00:00`;
+                const endDate = `${year}-${month}-${day}T23:59:59`;
+
+                const res = await fetch(`/api/appointments?startDate=${startDate}&endDate=${endDate}`);
+                if (res.ok) {
+                    const data = await res.json();
+
+                    // Transform API data to Appointment format
+                    const transformed: Appointment[] = data.map((apt: any) => {
+                        const startTime = new Date(apt.startTime);
+                        const arrived = apt.status === 'CHECKED_IN' || apt.status === 'IN_PROGRESS' || apt.status === 'COMPLETED';
+                        const inProgress = apt.status === 'IN_PROGRESS';
+
+                        return {
+                            id: apt.id,
+                            time: formatTime(startTime),
+                            client: apt.client?.firstName
+                                ? `${apt.client.firstName} ${apt.client.lastName || ''}`.trim()
+                                : 'Walk-In',
+                            phone: apt.client?.phone || '',
+                            email: apt.client?.email || '',
+                            service: apt.service?.name || 'Service',
+                            duration: apt.service?.durationMinutes || 30,
+                            status: arrived ? 'arrived' : isLate(startTime) ? 'late' : 'scheduled',
+                            arrived,
+                            inProgress,
+                            arrivedAt: arrived ? formatTime(new Date(apt.checkedInAt || apt.startTime)) : undefined
+                        };
+                    });
+
+                    setAppointments(transformed);
+                }
+            } catch (error) {
+                console.error('Failed to fetch appointments:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAppointments();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchAppointments, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const handleCheckIn = async (id: string) => {
+        // Optimistic update
         setAppointments(appointments.map(apt =>
             apt.id === id
                 ? { ...apt, arrived: true, status: 'arrived', arrivedAt: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) }
                 : apt
         ));
+
+        // Call API to update appointment status
+        try {
+            await fetch(`/api/appointments/${id}/check-in`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            toast.success('Client checked in');
+        } catch (error) {
+            console.error('Failed to check in:', error);
+            toast.error('Failed to check in');
+        }
     };
 
-    const handleAddWalkIn = (client: Omit<Appointment, 'id' | 'status' | 'arrived'>) => {
+    const handleStartService = async (id: string) => {
+        const appointment = appointments.find(a => a.id === id);
+        setConfirmModal({
+            isOpen: true,
+            title: 'Start Service',
+            message: `Start service for ${appointment?.client || 'client'}?`,
+            confirmText: 'Start Service',
+            confirmColor: 'blue',
+            onConfirm: async () => {
+                // Optimistic update
+                setAppointments(prev => prev.map(apt =>
+                    apt.id === id
+                        ? { ...apt, inProgress: true }
+                        : apt
+                ));
+
+                try {
+                    const res = await fetch(`/api/appointments/${id}/start`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+
+                    if (!res.ok) {
+                        throw new Error('Failed to start service');
+                    }
+                    toast.success('Service started');
+                } catch (error) {
+                    console.error('Failed to start service:', error);
+                    toast.error('Failed to start service');
+                    // Revert optimistic update
+                    setAppointments(prev => prev.map(apt =>
+                        apt.id === id
+                            ? { ...apt, inProgress: false }
+                            : apt
+                    ));
+                }
+            }
+        });
+    };
+
+    const handleAddWalkIn = (client: Omit<Appointment, 'id' | 'status' | 'arrived' | 'inProgress'>) => {
         const newAppointment: Appointment = {
             ...client,
-            id: Date.now(),
+            id: `walkin-${Date.now()}`,
             status: 'arrived',
             arrived: true,
+            inProgress: false,
             arrivedAt: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
         };
         setAppointments([newAppointment, ...appointments]);
@@ -297,6 +512,14 @@ export default function CheckInPage() {
     const waitingCount = appointments.filter(a => a.arrived).length;
     const upcomingCount = appointments.filter(a => !a.arrived && a.status !== 'late').length;
     const lateCount = appointments.filter(a => a.status === 'late').length;
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="animate-spin text-[var(--primary)]" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-3xl mx-auto">
@@ -346,6 +569,7 @@ export default function CheckInPage() {
                             key={apt.id}
                             appointment={apt}
                             onCheckIn={handleCheckIn}
+                            onStartService={handleStartService}
                         />
                     ))}
             </div>
@@ -366,6 +590,17 @@ export default function CheckInPage() {
                 isOpen={showWalkInModal}
                 onClose={() => setShowWalkInModal(false)}
                 onAdd={handleAddWalkIn}
+            />
+
+            {/* Confirmation Modal */}
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+                onConfirm={confirmModal.onConfirm}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                confirmText={confirmModal.confirmText}
+                confirmColor={confirmModal.confirmColor}
             />
         </div>
     );

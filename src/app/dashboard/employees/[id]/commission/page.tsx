@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
     Save,
     ArrowLeft,
@@ -186,12 +187,12 @@ export default function CommissionConfigPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => router.back()}
+                    <Link
+                        href={`/dashboard/employees/${employeeId}`}
                         className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-white transition-colors"
                     >
                         <ArrowLeft className="h-6 w-6" />
-                    </button>
+                    </Link>
                     <div>
                         <h1 className="text-2xl font-bold text-stone-100">
                             Commission Configuration

@@ -149,6 +149,8 @@ interface Client {
         driverLicense: boolean
         feinLetter: boolean
     }
+    // Service type
+    processingType: 'POS_ONLY' | 'POS_AND_PROCESSING' | null
 }
 
 type CategoryView = 'status' | 'sales' | 'pulse' | 'features' | 'integrations' | 'locations' | 'pricing' | 'tips' | 'payments' | 'documents' | 'history' | null
@@ -305,7 +307,9 @@ export default function AccountConfigurationsPage() {
                         acceptsChecks: client.config?.acceptsChecks ?? false,
                         acceptsOnAccount: client.config?.acceptsOnAccount ?? false,
                         // Document verification
-                        documents: client.documents || { voidCheck: false, driverLicense: false, feinLetter: false }
+                        documents: client.documents || { voidCheck: false, driverLicense: false, feinLetter: false },
+                        // Service type (POS_ONLY or POS_AND_PROCESSING)
+                        processingType: client.processingType || 'POS_AND_PROCESSING'
                     }
                 })
                 setClients(transformed)
@@ -327,13 +331,30 @@ export default function AccountConfigurationsPage() {
                 body: JSON.stringify(updates)
             })
             if (res.ok) {
+                const data = await res.json()
+                // Update local state with the server response to ensure consistency
+                const updatedConfig = data.config || {}
                 setClients(prev => prev.map(c =>
                     c.id === clientId
-                        ? { ...c, ...updates, features: { ...c.features, ...updates } }
+                        ? {
+                            ...c,
+                            ...updates,
+                            pricingModel: updatedConfig.pricingModel || c.pricingModel,
+                            cardSurcharge: parseFloat(updatedConfig.cardSurcharge) || c.cardSurcharge,
+                            cardSurchargeType: updatedConfig.cardSurchargeType || c.cardSurchargeType,
+                            features: { ...c.features, ...updates }
+                        }
                         : c
                 ))
                 if (selectedClient?.id === clientId) {
-                    setSelectedClient(prev => prev ? { ...prev, ...updates, features: { ...prev.features, ...updates } } : null)
+                    setSelectedClient(prev => prev ? {
+                        ...prev,
+                        ...updates,
+                        pricingModel: updatedConfig.pricingModel || prev.pricingModel,
+                        cardSurcharge: parseFloat(updatedConfig.cardSurcharge) || prev.cardSurcharge,
+                        cardSurchargeType: updatedConfig.cardSurchargeType || prev.cardSurchargeType,
+                        features: { ...prev.features, ...updates }
+                    } : null)
                 }
             }
         } catch (error) {
@@ -937,7 +958,7 @@ export default function AccountConfigurationsPage() {
                     <div className="bg-stone-900 rounded-2xl border border-stone-700 p-6">
                         <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
                             <Smartphone className="w-6 h-6 text-violet-400" />
-                            Oronex Pulse Access
+                            Oro 9 Pulse Access
                         </h3>
 
                         <div className="mb-6">
@@ -1599,17 +1620,36 @@ export default function AccountConfigurationsPage() {
                     </button>
 
                     <div className="bg-stone-900 rounded-2xl border border-stone-700 p-6">
-                        <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-3">
                             <FileText className="w-6 h-6 text-red-400" />
                             Required Documents
                         </h3>
 
+                        {/* Service Type Badge */}
+                        <div className="mb-6 p-3 rounded-xl border border-stone-700 bg-stone-800/50">
+                            <p className="text-xs text-stone-400 mb-1">Service Type</p>
+                            <p className={`font-semibold ${selectedClient.processingType === 'POS_ONLY' ? 'text-purple-400' : 'text-orange-400'}`}>
+                                {selectedClient.processingType === 'POS_ONLY' ? '📱 POS Only' : '💳 POS + Processing'}
+                            </p>
+                            <p className="text-xs text-stone-500 mt-1">
+                                {selectedClient.processingType === 'POS_ONLY'
+                                    ? 'Only Void Check required for bank verification'
+                                    : 'Full documentation required for payment processing'}
+                            </p>
+                        </div>
+
                         <div className="space-y-4">
-                            {[
-                                { key: 'voidCheck', name: 'Void Check', desc: 'For bank account verification', icon: '🏦', accept: 'image/*,.pdf' },
-                                { key: 'driverLicense', name: 'Driver License', desc: 'Government-issued ID', icon: '🪪', accept: 'image/*,.pdf' },
-                                { key: 'feinLetter', name: 'FEIN Letter', desc: 'Federal Employer ID Number', icon: '📄', accept: 'image/*,.pdf' }
-                            ].map(doc => (
+                            {/* Conditional documents based on processingType */}
+                            {(selectedClient.processingType === 'POS_ONLY'
+                                ? [
+                                    { key: 'voidCheck', name: 'Void Check', desc: 'For bank account verification', icon: '🏦', accept: 'image/*,.pdf' }
+                                ]
+                                : [
+                                    { key: 'voidCheck', name: 'Void Check', desc: 'For bank account verification', icon: '🏦', accept: 'image/*,.pdf' },
+                                    { key: 'driverLicense', name: 'Driver License', desc: 'Government-issued ID', icon: '🪪', accept: 'image/*,.pdf' },
+                                    { key: 'feinLetter', name: 'FEIN Letter', desc: 'Federal Employer ID Number', icon: '📄', accept: 'image/*,.pdf' }
+                                ]
+                            ).map(doc => (
                                 <div key={doc.key} className="flex items-center justify-between p-4 bg-stone-800/50 rounded-xl border border-stone-700">
                                     <div className="flex items-center gap-3">
                                         <span className="text-2xl">{doc.icon}</span>
@@ -1879,12 +1919,16 @@ export default function AccountConfigurationsPage() {
                     <CategoryCard
                         icon={FileText}
                         title="Documents"
-                        subtitle={[
-                            selectedClient.documents.voidCheck && '✓ Check',
-                            selectedClient.documents.driverLicense && '✓ DL',
-                            selectedClient.documents.feinLetter && '✓ FEIN'
-                        ].filter(Boolean).join(', ') || '⚠️ Missing docs'}
-                        color={selectedClient.documents.voidCheck && selectedClient.documents.driverLicense ? 'emerald' : 'red'}
+                        subtitle={selectedClient.processingType === 'POS_ONLY'
+                            ? (selectedClient.documents.voidCheck ? '✓ Void Check' : '⚠️ Missing Void Check')
+                            : [
+                                selectedClient.documents.voidCheck && '✓ Check',
+                                selectedClient.documents.driverLicense && '✓ DL',
+                                selectedClient.documents.feinLetter && '✓ FEIN'
+                            ].filter(Boolean).join(', ') || '⚠️ Missing docs'}
+                        color={selectedClient.processingType === 'POS_ONLY'
+                            ? (selectedClient.documents.voidCheck ? 'emerald' : 'red')
+                            : (selectedClient.documents.voidCheck && selectedClient.documents.driverLicense ? 'emerald' : 'red')}
                         onClick={() => setCategoryView('documents')}
                     />
                     <CategoryCard

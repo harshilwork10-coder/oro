@@ -260,7 +260,7 @@ export async function GET(request: NextRequest) {
 
         <div class="footer">
             <p>This report is generated from POS transaction data and is intended for tax preparation purposes.</p>
-            <p>System: OroNext POS | Report Generated: ${new Date().toLocaleString()}</p>
+            <p>System: ORO 9 POS | Report Generated: ${new Date().toLocaleString()}</p>
         </div>
 
         <div class="no-print" style="margin-top: 30px; text-align: center; padding: 15px; background: #f0f0f0; border-radius: 8px;">

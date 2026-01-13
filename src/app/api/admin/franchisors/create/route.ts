@@ -18,7 +18,7 @@ function checkRateLimit(userId: string): boolean {
         return true
     }
 
-    if (userAttempts.count >= 5) {
+    if (userAttempts.count >= 50) {
         return false
     }
 
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { name, email, phone, companyName, supportFee, type, businessType, industryType, billingMethod, enableCommission } = body
+        const { name, email, phone, companyName, storeName, supportFee, type, businessType, industryType, processingType, billingMethod, enableCommission } = body
 
         if (!name || !email || !companyName) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -73,8 +73,13 @@ export async function POST(request: NextRequest) {
         const validIndustryTypes = ['SERVICE', 'RETAIL', 'RESTAURANT']
         const finalIndustryType = validIndustryTypes.includes(industryType) ? industryType : 'SERVICE'
 
+        // Validate processingType
+        const validProcessingTypes = ['POS_ONLY', 'POS_AND_PROCESSING']
+        const finalProcessingType = validProcessingTypes.includes(processingType) ? processingType : 'POS_AND_PROCESSING'
+
         const sanitizedName = sanitizeInput(name)
         const sanitizedCompanyName = sanitizeInput(companyName)
+        const sanitizedStoreName = storeName ? sanitizeInput(storeName) : sanitizedCompanyName // Default to company name if not provided
         const sanitizedEmail = email.toLowerCase().trim()
         const sanitizedPhone = phone ? sanitizeInput(phone) : null
 
@@ -111,6 +116,7 @@ export async function POST(request: NextRequest) {
                 ownerId: user.id,
                 businessType: finalBusinessType,
                 industryType: finalIndustryType,
+                processingType: finalProcessingType, // POS_ONLY or POS_AND_PROCESSING
                 phone: sanitizedPhone,
             }
         })
@@ -132,11 +138,22 @@ export async function POST(request: NextRequest) {
                 }
             })
 
-            // Create the default location (first store)
+            // IMPORTANT: Link the user to their franchise
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { franchiseId: franchise.id }
+            })
+
+            // Create the default location using STORE NAME (DBA), not company name
+            const storeSlug = sanitizedStoreName
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '')
+
             await prisma.location.create({
                 data: {
-                    name: sanitizedCompanyName,
-                    slug: `${baseSlug}-main`,
+                    name: sanitizedStoreName, // Use DBA name for the location!
+                    slug: `${storeSlug}-main`,
                     franchiseId: franchise.id
                 }
             })
@@ -163,10 +180,10 @@ export async function POST(request: NextRequest) {
         // Send Email
         await sendEmail({
             to: sanitizedEmail,
-            subject: 'Welcome to OroNext - Setup Your Franchise Account',
+            subject: 'Welcome to ORO 9 - Setup Your Franchise Account',
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h1>Welcome to OroNext!</h1>
+                    <h1>Welcome to ORO 9!</h1>
                     <p>You have been invited to join Oro as a ${finalBusinessType === 'BRAND_FRANCHISOR' ? 'Franchise Brand Owner' : 'Multi-Location Owner'}.</p>
                     <p><strong>Company:</strong> ${sanitizedCompanyName}</p>
                     <br/>

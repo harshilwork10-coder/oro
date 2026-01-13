@@ -4,19 +4,21 @@ import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import OroLogo from '@/components/ui/OroLogo'
+import { DeviceTrust } from '@/lib/device-trust'
 import { Building2, Store, Key, Loader2, Settings, X } from 'lucide-react'
 
 interface TerminalConfig {
     business: { id: string; name: string; industryType: string; logo?: string | null }
     location: { id: string; name: string }
+    station?: { id: string; name: string; pairingCode: string; paymentMode?: string }
 }
 
 export default function EmployeeLoginPage() {
-    const [step, setStep] = useState<'LOADING' | 'ENTER_CODE' | 'ENTER_PIN'>('LOADING')
+    const [step, setStep] = useState<'LOADING' | 'ENTER_CODE' | 'ENTER_PIN' | 'RESTORING'>('LOADING')
     const [terminalConfig, setTerminalConfig] = useState<TerminalConfig | null>(null)
 
-    // Setup code entry
-    const [setupCode, setSetupCode] = useState('')
+    // Station code entry
+    const [stationCode, setStationCode] = useState('')
     const [codeError, setCodeError] = useState('')
     const [validating, setValidating] = useState(false)
 
@@ -34,30 +36,72 @@ export default function EmployeeLoginPage() {
 
     // Check for existing terminal config on mount
     useEffect(() => {
-        const savedConfig = localStorage.getItem('terminal_config')
-        if (savedConfig) {
-            try {
-                const config = JSON.parse(savedConfig) as TerminalConfig
-                if (config.business && config.location) {
-                    setTerminalConfig(config)
-                    setStep('ENTER_PIN')
-                } else {
+        const attemptRestore = async () => {
+            const savedConfig = localStorage.getItem('terminal_config')
+
+            // 1. If we have config, we assume we are good (Normal Flow)
+            if (savedConfig) {
+                try {
+                    const config = JSON.parse(savedConfig) as TerminalConfig
+                    if (config.business && config.location) {
+                        setTerminalConfig(config)
+                        setStep('ENTER_PIN')
+                        return
+                    }
+                } catch {
                     localStorage.removeItem('terminal_config')
-                    setStep('ENTER_CODE')
+                }
+            }
+
+            // If NO config (Cookies cleared?), try "Cockroach" Restore
+            setStep('RESTORING')
+
+            try {
+                // Ensure we have a Device ID (make one if needed)
+                const deviceId = await DeviceTrust.getDeviceId()
+                if (!deviceId) throw new Error('No device ID')
+
+                // Try to restore from server
+                const res = await fetch('/api/auth/restore-device', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deviceId })
+                })
+
+                const data = await res.json()
+
+                if (res.ok && data.restored && data.loginToken) {
+                    // Auto-login to restore session cookie
+                    const result = await signIn('credentials', {
+                        password: data.loginToken, // Special token
+                        redirect: false
+                    })
+
+                    if (result?.ok && data.config) {
+                        // Restore the UI config
+                        localStorage.setItem('terminal_config', JSON.stringify(data.config))
+                        if (data.stationId) localStorage.setItem('station_id', data.stationId)
+
+                        setTerminalConfig(data.config)
+                        setStep('ENTER_PIN')
+                        return
+                    }
                 }
             } catch {
-                localStorage.removeItem('terminal_config')
-                setStep('ENTER_CODE')
+                // Device trust restore failed, falling back to pairing code
             }
-        } else {
+
+            // 3. Fallback to Pairing Code
             setStep('ENTER_CODE')
         }
+
+        attemptRestore()
     }, [])
 
     // Validate setup code
     const handleValidateCode = async () => {
-        if (!setupCode.trim()) {
-            setCodeError('Please enter a setup code')
+        if (!stationCode.trim()) {
+            setCodeError('Please enter a station code')
             return
         }
 
@@ -65,10 +109,26 @@ export default function EmployeeLoginPage() {
         setCodeError('')
 
         try {
+            // Attempt to get Device ID, but don't block login if it fails (e.g. private mode / basic browser)
+            let deviceId = undefined
+            try {
+                deviceId = await DeviceTrust.getDeviceId()
+            } catch {
+                // Private mode or basic browser - continue without device ID
+            }
+
             const res = await fetch('/api/pos/validate-setup-code', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: setupCode.toUpperCase().trim() })
+                body: JSON.stringify({
+                    code: stationCode.toUpperCase().trim(),
+                    deviceId,
+                    meta: {
+                        userAgent: navigator.userAgent,
+                        platform: navigator.platform,
+                        deviceName: `Browser (${navigator.platform})`
+                    }
+                })
             })
 
             const data = await res.json()
@@ -76,16 +136,24 @@ export default function EmployeeLoginPage() {
             if (res.ok && data.success) {
                 const config: TerminalConfig = {
                     business: data.business,
-                    location: data.location
+                    location: data.location,
+                    station: data.station
                 }
                 localStorage.setItem('terminal_config', JSON.stringify(config))
+                // Also store station ID separately for quick access
+                if (data.station?.id) {
+                    localStorage.setItem('station_id', data.station.id)
+                }
                 setTerminalConfig(config)
                 setStep('ENTER_PIN')
             } else {
-                setCodeError(data.error || 'Invalid setup code')
+                // Show detailed error if available
+                const detailedError = data.error ? `${data.error} (${res.status})` : `Invalid code (${res.status})`
+                setCodeError(detailedError)
             }
         } catch (err) {
-            setCodeError('Failed to validate code')
+            console.error('Validation Error:', err)
+            setCodeError('Connection failed. Please try again.')
         } finally {
             setValidating(false)
         }
@@ -178,8 +246,9 @@ export default function EmployeeLoginPage() {
 
             const data = await res.json()
             if (data.success) {
-                // Clear terminal config and show setup
+                // Clear terminal config and station ID, then show setup
                 localStorage.removeItem('terminal_config')
+                localStorage.removeItem('station_id')
                 setTerminalConfig(null)
                 setShowAdminUnlock(false)
                 setAdminPin('')
@@ -195,8 +264,21 @@ export default function EmployeeLoginPage() {
     // Loading state
     if (step === 'LOADING') {
         return (
-            <div className="min-h-screen bg-stone-950 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-4 gap-4">
                 <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+                <p className="text-stone-500 text-sm">Loading configuration...</p>
+            </div>
+        )
+    }
+
+    if (step === 'RESTORING') {
+        return (
+            <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-4 gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+                <p className="text-stone-500 text-sm font-medium">Restoring secure connection...</p>
+                <div className="w-48 h-1 bg-stone-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-500 animate-[shimmer_1s_infinite] w-full origin-left" />
+                </div>
             </div>
         )
     }
@@ -216,17 +298,17 @@ export default function EmployeeLoginPage() {
                             <h1 className="text-xl font-bold">Terminal Setup</h1>
                         </div>
                         <p className="text-stone-400 text-center text-sm mb-6">
-                            Enter the setup code provided by your business owner
+                            Enter the station code provided by your business owner
                         </p>
 
                         <input
                             type="text"
-                            value={setupCode}
+                            value={stationCode}
                             onChange={(e) => {
-                                setSetupCode(e.target.value.toUpperCase())
+                                setStationCode(e.target.value.toUpperCase())
                                 setCodeError('')
                             }}
-                            placeholder="e.g. MIKE-1234"
+                            placeholder="e.g. HUZUPR"
                             className="w-full px-4 py-4 bg-stone-800 border border-stone-700 rounded-xl text-white text-center text-xl font-mono tracking-widest placeholder:text-stone-600 placeholder:text-base placeholder:tracking-normal focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleValidateCode()
@@ -239,14 +321,14 @@ export default function EmployeeLoginPage() {
 
                         <button
                             onClick={handleValidateCode}
-                            disabled={validating || !setupCode.trim()}
+                            disabled={validating || !stationCode.trim()}
                             className="w-full mt-4 py-4 bg-orange-600 hover:bg-orange-500 disabled:bg-stone-700 disabled:text-stone-500 rounded-xl font-bold transition-colors"
                         >
                             {validating ? 'Validating...' : 'Pair Terminal'}
                         </button>
 
                         <p className="text-stone-500 text-xs text-center mt-4">
-                            Contact your business owner for the setup code
+                            Contact your business owner for the station code
                         </p>
                     </div>
 
@@ -283,7 +365,10 @@ export default function EmployeeLoginPage() {
                         <Building2 className="h-5 w-5 text-orange-400" />
                         <div>
                             <p className="text-sm font-medium text-white">{terminalConfig?.business.name}</p>
-                            <p className="text-xs text-stone-500">{terminalConfig?.location.name}</p>
+                            <p className="text-xs text-stone-500">
+                                {terminalConfig?.location.name}
+                                {terminalConfig?.station && ` • ${terminalConfig.station.name}`}
+                            </p>
                         </div>
                     </div>
                     <button

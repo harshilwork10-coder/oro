@@ -34,8 +34,8 @@ function DisplayContent() {
     useEffect(() => {
         if (isSupported) {
             setTimeout(() => {
-                enterFullscreen().catch(err => {
-                    console.log('Fullscreen requires user interaction')
+                enterFullscreen().catch(() => {
+                    // Fullscreen requires user interaction
                 })
             }, 1000)
         }
@@ -62,12 +62,13 @@ function DisplayContent() {
 
                         // If we're in processing mode, check for exit conditions
                         if (isProcessing) {
-                            // Exit processing if: transaction completed, cart cleared, or cart is new
-                            if (data.status === 'COMPLETED' ||
+                            const shouldExit = data.status === 'COMPLETED' ||
                                 data.status === 'IDLE' ||
                                 data.status === 'CANCELLED' ||
                                 !data.items ||
-                                data.items.length === 0) {
+                                data.items.length === 0
+                            // Exit processing if: transaction completed, cart cleared, or cart is new
+                            if (shouldExit) {
                                 setIsProcessing(false)
                                 setSavedTipAmount(0)
 
@@ -116,7 +117,6 @@ function DisplayContent() {
             const checkTimeout = setInterval(() => {
                 const elapsed = Date.now() - processingStartTime
                 if (elapsed > PROCESSING_TIMEOUT_MS) {
-                    console.log('[DISPLAY] Processing timeout - resetting')
                     setIsProcessing(false)
                     setSavedTipAmount(0)
                     setProcessingStartTime(null)

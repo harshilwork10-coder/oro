@@ -55,7 +55,7 @@ export class PaxTerminal {
      */
     private async validateLicense(): Promise<void> {
         if (!this.licenseKey) {
-            console.warn('[PAX] No license key provided, skipping validation (Development Mode)');
+            // Development mode - skip license validation
             return;
         }
 
@@ -66,7 +66,6 @@ export class PaxTerminal {
                 body: JSON.stringify({
                     licenseKey: this.licenseKey,
                     terminalIp: this.ip
-                    // TODO: Add terminalSerialNumber when we can fetch it from device
                 })
             });
 
@@ -75,8 +74,6 @@ export class PaxTerminal {
             if (!res.ok || !data.valid) {
                 throw new Error(data.error || 'License validation failed');
             }
-
-            console.log('[PAX] License validated successfully');
         } catch (error: any) {
             console.error('[PAX] License validation error:', error);
             throw new Error(`License Error: ${error.message}`);
@@ -133,19 +130,11 @@ export class PaxTerminal {
         const cashierInfo = {};
         const commercialInfo = {};
         const motoEcommerce = {};
-        // CRITICAL FIX: Additional Info fields must be sent as "KEY=VALUE" strings!
-        // The official PAX sample encodes them as name+"="+value.
+        // Additional Info - EDCTYPE forces online credit processing
         const additionalInfo = {
             TABLE: '',
-            EDCTYPE: 'EDCTYPE=CREDIT' // ADDED: Try this to force online processing
+            EDCTYPE: 'EDCTYPE=CREDIT'
         };
-
-        console.log('[PAX] Building Request with:');
-        console.log('  Amount:', request.amount);
-        console.log('  Invoice:', request.invoiceNumber);
-        console.log('  Reference:', request.referenceNumber || '1');
-        console.log('  EDCTYPE: EDCTYPE=CREDIT (Trying to force Online)');
-        console.log('  REPORTSTATUS: REPORTSTATUS=1 (Re-enabled)');
 
         // 2. Build Raw Params for LRC Calculation
         let rawParams: any[] = [this.STX.hex, command, this.FS.hex, version];
@@ -225,10 +214,7 @@ export class PaxTerminal {
         const finalString = elements.join(" ");
         const finalBase64 = this.hexToBase64(finalString);
 
-        console.log('[PAX] Sending Request via Proxy');
-        console.log('[PAX] Payload:', finalBase64);
-
-        // 6. Send Request via Proxy
+        // Send Request via Proxy
         try {
             const response = await fetch('/api/pax/proxy', {
                 method: 'POST',
@@ -248,10 +234,9 @@ export class PaxTerminal {
                 throw new Error(data.error || 'Proxy request failed');
             }
 
-            console.log('[PAX] Raw Response:', data.response);
             return this.parseResponse(data.response);
         } catch (error) {
-            console.error('[PAX] Error:', error);
+            console.error('[PAX] Communication error:', error);
             throw new Error('Failed to communicate with PAX terminal');
         }
     }
@@ -369,29 +354,6 @@ export class PaxTerminal {
             cardType,
             rawResponse: cleanParts
         };
-
-        // DETAILED LOGGING FOR DEBUGGING
-        console.log('========== PAX RESPONSE DETAILS ==========');
-        console.log('Status:', parsedResponse.status);
-        console.log('Command:', parsedResponse.command);
-        console.log('Version:', parsedResponse.version);
-        console.log('Response Code:', parsedResponse.responseCode);
-        console.log('Response Message:', parsedResponse.responseMessage);
-        console.log('Transaction ID:', parsedResponse.transactionId);
-        console.log('Auth Code:', parsedResponse.authCode);
-        console.log('Card Last 4:', parsedResponse.cardLast4);
-        console.log('Card Type:', parsedResponse.cardType);
-        console.log('\n--- RAW RESPONSE PARTS ---');
-        cleanParts.forEach((part, idx) => {
-            console.log(`Part ${idx}:`, part);
-            if (idx === 5) {
-                console.log('  → Host Info Fields:', hostInfo);
-            }
-            if (idx === 8) {
-                console.log('  → Account Info Fields:', accountInfo);
-            }
-        });
-        console.log('==========================================');
 
         return parsedResponse;
     }

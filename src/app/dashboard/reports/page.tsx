@@ -18,10 +18,10 @@ const reportCategories = [
     {
         id: 'sales',
         name: 'Sales Reports',
-        description: 'Daily sales, tax summary, payment breakdown, credit card batches',
+        description: 'Daily sales, service sales, stylist performance, commissions, tips',
         icon: DollarSign,
         color: 'from-green-500 to-emerald-600',
-        count: 9,
+        count: 12,
         href: '/dashboard/reports/sales'
     },
     {

@@ -30,7 +30,7 @@ export async function POST(request: Request) {
         const isTipResponse = cart?.tipSelected === true && cart?.status === 'TIP_SELECTED'
 
         if (!isPosRequest && !isTipResponse) {
-            console.warn(`[SECURITY] Unauthorized cart update attempt for station ${key}`)
+            console.error(`[SECURITY] Unauthorized cart update attempt for station ${key}`)
         }
 
         // Store cart data with timestamp, keyed by station ID

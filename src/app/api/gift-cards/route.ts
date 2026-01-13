@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
             }
         })
 
-        console.log(`✅ Gift card created: ${code} - $${initialAmount}`)
+        // Debug log removed
 
         return ApiResponse.created(giftCard)
     } catch (error) {

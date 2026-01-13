@@ -62,7 +62,7 @@ export async function generateReceipt(data: ReceiptData) {
     if (data.branding?.primaryColor) {
         doc.setTextColor(data.branding.primaryColor)
     }
-    doc.text(data.franchiseName || 'OroNext Business', 40, yPos, { align: 'center' })
+    doc.text(data.franchiseName || 'ORO 9 Business', 40, yPos, { align: 'center' })
     doc.setTextColor(0, 0, 0) // Reset color
     yPos += 6
 
@@ -107,8 +107,10 @@ export async function generateReceipt(data: ReceiptData) {
         doc.text(itemName, 5, yPos)
         yPos += 4
 
-        const qtyText = `  ${item.quantity} x $${item.price.toFixed(2)}`
-        const totalText = `$${item.total.toFixed(2)}`
+        const price = Number(item.price) || 0
+        const total = Number(item.total) || 0
+        const qtyText = `  ${item.quantity} x $${price.toFixed(2)}`
+        const totalText = `$${total.toFixed(2)}`
         doc.text(qtyText, 5, yPos)
         doc.text(totalText, 75, yPos, { align: 'right' })
         yPos += 4

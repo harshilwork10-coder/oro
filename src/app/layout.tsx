@@ -6,13 +6,12 @@ import { Providers } from "./providers";
 const outfit = Outfit({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'OroNext | The Gold Standard in POS',
+  title: 'Oro 9 Pulse | The Gold Standard in POS',
   description: 'Complete franchise and business management platform with insights that see everything',
-  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'OroNext',
+    title: 'Oro 9 Pulse',
   },
   formatDetection: {
     telephone: false,
@@ -45,36 +44,16 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* PWA Meta Tags */}
-        <link rel="manifest" href="/manifest.json" />
+        {/* PWA Meta Tags - manifest is auto-generated from manifest.ts */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="OroNext" />
+        <meta name="apple-mobile-web-app-title" content="Oro 9 Pulse" />
         <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
       </head>
       <body className={outfit.className} suppressHydrationWarning>
         <Providers>{children}</Providers>
-        {/* Service Worker Registration */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(
-                    function(registration) {
-                      console.log('OroNext PWA: Service Worker registered', registration.scope);
-                    },
-                    function(err) {
-                      console.log('OroNext PWA: Service Worker registration failed', err);
-                    }
-                  );
-                });
-              }
-            `,
-          }}
-        />
       </body>
     </html>
   );

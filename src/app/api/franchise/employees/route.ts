@@ -59,8 +59,11 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true,
             email: true,
+            phone: true,          // For Phone + PIN login
             role: true,
+            locationId: true,     // For edit form
             location: { select: { id: true, name: true } },
+            // Permission fields
             canAddServices: true,
             canAddProducts: true,
             canManageInventory: true,
@@ -68,6 +71,8 @@ export async function GET(request: NextRequest) {
             canProcessRefunds: true,
             canManageSchedule: true,
             canManageEmployees: true,
+            // Employee settings
+            canSetOwnPrices: true,
             createdAt: true
         },
         orderBy: orderBy || { createdAt: 'desc' }
@@ -95,7 +100,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) return ApiResponse.unauthorized()
+    if (!session?.user?.email) {
+        return ApiResponse.unauthorized()
+    }
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
@@ -110,7 +117,26 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, email, password, permissions, locationId, pin } = body
+    const {
+        name,
+        email,
+        phone,
+        password,
+        permissions,
+        locationId,
+        pin,
+        // Compensation fields
+        compensationType,
+        chairRentAmount,
+        chairRentPeriod,
+        assignedResourceId,
+        commissionSplit,
+        hourlyRate,
+        salaryAmount,
+        salaryPeriod,
+        requiresTimeClock,
+        canSetOwnPrices
+    } = body
 
     if (!name || !email || !password) {
         return ApiResponse.validationError('Name, email, and password are required')
@@ -150,55 +176,77 @@ export async function POST(request: NextRequest) {
         return ApiResponse.conflict('User with this email already exists')
     }
 
-    // Check user limit based on subscription
-    if (user.role === 'FRANCHISOR') {
-        const franchisor = await prisma.franchisor.findUnique({
-            where: { ownerId: user.id },
-            include: {
-                config: { select: { maxUsers: true, subscriptionTier: true } },
-                franchises: { select: { id: true } }
-            }
-        })
-
-        if (franchisor) {
-            const franchiseIds = franchisor.franchises.map(f => f.id)
-            const currentUserCount = await prisma.user.count({
-                where: { franchiseId: { in: franchiseIds } }
-            })
-            const maxUsers = franchisor.config?.maxUsers || 1
-
-            if (currentUserCount >= maxUsers) {
-                return ApiResponse.error(
-                    `User limit reached. Your ${franchisor.config?.subscriptionTier || 'STARTER'} plan allows ${maxUsers} user(s). Upgrade to add more.`,
-                    403,
-                    { code: 'LIMIT_REACHED', details: { current: currentUserCount, limit: maxUsers } }
-                )
-            }
-        }
-    }
+    // NOTE: maxUsers limit is for Oro 9 Plus customer app, not for employee management
+    // Employees are unlimited - subscription limits only apply to Oro 9 Plus features
 
     const hashedPassword = await hash(password, 10)
     const hashedPin = pin ? await hash(pin, 10) : undefined
 
-    const employee = await prisma.user.create({
-        data: {
-            name,
-            email,
-            password: hashedPassword,
-            pin: hashedPin,
-            role: 'EMPLOYEE',
-            franchiseId: finalFranchiseId,
-            locationId: locationId || null,
-            canAddServices: permissions?.canAddServices || false,
-            canAddProducts: permissions?.canAddProducts || false,
-            canManageInventory: permissions?.canManageInventory || false,
-            canViewReports: permissions?.canViewReports || false,
-            canProcessRefunds: permissions?.canProcessRefunds || false,
-            canManageSchedule: permissions?.canManageSchedule || false,
-            canManageEmployees: permissions?.canManageEmployees || false,
+    // Create employee and compensation plan in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+        // Create employee user
+        const employee = await tx.user.create({
+            data: {
+                name,
+                email,
+                phone: phone?.replace(/\D/g, '') || null, // Store only digits
+                password: hashedPassword,
+                pin: hashedPin,
+                role: 'EMPLOYEE',
+                franchiseId: finalFranchiseId,
+                locationId: locationId || null,
+                canAddServices: permissions?.canAddServices || false,
+                canAddProducts: permissions?.canAddProducts || false,
+                canManageInventory: permissions?.canManageInventory || false,
+                canViewReports: permissions?.canViewReports || false,
+                canProcessRefunds: permissions?.canProcessRefunds || false,
+                canManageSchedule: permissions?.canManageSchedule || false,
+                canManageEmployees: permissions?.canManageEmployees || false,
+            }
+        })
+
+        // Create CompensationPlan if compensation type is specified
+        if (compensationType) {
+            await tx.compensationPlan.create({
+                data: {
+                    userId: employee.id,
+                    locationId: locationId || null,
+                    workerType: compensationType === 'CHAIR_RENTAL' ? 'BOOTH_RENTER' : 'W2_EMPLOYEE',
+                    compensationType,
+                    effectiveFrom: new Date(),
+                    // Chair rental fields
+                    chairRentAmount: chairRentAmount ? parseFloat(chairRentAmount) : null,
+                    chairRentPeriod: chairRentPeriod || null,
+                    chairRentStartDate: compensationType === 'CHAIR_RENTAL' ? new Date() : null,
+                    // Commission fields
+                    commissionSplit: commissionSplit ? parseFloat(commissionSplit) : null,
+                    // Hourly fields
+                    hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
+                    // Salary fields
+                    salaryAmount: salaryAmount ? parseFloat(salaryAmount) : null,
+                    salaryPeriod: salaryPeriod || null,
+                    // Time clock
+                    requiresTimeClock: requiresTimeClock || false,
+                    // Price control
+                    canSetOwnPrices: canSetOwnPrices ?? (compensationType === 'CHAIR_RENTAL'),
+                }
+            })
+
+            // If assigned resource (chair), create the UserResource link
+            if (assignedResourceId) {
+                await tx.userResource.create({
+                    data: {
+                        userId: employee.id,
+                        resourceId: assignedResourceId,
+                        isDefault: true
+                    }
+                })
+            }
         }
+
+        return employee
     })
 
-    const { password: _, ...employeeWithoutPassword } = employee
+    const { password: _, ...employeeWithoutPassword } = result
     return ApiResponse.created(employeeWithoutPassword)
 }

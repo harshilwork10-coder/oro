@@ -21,7 +21,7 @@ authenticator.options = {
     window: 1  // Allow 1 step before/after for clock drift
 }
 
-const APP_NAME = 'OroNext POS'
+const APP_NAME = 'ORO 9 POS'
 
 export interface MFASetupResult {
     secret: string           // Encrypted secret for storage

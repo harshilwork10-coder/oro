@@ -61,7 +61,9 @@ export default function LocationsPage() {
             const res = await fetch('/api/locations')
             if (res.ok) {
                 const data = await res.json()
-                setLocations(data)
+                // Handle both array and { locations: [...] } formats
+                const locationsArray = Array.isArray(data) ? data : (data.locations || data.data || [])
+                setLocations(locationsArray)
             }
         } catch (error) {
             console.error('Error fetching locations:', error)
@@ -75,7 +77,9 @@ export default function LocationsPage() {
             const res = await fetch('/api/franchises')
             if (res.ok) {
                 const data = await res.json()
-                setFranchises(data)
+                // Handle both array and { franchises: [...] } formats
+                const franchisesArray = Array.isArray(data) ? data : (data.franchises || data.data || [])
+                setFranchises(franchisesArray)
             }
         } catch (error) {
             console.error('Error fetching franchises:', error)
@@ -179,13 +183,15 @@ export default function LocationsPage() {
                     <h1 className="text-3xl font-bold text-stone-100">My Stores</h1>
                     <p className="text-stone-400 mt-1">Manage your store locations</p>
                 </div>
-                <button
-                    onClick={() => openModal()}
-                    className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-medium px-6 py-3 rounded-xl shadow-lg shadow-emerald-900/20 hover:shadow-emerald-900/40 hover:scale-105 transition-all"
-                >
-                    <Plus className="h-5 w-5" />
-                    Add Store
-                </button>
+                {session?.user?.role === 'PROVIDER' && (
+                    <button
+                        onClick={() => openModal()}
+                        className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-medium px-6 py-3 rounded-xl shadow-lg shadow-emerald-900/20 hover:shadow-emerald-900/40 hover:scale-105 transition-all"
+                    >
+                        <Plus className="h-5 w-5" />
+                        Add Store
+                    </button>
+                )}
             </div>
 
             {/* Filters */}
@@ -225,15 +231,19 @@ export default function LocationsPage() {
                     </div>
                     <h3 className="text-xl font-bold text-stone-100 mb-2">No stores yet</h3>
                     <p className="text-stone-400 mb-6">
-                        Add your first store to get started! Click the "Add Store" button to create a location.
+                        {session?.user?.role === 'PROVIDER'
+                            ? 'Add your first store to get started! Click the "Add Store" button to create a location.'
+                            : 'No stores have been added yet. Please contact your system provider to set up your locations.'}
                     </p>
-                    <button
-                        onClick={() => openModal()}
-                        className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-medium px-6 py-3 rounded-xl shadow-lg hover:shadow-emerald-900/40 hover:scale-105 transition-all"
-                    >
-                        <Plus className="h-5 w-5" />
-                        Add Your First Store
-                    </button>
+                    {session?.user?.role === 'PROVIDER' && (
+                        <button
+                            onClick={() => openModal()}
+                            className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-medium px-6 py-3 rounded-xl shadow-lg hover:shadow-emerald-900/40 hover:scale-105 transition-all"
+                        >
+                            <Plus className="h-5 w-5" />
+                            Add Your First Store
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -256,18 +266,24 @@ export default function LocationsPage() {
                                     >
                                         <Monitor className="h-4 w-4 text-stone-400 group-hover/btn:text-purple-400" />
                                     </button>
-                                    <button
-                                        onClick={() => openModal(location)}
-                                        className="p-2 hover:bg-stone-800 rounded-lg transition-colors"
-                                    >
-                                        <Edit2 className="h-4 w-4 text-stone-400 hover:text-stone-200" />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(location.id)}
-                                        className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
-                                    >
-                                        <Trash2 className="h-4 w-4 text-red-400 hover:text-red-300" />
-                                    </button>
+                                    {session?.user?.role === 'PROVIDER' && (
+                                        <>
+                                            <button
+                                                onClick={() => openModal(location)}
+                                                className="p-2 hover:bg-stone-800 rounded-lg transition-colors"
+                                                title="Edit Store"
+                                            >
+                                                <Edit2 className="h-4 w-4 text-stone-400 hover:text-stone-200" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(location.id)}
+                                                className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                title="Delete Store"
+                                            >
+                                                <Trash2 className="h-4 w-4 text-red-400 hover:text-red-300" />
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 

@@ -32,7 +32,7 @@ export default function CompliancePage() {
         score: 0
     })
 
-    const locationId = 'your-location-id' // TODO: Get from session
+    const locationId = 'your-location-id' // Replace with session.user.locationId
 
     useEffect(() => {
         if (status === 'authenticated') {

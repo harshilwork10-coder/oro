@@ -208,7 +208,6 @@ export async function lookupBarcode(barcode: string): Promise<SKULookupResult> {
     // Create a master timeout that cancels the entire lookup after 15 seconds
     const masterTimeout = new Promise<SKULookupResult>((resolve) => {
         setTimeout(() => {
-            console.log('[SKU_LOOKUP] Master timeout reached (15s)')
             resolve({ found: false, barcode: cleanBarcode })
         }, 15000)
     })
@@ -219,32 +218,32 @@ export async function lookupBarcode(barcode: string): Promise<SKULookupResult> {
         try {
             const oroResult = await lookupOroDatabase(cleanBarcode)
             if (oroResult.found) return applyBrandCategoryCorrection(oroResult)
-        } catch (error) {
-            console.log('[SKU_LOOKUP] Oro database check failed:', error)
+        } catch {
+            // Oro database check failed, continue to next source
         }
 
         // Try Barcode Spider (500M-1.5B products, good coverage)
         try {
             const spiderResult = await lookupBarcodeSpider(cleanBarcode)
             if (spiderResult.found) return applyBrandCategoryCorrection(spiderResult)
-        } catch (error) {
-            console.log('[SKU_LOOKUP] Barcode Spider failed:', error)
+        } catch {
+            // Barcode Spider failed, continue to next source
         }
 
         // Try Open Food Facts (great for food/beverages)
         try {
             const offResult = await lookupOpenFoodFacts(cleanBarcode)
             if (offResult.found) return applyBrandCategoryCorrection(offResult)
-        } catch (error) {
-            console.log('[SKU_LOOKUP] Open Food Facts failed:', error)
+        } catch {
+            // Open Food Facts failed, continue to next source
         }
 
         // Try UPC ItemDB (general products)
         try {
             const upcResult = await lookupUPCItemDB(cleanBarcode)
             if (upcResult.found) return applyBrandCategoryCorrection(upcResult)
-        } catch (error) {
-            console.log('[SKU_LOOKUP] UPC ItemDB failed:', error)
+        } catch {
+            // UPC ItemDB failed, no more sources
         }
 
         return { found: false, barcode: cleanBarcode }
@@ -277,13 +276,9 @@ function applyBrandCategoryCorrection(result: SKULookupResult): SKULookupResult 
 
     for (const brand of tobaccoBrands) {
         if (nameUpper.includes(brand) || brandUpper.includes(brand)) {
-            const correctedCategory = 'Tobacco'
-            if (result.category !== correctedCategory) {
-                console.log(`[SKU_LOOKUP] Category corrected: "${result.category}" -> "${correctedCategory}" for brand "${brand}"`)
-            }
             return {
                 ...result,
-                category: correctedCategory
+                category: 'Tobacco'
             }
         }
     }
@@ -299,12 +294,10 @@ function applyBrandCategoryCorrection(result: SKULookupResult): SKULookupResult 
 
     for (const brand of alcoholBrands) {
         if (nameUpper.includes(brand) || brandUpper.includes(brand)) {
-            const correctedCategory = 'Alcohol'
-            if (result.category !== correctedCategory && result.category !== 'Beer' && result.category !== 'Wine' && result.category !== 'Spirits') {
-                console.log(`[SKU_LOOKUP] Category corrected: "${result.category}" -> "${correctedCategory}" for brand "${brand}"`)
+            if (result.category !== 'Alcohol' && result.category !== 'Beer' && result.category !== 'Wine' && result.category !== 'Spirits') {
                 return {
                     ...result,
-                    category: correctedCategory
+                    category: 'Alcohol'
                 }
             }
         }

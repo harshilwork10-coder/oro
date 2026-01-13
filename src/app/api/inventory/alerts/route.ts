@@ -63,7 +63,7 @@ export async function POST(req: Request) {
         const { productId, reorderPoint } = body
 
         // In real app: Update InventoryItem reorderPoint
-        console.log(`✅ Reorder point updated for product ${productId}: ${reorderPoint}`)
+        // Debug log removed
 
         return NextResponse.json({ success: true })
     } catch (error) {

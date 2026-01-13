@@ -9,8 +9,10 @@ import {
     Search,
     User,
     DollarSign,
-    Medal
+    Medal,
+    FileDown
 } from 'lucide-react'
+import jsPDF from 'jspdf'
 import Link from 'next/link'
 
 interface TopSpender {
@@ -55,6 +57,59 @@ export default function TopSpendersPage() {
         return <span className="text-gray-500 font-mono">#{rank}</span>
     }
 
+    const exportCSV = () => {
+        const headers = ['Rank', 'Customer', 'Phone', 'Visits', 'Avg Ticket', 'Total Spent']
+        const csvContent = [
+            headers.join(','),
+            ...customers.map(c => [
+                c.rank,
+                `"${c.name}"`,
+                `"${c.phone || ''}"`,
+                c.visitCount,
+                c.averageTicket.toFixed(2),
+                c.totalSpent.toFixed(2)
+            ].join(','))
+        ].join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `top_spenders_${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+    }
+
+    const exportToPDF = () => {
+        const doc = new jsPDF()
+        let yPos = 20
+        doc.setFontSize(18)
+        doc.text('Top Spenders Report', 20, yPos)
+        yPos += 10
+        doc.setFontSize(10)
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 20, yPos)
+        yPos += 10
+
+        const headers = ['Rank', 'Customer', 'Visits', 'Avg Ticket', 'Total']
+        const xPos = [20, 40, 100, 130, 160]
+        doc.setFont('helvetica', 'bold')
+        headers.forEach((h, i) => doc.text(h, xPos[i], yPos))
+        yPos += 7
+        doc.line(20, yPos - 5, 190, yPos - 5)
+
+        doc.setFont('helvetica', 'normal')
+        customers.forEach(c => {
+            if (yPos > 270) { doc.addPage(); yPos = 20; }
+            doc.text(String(c.rank), xPos[0], yPos)
+            doc.text(c.name.substring(0, 25), xPos[1], yPos)
+            doc.text(String(c.visitCount), xPos[2], yPos)
+            doc.text(`$${c.averageTicket.toFixed(2)}`, xPos[3], yPos)
+            doc.text(`$${c.totalSpent.toFixed(2)}`, xPos[4], yPos)
+            yPos += 7
+        })
+        doc.save(`top_spenders_${new Date().toISOString().split('T')[0]}.pdf`)
+    }
+
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
@@ -80,6 +135,12 @@ export default function TopSpendersPage() {
                         <option value={50}>Top 50</option>
                         <option value={100}>Top 100</option>
                     </select>
+                    <button onClick={exportToPDF} className="p-2 bg-red-600 hover:bg-red-500 rounded-lg text-white" title="Export PDF">
+                        <FileDown className="w-4 h-4" />
+                    </button>
+                    <button onClick={exportCSV} className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white" title="Export Excel">
+                        <FileDown className="w-4 h-4" />
+                    </button>
                     <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg">
                         <RefreshCw className="w-4 h-4" />
                         Refresh
@@ -128,4 +189,3 @@ export default function TopSpendersPage() {
         </div>
     )
 }
-

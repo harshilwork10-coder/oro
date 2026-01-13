@@ -99,7 +99,7 @@ export async function sendVerificationSMS(
             return { success: false, error: 'Invalid phone number' }
         }
 
-        const message = `Your OroNext verification code is: ${code}\n\nThis code expires in ${CODE_EXPIRY_MINUTES} minutes.`
+        const message = `Your ORO 9 verification code is: ${code}\n\nThis code expires in ${CODE_EXPIRY_MINUTES} minutes.`
 
         const response = await fetch(
             `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,

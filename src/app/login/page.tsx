@@ -212,20 +212,19 @@ export default function LoginPage() {
                     ))}
                 </div>
 
-                {/* Logo + Slogan */}
+                {/* Logo + Slogan - Centered */}
                 <div className="relative z-10">
-                    <div className="flex items-center gap-5 mb-4">
-                        <div className="relative group">
-                            <div className="absolute -inset-1 bg-white/20 rounded-2xl blur group-hover:bg-white/30 transition-all"></div>
-                            <div className="relative h-20 w-20 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 shadow-2xl overflow-hidden">
-                                <img src="/oronext-logo.jpg" alt="OroNext" className="w-14 h-14 object-contain drop-shadow-lg" />
+                    <div className="flex flex-col items-center text-center mb-4">
+                        <div className="relative group mb-4">
+                            <div className="absolute -inset-2 bg-white/20 rounded-3xl blur-lg group-hover:bg-white/30 transition-all"></div>
+                            <div className="relative h-44 w-44 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center border border-white/30 shadow-2xl overflow-hidden">
+                                <img src="/ORO9.png" alt="ORO 9" className="w-36 h-36 object-contain drop-shadow-lg" />
                             </div>
                         </div>
-                        <div>
-                            <h1 className="text-5xl font-black text-white tracking-tight drop-shadow-lg">OroNext</h1>
-                            <p className="text-orange-100/90 text-lg font-medium mt-1 flex items-center gap-2">
+                        <div className="text-center">
+                            <p className="text-orange-100/90 text-lg font-medium mt-2 flex items-center justify-center gap-2">
                                 <Sparkles className="h-4 w-4" />
-                                Ultimate Business Solution
+                                Ultimate Business Solutions
                             </p>
                         </div>
                     </div>
@@ -288,11 +287,11 @@ export default function LoginPage() {
                         <div className="relative">
                             <div className="absolute inset-0 bg-orange-500/30 blur-xl rounded-full scale-150"></div>
                             <div className="relative h-20 w-20 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden bg-gradient-to-br from-orange-500 to-amber-500 p-2">
-                                <img src="/oronext-logo.jpg" alt="OroNext" className="w-full h-full object-contain" />
+                                <img src="/ORO9.png" alt="ORO 9" className="w-full h-full object-contain" />
                             </div>
                         </div>
-                        <h1 className="text-4xl font-black bg-gradient-to-r from-orange-400 via-amber-400 to-orange-400 bg-clip-text text-transparent">OroNext</h1>
-                        <p className="text-stone-400 text-sm">Ultimate Business Solution</p>
+                        <h1 className="text-4xl font-black bg-gradient-to-r from-orange-400 via-amber-400 to-orange-400 bg-clip-text text-transparent">ORO 9</h1>
+                        <p className="text-stone-400 text-sm">Ultimate Business Solutions</p>
                     </div>
 
                     {/* Login Card */}
@@ -377,7 +376,7 @@ export default function LoginPage() {
                                         <span className="text-3xl">👋</span>
                                     </div>
                                     <h2 className="text-3xl font-bold text-white">Welcome back!</h2>
-                                    <p className="mt-2 text-stone-400">Sign in to your OroNext account</p>
+                                    <p className="mt-2 text-stone-400">Sign in to your ORO 9 account</p>
                                 </div>
 
                                 <form className="space-y-5" onSubmit={handleSubmit}>
@@ -463,17 +462,25 @@ export default function LoginPage() {
                                             </p>
                                         </div>
                                     )}
+
+                                    {/* Personal Device - Phone + PIN */}
                                     <a
-                                        href="/employee-login"
-                                        className={`w-full flex items-center justify-center gap-3 font-semibold py-3.5 px-4 rounded-xl transition-all border-2 group ${isPairedDevice
-                                            ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-transparent hover:shadow-lg hover:shadow-orange-500/25'
-                                            : 'bg-stone-800/50 hover:bg-stone-800 text-stone-300 hover:text-white border-stone-700 hover:border-stone-600'
-                                            }`}
+                                        href="/staff-login"
+                                        className="w-full flex items-center justify-center gap-3 font-semibold py-3.5 px-4 rounded-xl transition-all border-2 group bg-stone-800/50 hover:bg-stone-800 text-stone-300 hover:text-white border-stone-700 hover:border-stone-600 mb-3"
                                     >
                                         <KeyRound className="h-5 w-5" />
-                                        {isPairedDevice ? 'Employee PIN Login (Recommended)' : 'Employee? Use PIN Login'}
+                                        Employee? Phone + PIN Login
                                         <ArrowRight className="h-4 w-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                                     </a>
+
+                                    {/* POS Terminal - Setup Code + PIN */}
+                                    <a
+                                        href="/employee-login"
+                                        className="w-full flex items-center justify-center gap-3 text-sm py-2.5 px-4 rounded-xl transition-all text-stone-500 hover:text-stone-300 hover:bg-stone-800/30"
+                                    >
+                                        POS Terminal Setup →
+                                    </a>
+
                                     {isPairedDevice && (
                                         <p className="text-stone-500 text-xs text-center mt-3">
                                             Owner? Use email login above for dashboard access
@@ -485,7 +492,7 @@ export default function LoginPage() {
                     </div>
 
                     <p className="mt-8 text-center text-sm text-stone-600">
-                        © 2025 OroNext POS System. All rights reserved.
+                        © 2025 ORO 9 POS System. All rights reserved.
                     </p>
                 </div>
             </div>

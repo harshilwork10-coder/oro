@@ -42,7 +42,7 @@ export async function GET(req: Request) {
             await prisma.supportMessage.create({
                 data: {
                     chatId: chat.id,
-                    content: "👋 Welcome to OroNext Support! How can we help you today?",
+                    content: "👋 Welcome to ORO 9 Support! How can we help you today?",
                     sender: 'SUPPORT'
                 }
             })

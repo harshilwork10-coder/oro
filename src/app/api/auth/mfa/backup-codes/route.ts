@@ -59,7 +59,7 @@ export async function POST(req: Request) {
             data: { mfaBackupCodes: encryptedBackupCodes }
         })
 
-        console.log(`[MFA] Backup codes regenerated for user ${session.user.id}`)
+        // Debug log removed
 
         return NextResponse.json({
             success: true,

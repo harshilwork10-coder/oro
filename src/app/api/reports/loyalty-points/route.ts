@@ -12,17 +12,29 @@ export async function GET(request: NextRequest) {
 
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: { franchiseId: true }
+            select: { id: true, role: true, franchiseId: true }
         })
 
-        if (!user?.franchiseId) {
+        let franchiseId = user?.franchiseId
+
+        if (user?.role === 'FRANCHISOR' && !franchiseId) {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: user.id },
+                include: { franchises: { take: 1, select: { id: true } } }
+            })
+            if (franchisor?.franchises[0]) {
+                franchiseId = franchisor.franchises[0].id
+            }
+        }
+
+        if (!franchiseId) {
             return NextResponse.json({ customers: [] })
         }
 
         // Get clients with loyalty data
         const clients = await prisma.client.findMany({
             where: {
-                franchiseId: user.franchiseId,
+                franchiseId: franchiseId,
                 loyaltyJoined: true
             },
             include: {

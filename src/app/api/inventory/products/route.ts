@@ -59,6 +59,8 @@ export async function GET(request: NextRequest) {
                 barcode: true,
                 sku: true,
                 price: true,
+                cashPrice: true,
+                cardPrice: true,
                 cost: true,
                 stock: true,
                 reorderPoint: true,
@@ -120,7 +122,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { name, barcode, sku, price, cost, stock, reorderPoint, categoryId, vendor, unitsPerCase, casePrice, sellByCase } = body
+        const { name, barcode, sku, price, cashPrice, cost, stock, reorderPoint, categoryId, vendor, unitsPerCase, casePrice, sellByCase } = body
 
         if (!name?.trim()) {
             return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -139,12 +141,38 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // Get franchise config for dual pricing settings
+        const franchise = await prisma.franchise.findUnique({
+            where: { id: user.franchiseId },
+            include: {
+                franchisor: {
+                    include: { config: true }
+                }
+            }
+        })
+
+        // Determine cash price (use cashPrice if provided, else fall back to price)
+        const baseCashPrice = parseFloat(cashPrice ?? price) || 0
+
+        // Calculate card price if dual pricing is enabled
+        let calculatedCardPrice: number | null = null
+        // Cast config as any since Prisma types may be stale after schema changes
+        const config = franchise?.franchisor?.config as any
+        if (config?.pricingModel === 'DUAL_PRICING') {
+            const percentage = parseFloat(String(config.cardSurcharge)) || 0
+            // Formula: cardPrice = cashPrice × (1 + percentage/100)
+            calculatedCardPrice = baseCashPrice * (1 + percentage / 100)
+        }
+
         const product = await prisma.product.create({
+            // Cast data as any since Prisma types may be stale after schema changes
             data: {
                 name: name.trim(),
                 barcode: barcode?.trim() || null,
                 sku: sku?.trim() || null,
-                price: parseFloat(price) || 0,
+                price: baseCashPrice, // Legacy field - keep in sync with cashPrice
+                cashPrice: baseCashPrice,
+                cardPrice: calculatedCardPrice,
                 cost: cost ? parseFloat(cost) : null,
                 stock: parseInt(stock) || 0,
                 reorderPoint: reorderPoint ? parseInt(reorderPoint) : null,
@@ -155,7 +183,7 @@ export async function POST(request: NextRequest) {
                 casePrice: casePrice ? parseFloat(casePrice) : null,
                 sellByCase: sellByCase ?? false,
                 franchiseId: user.franchiseId
-            },
+            } as any,
             include: {
                 productCategory: {
                     select: {

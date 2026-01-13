@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        console.log(`🔒 Account ${action}: ${franchisor.name || franchisor.owner?.email} - ${newStatus}`)
+        // Debug log removed
 
         // TODO: Send email notification to the franchisor about account status change
 

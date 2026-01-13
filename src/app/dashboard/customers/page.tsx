@@ -1,13 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { Users, Heart, Mail, Phone, Plus, Search } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Users, Heart, Mail, Phone, Plus, Search, Loader2, Trash2, X } from 'lucide-react'
+import { useToast } from '@/components/providers/ToastProvider'
 
 export default function CustomersPage() {
+    const toast = useToast()
     const [searchTerm, setSearchTerm] = useState('')
     const [showEnrollModal, setShowEnrollModal] = useState(false)
     const [showAddCustomerModal, setShowAddCustomerModal] = useState(false)
+    const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; customer: any | null }>({ open: false, customer: null })
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
+    const [customers, setCustomers] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
     const [newCustomer, setNewCustomer] = useState({
         firstName: '',
         lastName: '',
@@ -16,13 +21,35 @@ export default function CustomersPage() {
         enrollInLoyalty: false
     })
 
-    const customers = [
-        { id: 1, name: 'Sarah Jenkins', email: 'sarah@example.com', phone: '(555) 123-4567', visits: 12, lastVisit: '2 days ago', loyaltyMember: true, points: 850 },
-        { id: 2, name: 'Michael Chen', email: 'michael@example.com', phone: '(555) 234-5678', visits: 8, lastVisit: '1 week ago', loyaltyMember: true, points: 1200 },
-        { id: 3, name: 'Emma Wilson', email: 'emma@example.com', phone: '(555) 345-6789', visits: 15, lastVisit: 'Yesterday', loyaltyMember: false, points: 0 },
-        { id: 4, name: 'David Martinez', email: 'david@example.com', phone: '(555) 456-7890', visits: 5, lastVisit: '3 days ago', loyaltyMember: false, points: 0 },
-        { id: 5, name: 'Lisa Anderson', email: 'lisa@example.com', phone: '(555) 567-8901', visits: 20, lastVisit: 'Today', loyaltyMember: true, points: 2450 }
-    ]
+    // Fetch customers from database
+    useEffect(() => {
+        const fetchCustomers = async () => {
+            try {
+                const res = await fetch('/api/clients')
+                if (res.ok) {
+                    const data = await res.json()
+                    const clientsArray = Array.isArray(data) ? data : (data.clients || data.data || [])
+                    // Map to expected format
+                    const formatted = clientsArray.map((c: any) => ({
+                        id: c.id,
+                        name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unknown',
+                        email: c.email || '',
+                        phone: c.phone || '',
+                        visits: c._count?.appointments || 0,
+                        lastVisit: c.lastVisit || 'Never',
+                        loyaltyMember: !!c.loyaltyJoined || !!c.loyalty,
+                        points: c.loyalty?.points || 0
+                    }))
+                    setCustomers(formatted)
+                }
+            } catch (error) {
+                console.error('Failed to fetch customers:', error)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchCustomers()
+    }, [])
 
     const handleEnrollInLoyalty = (customer: any) => {
         setSelectedCustomer(customer)
@@ -30,19 +57,69 @@ export default function CustomersPage() {
     }
 
     const confirmEnrollment = () => {
-        alert(`${selectedCustomer.name} enrolled in loyalty program!`)
+        toast.success(`${selectedCustomer.name} enrolled in loyalty program!`)
         setShowEnrollModal(false)
         setSelectedCustomer(null)
     }
 
-    const handleAddCustomer = () => {
+    const handleDeleteCustomer = async () => {
+        if (!deleteConfirm.customer) return
+
+        try {
+            const res = await fetch('/api/clients', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: deleteConfirm.customer.id })
+            })
+
+            if (res.ok) {
+                setCustomers(prev => prev.filter(c => c.id !== deleteConfirm.customer.id))
+                toast.success('Customer deleted successfully!')
+            } else {
+                toast.error('Failed to delete customer')
+            }
+        } catch (error) {
+            toast.error('Failed to delete customer')
+        } finally {
+            setDeleteConfirm({ open: false, customer: null })
+        }
+    }
+
+    const handleAddCustomer = async () => {
         if (!newCustomer.firstName || !newCustomer.lastName) {
             alert('Please enter first and last name')
             return
         }
-        alert(`Customer ${newCustomer.firstName} ${newCustomer.lastName} added successfully!`)
-        setShowAddCustomerModal(false)
-        setNewCustomer({ firstName: '', lastName: '', email: '', phone: '', enrollInLoyalty: false })
+
+        try {
+            const res = await fetch('/api/clients', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newCustomer)
+            })
+
+            if (res.ok) {
+                const created = await res.json()
+                // Add to list
+                setCustomers(prev => [...prev, {
+                    id: created.id,
+                    name: `${newCustomer.firstName} ${newCustomer.lastName}`,
+                    email: newCustomer.email,
+                    phone: newCustomer.phone,
+                    visits: 0,
+                    lastVisit: 'Never',
+                    loyaltyMember: newCustomer.enrollInLoyalty,
+                    points: 0
+                }])
+                setShowAddCustomerModal(false)
+                setNewCustomer({ firstName: '', lastName: '', email: '', phone: '', enrollInLoyalty: false })
+                toast.success('Customer added successfully!')
+            } else {
+                toast.error('Failed to add customer')
+            }
+        } catch (error) {
+            toast.error('Failed to add customer')
+        }
     }
 
     const filteredCustomers = customers.filter(c =>
@@ -139,15 +216,24 @@ export default function CustomersPage() {
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        {!customer.loyaltyMember && (
+                                        <div className="flex items-center justify-end gap-2">
+                                            {!customer.loyaltyMember && (
+                                                <button
+                                                    onClick={() => handleEnrollInLoyalty(customer)}
+                                                    className="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white text-xs rounded-lg font-medium transition-colors flex items-center gap-1"
+                                                >
+                                                    <Heart className="h-3 w-3" />
+                                                    Enroll in Loyalty
+                                                </button>
+                                            )}
                                             <button
-                                                onClick={() => handleEnrollInLoyalty(customer)}
-                                                className="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white text-xs rounded-lg font-medium transition-colors flex items-center gap-1 ml-auto"
+                                                onClick={() => setDeleteConfirm({ open: true, customer })}
+                                                className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                title="Delete customer"
                                             >
-                                                <Heart className="h-3 w-3" />
-                                                Enroll in Loyalty
+                                                <Trash2 className="h-4 w-4" />
                                             </button>
-                                        )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -269,6 +355,35 @@ export default function CustomersPage() {
                                 className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors"
                             >
                                 Add Customer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm.open && deleteConfirm.customer && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="glass-panel p-6 rounded-xl max-w-md w-full border border-stone-700">
+                        <h3 className="text-xl font-bold text-stone-100 mb-4 flex items-center gap-2">
+                            <Trash2 className="h-6 w-6 text-red-500" />
+                            Delete Customer
+                        </h3>
+                        <p className="text-stone-400 mb-6">
+                            Are you sure you want to delete <span className="text-stone-100 font-medium">{deleteConfirm.customer.name}</span>? This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setDeleteConfirm({ open: false, customer: null })}
+                                className="flex-1 px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg font-medium transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteCustomer}
+                                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors"
+                            >
+                                Delete
                             </button>
                         </div>
                     </div>

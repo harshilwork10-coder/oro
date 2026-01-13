@@ -40,7 +40,7 @@ export async function POST(
                 }
             })
 
-            console.log(`[ACCOUNT_DELETION_SCHEDULED] Franchise ${franchise.name} (${id}) scheduled for deletion on ${deletionDate.toISOString()} by ${session.user.email}`)
+            // Debug log removed scheduled for deletion on ${deletionDate.toISOString()} by ${session.user.email}`)
 
             return NextResponse.json({
                 success: true,
@@ -59,7 +59,7 @@ export async function POST(
                 }
             })
 
-            console.log(`[ACCOUNT_DELETION_CANCELLED] Franchise ${franchise.name} (${id}) deletion cancelled by ${session.user.email}`)
+            // Debug log removed deletion cancelled by ${session.user.email}`)
 
             return NextResponse.json({
                 success: true,
@@ -146,7 +146,7 @@ export async function DELETE(
             })
         ])
 
-        console.log(`[ACCOUNT_DELETED] Franchise ${franchise.name} (${id}) permanently deleted by ${session.user.email}. Summary: ${JSON.stringify(summary)}`)
+        // Debug log removed permanently deleted by ${session.user.email}. Summary: ${JSON.stringify(summary)}`)
 
         return NextResponse.json({
             success: true,

@@ -33,11 +33,11 @@ export async function PUT(
             }
         })
 
-        console.log(`✅ Terminal configuration updated for location: ${updated.name}`)
-        console.log(`   IP: ${paxTerminalIP || 'Not set'}`)
-        console.log(`   Port: ${paxTerminalPort || '10009'}`)
-        console.log(`   MID: ${processorMID || 'Not set'}`)
-        console.log(`   Updated by: ${session.user.email}`)
+        // Debug log removed
+        // Debug log removed
+        // Debug log removed
+        // Debug log removed
+        // Debug log removed
 
         return NextResponse.json({ success: true, data: updated })
     } catch (error) {

@@ -110,9 +110,24 @@ export default function ProviderHomePage() {
     const [ticketQueue, setTicketQueue] = useState<{ id: string; priority: string; client: string; location: string; category: string; status: string; sla: string }[]>([]);
 
     useEffect(() => {
-        // TODO: Fetch from /api/provider/dashboard
-        setLoading(false);
-    }, []);
+        const fetchDashboardStats = async () => {
+            try {
+                const res = await fetch('/api/provider/dashboard')
+                if (res.ok) {
+                    const data = await res.json()
+                    setStats(data.stats)
+                    setOnboardingQueue(data.onboardingQueue)
+                    setTicketQueue(data.ticketQueue)
+                }
+            } catch (error) {
+                console.error('Error fetching dashboard stats:', error)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchDashboardStats()
+    }, [])
 
     return (
         <div>

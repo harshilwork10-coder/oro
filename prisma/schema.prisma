@@ -20,6 +20,7 @@ enum UserRole {
   MANAGER
   SHIFT_SUPERVISOR
   EMPLOYEE
+  SUB_FRANCHISEE
 }
 
 enum TransactionStatus {
@@ -177,8 +178,13 @@ model User {
   canProcessRefunds  Boolean @default(false) // Can refund transactions
   canManageSchedule  Boolean @default(false) // Can create/edit employee schedules
   canManageEmployees Boolean @default(false) // Can add/edit employees
+  canSetOwnPrices    Boolean @default(false) // Chair rental/booth renter can set their own service prices
+  canApplyDiscounts  Boolean @default(false) // Can apply manual discounts
+  maxDiscountPercent Int     @default(0)     // Max discount percentage allowed (e.g., 20)
+  maxDiscountAmount  Decimal @default(0)     // Max discount flat amount allowed (e.g., 10.00)
 
   // Shift Management Permissions
+  requiresTimeClock Boolean @default(false) // Employee must clock in/out
   canManageShifts Boolean @default(false) // Can open/close cash drawer shifts
   canClockIn      Boolean @default(true) // Can clock in for work
   canClockOut     Boolean @default(true) // Can clock out from work
@@ -225,6 +231,9 @@ model User {
   // Global Catalog (Centralized Management)
   globalServices     GlobalService[]
   globalProducts     GlobalProduct[]
+
+  // Sub-Franchisee Link (Phase 2)
+  subFranchisee      SubFranchisee?
 
   // Advanced Commission System Relations (Optional - backward compatible)
   paymentConfig    EmployeePaymentConfig?      @relation("EmployeePaymentConfig")
@@ -277,6 +286,19 @@ model User {
 
   // Time Blocking (block personal time)
   timeBlocks TimeBlock[]
+
+  // Current working location (for rotating staff)
+  currentLocationId String?
+  currentLocation   Location? @relation("CurrentLocation", fields: [currentLocationId], references: [id])
+
+  // Per-barber pricing (for multi-location independent salons)
+  employeeServices EmployeeService[]
+  
+  // Compensation System (MULTI_LOCATION_OWNER only)
+  compensationPlans    CompensationPlan[]
+  priceOverrides       EmployeeServicePriceOverride[] @relation("PriceOverrides")
+  allowedServices      BarberAllowedService[]         @relation("AllowedServices")
+  assignedResources    UserResource[]
 }
 
 model Franchise {
@@ -362,6 +384,10 @@ model Franchise {
   onboardingRequests  OnboardingRequest[]         @relation("OnboardingRequests")
   onboardingLocations OnboardingRequestLocation[] @relation("OnboardingLocations")
   shipments           Shipment[]                  @relation("Shipments")
+
+  // Sub-Franchisee (Phase 2)
+  subFranchiseeId     String?
+  subFranchisee       SubFranchisee?               @relation(fields: [subFranchiseeId], references: [id])
 
   // Smart Ordering
   orderTemplates OrderTemplate[]
@@ -706,7 +732,7 @@ model Location {
   publicBannerUrl  String?
 
   // New Relations
-  resources             Resource[]
+  resources             Resource[] @relation("LocationResources")
   recurringAppointments RecurringAppointment[]
   checkIns              CheckIn[]
 
@@ -755,6 +781,12 @@ model Location {
 
   // Cash payouts
   cashPayouts CashPayout[]
+
+  // Staff currently working at this location (rotating staff)
+  currentStaff User[] @relation("CurrentLocation")
+  
+  // Compensation Plans for this location
+  compensationPlans CompensationPlan[] @relation("CompensationPlans")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -819,10 +851,37 @@ model Station {
   // Employees assigned to this station by Provider
   assignedEmployees User[] @relation("AssignedEmployee")
 
+  // Trusted Devices (Persistent Pairing)
+  trustedDevices TrustedDevice[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([locationId])
+}
+
+// Trusted Device - Persistent "Cockroach" binding for stations
+model TrustedDevice {
+  id            String   @id @default(cuid())
+  deviceId      String   @unique // UUID v4 stored in localStorage
+  stationId     String
+  station       Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  name          String?  // e.g. "Chrome on Windows"
+  userAgent     String?
+  lastSeenAt    DateTime @default(now())
+  lastIp        String?
+
+  status        String   @default("ACTIVE") // ACTIVE, REVOKED
+
+  // Security & Rotation
+  lastRotatedAt DateTime @default(now())
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([stationId])
+  @@index([deviceId])
 }
 
 // Payment Terminal (PAX, Clover, etc.) - 1 terminal per station (dedicated)
@@ -1113,7 +1172,12 @@ model Service {
   name            String
   description     String?
   duration        Int // in minutes
-  price           Decimal
+  price           Decimal           // Legacy - kept for backward compatibility
+  
+  // Dual Pricing Fields (compliant dual price system)
+  cashPrice       Decimal?          // Cash price (base price)
+  cardPrice       Decimal?          // Card price = cashPrice × (1 + dualPricingPercent)
+  
   categoryId      String? // Link to ServiceCategory
   serviceCategory ServiceCategory? @relation(fields: [categoryId], references: [id])
   franchiseId     String
@@ -1136,6 +1200,38 @@ model Service {
   
   // Add-on service flag (for upselling during booking)
   isAddOn Boolean @default(false)
+
+  // Per-barber pricing (for multi-location independent salons)
+  employeeServices EmployeeService[]
+  
+  // Booth renter custom prices (for CHAIR_RENTAL compensation type)
+  employeePriceOverrides EmployeeServicePriceOverride[] @relation("EmployeePriceOverrides")
+  
+  // Which barbers are allowed to perform this service
+  barberAllowedServices  BarberAllowedService[] @relation("BarberAllowedServices")
+}
+
+// ============ PER-BARBER PRICING (Multi-Location Independent Salons Only) ============
+// Each barber can set their own price for services
+// Only applies to MULTI_LOCATION_OWNER business type, NOT franchises
+
+model EmployeeService {
+  id          String   @id @default(cuid())
+  employeeId  String
+  serviceId   String
+  price       Decimal  // Barber's custom price for this service
+  duration    Int?     // Optional: custom duration if different from base service
+  isActive    Boolean  @default(true)
+  
+  employee    User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, serviceId])
+  @@index([employeeId])
+  @@index([serviceId])
 }
 
 model Client {
@@ -1318,7 +1414,13 @@ model Product {
 
   name            String
   description     String?
-  price           Decimal
+  price           Decimal           // Legacy - kept for backward compatibility
+  
+  // Dual Pricing Fields (compliant dual price system)
+  // cashPrice is the PRIMARY price, cardPrice is derived
+  cashPrice       Decimal?          // Cash price (base price)
+  cardPrice       Decimal?          // Card price = cashPrice × (1 + dualPricingPercent)
+  
   cost            Decimal? // Cost to franchise
   stock           Int              @default(0)
   category        String? // Legacy - plain text category
@@ -1439,6 +1541,17 @@ model Transaction {
   paymentMethod  String // CASH, DEBIT_CARD, CREDIT_CARD, SPLIT
   processingPlan String? // STANDARD, SURCHARGE, DUAL_PRICE (from merchant config)
 
+  // Dual Pricing Totals (compliant dual price system)
+  // Both cash and card totals are calculated at cart time
+  // chargedMode determines which total was actually charged
+  subtotalCash   Decimal? // Sum of all cashLineTotals
+  subtotalCard   Decimal? // Sum of all cardLineTotals
+  taxCash        Decimal? // Tax calculated on cash subtotal
+  taxCard        Decimal? // Tax calculated on card subtotal
+  totalCash      Decimal? // subtotalCash + taxCash
+  totalCard      Decimal? // subtotalCard + taxCard
+  chargedMode    String?  // "CASH" or "CARD" - which price set was charged
+
   // Split Payment Fields
   cashAmount Decimal @default(0) // Amount paid in cash (for SPLIT payments)
   cardAmount Decimal @default(0) // Amount paid by card (for SPLIT payments)
@@ -1499,9 +1612,30 @@ model TransactionLineItem {
   product   Product? @relation(fields: [productId], references: [id])
   quantity  Int      @default(1)
 
-  price    Decimal // Price per item
+  price    Decimal // Price per item (legacy)
   discount Decimal @default(0)
-  total    Decimal // Total for this line item
+  total    Decimal // Total for this line item (legacy)
+
+  // Dual Pricing Line Fields (compliant dual price system)
+  cashUnitPrice    Decimal?  // Cash price per unit
+  cardUnitPrice    Decimal?  // Card price per unit
+  cashLineTotal    Decimal?  // qty × cashUnitPrice
+  cardLineTotal    Decimal?  // qty × cardUnitPrice
+  lineChargedMode  String?   // "CASH" or "CARD" - which price was used
+
+  // === SNAPSHOT FIELDS (immutable after checkout) ===
+  // These fields are set at checkout and NEVER change
+  serviceNameSnapshot  String?   // Service/product name frozen at checkout
+  productNameSnapshot  String?   // Product name frozen at checkout
+  priceCharged         Decimal?  // Actual price charged per unit
+  discountAllocated    Decimal?  // Discount amount on this line item
+  taxAllocated         Decimal?  // Tax amount on this line item
+  tipAllocated         Decimal?  // Tip allocated to this line (for services)
+  commissionSplitUsed  Decimal?  // Commission % used (e.g., 50 for 50%)
+  commissionAmount     Decimal?  // Amount barber/staff earns
+  ownerAmount          Decimal?  // Amount owner keeps
+  businessDate         DateTime? // Business date (location timezone)
+  lineItemStatus       String?   @default("PAID") // PAID, REFUNDED, VOIDED
 
   createdAt DateTime @default(now())
 }
@@ -2066,6 +2200,27 @@ model Franchisor {
   // Industry Type (for conditional feature access)
   industryType String @default("SERVICE") // "SERVICE" | "RETAIL" | "RESTAURANT"
 
+  // ============ BRAND MODE (Phase 1) ============
+  // For businessType = BRAND_FRANCHISOR - turns this into a full brand entity
+  
+  // Brand Identity
+  brandCode           String?   @unique  // e.g., "GREATCLIPS", "SUPERCUTS" - unique identifier
+  
+  // Brand-Level Default Settings (applies to all locations unless overridden)
+  // JSON: { appointmentsEnabled, tipsEnabled, commissionRules, posDefaults }
+  brandSettings       String?   // JSON string for brand defaults
+  
+  // Brand Control Locks (what locations CANNOT change if true)
+  lockPricing         Boolean   @default(false)  // Locations cannot change service/product prices
+  lockServices        Boolean   @default(false)  // Locations cannot add/edit services
+  lockCommission      Boolean   @default(false)  // Locations cannot change commission rules
+  lockProducts        Boolean   @default(false)  // Locations cannot add/edit products
+
+  // Sub-Franchisees (Phase 2)
+  subFranchisees     SubFranchisee[]
+  
+
+
   // Existing Relations
   franchises         Franchise[]
   globalServices     GlobalService[]
@@ -2245,6 +2400,12 @@ model BusinessConfig {
   // New Client Tracking
   newClientBonusEnabled Boolean @default(false)
   newClientBonusAmount  Decimal @default(10)
+
+  // Pricing & Surcharges
+  pricingModel      String  @default("STANDARD") // STANDARD, CASH_DISCOUNT, DUAL_PRICING
+  cardSurcharge     Decimal @default(0)          // Surcharge amount or percent
+  cardSurchargeType String  @default("PERCENTAGE") // PERCENTAGE or FIXED
+  showDualPricing   Boolean @default(false)
 
   // Cash Discount Program (FRANCHISOR-CONTROLLED)
   // Each salon owner decides if they want dual pricing
@@ -2835,7 +2996,7 @@ model PackageUsage {
 model Resource {
   id         String   @id @default(cuid())
   locationId String
-  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  location    Location @relation("LocationResources", fields: [locationId], references: [id], onDelete: Cascade)
 
   name        String // "Chair 1", "Room A", "Laser Machine"
   type        String  @default("CHAIR") // CHAIR, ROOM, EQUIPMENT
@@ -2847,7 +3008,12 @@ model Resource {
   // Services that can use this resource (comma-separated IDs or null for all)
   allowedServiceIds String?
 
+  // Relations
   appointments Appointment[]
+  
+  // Assigned employees (many-to-many for chair assignments)
+  assignedEmployees UserResource[]
+  
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
@@ -4271,4 +4437,161 @@ model BoothRental {
 
   @@index([franchiseId])
   @@index([userId])
+}
+
+// ============ SALON: COMPREHENSIVE COMPENSATION SYSTEM ============
+// For MULTI_LOCATION_OWNER: Chair rental, hourly, salary, commission
+// Supports history via effective dates, multi-location, proper commission math
+
+model CompensationPlan {
+  id                  String    @id @default(cuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  locationId          String?   // null = applies everywhere
+  location            Location? @relation("CompensationPlans", fields: [locationId], references: [id])
+  
+  // Worker classification (legal/tax purposes)
+  workerType          String    @default("W2_EMPLOYEE") // W2_EMPLOYEE, 1099_CONTRACTOR, BOOTH_RENTER
+  
+  // Compensation type
+  compensationType    String    // CHAIR_RENTAL, HOURLY, SALARY, COMMISSION, HYBRID
+  
+  // Effective dates (enables history)
+  effectiveFrom       DateTime  @default(now())
+  effectiveTo         DateTime? // null = currently active
+  
+  // Hourly
+  hourlyRate          Decimal?  @db.Decimal(10, 2)
+  
+  // Salary
+  salaryAmount        Decimal?  @db.Decimal(10, 2)
+  salaryPeriod        String?   // WEEKLY, BIWEEKLY, MONTHLY
+
+  // Commission (Decimal for 67.5% etc)
+  commissionSplit         Decimal?  @db.Decimal(5, 2) // Employee's % (70.00 = employee gets 70%)
+  commissionBase          String    @default("AFTER_DISCOUNT") // ORIGINAL_PRICE, AFTER_DISCOUNT
+  commissionAppliesTo     String    @default("SERVICES_ONLY") // SERVICES_ONLY, SERVICES_AND_PRODUCTS
+  commissionIncludesTax   Boolean   @default(false)
+  commissionIncludesTips  Boolean   @default(false)
+  
+  // Chair/Booth Rental
+  chairRentAmount     Decimal?  @db.Decimal(10, 2)
+  chairRentPeriod     String?   // WEEKLY, MONTHLY
+  chairRentDueDay     Int?      // 1-31 for monthly, 1-7 for weekly
+  chairRentStartDate  DateTime?
+  chairRentAutoDeduct Boolean   @default(false) // Deduct from payout?
+  
+  // Time tracking (separate from pay model)
+  requiresTimeClock   Boolean   @default(false)
+  
+  // Price control (separate from compensation type)
+  // Defaults: ON for Chair Rental, OFF for others (but owner can override)
+  canSetOwnPrices     Boolean   @default(false)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@index([userId, effectiveFrom])
+  @@index([locationId])
+}
+
+// Snapshot stored on completed appointments (locks in compensation rates)
+model CompensationSnapshot {
+  id                  String    @id @default(cuid())
+  appointmentLineId   String?   @unique // Link to appointment line item
+  transactionItemId   String?   @unique // Link to transaction item
+  
+  // Frozen values at time of service
+  compensationType    String
+  commissionSplit     Decimal?  @db.Decimal(5, 2)
+  commissionBase      String?
+  hourlyRate          Decimal?  @db.Decimal(10, 2)
+  
+  createdAt           DateTime  @default(now())
+}
+
+// Many-to-many: Employee <-> Resource (chair assignments)
+model UserResource {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resourceId  String
+  resource    Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  isDefault   Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([userId, resourceId])
+  @@index([userId])
+  @@index([resourceId])
+}
+
+// Employee price overrides (for booth renters setting own prices)
+model EmployeeServicePriceOverride {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("PriceOverrides", fields: [userId], references: [id], onDelete: Cascade)
+  serviceId   String
+  service     Service  @relation("EmployeePriceOverrides", fields: [serviceId], references: [id], onDelete: Cascade)
+  
+  price       Decimal  @db.Decimal(10, 2)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, serviceId])
+  @@index([userId])
+  @@index([serviceId])
+}
+
+// Barber allowed services (which services each barber can perform)
+// Shop has master service menu, each barber has subset of services they can do
+model BarberAllowedService {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("AllowedServices", fields: [userId], references: [id], onDelete: Cascade)
+  serviceId   String
+  service     Service  @relation("BarberAllowedServices", fields: [serviceId], references: [id], onDelete: Cascade)
+  
+  // Phase 2: Service availability schedule per barber
+  // availableDays String? // e.g., "SAT,SUN" for weekends only
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([userId, serviceId])
+  @@index([userId])
+  @@index([serviceId])
+}
+
+// ============ BRAND MODE MODELS (Phase 2) ============
+
+model SubFranchisee {
+  id              String      @id @default(cuid())
+  
+  // Link to brand (Franchisor)
+  franchisorId    String
+  franchisor      Franchisor  @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
+  
+  // Operator info
+  name            String
+  email           String      @unique
+  phone           String?
+  
+  // Assigned locations (Franchises that this sub-franchisee manages)
+  franchises      Franchise[]
+  
+  // Permission overrides (what brand allows them to edit)
+  permissions     String?     // JSON string: { canEditPricing: false, canEditServices: false, ... }
+  
+  // Status
+  status          String      @default("PENDING") // PENDING, ACTIVE, SUSPENDED
+  invitedAt       DateTime    @default(now())
+  acceptedAt      DateTime?
+  
+  // Auth
+  userId          String?     @unique
+  user            User?       @relation(fields: [userId], references: [id])
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }

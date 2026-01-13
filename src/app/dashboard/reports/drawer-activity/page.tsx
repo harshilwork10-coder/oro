@@ -44,7 +44,7 @@ export default function DrawerActivityPage() {
     const fetchActivities = async () => {
         setLoading(true)
         try {
-            // TODO: Fetch from real API
+            // Real API integration pending
             // const res = await fetch(`/api/reports/drawer-activity?date=${selectedDate}`)
             // const data = await res.json()
             // setActivities(data.activities)

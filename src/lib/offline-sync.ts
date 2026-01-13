@@ -46,14 +46,10 @@ class OfflineSyncService {
     }
 
     private async handleOnline() {
-        console.log('[OfflineSync] Back online - syncing immediately...');
         const result = await this.syncAll();
 
-        // Notify about pending card payments
-        const cardPending = await offlineDB.getCardPendingCount();
-        if (cardPending > 0) {
-            console.log(`[OfflineSync] ${cardPending} card payments need processing`);
-        }
+        // Card payments are queued separately
+        await offlineDB.getCardPendingCount();
     }
 
     stopAutoSync() {
@@ -70,22 +66,21 @@ class OfflineSyncService {
         if (!navigator.onLine) return { success: false, synced: 0, failed: 0, cardsPending: 0, priceConflicts: [] };
 
         this.isSyncing = true;
-        console.log('[OfflineSync] Starting full sync...');
 
         try {
-            // 1. Download fresh product catalog
+            // Download fresh product catalog
             await this.downloadProducts();
 
-            // 2. Sync pending cash transactions
+            // Sync pending cash transactions
             const txResult = await this.syncPendingTransactions();
 
-            // 3. Check card pending transactions
+            // Check card pending transactions
             const cardsPending = await offlineDB.getCardPendingCount();
 
-            // 4. Clean up old synced transactions
+            // Clean up old synced transactions
             await offlineDB.clearSyncedTransactions();
 
-            // 5. Update last sync time
+            // Update last sync time
             await offlineDB.setLastSyncTime();
             await offlineDB.logSync('full-sync', {
                 products: await offlineDB.getProductCount(),
@@ -93,7 +88,6 @@ class OfflineSyncService {
                 cardsPending
             });
 
-            console.log('[OfflineSync] Full sync complete');
             const result: SyncResult = {
                 success: true,
                 ...txResult,
@@ -138,7 +132,6 @@ class OfflineSyncService {
             }));
 
             await offlineDB.saveProducts(products);
-            console.log(`[OfflineSync] Downloaded ${products.length} products`);
             return products.length;
         } catch (error) {
             console.error('[OfflineSync] Failed to download products:', error);
@@ -152,8 +145,6 @@ class OfflineSyncService {
 
         const pending = await offlineDB.getPendingTransactions();
         if (pending.length === 0) return { synced: 0, failed: 0, priceConflicts: [] };
-
-        console.log(`[OfflineSync] Syncing ${pending.length} pending transactions...`);
 
         let synced = 0;
         let failed = 0;
@@ -201,11 +192,6 @@ class OfflineSyncService {
             }
         }
 
-        console.log(`[OfflineSync] Synced ${synced}/${pending.length} transactions`);
-        if (allPriceConflicts.length > 0) {
-            console.warn(`[OfflineSync] ${allPriceConflicts.length} price conflicts detected`);
-        }
-
         return { synced, failed, priceConflicts: allPriceConflicts };
     }
 
@@ -216,15 +202,11 @@ class OfflineSyncService {
         const cardPending = await offlineDB.getCardPendingTransactions();
         if (cardPending.length === 0) return { processed: 0, failed: 0 };
 
-        console.log(`[OfflineSync] Processing ${cardPending.length} card payments...`);
-
         let processed = 0;
         let failed = 0;
 
         for (const tx of cardPending) {
             // Card payments require terminal - notify user to process manually
-            // For now, mark as needing manual processing
-            console.log(`[OfflineSync] Card payment ${tx.id} requires manual processing`);
             failed++;
         }
 

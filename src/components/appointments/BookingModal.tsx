@@ -15,9 +15,12 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
     const [loading, setLoading] = useState(false)
     const [services, setServices] = useState<any[]>([])
     const [employees, setEmployees] = useState<any[]>([])
+    const [locations, setLocations] = useState<any[]>([])
+    const [bookedSlots, setBookedSlots] = useState<Map<string, 'online' | 'store'>>(new Map())
     const [serviceSearch, setServiceSearch] = useState('')
-    const [serviceCategory, setServiceCategory] = useState('Popular')
+    const [serviceCategory, setServiceCategory] = useState('All')
     const [timePeriod, setTimePeriod] = useState<'Morning' | 'Afternoon' | 'Evening'>('Morning')
+    const [employeePrices, setEmployeePrices] = useState<Map<string, { price: number, duration: number }>>(new Map())
 
     // Phone-first lookup states
     const [phoneNumber, setPhoneNumber] = useState('')
@@ -78,42 +81,138 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
         }
     }
 
-    // Mock data fetch
+    // Fetch real services and employees from database
     useEffect(() => {
-        setServices([
-            // Popular / Favorites
-            { id: '1', name: 'Haircut', duration: 30, price: 50, category: 'Hair', popular: true },
-            { id: '2', name: 'Color', duration: 120, price: 150, category: 'Color', popular: true },
-            { id: '3', name: 'Styling', duration: 45, price: 75, category: 'Hair', popular: true },
-            // Hair
-            { id: '4', name: 'Men\'s Cut', duration: 20, price: 35, category: 'Hair' },
-            { id: '5', name: 'Kids Cut', duration: 20, price: 25, category: 'Hair' },
-            { id: '6', name: 'Buzz Cut', duration: 15, price: 20, category: 'Hair' },
-            { id: '7', name: 'Trim', duration: 15, price: 25, category: 'Hair' },
-            { id: '8', name: 'Bang Trim', duration: 10, price: 15, category: 'Hair' },
-            // Color
-            { id: '9', name: 'Highlights', duration: 90, price: 120, category: 'Color' },
-            { id: '10', name: 'Balayage', duration: 150, price: 200, category: 'Color' },
-            { id: '11', name: 'Root Touch-up', duration: 45, price: 75, category: 'Color' },
-            { id: '12', name: 'Gloss Treatment', duration: 30, price: 45, category: 'Color' },
-            // Treatments
-            { id: '13', name: 'Deep Conditioning', duration: 30, price: 40, category: 'Treatments' },
-            { id: '14', name: 'Keratin', duration: 120, price: 250, category: 'Treatments' },
-            { id: '15', name: 'Scalp Treatment', duration: 30, price: 35, category: 'Treatments' },
-            // Nails
-            { id: '16', name: 'Manicure', duration: 30, price: 30, category: 'Nails' },
-            { id: '17', name: 'Pedicure', duration: 45, price: 45, category: 'Nails' },
-            { id: '18', name: 'Gel Nails', duration: 45, price: 55, category: 'Nails' },
-            // Waxing
-            { id: '19', name: 'Eyebrow Wax', duration: 15, price: 15, category: 'Waxing' },
-            { id: '20', name: 'Leg Wax', duration: 45, price: 60, category: 'Waxing' },
-        ])
+        const fetchServices = async () => {
+            try {
+                const res = await fetch('/api/services')
+                if (res.ok) {
+                    const data = await res.json()
+                    // Handle both array and { services: [...] } formats
+                    const servicesArray = Array.isArray(data) ? data : (data.services || data.data || [])
+                    // Map to expected format with category
+                    const formattedServices = servicesArray.map((s: any) => ({
+                        id: s.id,
+                        name: s.name,
+                        duration: s.duration || 30,
+                        price: s.price || 0,
+                        category: s.category || 'General',
+                        popular: s.popular || false
+                    }))
+                    setServices(formattedServices)
+                }
+            } catch (error) {
+                console.error('Error fetching services:', error)
+            }
+        }
 
-        setEmployees([
-            { id: '1', name: 'Sarah Stylist' },
-            { id: '2', name: 'Mike Master' }
-        ])
+        const fetchEmployees = async () => {
+            try {
+                const res = await fetch('/api/employees')
+                if (res.ok) {
+                    const data = await res.json()
+                    // Handle both array and { employees: [...] } formats
+                    const employeesArray = Array.isArray(data) ? data : (data.employees || data.data || [])
+                    setEmployees(employeesArray)
+                }
+            } catch (error) {
+                console.error('Error fetching employees:', error)
+            }
+        }
+
+        const fetchLocations = async () => {
+            try {
+                const res = await fetch('/api/locations')
+                if (res.ok) {
+                    const data = await res.json()
+                    const locationsArray = Array.isArray(data) ? data : (data.locations || data.data || [])
+                    setLocations(locationsArray)
+                }
+            } catch (error) {
+                console.error('Error fetching locations:', error)
+            }
+        }
+
+        fetchServices()
+        fetchEmployees()
+        fetchLocations()
     }, [])
+
+    // Fetch employee-specific prices when employee is selected
+    useEffect(() => {
+        const fetchEmployeePrices = async () => {
+            if (!formData.employeeId) {
+                setEmployeePrices(new Map())
+                return
+            }
+
+            try {
+                const res = await fetch(`/api/employees/services?employeeId=${formData.employeeId}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    const priceMap = new Map<string, { price: number, duration: number }>()
+                    if (data.services) {
+                        data.services.forEach((s: any) => {
+                            priceMap.set(s.serviceId, {
+                                price: Number(s.employeePrice),
+                                duration: s.employeeDuration
+                            })
+                        })
+                    }
+                    setEmployeePrices(priceMap)
+                }
+            } catch (error) {
+                console.error('Error fetching employee prices:', error)
+            }
+        }
+
+        fetchEmployeePrices()
+    }, [formData.employeeId])
+
+    // Fetch booked appointments to show unavailable slots
+    useEffect(() => {
+        const fetchBookedSlots = async () => {
+            if (!formData.date || !locations[0]?.id) {
+                setBookedSlots(new Map())
+                return
+            }
+
+            try {
+                const startDate = `${formData.date}T00:00:00`
+                const endDate = `${formData.date}T23:59:59`
+                let url = `/api/appointments?startDate=${startDate}&endDate=${endDate}&locationId=${locations[0]?.id}`
+                if (formData.employeeId) {
+                    url += `&employeeId=${formData.employeeId}`
+                }
+
+                const res = await fetch(url)
+                if (res.ok) {
+                    const appointments = await res.json()
+                    const slotsMap = new Map<string, 'online' | 'store'>()
+
+                    appointments.forEach((apt: any) => {
+                        const startTime = new Date(apt.startTime)
+                        const endTime = new Date(apt.endTime)
+                        // Mark all 30-min slots that overlap with this appointment
+                        const current = new Date(startTime)
+                        while (current < endTime) {
+                            const slotKey = `${current.getHours().toString().padStart(2, '0')}:${current.getMinutes().toString().padStart(2, '0')}`
+                            // Check if it's an online booking (has source = 'ONLINE' or similar)
+                            slotsMap.set(slotKey, apt.source === 'ONLINE' ? 'online' : 'store')
+                            current.setMinutes(current.getMinutes() + 30)
+                        }
+                    })
+
+                    setBookedSlots(slotsMap)
+                }
+            } catch (error) {
+                console.error('Error fetching booked slots:', error)
+            }
+        }
+
+        fetchBookedSlots()
+    }, [formData.date, formData.employeeId, locations])
+
 
     async function handleSubmit() {
         setLoading(true)
@@ -157,7 +256,7 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                 body: JSON.stringify({
                     ...formData,
                     clientId,
-                    locationId: 'clp...', // Mock location
+                    locationId: locations[0]?.id, // Use first location from user's franchise
                     startTime: startTime.toISOString(),
                     endTime: endTime.toISOString()
                 })
@@ -166,7 +265,9 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
             if (res.ok) {
                 onSuccess()
             } else {
-                setToast({ message: 'Failed to book appointment', type: 'error' })
+                const errorData = await res.json().catch(() => ({}))
+                const errorMsg = errorData.error || 'Failed to book appointment'
+                setToast({ message: errorMsg, type: 'error' })
             }
         } catch (error) {
             console.error('Error booking:', error)
@@ -201,8 +302,9 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                                 type="tel"
                                 placeholder="Enter phone number..."
                                 value={phoneNumber}
+                                maxLength={10}
                                 onChange={(e) => {
-                                    const phone = e.target.value.replace(/\D/g, '')
+                                    const phone = e.target.value.replace(/\D/g, '').slice(0, 10)
                                     setPhoneNumber(phone)
                                     // Auto-lookup when 10 digits entered
                                     if (phone.length === 10) {
@@ -213,8 +315,18 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                                         setFormData({ ...formData, clientId: '' })
                                     }
                                 }}
-                                className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-xl text-white text-lg tracking-wider focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                className={`w-full px-4 py-3 bg-stone-800 border rounded-xl text-white text-lg tracking-wider focus:ring-2 focus:ring-purple-500 focus:border-transparent ${phoneNumber.length > 0 && phoneNumber.length < 10
+                                    ? 'border-amber-500'
+                                    : phoneNumber.length >= 10
+                                        ? 'border-emerald-500'
+                                        : 'border-stone-700'
+                                    }`}
                             />
+                            {phoneNumber.length > 0 && phoneNumber.length < 10 && (
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-amber-400">
+                                    {10 - phoneNumber.length} more digits
+                                </span>
+                            )}
                             {searchStatus === 'searching' && (
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                     <div className="animate-spin h-5 w-5 border-2 border-purple-500 border-t-transparent rounded-full"></div>
@@ -275,47 +387,83 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                         <label className="block text-sm font-medium text-stone-300 mb-2">
                             Select Service
                         </label>
-
-                        {/* Category Tabs */}
-                        <div className="flex gap-1 mb-3 flex-wrap">
-                            {['Popular', 'Hair', 'Color', 'Treatments', 'Nails', 'Waxing'].map(cat => (
+                        {/* Category Tabs - Dynamic from services */}
+                        {services.length > 0 && (
+                            <div className="flex gap-1 mb-3 flex-wrap">
                                 <button
-                                    key={cat}
                                     type="button"
-                                    onClick={() => setServiceCategory(cat)}
-                                    className={`px-4 py-3 rounded-xl text-sm font-medium transition-all active:scale-95 min-h-[44px] ${serviceCategory === cat
+                                    onClick={() => setServiceCategory('All')}
+                                    className={`px-4 py-3 rounded-xl text-sm font-medium transition-all active:scale-95 min-h-[44px] ${serviceCategory === 'All'
                                         ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
                                         : 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
                                         }`}
                                 >
-                                    {cat === 'Popular' ? '⭐ ' : ''}{cat}
+                                    All Services
                                 </button>
-                            ))}
-                        </div>
-
-                        {/* Services Grid (No Scroll) */}
-                        <div className="grid grid-cols-2 gap-3">
-                            {services
-                                .filter(s => serviceCategory === 'Popular' ? s.popular : s.category === serviceCategory)
-                                .slice(0, 6)
-                                .map(service => (
+                                {/* Dynamic categories from actual services */}
+                                {[...new Set(services.map(s => s.category))].map(cat => (
                                     <button
-                                        key={service.id}
+                                        key={cat}
                                         type="button"
-                                        onClick={() => setFormData({ ...formData, serviceId: service.id })}
-                                        className={`p-4 rounded-xl text-left transition-all border-2 min-h-[64px] active:scale-[0.98] ${formData.serviceId === service.id
-                                            ? 'bg-purple-600/30 border-purple-500 text-white shadow-lg shadow-purple-500/20'
-                                            : 'bg-stone-800 border-stone-700 hover:border-stone-500 text-stone-200'
+                                        onClick={() => setServiceCategory(cat)}
+                                        className={`px-4 py-3 rounded-xl text-sm font-medium transition-all active:scale-95 min-h-[44px] ${serviceCategory === cat
+                                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                                            : 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
                                             }`}
                                     >
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-semibold text-base truncate">{service.name}</span>
-                                            <span className="text-emerald-400 font-bold text-base">${service.price}</span>
-                                        </div>
-                                        <span className="text-sm text-stone-400">{service.duration} mins</span>
+                                        {cat}
                                     </button>
                                 ))}
-                        </div>
+                            </div>
+                        )}
+
+                        {/* Empty State when no services */}
+                        {services.length === 0 && (
+                            <div className="p-6 bg-stone-800/50 border border-stone-700 rounded-xl text-center">
+                                <Scissors className="h-10 w-10 text-stone-500 mx-auto mb-3" />
+                                <p className="text-stone-400 font-medium">No services available</p>
+                                <p className="text-stone-500 text-sm mt-1">Services need to be added first in the dashboard</p>
+                            </div>
+                        )}
+
+                        {/* Services Grid (No Scroll) */}
+                        {services.length > 0 && (
+                            <div className="grid grid-cols-2 gap-3">
+                                {services
+                                    .filter(s => serviceCategory === 'All' ? true : s.category === serviceCategory)
+                                    .slice(0, 8)
+                                    .map(service => (
+                                        <button
+                                            key={service.id}
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, serviceId: service.id })}
+                                            className={`p-4 rounded-xl text-left transition-all border-2 min-h-[64px] active:scale-[0.98] ${formData.serviceId === service.id
+                                                ? 'bg-purple-600/30 border-purple-500 text-white shadow-lg shadow-purple-500/20'
+                                                : 'bg-stone-800 border-stone-700 hover:border-stone-500 text-stone-200'
+                                                }`}
+                                        >
+                                            {(() => {
+                                                const empPrice = employeePrices.get(service.id)
+                                                const displayPrice = empPrice?.price ?? service.price
+                                                const displayDuration = empPrice?.duration ?? service.duration
+                                                const hasCustomPrice = !!empPrice
+                                                return (
+                                                    <>
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="font-semibold text-base truncate">{service.name}</span>
+                                                            <span className={`font-bold text-base ${hasCustomPrice ? 'text-orange-400' : 'text-emerald-400'}`}>
+                                                                ${Number(displayPrice).toFixed(0)}
+                                                                {hasCustomPrice && <span className="text-xs ml-1">★</span>}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-sm text-stone-400">{displayDuration} mins</span>
+                                                    </>
+                                                )
+                                            })()}
+                                        </button>
+                                    ))}
+                            </div>
+                        )}
 
                         {/* Selected indicator */}
                         {formData.serviceId && (
@@ -358,6 +506,18 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                             </div>
                         </div>
 
+                        {/* Date Selection */}
+                        <div>
+                            <label className="block text-sm font-medium text-stone-300 mb-2">Date</label>
+                            <input
+                                type="date"
+                                value={formData.date}
+                                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                                min={new Date().toISOString().split('T')[0]}
+                                className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg"
+                            />
+                        </div>
+
                         {/* Time Slots - Filter by Period */}
                         <div>
                             <div className="flex items-center justify-between mb-3">
@@ -388,17 +548,35 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                                     const [h, m] = time.split(':')
                                     const hour = parseInt(h)
                                     const displayTime = `${hour > 12 ? hour - 12 : hour}:${m}${hour >= 12 ? 'p' : 'a'}`
+                                    const bookingType = bookedSlots.get(time)
+                                    const isBooked = !!bookingType
+
+                                    // Color coding: red for store, blue for online, green for available
+                                    const getButtonClass = () => {
+                                        if (formData.time === time) {
+                                            return 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                                        }
+                                        if (bookingType === 'store') {
+                                            return 'bg-red-600/30 text-red-300 border border-red-500/50 cursor-not-allowed'
+                                        }
+                                        if (bookingType === 'online') {
+                                            return 'bg-blue-600/30 text-blue-300 border border-blue-500/50 cursor-not-allowed'
+                                        }
+                                        return 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                    }
+
                                     return (
                                         <button
                                             key={time}
                                             type="button"
-                                            onClick={() => setFormData({ ...formData, time })}
-                                            className={`py-3 rounded-xl text-sm font-semibold transition-all min-h-[52px] active:scale-95 ${formData.time === time
-                                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
-                                                : 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
-                                                }`}
+                                            disabled={isBooked}
+                                            onClick={() => !isBooked && setFormData({ ...formData, time })}
+                                            className={`py-3 rounded-xl text-sm font-semibold transition-all min-h-[52px] active:scale-95 ${getButtonClass()}`}
+                                            title={isBooked ? `Booked (${bookingType})` : 'Available'}
                                         >
                                             {displayTime}
+                                            {bookingType === 'store' && <span className="block text-[10px] opacity-75">Store</span>}
+                                            {bookingType === 'online' && <span className="block text-[10px] opacity-75">Online</span>}
                                         </button>
                                     )
                                 })}

@@ -53,7 +53,7 @@ export async function PATCH(
             }
         })
 
-        console.log(`[INTEGRATIONS] Provider ${session.user.email} updated integrations for client ${id}:`, updates)
+        // Debug log removed
 
         return NextResponse.json({
             success: true,

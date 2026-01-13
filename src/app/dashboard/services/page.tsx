@@ -15,6 +15,7 @@ export default function ServicesPage() {
     const [categoryName, setCategoryName] = useState('')
     const [formData, setFormData] = useState({ name: '', categoryId: '', price: '', duration: '30', description: '' })
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+    const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'service' | 'category'; id: string; name: string } | null>(null)
 
     // Franchise detection - if user belongs to a franchisee, they can only view
     const [isFranchise, setIsFranchise] = useState(false)
@@ -83,23 +84,39 @@ export default function ServicesPage() {
                 setShowModal(false)
                 setEditingService(null)
                 setFormData({ name: '', categoryId: '', price: '', duration: '30', description: '' })
+                setToast({ message: editingService ? 'Service updated!' : 'Service added!', type: 'success' })
+                setTimeout(() => setToast(null), 3000)
+            } else {
+                setToast({ message: 'Failed to save service', type: 'error' })
+                setTimeout(() => setToast(null), 3000)
             }
         } catch (error) {
             console.error('Failed to save service:', error)
+            setToast({ message: 'Failed to save service', type: 'error' })
+            setTimeout(() => setToast(null), 3000)
         }
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete this service?')) return
         try {
             const res = await fetch('/api/franchise/services', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id })
             })
-            if (res.ok) await fetchServices()
+            if (res.ok) {
+                await fetchServices()
+                setDeleteConfirm(null)
+                setToast({ message: 'Service deleted!', type: 'success' })
+                setTimeout(() => setToast(null), 3000)
+            } else {
+                setToast({ message: 'Failed to delete service', type: 'error' })
+                setTimeout(() => setToast(null), 3000)
+            }
         } catch (error) {
             console.error('Failed to delete service:', error)
+            setToast({ message: 'Failed to delete service', type: 'error' })
+            setTimeout(() => setToast(null), 3000)
         }
     }
 
@@ -130,7 +147,6 @@ export default function ServicesPage() {
     }
 
     const handleDeleteCategory = async (id: string) => {
-        if (!confirm('Delete this category? This cannot be undone.')) return
         try {
             const res = await fetch('/api/service-categories', {
                 method: 'DELETE',
@@ -139,12 +155,18 @@ export default function ServicesPage() {
             })
             if (res.ok) {
                 await fetchCategories()
+                setDeleteConfirm(null)
+                setToast({ message: 'Category deleted!', type: 'success' })
+                setTimeout(() => setToast(null), 3000)
             } else {
                 const data = await res.json()
                 setToast({ message: data.error || 'Failed to delete category', type: 'error' })
+                setTimeout(() => setToast(null), 3000)
             }
         } catch (error) {
             console.error('Failed to delete category:', error)
+            setToast({ message: 'Failed to delete category', type: 'error' })
+            setTimeout(() => setToast(null), 3000)
         }
     }
 
@@ -258,7 +280,7 @@ export default function ServicesPage() {
                                     <button onClick={() => openEdit(service)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-orange-400">
                                         <Edit className="h-4 w-4" />
                                     </button>
-                                    <button onClick={() => handleDelete(service.id)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-red-400">
+                                    <button onClick={() => setDeleteConfirm({ type: 'service', id: service.id, name: service.name })} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-red-400">
                                         <Trash2 className="h-4 w-4" />
                                     </button>
                                 </div>
@@ -361,7 +383,7 @@ export default function ServicesPage() {
                                             <button onClick={() => openEditCategory(category)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-orange-400">
                                                 <Edit className="h-4 w-4" />
                                             </button>
-                                            <button onClick={() => handleDeleteCategory(category.id)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-red-400">
+                                            <button onClick={() => setDeleteConfirm({ type: 'category', id: category.id, name: category.name })} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-red-400">
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
                                         </div>
@@ -373,11 +395,45 @@ export default function ServicesPage() {
                 </div>
             )}
 
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+                    <div className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-800 p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-3 bg-red-500/20 rounded-full">
+                                <Trash2 className="h-6 w-6 text-red-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-white">Delete {deleteConfirm.type === 'service' ? 'Service' : 'Category'}</h3>
+                                <p className="text-stone-400 text-sm">This action cannot be undone</p>
+                            </div>
+                        </div>
+                        <p className="text-stone-300 mb-6">
+                            Are you sure you want to delete <span className="font-semibold text-white">"{deleteConfirm.name}"</span>?
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className="flex-1 px-4 py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-lg font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => deleteConfirm.type === 'service' ? handleDelete(deleteConfirm.id) : handleDeleteCategory(deleteConfirm.id)}
+                                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Toast Notification */}
             {toast && (
                 <div className={`fixed bottom-4 right-4 px-6 py-4 rounded-xl shadow-2xl z-[60] flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
-                    <span className="text-white">{toast.message}</span>
-                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">?</button>
+                    <span className="text-white font-medium">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-white/70 hover:text-white text-lg">✕</button>
                 </div>
             )}
         </div>

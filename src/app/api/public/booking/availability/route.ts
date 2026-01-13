@@ -24,11 +24,10 @@ export async function GET(request: NextRequest) {
             if (service) duration = service.duration
         }
 
-        // Get existing appointments for that date
-        const dateStart = new Date(date)
-        dateStart.setHours(0, 0, 0, 0)
-        const dateEnd = new Date(date)
-        dateEnd.setHours(23, 59, 59, 999)
+        // Parse date as local date (YYYY-MM-DD format)
+        const [y, m, d] = date.split('-').map(Number)
+        const dateStart = new Date(y, m - 1, d, 0, 0, 0, 0)
+        const dateEnd = new Date(y, m - 1, d, 23, 59, 59, 999)
 
         const appointments = await prisma.appointment.findMany({
             where: {
@@ -115,10 +114,13 @@ export async function GET(request: NextRequest) {
         const startHour = 9
         const endHour = 18
 
+        // Parse the date string to get year, month, day in local context
+        const [year, month, day] = date.split('-').map(Number)
+
         for (let hour = startHour; hour < endHour; hour++) {
             for (let minute = 0; minute < 60; minute += 30) {
-                const slotTime = new Date(date)
-                slotTime.setHours(hour, minute, 0, 0)
+                // Create slot time explicitly in local timezone
+                const slotTime = new Date(year, month - 1, day, hour, minute, 0, 0)
 
                 // Check if slot is in the past
                 if (slotTime < new Date()) {

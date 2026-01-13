@@ -125,21 +125,16 @@ Thank you for your purchase!
 </html>
 `.trim()
 
-        // TODO: Integrate with actual SMS/Email service
-        // For MVP, we'll log and simulate success
+        // Send receipt via SMS or Email service (mock for MVP)
         if (method === 'sms') {
-            console.log(`[DIGITAL_RECEIPT] SMS to ${destination}:`)
-            console.log(smsReceipt)
-            // TODO: Integration with Twilio or similar
+            // Integration with Twilio or similar would go here
             // await twilioClient.messages.create({
             //     body: smsReceipt,
             //     to: destination,
             //     from: process.env.TWILIO_PHONE_NUMBER
             // })
         } else {
-            console.log(`[DIGITAL_RECEIPT] Email to ${destination}:`)
-            console.log('Subject: Your Receipt from', storeName)
-            // TODO: Integration with SendGrid, Mailgun, or similar
+            // Integration with SendGrid, Mailgun, or similar would go here
             // await sendgridClient.send({
             //     to: destination,
             //     from: 'receipts@yourdomain.com',

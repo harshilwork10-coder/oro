@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
             file.type
         )
 
-        console.log(`✅ File uploaded successfully to S3: ${s3Key}`)
+        // File uploaded successfully to S3
 
         return NextResponse.json({
             success: true,

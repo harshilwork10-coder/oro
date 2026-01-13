@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, Search, MoreHorizontal, User, Clock, Shield, DollarSign, X, Phone, Mail } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Search, MoreHorizontal, User, Clock, Shield, DollarSign, X, Phone, Mail, Loader2 } from 'lucide-react';
 
 type EmployeeTab = 'all' | 'active' | 'inactive';
 
 interface Employee {
-    id: number;
+    id: string;
     name: string;
     email: string;
     phone: string;
@@ -16,12 +16,6 @@ interface Employee {
     salesThisWeek: number;
 }
 
-const MOCK_EMPLOYEES: Employee[] = [
-    { id: 1, name: 'Emma Wilson', email: 'emma@example.com', phone: '(555) 123-4567', role: 'Manager', status: 'active', hoursThisWeek: 38, salesThisWeek: 2450 },
-    { id: 2, name: 'Alex Chen', email: 'alex@example.com', phone: '(555) 234-5678', role: 'Stylist', status: 'active', hoursThisWeek: 32, salesThisWeek: 1820 },
-    { id: 3, name: 'Maria Garcia', email: 'maria@example.com', phone: '(555) 345-6789', role: 'Cashier', status: 'active', hoursThisWeek: 40, salesThisWeek: 890 },
-    { id: 4, name: 'John Smith', email: 'john@example.com', phone: '(555) 456-7890', role: 'Stylist', status: 'inactive', hoursThisWeek: 0, salesThisWeek: 0 },
-];
 
 // Phone formatter helper
 function formatPhone(value: string): string {
@@ -176,8 +170,38 @@ function AddEmployeeModal({ isOpen, onClose, onAdd }: {
 export default function EmployeesPage() {
     const [activeTab, setActiveTab] = useState<EmployeeTab>('all');
     const [searchQuery, setSearchQuery] = useState('');
-    const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    // Fetch employees from database
+    useEffect(() => {
+        const fetchEmployees = async () => {
+            try {
+                const res = await fetch('/api/employees')
+                if (res.ok) {
+                    const data = await res.json()
+                    const empArray = Array.isArray(data) ? data : (data.employees || data.data || [])
+                    const formatted = empArray.map((e: any) => ({
+                        id: e.id,
+                        name: e.name || `${e.firstName || ''} ${e.lastName || ''}`.trim() || 'Unknown',
+                        email: e.email || '',
+                        phone: e.phone || '',
+                        role: e.role || 'Employee',
+                        status: e.isActive === false ? 'inactive' : 'active',
+                        hoursThisWeek: 0,
+                        salesThisWeek: 0
+                    }))
+                    setEmployees(formatted)
+                }
+            } catch (err) {
+                console.error('Failed to fetch employees:', err)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchEmployees()
+    }, [])
 
     const tabs: { id: EmployeeTab; label: string }[] = [
         { id: 'all', label: 'All Employees' },
@@ -185,11 +209,23 @@ export default function EmployeesPage() {
         { id: 'inactive', label: 'Inactive' },
     ];
 
-    const handleAddEmployee = (newEmp: Omit<Employee, 'id' | 'hoursThisWeek' | 'salesThisWeek'>) => {
-        setEmployees([
-            ...employees,
-            { ...newEmp, id: Date.now(), hoursThisWeek: 0, salesThisWeek: 0 }
-        ]);
+    const handleAddEmployee = async (newEmp: Omit<Employee, 'id' | 'hoursThisWeek' | 'salesThisWeek'>) => {
+        try {
+            const res = await fetch('/api/employees', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newEmp)
+            })
+            if (res.ok) {
+                const created = await res.json()
+                setEmployees([
+                    ...employees,
+                    { ...newEmp, id: created.id, hoursThisWeek: 0, salesThisWeek: 0 }
+                ])
+            }
+        } catch (err) {
+            console.error('Failed to add employee:', err)
+        }
     };
 
     const filteredEmployees = employees.filter(emp => {

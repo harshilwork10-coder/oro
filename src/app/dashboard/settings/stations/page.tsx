@@ -34,6 +34,9 @@ interface Location {
     franchise?: { name: string } | null
 }
 
+import EditStationModal from '@/components/modals/EditStationModal'
+import { QRCodeSVG } from 'qrcode.react'
+
 export default function StationsPage() {
     const { data: session, status } = useSession()
     const router = useRouter()
@@ -482,12 +485,21 @@ export default function StationsPage() {
                                                 </div>
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => handleDeleteStation(station.id)}
-                                            className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"
-                                        >
-                                            <Trash2 className="w-5 h-5" />
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setEditingStation(station)}
+                                                className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg"
+                                                title="Edit Station"
+                                            >
+                                                <Edit2 className="w-5 h-5" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteStation(station.id)}
+                                                className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Employee Assignment Section */}
@@ -556,6 +568,20 @@ export default function StationsPage() {
                     </ol>
                 </div>
             </div>
+
+            {/* Edit Modal */}
+            {editingStation && (
+                <EditStationModal
+                    isOpen={!!editingStation}
+                    onClose={() => setEditingStation(null)}
+                    onSuccess={(updated) => {
+                        setStations(stations.map(s => s.id === updated.id ? updated : s))
+                        setToast({ message: 'Station updated', type: 'success' })
+                    }}
+                    station={editingStation}
+                    terminals={terminals}
+                />
+            )}
         </div>
     )
 }

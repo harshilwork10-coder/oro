@@ -47,13 +47,14 @@ export default function ProviderClientsPage() {
     const [suspendReason, setSuspendReason] = useState('');
     const [suspending, setSuspending] = useState(false);
 
-    // Fetch clients
     async function fetchClients() {
         try {
             const response = await fetch('/api/admin/franchisors');
             if (response.ok) {
                 const data = await response.json();
-                const transformed: Client[] = data.map((f: any) => ({
+                // Handle both array and { franchisors: [...] } formats
+                const franchisorsArray = Array.isArray(data) ? data : (data.franchisors || data.data || []);
+                const transformed: Client[] = franchisorsArray.map((f: any) => ({
                     id: f.id,
                     name: f.owner?.name || f.name || 'Unknown',
                     businessName: f.businessName || f.name || 'Unknown Business',

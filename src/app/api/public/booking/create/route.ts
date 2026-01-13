@@ -288,8 +288,8 @@ export async function POST(request: NextRequest) {
                 staff: primaryAppointment.employee.name,
                 location: primaryAppointment.location.name,
                 address: primaryAppointment.location.address,
-                date: startTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-                time: startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+                // Pass raw ISO string so client can format in user's timezone
+                startTime: startTime.toISOString(),
                 price: Number(primaryAppointment.service.price)
             },
             groupMembers: groupAppointments,

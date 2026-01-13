@@ -15,7 +15,7 @@ interface RolePermissions {
 const REPORT_PERMISSIONS: RolePermissions = {
     financial: [Role.PROVIDER, Role.FRANCHISOR, Role.FRANCHISEE],
     operational: [Role.PROVIDER, Role.FRANCHISOR, Role.FRANCHISEE, Role.MANAGER],
-    'z-report': [Role.PROVIDER, Role.FRANCHISEE, Role.MANAGER, Role.EMPLOYEE, Role.USER],
+    'z-report': [Role.PROVIDER, Role.FRANCHISOR, Role.FRANCHISEE, Role.MANAGER, Role.EMPLOYEE, Role.USER],
     benchmarking: [Role.PROVIDER, Role.FRANCHISOR],
     compliance: [Role.PROVIDER, Role.FRANCHISOR, Role.FRANCHISEE]
 }

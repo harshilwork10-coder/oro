@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
             // Check if business has Pulse enabled
             if (!config?.usesMobilePulse) {
                 return NextResponse.json({
-                    error: 'Oronex Pulse is not enabled for this business. Enable it first.',
+                    error: 'Oro 9 Pulse is not enabled for this business. Enable it first.',
                     code: 'PULSE_NOT_ENABLED'
                 }, { status: 400 })
             }

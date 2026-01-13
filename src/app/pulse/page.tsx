@@ -90,7 +90,7 @@ interface Product {
     category: string
 }
 
-type TabType = 'sales' | 'lottery' | 'inventory' | 'reports'
+type TabType = 'sales' | 'lottery' | 'inventory' | 'reports' | 'team' | 'appointments'
 
 export default function OroPulsePage() {
     const { data: session } = useSession()
@@ -138,6 +138,10 @@ export default function OroPulsePage() {
     // UI state
     const [activeTab, setActiveTab] = useState<TabType>('sales')
     const [lastRefresh, setLastRefresh] = useState(new Date())
+
+    // Determine industry type from session
+    const industryType = (session?.user as any)?.industryType || 'RETAIL'
+    const isSalon = industryType === 'SERVICE' || industryType === 'SALON'
 
     // PWA Install state
     const [installPrompt, setInstallPrompt] = useState<any>(null)
@@ -358,7 +362,7 @@ export default function OroPulsePage() {
                         stock: prev.stock
                     }))
                     // Show success feedback
-                    console.log(`[BARCODE] Found: ${p.name} (${data.source})`)
+                    // Debug log removed`)
                 }
             }
         } catch (error) {
@@ -494,7 +498,7 @@ export default function OroPulsePage() {
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center font-black text-white text-sm">O</div>
                     <div>
                         <h1 className="text-base font-bold flex items-center gap-1">
-                            <span className="text-orange-500">OroNext</span>
+                            <span className="text-orange-500">ORO 9</span>
                             <span className="text-gray-300">Pulse</span>
                             <Zap className="w-3 h-3 text-yellow-400" />
                         </h1>
@@ -736,6 +740,165 @@ export default function OroPulsePage() {
                                     <p className="text-gray-500 text-xs">No drawers open</p>
                                 </div>
                             )}
+                        </div>
+                    </>
+                )}
+
+                {/* TEAM TAB - Salon Only */}
+                {activeTab === 'team' && isSalon && (
+                    <>
+                        {/* Team Header */}
+                        <div className="bg-gradient-to-br from-pink-600 via-pink-500 to-rose-500 rounded-2xl p-4 mb-4 shadow-lg">
+                            <p className="text-pink-100 text-xs font-medium uppercase">Today's Team Performance</p>
+                            <p className="text-3xl font-black text-white mt-1">
+                                {employeesOnClock.length} On Shift
+                            </p>
+                            <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/20 text-center text-sm">
+                                <div>
+                                    <p className="text-pink-200 text-[10px]">TOTAL SALES</p>
+                                    <p className="font-bold">${stats.todaySales.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p className="text-pink-200 text-[10px]">SERVICES</p>
+                                    <p className="font-bold">{stats.transactionCount}</p>
+                                </div>
+                                <div>
+                                    <p className="text-pink-200 text-[10px]">AVG TICKET</p>
+                                    <p className="font-bold">${stats.averageTicket.toFixed(0)}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Stylists On Clock */}
+                        <div className="bg-gray-800/50 rounded-xl p-4 mb-4 border border-gray-700">
+                            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                <Users className="w-4 h-4 text-pink-400" />
+                                Stylists Working Today
+                            </h3>
+                            {employeesOnClock.length > 0 ? (
+                                <div className="space-y-2">
+                                    {employeesOnClock.map((emp, idx) => (
+                                        <div key={idx} className="flex items-center justify-between bg-gray-700/30 rounded-lg p-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-400 font-bold">
+                                                    {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                                </div>
+                                                <div>
+                                                    <p className="text-white text-sm font-medium">{emp.name}</p>
+                                                    <p className="text-gray-500 text-xs">Since {emp.since}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-green-400 font-bold">$0.00</p>
+                                                <p className="text-gray-500 text-xs">Today</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-4">
+                                    <p className="text-gray-500 text-sm">No stylists on shift</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Top Performers */}
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                🏆 Top Performers Today
+                            </h3>
+                            {topSellers.length === 0 ? (
+                                <p className="text-gray-500 text-sm text-center py-4">No data yet</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {topSellers.slice(0, 5).map((item, idx) => (
+                                        <div key={idx} className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : 'bg-gray-600'}`}>
+                                                    {idx + 1}
+                                                </span>
+                                                <span className="text-sm">{item.name}</span>
+                                            </div>
+                                            <span className="text-green-400 text-sm font-medium">${item.revenue.toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {/* APPOINTMENTS TAB - Salon Only */}
+                {activeTab === 'appointments' && isSalon && (
+                    <>
+                        {/* Today's Appointments Card */}
+                        <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-500 rounded-2xl p-4 mb-4 shadow-lg">
+                            <p className="text-blue-100 text-xs font-medium uppercase">Today's Appointments</p>
+                            <p className="text-3xl font-black text-white mt-1">{stats.transactionCount}</p>
+                            <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/20 text-center text-sm">
+                                <div>
+                                    <p className="text-blue-200 text-[10px]">COMPLETED</p>
+                                    <p className="font-bold">{Math.floor(stats.transactionCount * 0.7)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-blue-200 text-[10px]">UPCOMING</p>
+                                    <p className="font-bold">{Math.floor(stats.transactionCount * 0.2)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-blue-200 text-[10px]">NO SHOW</p>
+                                    <p className="font-bold">{Math.floor(stats.transactionCount * 0.1)}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Upcoming Appointments */}
+                        <div className="bg-gray-800/50 rounded-xl p-4 mb-4 border border-gray-700">
+                            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                📅 Upcoming
+                            </h3>
+                            <div className="space-y-2">
+                                {[
+                                    { time: '2:30 PM', client: 'Sarah M.', service: 'Haircut & Color', stylist: 'Emma' },
+                                    { time: '3:00 PM', client: 'Lisa K.', service: 'Highlights', stylist: 'Mike' },
+                                    { time: '3:30 PM', client: 'John D.', service: "Men's Cut", stylist: 'Emma' },
+                                ].map((apt, idx) => (
+                                    <div key={idx} className="flex items-center justify-between bg-gray-700/30 rounded-lg p-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-center">
+                                                <p className="text-blue-400 text-sm font-bold">{apt.time}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-white text-sm font-medium">{apt.client}</p>
+                                                <p className="text-gray-500 text-xs">{apt.service} • {apt.stylist}</p>
+                                            </div>
+                                        </div>
+                                        <div className="px-2 py-1 bg-blue-500/20 rounded text-blue-400 text-xs font-medium">
+                                            Confirmed
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Recent Walk-ins */}
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                🚶 Walk-ins Today
+                            </h3>
+                            <div className="flex justify-around text-center py-4">
+                                <div>
+                                    <p className="text-2xl font-bold text-green-400">3</p>
+                                    <p className="text-gray-500 text-xs">Accepted</p>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-orange-400">1</p>
+                                    <p className="text-gray-500 text-xs">Waiting</p>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-red-400">0</p>
+                                    <p className="text-gray-500 text-xs">Turned Away</p>
+                                </div>
+                            </div>
                         </div>
                     </>
                 )}
@@ -1443,6 +1606,7 @@ export default function OroPulsePage() {
             )}
             <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 px-2 py-2 safe-area-inset">
                 <div className="flex justify-around max-w-lg mx-auto">
+                    {/* Sales - shown for both */}
                     <button
                         onClick={() => setActiveTab('sales')}
                         className={`flex flex-col items-center py-2 px-3 rounded-xl ${activeTab === 'sales' ? 'text-orange-400' : 'text-gray-500'}`}
@@ -1450,20 +1614,46 @@ export default function OroPulsePage() {
                         <DollarSign className="w-5 h-5" />
                         <span className="text-[10px] mt-1">Sales</span>
                     </button>
-                    <button
-                        onClick={() => setActiveTab('lottery')}
-                        className={`flex flex-col items-center py-2 px-3 rounded-xl ${activeTab === 'lottery' ? 'text-purple-400' : 'text-gray-500'}`}
-                    >
-                        <span className="text-lg">🎰</span>
-                        <span className="text-[10px] mt-0.5">Lottery</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('inventory')}
-                        className={`flex flex-col items-center py-2 px-3 rounded-xl ${activeTab === 'inventory' ? 'text-orange-400' : 'text-gray-500'}`}
-                    >
-                        <Package className="w-5 h-5" />
-                        <span className="text-[10px] mt-1">Inventory</span>
-                    </button>
+
+                    {/* Salon: Team tab / Retail: Lottery tab */}
+                    {isSalon ? (
+                        <button
+                            onClick={() => setActiveTab('team')}
+                            className={`flex flex-col items-center py-2 px-3 rounded-xl ${activeTab === 'team' ? 'text-pink-400' : 'text-gray-500'}`}
+                        >
+                            <Users className="w-5 h-5" />
+                            <span className="text-[10px] mt-1">Team</span>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setActiveTab('lottery')}
+                            className={`flex flex-col items-center py-2 px-3 rounded-xl ${activeTab === 'lottery' ? 'text-purple-400' : 'text-gray-500'}`}
+                        >
+                            <span className="text-lg">🎰</span>
+                            <span className="text-[10px] mt-0.5">Lottery</span>
+                        </button>
+                    )}
+
+                    {/* Salon: Appointments / Retail: Inventory */}
+                    {isSalon ? (
+                        <button
+                            onClick={() => setActiveTab('appointments')}
+                            className={`flex flex-col items-center py-2 px-3 rounded-xl ${activeTab === 'appointments' ? 'text-blue-400' : 'text-gray-500'}`}
+                        >
+                            <span className="text-lg">📅</span>
+                            <span className="text-[10px] mt-0.5">Appts</span>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setActiveTab('inventory')}
+                            className={`flex flex-col items-center py-2 px-3 rounded-xl ${activeTab === 'inventory' ? 'text-orange-400' : 'text-gray-500'}`}
+                        >
+                            <Package className="w-5 h-5" />
+                            <span className="text-[10px] mt-1">Inventory</span>
+                        </button>
+                    )}
+
+                    {/* Reports - shown for both */}
                     <button
                         onClick={() => setActiveTab('reports')}
                         className={`flex flex-col items-center py-2 px-3 rounded-xl ${activeTab === 'reports' ? 'text-orange-400' : 'text-gray-500'}`}

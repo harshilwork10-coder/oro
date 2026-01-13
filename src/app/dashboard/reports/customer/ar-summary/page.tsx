@@ -10,8 +10,10 @@ import {
     User,
     AlertTriangle,
     CreditCard,
-    ChevronRight
+    ChevronRight,
+    FileDown
 } from 'lucide-react'
+import jsPDF from 'jspdf'
 import Link from 'next/link'
 
 interface StoreAccount {
@@ -45,8 +47,8 @@ export default function ARSummaryPage() {
             const res = await fetch(`/api/store-accounts?filter=${filter}`)
             if (res.ok) {
                 const data = await res.json()
-                setAccounts(data.accounts || [])
-                setTotals(data.totals || { totalAccounts: 0, totalOutstanding: 0, accountsWithBalance: 0 })
+                setAccounts(data.data.accounts || [])
+                setTotals(data.data.totals || { totalAccounts: 0, totalOutstanding: 0, accountsWithBalance: 0 })
             }
         } catch (error) {
             console.error('Failed to fetch:', error)
@@ -73,6 +75,57 @@ export default function ARSummaryPage() {
         a.phone?.includes(searchTerm)
     )
 
+    const exportCSV = () => {
+        const headers = ['Name', 'Phone', 'Balance', 'Limit', 'Last Approved']
+        const csvContent = [
+            headers.join(','),
+            ...filtered.map(a => [
+                `"${a.name}"`,
+                `"${a.phone || ''}"`,
+                a.balance.toFixed(2),
+                a.limit,
+                `"${a.approvedAt || ''}"`
+            ].join(','))
+        ].join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `ar_summary_${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+    }
+
+    const exportToPDF = () => {
+        const doc = new jsPDF()
+        let yPos = 20
+        doc.setFontSize(18)
+        doc.text('A/R Summary Report', 20, yPos)
+        yPos += 10
+        doc.setFontSize(10)
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 20, yPos)
+        yPos += 10
+
+        const headers = ['Name', 'Phone', 'Balance', 'Limit']
+        const xPos = [20, 80, 130, 170]
+        doc.setFont('helvetica', 'bold')
+        headers.forEach((h, i) => doc.text(h, xPos[i], yPos))
+        yPos += 7
+        doc.line(20, yPos - 5, 190, yPos - 5)
+
+        doc.setFont('helvetica', 'normal')
+        filtered.forEach(a => {
+            if (yPos > 270) { doc.addPage(); yPos = 20; }
+            doc.text(a.name.substring(0, 30), xPos[0], yPos)
+            doc.text(a.phone || '-', xPos[1], yPos)
+            doc.text(`$${a.balance.toFixed(2)}`, xPos[2], yPos)
+            doc.text(`$${a.limit}`, xPos[3], yPos)
+            yPos += 7
+        })
+        doc.save(`ar_summary_${new Date().toISOString().split('T')[0]}.pdf`)
+    }
+
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
@@ -91,10 +144,18 @@ export default function ARSummaryPage() {
                         <p className="text-gray-400 mt-1">Customers with store accounts and balances</p>
                     </div>
                 </div>
-                <button onClick={fetchAccounts} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg">
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={exportToPDF} className="p-2 bg-red-600 hover:bg-red-500 rounded-lg text-white" title="Export PDF">
+                        <FileDown className="w-4 h-4" />
+                    </button>
+                    <button onClick={exportCSV} className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white" title="Export Excel">
+                        <FileDown className="w-4 h-4" />
+                    </button>
+                    <button onClick={fetchAccounts} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg">
+                        <RefreshCw className="w-4 h-4" />
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {/* Summary Cards */}
@@ -223,4 +284,3 @@ export default function ARSummaryPage() {
         </div>
     )
 }
-

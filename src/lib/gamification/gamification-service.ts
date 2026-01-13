@@ -131,7 +131,7 @@ export class GamificationService {
             }
         }
         */
-        console.log('Badge checking skipped (badge system not fully implemented)')
+        // Badge system not fully implemented
     }
 
     private static getBadgeInfo(name: string) {

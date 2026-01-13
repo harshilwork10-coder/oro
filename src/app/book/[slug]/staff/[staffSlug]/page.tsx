@@ -322,8 +322,8 @@ export default function StaffBookingPage({ params }: { params: Promise<{ slug: s
                                                 setSelectedTime('')
                                             }}
                                             className={`flex-shrink-0 w-[72px] py-3 rounded-xl text-center transition-all ${selectedDate === d.value
-                                                    ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white'
-                                                    : 'bg-white/5 hover:bg-white/10 text-violet-200'
+                                                ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white'
+                                                : 'bg-white/5 hover:bg-white/10 text-violet-200'
                                                 }`}
                                         >
                                             <p className="text-[10px] opacity-60">{d.isToday ? 'TODAY' : d.day}</p>
@@ -352,8 +352,8 @@ export default function StaffBookingPage({ params }: { params: Promise<{ slug: s
                                                             setStep('details')
                                                         }}
                                                         className={`py-3 rounded-xl font-medium text-sm transition-all ${selectedTime === slot.time
-                                                                ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white'
-                                                                : 'bg-white/5 hover:bg-white/10 text-violet-200'
+                                                            ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white'
+                                                            : 'bg-white/5 hover:bg-white/10 text-violet-200'
                                                             }`}
                                                     >
                                                         {new Date(slot.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
@@ -510,7 +510,7 @@ export default function StaffBookingPage({ params }: { params: Promise<{ slug: s
 
                 {/* Footer */}
                 <footer className="fixed bottom-0 left-0 right-0 py-4 text-center text-violet-400/40 text-xs bg-gradient-to-t from-[#0a0a0f] to-transparent">
-                    Powered by <span className="text-violet-400/60 font-medium">OroNext</span>
+                    Powered by <span className="text-violet-400/60 font-medium">ORO 9</span>
                 </footer>
             </div>
         </div>

@@ -6,11 +6,6 @@ export async function middleware(req: NextRequest) {
     const token = await getToken({ req })
     const isAuth = !!token
 
-    // Debug: Log token info (remove in production)
-    if (token) {
-        console.log('[Middleware] Token:', { role: token.role, approvalStatus: token.approvalStatus })
-    }
-
     // PROVIDER, ADMIN, EMPLOYEE, MANAGER are always approved - don't check their approvalStatus
     const alwaysApprovedRoles = ['PROVIDER', 'ADMIN', 'EMPLOYEE', 'MANAGER']
     const isAlwaysApproved = token?.role && alwaysApprovedRoles.includes(token.role as string)
@@ -24,7 +19,8 @@ export async function middleware(req: NextRequest) {
     // Public paths that don't require auth
     const isPublic =
         pathname.startsWith('/login') ||
-        pathname.startsWith('/employee-login') ||  // Employee PIN login page
+        pathname.startsWith('/employee-login') ||  // Employee PIN login page (POS terminal)
+        pathname.startsWith('/staff-login') ||     // Employee Phone + PIN login page
         pathname.startsWith('/register') ||
         pathname.startsWith('/auth/magic-link') ||
         pathname.startsWith('/api') ||
@@ -74,6 +70,7 @@ export async function middleware(req: NextRequest) {
 
     // Content Security Policy - prevents XSS attacks
     // Note: 'unsafe-inline' and 'unsafe-eval' needed for Next.js/React
+    // localhost:9100 is for local print agent (thermal receipt printer)
     response.headers.set(
         'Content-Security-Policy',
         "default-src 'self'; " +
@@ -81,7 +78,7 @@ export async function middleware(req: NextRequest) {
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
         "font-src 'self' https://fonts.gstatic.com; " +
         "img-src 'self' data: blob: https:; " +
-        "connect-src 'self' https:; " +
+        "connect-src 'self' https: http://localhost:9100 http://127.0.0.1:9100; " +
         "frame-ancestors 'none';"
     )
 

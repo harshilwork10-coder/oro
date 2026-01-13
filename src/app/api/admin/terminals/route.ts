@@ -11,7 +11,8 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
-        const terminals = await prisma.terminal.findMany({
+        // Fetch terminals with full relation chain
+        const allTerminals = await prisma.terminal.findMany({
             select: {
                 id: true,
                 serialNumber: true,
@@ -24,12 +25,29 @@ export async function GET() {
                 updatedAt: true,
                 location: {
                     select: {
-                        name: true
+                        name: true,
+                        franchise: {
+                            select: {
+                                name: true,
+                                franchisorId: true,
+                                franchisor: {
+                                    select: {
+                                        id: true,
+                                        name: true
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
             orderBy: { createdAt: 'desc' }
         })
+
+        // Filter to only return terminals linked to valid franchisors
+        const terminals = allTerminals.filter(t =>
+            t.location?.franchise?.franchisorId && t.location?.franchise?.franchisor
+        )
 
         return NextResponse.json({ terminals })
     } catch (error) {

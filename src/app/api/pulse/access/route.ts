@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-// Check if user has access to Oronex Pulse
+// Check if user has access to Oro 9 Pulse
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
@@ -35,13 +35,22 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ hasAccess: true, reason: 'provider_access' })
         }
 
-        // EMPLOYEES, MANAGERS, SHIFT_SUPERVISORS CANNOT access Pulse - it's for OWNERS only
-        const blockedRoles = ['EMPLOYEE', 'MANAGER', 'SHIFT_SUPERVISOR', 'FRANCHISEE']
+        // EMPLOYEES and MANAGERS get free access to Pulse (for their salon/retail app)
+        if (user.role === 'EMPLOYEE' || user.role === 'MANAGER') {
+            return NextResponse.json({
+                hasAccess: true,
+                reason: 'employee_access',
+                message: 'Employee access to Oro Pulse'
+            })
+        }
+
+        // SHIFT_SUPERVISOR, FRANCHISEE have limited access - subject to business decision
+        const blockedRoles = ['SHIFT_SUPERVISOR', 'FRANCHISEE']
         if (blockedRoles.includes(user.role)) {
             return NextResponse.json({
                 hasAccess: false,
                 reason: 'role_not_allowed',
-                message: 'Oronex Pulse is only available for business owners.'
+                message: 'Oro 9 Pulse is only available for business owners and staff.'
             })
         }
 
@@ -50,7 +59,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({
                 hasAccess: false,
                 reason: 'role_not_allowed',
-                message: 'Oronex Pulse is only available for business owners.'
+                message: 'Oro 9 Pulse is only available for business owners.'
             })
         }
 
@@ -70,7 +79,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({
                 hasAccess: false,
                 reason: 'no_config',
-                message: 'Oronex Pulse is not configured for your business. Contact your administrator.'
+                message: 'Oro 9 Pulse is not configured for your business. Contact your administrator.'
             })
         }
 
@@ -78,7 +87,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({
                 hasAccess: false,
                 reason: 'not_enabled',
-                message: 'Oronex Pulse is not enabled for your business. Contact your provider to add this feature.'
+                message: 'Oro 9 Pulse is not enabled for your business. Contact your provider to add this feature.'
             })
         }
 

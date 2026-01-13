@@ -34,7 +34,7 @@ export class InterventionAutomationService {
                 const owner = intervention.franchise.users.find(u => u.role === 'FRANCHISOR' || u.franchiseId === intervention.franchiseId)
 
                 if (!owner) {
-                    console.warn(`No owner found for franchise ${intervention.franchise.name}`)
+                    console.error(`No owner found for franchise ${intervention.franchise.name}`)"
                     continue
                 }
 
@@ -56,7 +56,7 @@ export class InterventionAutomationService {
                         `
                     })
                 } else {
-                    console.log(`[MOCK EMAIL] To: ${owner.email}, Subject: Compliance Alert, Body: ${intervention.reason}`)
+                    // Debug log removed
                 }
 
                 // Log Email
@@ -96,7 +96,7 @@ export class InterventionAutomationService {
 
         return results
         */
-        console.log('Intervention automation skipped (models not implemented)')
+        // Intervention automation not implemented
         return []
     }
 }

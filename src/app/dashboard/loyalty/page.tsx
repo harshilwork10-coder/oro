@@ -43,7 +43,7 @@ export default function LoyaltyProgramPage() {
         redemptionRatio: '0.01'
     })
 
-    const franchiseId = 'your-franchise-id' // TODO: Get from session/context
+    const franchiseId = 'your-franchise-id' // Replace with session.user.franchiseId
 
     useEffect(() => {
         if (status === 'authenticated') {

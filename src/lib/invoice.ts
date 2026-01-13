@@ -47,7 +47,27 @@ export async function generateInvoiceNumber(franchiseId: string): Promise<string
     }
 
     // Format: YYYYMMDDXXX (pure numeric, pad sequence to 3 digits)
-    return `${dateStr}${sequence.toString().padStart(3, '0')}`
+    let candidate = `${dateStr}${sequence.toString().padStart(3, '0')}`
+
+    // Ensure Global Uniqueness (collision protection against other franchises)
+    let isUnique = false
+    while (!isUnique) {
+        const existing = await prisma.transaction.findUnique({
+            where: { invoiceNumber: candidate },
+            select: { id: true }
+        })
+
+        if (!existing) {
+            isUnique = true
+        } else {
+            // Collision detected (likely another franchise took this number)
+            // Increment and try again
+            sequence++
+            candidate = `${dateStr}${sequence.toString().padStart(3, '0')}`
+        }
+    }
+
+    return candidate
 }
 
 /**

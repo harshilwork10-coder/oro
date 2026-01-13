@@ -66,7 +66,7 @@ export async function POST(req: Request) {
         const { name, type, subject, content } = body
 
         // In real app: Create campaign record
-        console.log(`✅ Campaign created: ${name} (${type})`)
+        // Debug log removed`)
 
         return NextResponse.json({ success: true })
     } catch (error) {

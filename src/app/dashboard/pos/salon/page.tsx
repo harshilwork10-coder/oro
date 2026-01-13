@@ -25,7 +25,9 @@ import {
     DollarSign,
     Gift,
     X,
-    Menu
+    Menu,
+    Maximize2,
+    Minimize2
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
@@ -35,6 +37,9 @@ import { useFeature, useBusinessConfig } from '@/hooks/useBusinessConfig'
 import { QRCodeSVG } from 'qrcode.react'
 import Toast from '@/components/ui/Toast'
 import { Printer } from 'lucide-react'
+import ReceiptModal from '@/components/pos/ReceiptModal'
+import { printReceipt as printThermalReceipt, isPrintAgentAvailable, ReceiptData } from '@/lib/print-agent'
+import { normalizeTransactionForPrint } from '@/lib/print-utils'
 
 // Removed hardcoded maps
 
@@ -56,6 +61,9 @@ interface CartItem {
     originalId?: string
     bodyPart?: string
     discount?: number
+    barberId?: string // ID of barber who will perform this service
+    cashPrice?: number // Dual pricing
+    cardPrice?: number // Dual pricing
 }
 
 interface MenuData {
@@ -78,6 +86,12 @@ interface Transaction {
     }
     lineItems: any[]
     invoiceNumber?: string
+    // Dual pricing fields (API returns strings, consumers convert as needed)
+    totalCash?: number
+    totalCard?: number
+    chargedMode?: string
+    change?: number
+    cardLast4?: string
 }
 
 // Categories are now dynamically loaded from services - no hardcoded list
@@ -86,7 +100,6 @@ interface Transaction {
 function TipPollingEffect({ onTipReceived, locationId }: { onTipReceived: (tipAmount: number) => void, locationId?: string }) {
     useEffect(() => {
         if (!locationId) {
-            console.warn('No locationId for tip polling')
             return
         }
 
@@ -128,7 +141,6 @@ function TipPollingEffect({ onTipReceived, locationId }: { onTipReceived: (tipAm
 
 function POSContent() {
     const searchParams = useSearchParams()
-    console.log('POSPage: Rendering...')
     const { data: session } = useSession()
     const user = session?.user as any
     const { data: config } = useBusinessConfig()
@@ -159,6 +171,9 @@ function POSContent() {
     const [showTransactionModal, setShowTransactionModal] = useState(false)
     const [selectedTxForActions, setSelectedTxForActions] = useState<Transaction | null>(null)
 
+    // DEBUG OVERLAY
+    const [showDebug, setShowDebug] = useState(false)
+
     // Customer and display state
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
     const [showDisplayModal, setShowDisplayModal] = useState(false)
@@ -170,6 +185,9 @@ function POSContent() {
     const [showTipWaiting, setShowTipWaiting] = useState(false)
     const [pendingTipAmount, setPendingTipAmount] = useState(0)
     const [tipSettings, setTipSettings] = useState<{ enabled: boolean; type: string; suggestions: string }>({ enabled: true, type: 'PERCENT', suggestions: '[15,20,25]' })
+
+    // Ref to skip next cart sync (used when canceling payment to avoid race condition)
+    const skipNextCartSync = useRef(false)
 
     // Confirmation modal state
     const [showClearCartConfirm, setShowClearCartConfirm] = useState(false)
@@ -192,6 +210,14 @@ function POSContent() {
     // Cash tendering state
     const [showCashTendering, setShowCashTendering] = useState(false)
     const [cashReceived, setCashReceived] = useState('')
+
+    // Fullscreen state
+    const [isFullscreen, setIsFullscreen] = useState(false)
+    useEffect(() => {
+        const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement)
+        document.addEventListener('fullscreenchange', handleFullscreenChange)
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }, [])
     const [cashTenderingTotal, setCashTenderingTotal] = useState(0)
     const [cashQuickSelect, setCashQuickSelect] = useState(false) // Track if value came from quick button
 
@@ -204,16 +230,38 @@ function POSContent() {
     const [isSplitPayment, setIsSplitPayment] = useState(false) // Flag to indicate split payment mode
     const [paxAmount, setPaxAmount] = useState(0) // Custom amount for PAX (card portion in split)
 
+    // Receipt modal state
+    const [showReceiptModal, setShowReceiptModal] = useState(false)
+    const [lastTransactionData, setLastTransactionData] = useState<any>(null)
+
     // Franchise pricing settings
-    const [pricingSettings, setPricingSettings] = useState<{ pricingModel: string; cardSurchargeType: string; cardSurcharge: number; showDualPricing: boolean }>({
+    const [pricingSettings, setPricingSettings] = useState<{ pricingModel: string; cardSurchargeType: string; cardSurcharge: number; showDualPricing: boolean; taxRate?: number }>({
         pricingModel: 'STANDARD',
         cardSurchargeType: 'PERCENTAGE',
         cardSurcharge: 0,
-        showDualPricing: false
+        showDualPricing: false,
+        taxRate: 0.08 // Default fallback
     })
     const [appliedDiscount, setAppliedDiscount] = useState(0)
     const [appliedDiscountSource, setAppliedDiscountSource] = useState<string | null>(null)
     const [checkedInCustomers, setCheckedInCustomers] = useState<any[]>([])
+
+    // Barber selection for service-based pricing
+    interface BarberInfo {
+        id: string
+        name: string
+    }
+    interface BarberService {
+        id: string
+        name: string
+        duration: number
+        price: number
+        shopPrice: number
+        hasCustomPrice: boolean
+    }
+    const [selectedBarber, setSelectedBarber] = useState<BarberInfo | null>(null)
+    const [barberServices, setBarberServices] = useState<BarberService[]>([])
+    const [barberList, setBarberList] = useState<BarberInfo[]>([])
 
     // Station support for multi-register display sync
     interface StationInfo {
@@ -225,6 +273,7 @@ function POSContent() {
     // Transaction search and filter state
     const [txSearchQuery, setTxSearchQuery] = useState('')
     const [txFilterStatus, setTxFilterStatus] = useState<'ALL' | 'COMPLETED' | 'REFUNDED' | 'VOIDED'>('ALL')
+    const [txDateFilter, setTxDateFilter] = useState<string>(new Date().toISOString().split('T')[0]) // Default to today
 
     // Pin pad state for cash drawer modal
     const [selectedDenom, setSelectedDenom] = useState<string | null>(null)
@@ -250,12 +299,66 @@ function POSContent() {
         return Array.from(categories).sort()
     }, [menu.services, menu.products])
 
+    // Auto-select first category if none selected
     useEffect(() => {
-        fetchMenu()
-        fetchTransactions()
-        checkShift()
+        if (!selectedCategory && serviceCategories.length > 0) {
+            setSelectedCategory(serviceCategories[0])
+        }
+    }, [serviceCategories, selectedCategory])
+
+    // Combined init function - reduces 4 API calls to 1
+    const initSalonPOS = async () => {
+        try {
+            const res = await fetch('/api/pos/salon/init')
+            if (res.ok) {
+                const data = await res.json()
+
+                // Menu (services, products, discounts)
+                // ApiResponse wraps the payload in a 'data' property
+                const payload = data.data || data
+
+                if (payload.menu) {
+                    setMenu({
+                        services: payload.menu.services || [],
+                        products: payload.menu.products || [],
+                        discounts: payload.menu.discounts || []
+                    })
+                }
+
+                if (payload.employees) {
+                    setBarberList(payload.employees.map((e: any) => ({ id: e.id, name: e.name })))
+                }
+
+                // Pricing settings
+                if (payload.pricingSettings) {
+                    setPricingSettings(payload.pricingSettings)
+                }
+
+                if (payload.activeShift) {
+                    setShift(payload.activeShift)
+                }
+            } else {
+                console.error('[SALON POS] Init failed:', res.status)
+                // Fallback to individual fetches if combined fails
+                fetchMenu()
+                fetchBarberList()
+            }
+        } catch (error) {
+            console.error('[SALON POS] Init error:', error)
+            // Fallback
+            fetchMenu()
+            fetchBarberList()
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        initSalonPOS()      // Combined: menu + employees + pricing (1 call)
+        fetchTransactions() // Transactions (1 call)
+        checkShift()        // Shift with role logic (1 call)
         fetchCheckedInCustomers()
-        loadAssignedStation() // Load station for display sync
+        loadAssignedStation()
         if (session?.user) {
             fetchDetails()
         }
@@ -307,10 +410,16 @@ function POSContent() {
     }, [searchParams])
 
     // Sync cart to customer display - especially when cart becomes empty (cancel/delete)
-    // But DON'T sync when checkout/tip modals are active (would interfere with payment flow)
+    // But DON'T sync when checkout/tip/pax modals are active (would interfere with payment flow)
     useEffect(() => {
-        // Skip syncing during checkout/tip flow to prevent overriding TIP_SELECTED status
-        if (showCheckoutModal || showTipWaiting) return
+        // Skip syncing during checkout/tip/pax flow to prevent overriding status
+        if (showCheckoutModal || showTipWaiting || showPaxModal) return
+
+        // Check if we should skip this sync (e.g., after cancel to avoid race condition)
+        if (skipNextCartSync.current) {
+            skipNextCartSync.current = false
+            return
+        }
 
         const syncCartToDisplay = async () => {
             const user = session?.user as any
@@ -338,30 +447,50 @@ function POSContent() {
 
                 const total = discountedSubtotal + tax
 
+                const cartData = cart.length === 0
+                    ? { items: [], status: 'IDLE', subtotal: 0, tax: 0, total: 0, cashTotal: 0, cardTotal: 0, showDualPricing: false, customerName: null }
+                    : {
+                        items: cart.map(item => {
+                            const cashPrice = getItemPrice(item)
+                            const cardPrice = pricingSettings.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
+                                ? (pricingSettings.cardSurchargeType === 'PERCENTAGE'
+                                    ? cashPrice * (1 + pricingSettings.cardSurcharge / 100)
+                                    : cashPrice + pricingSettings.cardSurcharge)
+                                : cashPrice
+                            return {
+                                name: item.name,
+                                type: item.type,
+                                price: item.price,
+                                quantity: item.quantity,
+                                discount: item.discount || 0,
+                                // Send both cash and card prices for dual pricing display
+                                displayPrice: cashPrice,
+                                cashPrice: cashPrice,
+                                cardPrice: cardPrice
+                            }
+                        }),
+                        status: 'ACTIVE',
+                        subtotal: discountedSubtotal,
+                        tax: tax,
+                        total: total,
+                        // Dual pricing data for customer display
+                        cashTotal: total,
+                        cardTotal: pricingSettings.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
+                            ? (pricingSettings.cardSurchargeType === 'PERCENTAGE'
+                                ? total * (1 + pricingSettings.cardSurcharge / 100)
+                                : total + pricingSettings.cardSurcharge)
+                            : total,
+                        showDualPricing: pricingSettings.showDualPricing,
+                        customerName: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : null
+                    }
+
                 await fetch('/api/pos/display-sync', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         // Use stationId if station assigned, else locationId for backward compatibility
                         ...(selectedStation?.id ? { stationId: selectedStation.id } : { locationId: user?.locationId }),
-                        cart: cart.length === 0
-                            ? { items: [], status: 'IDLE', subtotal: 0, tax: 0, total: 0, customerName: null }
-                            : {
-                                items: cart.map(item => ({
-                                    name: item.name,
-                                    type: item.type,
-                                    price: item.price,
-                                    quantity: item.quantity,
-                                    discount: item.discount || 0,
-                                    // Send the actual calculated price after discount
-                                    displayPrice: getItemPrice(item)
-                                })),
-                                status: 'ACTIVE',
-                                subtotal: discountedSubtotal,
-                                tax: tax,
-                                total: total,
-                                customerName: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : null
-                            }
+                        cart: cartData
                     })
                 })
             } catch (error) {
@@ -372,7 +501,93 @@ function POSContent() {
         // Debounce to avoid too many requests
         const timeoutId = setTimeout(syncCartToDisplay, 300)
         return () => clearTimeout(timeoutId)
-    }, [cart, session, showCheckoutModal, showTipWaiting, selectedCustomer, selectedStation])
+    }, [cart, session, showCheckoutModal, showTipWaiting, showPaxModal, selectedCustomer, selectedStation, pricingSettings])
+
+    // Helper to cancel payment on customer display - sends CANCELLED status so display exits Processing mode
+    const cancelPaymentOnDisplay = async () => {
+        const user = session?.user as any
+        const syncKey = selectedStation?.id || user?.locationId
+        if (!syncKey) return
+
+        // Set flag to skip the next automatic cart sync (which would run when modal closes)
+        skipNextCartSync.current = true
+
+        try {
+            // First, send CANCELLED to exit processing mode on display
+            await fetch('/api/pos/display-sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...(selectedStation?.id ? { stationId: selectedStation.id } : { locationId: user?.locationId }),
+                    cart: {
+                        status: 'CANCELLED',
+                        items: [],
+                        subtotal: 0,
+                        tax: 0,
+                        total: 0
+                    }
+                })
+            })
+
+            // Wait a moment for display to pick up CANCELLED status, then send actual cart
+            setTimeout(async () => {
+                try {
+                    const subtotal = cart.reduce((sum, item) => sum + getItemPrice(item), 0)
+                    const discountedSubtotal = Math.max(0, subtotal - appliedDiscount)
+                    const tax = discountedSubtotal * 0.08 // Use default 8% tax for display sync
+                    const total = discountedSubtotal + tax
+
+                    const cartData = cart.length === 0
+                        ? { items: [], status: 'IDLE', subtotal: 0, tax: 0, total: 0, cashTotal: 0, cardTotal: 0, showDualPricing: false, customerName: null }
+                        : {
+                            items: cart.map(item => {
+                                const cashPrice = getItemPrice(item)
+                                const cardPrice = pricingSettings.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
+                                    ? (pricingSettings.cardSurchargeType === 'PERCENTAGE'
+                                        ? cashPrice * (1 + pricingSettings.cardSurcharge / 100)
+                                        : cashPrice + pricingSettings.cardSurcharge)
+                                    : cashPrice
+                                return {
+                                    name: item.name,
+                                    type: item.type,
+                                    price: item.price,
+                                    quantity: item.quantity,
+                                    discount: item.discount || 0,
+                                    displayPrice: cashPrice,
+                                    cashPrice: cashPrice,
+                                    cardPrice: cardPrice
+                                }
+                            }),
+                            status: 'ACTIVE',
+                            subtotal: discountedSubtotal,
+                            tax: tax,
+                            total: total,
+                            cashTotal: total,
+                            cardTotal: pricingSettings.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
+                                ? (pricingSettings.cardSurchargeType === 'PERCENTAGE'
+                                    ? total * (1 + pricingSettings.cardSurcharge / 100)
+                                    : total + pricingSettings.cardSurcharge)
+                                : total,
+                            showDualPricing: pricingSettings.showDualPricing,
+                            customerName: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : null
+                        }
+
+                    await fetch('/api/pos/display-sync', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ...(selectedStation?.id ? { stationId: selectedStation.id } : { locationId: user?.locationId }),
+                            cart: cartData
+                        })
+                    })
+                } catch (error) {
+                    console.error('Error syncing cart after cancel:', error)
+                }
+            }, 600) // Wait 600ms for display to poll and process CANCELLED
+        } catch (error) {
+            console.error('Error cancelling payment on display:', error)
+        }
+    }
 
     const fetchCheckedInCustomers = async () => {
         try {
@@ -409,12 +624,12 @@ function POSContent() {
                             suggestions: data.settings.tipSuggestions || '[15,20,25]'
                         })
                         // Load pricing settings
-                        setPricingSettings({
+                        setPricingSettings(prev => ({
+                            ...prev,
                             pricingModel: data.settings.pricingModel || 'STANDARD',
                             cardSurchargeType: data.settings.cardSurchargeType || 'PERCENTAGE',
                             cardSurcharge: parseFloat(data.settings.cardSurcharge) || 0,
-                            showDualPricing: data.settings.showDualPricing ?? false
-                        })
+                        }))
                     }
                 }
             }
@@ -534,8 +749,6 @@ function POSContent() {
 
             if (displayWindow) {
                 customerDisplayRef.current = displayWindow
-            } else {
-                console.warn('Customer Display popup was blocked')
             }
         }
     }, [shift?.id])
@@ -559,9 +772,57 @@ function POSContent() {
         }
     }
 
-    const fetchTransactions = async () => {
+    // Fetch list of barbers (employees) for barber selection
+    const fetchBarberList = async () => {
         try {
-            const res = await fetch('/api/pos/transaction')
+            const res = await fetch('/api/franchise/employees')
+            if (res.ok) {
+                const data = await res.json()
+                // API returns paginated format: { data: [...], pagination: {...} }
+                const employees = data.data || data.employees || (Array.isArray(data) ? data : [])
+                // Debug log removed
+                setBarberList(employees.map((e: any) => ({ id: e.id, name: e.name })))
+            } else {
+                console.error('[SALON POS] Failed to fetch staff list:', res.status)
+            }
+        } catch (error) {
+            console.error('Failed to fetch barber list:', error)
+        }
+    }
+
+    // Fetch barber's allowed services with their prices
+    const fetchBarberServices = async (barberId: string) => {
+        try {
+            const res = await fetch(`/api/pos/barber-prices/${barberId}`)
+            if (res.ok) {
+                const data = await res.json()
+                setBarberServices(data.services || [])
+            }
+        } catch (error) {
+            console.error('Failed to fetch barber services:', error)
+            setBarberServices([])
+        }
+    }
+
+    // Load barber list on mount
+    useEffect(() => {
+        fetchBarberList()
+    }, [])
+
+    // Load barber services when barber is selected
+    useEffect(() => {
+        if (selectedBarber) {
+            fetchBarberServices(selectedBarber.id)
+        } else {
+            setBarberServices([])
+        }
+    }, [selectedBarber])
+
+    const fetchTransactions = async (dateOverride?: string) => {
+        try {
+            // Use override date or current filter date
+            const dateStr = dateOverride || txDateFilter
+            const res = await fetch(`/api/pos/transaction?dateFrom=${dateStr}&dateTo=${dateStr}`)
             const data = await res.json()
             setTransactions(data)
         } catch (error) {
@@ -693,7 +954,8 @@ function POSContent() {
             name: item.name,
             price: item.price,
             quantity: 1,
-            discount: 0
+            discount: 0,
+            barberId: type === 'SERVICE' ? selectedBarber?.id : undefined
         }
 
         setCart(prev => {
@@ -742,7 +1004,44 @@ function POSContent() {
         return basePrice
     }
 
-    const printReceipt = (transaction: Transaction) => {
+    // === PRINT RECEIPT: Uses shared normalizer (single source of truth) ===
+    // No more cart snapshot workaround - always uses DB transaction data
+    const printReceipt = async (transaction: Transaction) => {
+        try {
+            // Check if thermal print agent is available
+            const agentAvailable = await isPrintAgentAvailable()
+
+            if (agentAvailable) {
+                // Use shared normalizer for consistent print format
+                const receiptData: ReceiptData = normalizeTransactionForPrint(
+                    transaction as any,
+                    {
+                        showDualPricing: pricingSettings.showDualPricing,
+                        storeName: franchiseName || locationName || 'Store',
+                        storeAddress: '123 Main St, City, ST 12345', // TODO: Get from franchise settings
+                        storePhone: '(555) 123-4567' // TODO: Get from franchise settings
+                    },
+                    (session?.user as any)?.name || 'Staff'
+                )
+
+                const result = await printThermalReceipt(receiptData)
+                if (!result.success) {
+                    console.error('Thermal print failed:', result.error)
+                    // Fallback to browser print
+                    openBrowserPrintWindow(transaction)
+                }
+            } else {
+                // Fallback to browser print
+                openBrowserPrintWindow(transaction)
+            }
+        } catch (error) {
+            console.error('Print error:', error)
+            openBrowserPrintWindow(transaction)
+        }
+    }
+
+    // Fallback browser print function
+    const openBrowserPrintWindow = (transaction: Transaction) => {
         const receiptWindow = window.open('', '_blank', 'width=400,height=600')
         if (receiptWindow) {
             receiptWindow.document.write(`
@@ -759,22 +1058,22 @@ function POSContent() {
                     </head>
                     <body>
                         <div class="header">
-                            <h2>ORONEXT</h2>
+                            <h2>${franchiseName || 'Store'}</h2>
                             <p>${new Date(transaction.createdAt).toLocaleString()}</p>
-                            <p>Tx: ${transaction.id}</p>
+                            <p>Invoice: ${transaction.invoiceNumber || transaction.id}</p>
                         </div>
                         <div class="items">
                             ${transaction.lineItems.map((item: any) => `
                                 <div class="item">
-                                    <span>${item.quantity}x ${item.name || 'Item'}</span>
-                                    <span>$${(item.price * item.quantity).toFixed(2)}</span>
+                                    <span>${item.quantity}x ${item.serviceNameSnapshot || item.productNameSnapshot || item.name || 'Item'}</span>
+                                    <span>$${(Number(item.priceCharged || item.price || 0) * (item.quantity || 1)).toFixed(2)}</span>
                                 </div>
                             `).join('')}
                         </div>
                         <div class="total">
                             <div class="item">
                                 <span>TOTAL</span>
-                                <span>$${transaction.total.toFixed(2)}</span>
+                                <span>$${Number(transaction.total || 0).toFixed(2)}</span>
                             </div>
                         </div>
                         <div class="footer">
@@ -793,6 +1092,17 @@ function POSContent() {
     const handleCheckout = async (paymentMethod: 'CASH' | 'CREDIT_CARD' | 'SPLIT', cashAmount?: number, cardAmount?: number, paymentDetails?: PaymentDetails) => {
         if (cart.length === 0) return
 
+        // Require staff selection for salon checkout
+        if (!selectedBarber) {
+            setToast({ message: 'Please select a staff member before checkout', type: 'error' })
+            return
+        }
+
+        if (!shift || shift.endTime) {
+            setToast({ message: 'No open shift. Please open a shift first.', type: 'error' })
+            return
+        }
+
         setIsLoading(true)
         try {
             const { subtotal, tax, totalCash, totalCard, tip } = calculateTotal()
@@ -809,29 +1119,42 @@ function POSContent() {
                 }
             }
 
-            console.log('Processing Checkout:', { paymentMethod, cashAmount, cardAmount, paymentDetails, tip })
-
             const res = await fetch('/api/pos/transaction', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    items: cart,
+                    items: cart.map(item => ({
+                        ...item,
+                        // Include dual pricing per line item
+                        cashPrice: item.cashPrice,
+                        cardPrice: item.cardPrice
+                    })),
                     subtotal,
                     tax,
                     tip, // Include tip amount
                     total,
+                    // Dual Pricing Totals for receipt printing
+                    subtotalCash: totalCash ? totalCash - tax : undefined,
+                    subtotalCard: totalCard ? totalCard - tax : undefined,
+                    taxCash: tax,
+                    taxCard: tax,
+                    totalCash: totalCash || undefined,
+                    totalCard: totalCard || undefined,
                     paymentMethod,
                     cashDrawerSessionId: shift?.id,
                     cashAmount: cashAmount || 0,
                     cardAmount: cardAmount || 0,
+                    clientId: selectedCustomer?.id,
                     ...paymentDetails // Spread optional payment details
                 })
             })
 
             if (res.ok) {
                 const transaction = await res.json()
+
+                // Clear state
                 setCart([])
-                setPendingTipAmount(0) // Reset tip after successful transaction
+                setPendingTipAmount(0)
                 setShowCheckoutModal(false)
                 fetchTransactions()
 
@@ -850,7 +1173,7 @@ function POSContent() {
                     })
                 })
 
-                // Show success toast and auto-print receipt
+                // Print receipt using DB data only (no cart snapshot workaround)
                 setToast({ message: '✓ Transaction Successful!', type: 'success' })
                 printReceipt(transaction)
             } else {
@@ -1282,6 +1605,8 @@ function POSContent() {
                             ))}
                         </div>
 
+
+
                         {/* Buttons */}
                         <div className="flex gap-2 mt-4">
                             <button
@@ -1313,129 +1638,229 @@ function POSContent() {
     const { subtotal, tax, totalCash, totalCard, totalWithTip, totalCardWithTip, tip } = calculateTotal()
 
     const getFilteredItems = () => {
+        // Use services list based on barber selection or default menu
+        // We do NOT overwrite the category here, allowing the original category (e.g. 'HAIR', 'Flexible') to be used for filtering
+        const serviceList = selectedBarber && barberServices.length > 0
+            ? barberServices
+            : (menu.services || [])
+
         if (searchQuery) {
-            const allItems = [...(menu.services || []), ...(menu.products || [])]
+            const allItems = [...serviceList, ...(menu.products || [])]
             return allItems.filter(item =>
                 item.name.toLowerCase().includes(searchQuery.toLowerCase())
             )
         }
         if (!selectedCategory) return []
         if (selectedCategory === 'PRODUCTS') return menu.products || []
-        return (menu.services || []).filter(s => s.category === selectedCategory)
+        if (selectedCategory === 'BARBER_SERVICE') return serviceList // Show all if specifically 'BARBER_SERVICE' is selected/needed
+
+        // Filter by the selected category (e.g. 'HAIR')
+        return serviceList.filter(s => (s.category || 'General') === selectedCategory)
     }
 
     const filteredItems = getFilteredItems()
 
+
     return (
         <>
+            {showDebug && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="bg-stone-900 border-2 border-red-500 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+                        <h3 className="text-xl font-bold text-red-500 flex items-center gap-2">
+                            🐞 DEBUG MODE
+                        </h3>
+                        <div className="space-y-2 text-sm font-mono text-stone-300">
+                            <p><span className="text-stone-500">User:</span> {user?.email || 'No Session'}</p>
+                            <p><span className="text-stone-500">Role:</span> {user?.role}</p>
+                            <p><span className="text-stone-500">FranchiseID:</span> {user?.franchiseId || 'NULL'}</p>
+                            <hr className="border-stone-800" />
+                            <p><span className="text-stone-500">Total Services Loaded:</span> {menu.services.length}</p>
+                            <p><span className="text-stone-500">Categories:</span> {serviceCategories.join(', ') || 'None'}</p>
+                            <p><span className="text-stone-500">Selected Cat:</span> {selectedCategory || 'None'}</p>
+                            <p><span className="text-stone-500">Filtered Items:</span> {filteredItems.length}</p>
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="flex-1 py-3 bg-stone-800 hover:bg-stone-700 rounded-xl font-bold"
+                            >
+                                Reload Page
+                            </button>
+                            <button
+                                onClick={() => {
+                                    initSalonPOS()
+                                    alert('Refetched data')
+                                }}
+                                className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold"
+                            >
+                                Force Fetch
+                            </button>
+                            <button
+                                onClick={() => setShowDebug(false)}
+                                className="flex-1 py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold"
+                            >
+                                Close Debug
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="flex h-screen bg-stone-950 overflow-hidden">
                 {/* Left Side: Content Area */}
                 <div className="flex-1 flex flex-col border-r border-stone-800 min-w-0">
-                    {/* Header - Responsive padding and sizing */}
-                    <div className="h-16 xl:h-20 border-b border-stone-800 flex items-center justify-between px-3 xl:px-6 bg-stone-900/50">
-                        <div className="flex items-center gap-2 xl:gap-4">
-                            {/* Menu Button - Links to Dashboard */}
-                            <a
-                                href="/dashboard"
-                                className="p-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-white transition-colors"
-                                title="Back to Dashboard"
+                    {/* Header - Unified design with integrated menu button */}
+                    <div className="h-14 border-b border-white/5 flex items-center justify-between px-4 gap-4 bg-gradient-to-r from-stone-900/95 via-stone-900/90 to-stone-900/95 backdrop-blur-xl shadow-lg shadow-black/20">
+                        {/* Left Side - Menu + Register/History */}
+                        <div className="flex items-center gap-3 shrink-0">
+                            {/* Integrated Menu Button */}
+                            <button
+                                onClick={() => {
+                                    // Trigger sidebar - need to dispatch event since sidebar is in layout
+                                    const event = new CustomEvent('toggleSidebar')
+                                    window.dispatchEvent(event)
+                                }}
+                                className="p-2.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 text-stone-300 hover:text-white transition-all duration-200 border border-stone-700/50"
+                                title="Navigation Menu"
                             >
                                 <Menu className="h-5 w-5" />
-                            </a>
-                            <div className="flex bg-stone-800 rounded-lg p-1">
+                            </button>
+                            {/* Register/History Toggle */}
+                            <div className="flex bg-black/30 rounded-lg p-1 border border-white/5">
                                 <button
                                     onClick={() => setView('POS')}
-                                    className={`px-4 xl:px-6 py-2 xl:py-2.5 rounded-lg text-sm xl:text-base font-semibold transition-all ${view === 'POS' ? 'bg-orange-600 text-white shadow-lg' : 'text-stone-400 hover:text-white'}`}
+                                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all duration-200 ${view === 'POS' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/25' : 'text-stone-400 hover:text-white hover:bg-white/5'}`}
                                 >
                                     Register
                                 </button>
                                 <button
                                     onClick={() => setView('HISTORY')}
-                                    className={`px-4 xl:px-6 py-2 xl:py-2.5 rounded-lg text-sm xl:text-base font-semibold transition-all ${view === 'HISTORY' ? 'bg-orange-600 text-white shadow-lg' : 'text-stone-400 hover:text-white'}`}
+                                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all duration-200 ${view === 'HISTORY' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/25' : 'text-stone-400 hover:text-white hover:bg-white/5'}`}
                                 >
                                     History
                                 </button>
                             </div>
-
-                            {view === 'POS' && (
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search items..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="bg-stone-800 border-none rounded-lg pl-10 pr-4 py-2 text-stone-200 focus:ring-1 focus:ring-orange-500 w-64"
-                                    />
-                                </div>
-                            )}
                         </div>
 
-                        <div className="flex flex-col items-end mr-4 text-xs text-stone-500">
-                            {locationName && (
-                                <div>
-                                    <span className="font-medium text-stone-400">Loc: </span>
-                                    {locationName}
-                                </div>
-                            )}
-                            {franchiseName && (
-                                <div>
-                                    <span className="font-medium text-stone-400">Fran: </span>
-                                    {franchiseName}
-                                </div>
-                            )}
-                        </div>
-
-                        <button
-                            onClick={() => setShowDisplayModal(true)}
-                            className="mr-3 p-2 bg-blue-600/20 hover:bg-blue-600/40 rounded-lg text-blue-400 transition-colors"
-                            title="Open Customer Display"
-                        >
-                            <Monitor className="h-5 w-5" />
-                        </button>
-
+                        {/* Search - Flexible middle section */}
                         {view === 'POS' && (
-                            <button
-                                onClick={() => {
-                                    if (!shift) {
-                                        setShowShiftModal(true)
-                                    } else {
-                                        // Logic to add a new customer or other POS actions
+                            <div className="relative flex-1 max-w-[200px] mx-2">
+                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-stone-500" />
+                                <input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-black/30 border border-white/10 rounded pl-7 pr-2 py-1 text-xs text-stone-200 focus:ring-1 focus:ring-orange-500/50 placeholder:text-stone-600 transition-all"
+                                />
+                            </div>
+                        )}
+
+                        {/* Right Side Actions - Spaced out */}
+                        <div className="flex items-center gap-3 shrink-0">
+                            {/* Barber/Staff Selector */}
+                            <select
+                                value={selectedBarber?.id || ''}
+                                onChange={(e) => {
+                                    const barber = barberList.find(b => b.id === e.target.value)
+                                    setSelectedBarber(barber || null)
+                                    if (barber) {
+                                        setSelectedCategory('BARBER_SERVICE')
                                     }
                                 }}
-                                className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
+                                className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-orange-500"
                             >
-                                <UserPlus className="h-4 w-4" />
-                                New Customer
-                            </button>
-                        )}
+                                <option value="">Select Staff</option>
+                                {barberList.map(barber => (
+                                    <option key={barber.id} value={barber.id}>
+                                        {barber.name}
+                                    </option>
+                                ))}
+                            </select>
 
-                        {view === 'HISTORY' && (
+                            {/* Display Button */}
                             <button
-                                onClick={() => setShowShiftModal(true)}
-                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
+                                onClick={() => setShowDisplayModal(true)}
+                                className="p-2.5 bg-blue-600/20 hover:bg-blue-600/40 rounded-lg text-blue-400 transition-colors border border-blue-500/20"
+                                title="Customer Display"
                             >
-                                <DollarSign className="h-4 w-4" />
-                                {shift ? 'Close Shift' : 'Open Shift'}
+                                <Monitor className="h-5 w-5" />
                             </button>
-                        )}
-                    </div>
 
+                            {/* Fullscreen Toggle Button */}
+                            <button
+                                onClick={() => {
+                                    if (!document.fullscreenElement) {
+                                        document.documentElement.requestFullscreen()
+                                    } else {
+                                        document.exitFullscreen()
+                                    }
+                                }}
+                                className="p-2.5 bg-purple-600/20 hover:bg-purple-600/40 rounded-lg text-purple-400 transition-colors border border-purple-500/20"
+                                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                            >
+                                {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+                            </button>
+
+                            {/* New Customer Button */}
+                            {view === 'POS' && (
+                                <button
+                                    onClick={() => {
+                                        if (!shift) {
+                                            setShowShiftModal(true)
+                                        }
+                                    }}
+                                    className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-orange-500/20 flex items-center gap-2"
+                                    title="New Customer"
+                                >
+                                    <UserPlus className="h-4 w-4" />
+                                    <span>New</span>
+                                </button>
+                            )}
+
+                            {view === 'HISTORY' && (
+                                <button
+                                    onClick={() => setShowShiftModal(true)}
+                                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+                                    title={shift ? 'Close Shift' : 'Open Shift'}
+                                >
+                                    <DollarSign className="h-4 w-4" />
+                                    <span>{shift ? 'Close' : 'Open'}</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
                     {/* Main Content Area - Responsive padding */}
                     <div className="flex-1 overflow-y-auto p-3 xl:p-6">
                         {view === 'POS' ? (
                             <>
                                 {!selectedCategory && !searchQuery ? (
-                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 xl:gap-4">
+                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 xl:gap-5">
                                         {serviceCategories.map(cat => (
                                             <button
                                                 key={cat}
                                                 onClick={() => setSelectedCategory(cat)}
-                                                className="h-24 xl:h-32 bg-stone-900 rounded-xl border border-stone-800 hover:border-orange-500 transition-all flex flex-col items-center justify-center gap-2 group"
+                                                className="h-32 xl:h-40 bg-gradient-to-br from-stone-800/80 to-stone-900/80 backdrop-blur-sm rounded-2xl border border-white/10 hover:border-orange-500/50 transition-all duration-300 flex flex-col items-center justify-center gap-3 group hover:scale-[1.02] hover:shadow-xl hover:shadow-orange-500/10 active:scale-[0.98]"
                                             >
-                                                <span className="font-bold text-base xl:text-xl text-stone-300 group-hover:text-white">{cat}</span>
+                                                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center group-hover:from-orange-500/30 group-hover:to-amber-500/30 transition-all">
+                                                    <span className="text-2xl">✨</span>
+                                                </div>
+                                                <span className="font-bold text-base xl:text-lg text-stone-300 group-hover:text-white transition-colors">{cat}</span>
                                             </button>
                                         ))}
+
+                                        {/* Open Item Tile */}
+                                        <button
+                                            onClick={() => {
+                                                setOpenItemPrice('')
+                                                setShowOpenItemModal(true)
+                                            }}
+                                            className="h-32 xl:h-40 bg-stone-900/50 hover:bg-stone-800 rounded-2xl border border-dashed border-stone-700 hover:border-amber-500/50 transition-all duration-300 flex flex-col items-center justify-center gap-3 group hover:scale-[1.02] active:scale-[0.98]"
+                                        >
+                                            <div className="w-14 h-14 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-all">
+                                                <span className="text-2xl font-bold text-amber-500">+</span>
+                                            </div>
+                                            <span className="font-bold text-base xl:text-lg text-stone-400 group-hover:text-amber-500 transition-colors">Open Item</span>
+                                        </button>
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
@@ -1451,7 +1876,7 @@ function POSContent() {
                                             <h2 className="text-xl font-bold text-white">{selectedCategory || 'Search Results'}</h2>
                                         </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                                             {filteredItems.map(item => (
                                                 <div
                                                     key={item.id}
@@ -1466,18 +1891,22 @@ function POSContent() {
                                                             addToCart(item, item.category === 'PRODUCTS' ? 'PRODUCT' : 'SERVICE')
                                                         }
                                                     }}
-                                                    className="bg-stone-900 rounded-xl border border-stone-800 p-4 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-orange-500 transition-colors group"
+                                                    className="bg-gradient-to-br from-stone-800/60 to-stone-900/60 backdrop-blur-sm rounded-2xl border border-white/10 p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-500/10 transition-all duration-300 group hover:scale-[1.02] active:scale-[0.98]"
                                                 >
-                                                    {item.image && <img src={item.image} alt={item.name} className="h-24 w-24 object-cover rounded-full mb-2 group-hover:scale-105 transition-transform" />}
-                                                    <p className="font-medium text-white text-center">{item.name}</p>
-                                                    <div className="flex flex-col gap-0.5 items-center">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-xs text-stone-500">Cash:</span>
-                                                            <span className="text-sm font-semibold text-emerald-400">{formatCurrency(item.price)}</span>
+                                                    {item.image ? (
+                                                        <img src={item.image} alt={item.name} className="h-20 w-20 object-cover rounded-xl mb-1 group-hover:scale-110 transition-transform duration-300 shadow-lg" />
+                                                    ) : (
+                                                        <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center mb-1 group-hover:from-orange-500/30 group-hover:to-amber-500/30 transition-all">
+                                                            <span className="text-2xl">💇</span>
                                                         </div>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-xs text-stone-500">Card:</span>
-                                                            <span className="text-sm font-semibold text-stone-300">{formatCurrency(item.price * 1.0399)}</span>
+                                                    )}
+                                                    <p className="font-semibold text-white text-center text-sm leading-tight line-clamp-2 min-h-[2.5em] flex items-center">{item.name}</p>
+                                                    <div className="flex flex-wrap items-center justify-center gap-2 mt-1 w-full font-mono">
+                                                        <div className="bg-emerald-500/20 border border-emerald-500/30 px-2 py-1 rounded-lg shrink-0">
+                                                            <span className="text-xs font-bold text-emerald-400 block">${item.price.toFixed(2)}</span>
+                                                        </div>
+                                                        <div className="bg-stone-800 border border-stone-600 px-2 py-1 rounded-lg shrink-0">
+                                                            <span className="text-xs font-medium text-white block">${(item.price * 1.0399).toFixed(2)}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1509,7 +1938,18 @@ function POSContent() {
                                             </button>
                                         )}
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {/* Date Filter */}
+                                        <input
+                                            type="date"
+                                            value={txDateFilter}
+                                            onChange={(e) => {
+                                                setTxDateFilter(e.target.value)
+                                                fetchTransactions(e.target.value)
+                                            }}
+                                            className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-1 text-white text-xs focus:ring-2 focus:ring-orange-500"
+                                        />
+                                        {/* Status Filters */}
                                         {(['ALL', 'COMPLETED', 'REFUNDED', 'VOIDED'] as const).map(status => (
                                             <button
                                                 key={status}
@@ -1656,19 +2096,19 @@ function POSContent() {
                     </div>
                 </div>
 
-                {/* Right Side: Cart or Transaction Details - Responsive width */}
-                <div className="w-[320px] xl:w-[380px] 2xl:w-[420px] shrink-0 flex flex-col bg-stone-900 border-l border-stone-800 shadow-2xl">
+                {/* Right Side: Cart or Transaction Details - Premium Glass Design */}
+                <div className="w-[340px] xl:w-[400px] 2xl:w-[440px] shrink-0 flex flex-col bg-gradient-to-b from-stone-900/95 to-stone-950/95 backdrop-blur-xl border-l border-white/5 shadow-2xl shadow-black/50">
                     {view === 'POS' ? (
                         <>
-                            {/* Cart Header - Responsive */}
-                            <div className="h-16 xl:h-20 border-b border-stone-800 flex items-center justify-between px-3 xl:px-6">
-                                <h2 className="text-base xl:text-xl font-bold text-white">Order</h2>
-                                <div className="flex items-center gap-1 xl:gap-2">
+
+                            <div className="h-[72px] border-b border-white/5 flex items-center justify-between px-4 xl:px-5 bg-black/20">
+                                <h2 className="text-lg xl:text-xl font-bold text-white">Order</h2>
+                                <div className="flex items-center gap-2">
                                     {/* Clear Cart Button - Only show when cart has items */}
                                     {cart.length > 0 && (
                                         <button
                                             onClick={() => setShowClearCartConfirm(true)}
-                                            className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                                            className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all duration-200 border border-red-500/20 hover:border-red-500/30"
                                             title="Clear Cart"
                                         >
                                             <Trash2 className="h-5 w-5" />
@@ -1678,7 +2118,7 @@ function POSContent() {
                                     {/* Customer Button */}
                                     <button
                                         onClick={() => setShowCustomerModal(true)}
-                                        className={`p-2 rounded-lg transition-colors ${selectedCustomer ? 'bg-emerald-600/30 text-emerald-400' : 'hover:bg-stone-800 text-stone-400'}`}
+                                        className={`p-2.5 rounded-xl transition-all duration-200 border ${selectedCustomer ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'hover:bg-white/5 text-stone-400 border-white/10 hover:border-white/20'}`}
                                         title={selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : 'Select Customer'}
                                     >
                                         <User className="h-5 w-5" />
@@ -1686,7 +2126,7 @@ function POSContent() {
                                     {/* Discounts Button */}
                                     <button
                                         onClick={() => setShowDiscounts(true)}
-                                        className={`p-2 rounded-lg transition-colors ${appliedDiscount > 0 ? 'bg-pink-600/20 text-pink-400' : 'bg-purple-600/20 hover:bg-purple-600/40 text-purple-400'}`}
+                                        className={`p-2.5 rounded-xl transition-all duration-200 border ${appliedDiscount > 0 ? 'bg-pink-500/20 text-pink-400 border-pink-500/30' : 'hover:bg-white/5 text-purple-400 border-white/10 hover:border-white/20'}`}
                                         title="Customer Discounts"
                                     >
                                         <Gift className="h-5 w-5" />
@@ -1720,19 +2160,22 @@ function POSContent() {
                             {/* Cart Items */}
                             <div className="flex-1 overflow-y-auto p-4 space-y-3">
                                 {cart.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-stone-500 space-y-4">
-                                        <ShoppingBag className="h-12 w-12 opacity-20" />
-                                        <p>Cart is empty</p>
+                                    <div className="h-full flex flex-col items-center justify-center text-stone-600 space-y-3">
+                                        <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
+                                            <ShoppingBag className="h-10 w-10 text-stone-600" />
+                                        </div>
+                                        <p className="font-medium">Cart is empty</p>
+                                        <p className="text-xs text-stone-700">Tap an item to get started</p>
                                     </div>
                                 ) : (
                                     cart.map((item, idx) => (
-                                        <div key={idx} className="bg-stone-950/50 p-4 rounded-xl border border-stone-800 flex flex-col gap-2 group">
+                                        <div key={idx} className="bg-gradient-to-br from-white/5 to-white/[0.02] p-4 rounded-xl border border-white/10 flex flex-col gap-2 group hover:border-white/20 transition-all duration-200">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex-1">
-                                                    <p className="font-medium text-stone-200">{item.name}</p>
-                                                    <p className="text-sm text-stone-500">{formatCurrency(item.price)}</p>
+                                                    <p className="font-semibold text-white">{item.name}</p>
+                                                    <p className="text-sm text-emerald-400 font-medium">{formatCurrency(item.price)}</p>
                                                 </div>
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={() => {
                                                             setSelectedCartIndex(idx)
@@ -1779,44 +2222,49 @@ function POSContent() {
                                 )}
                             </div>
 
-                            {/* Totals & Actions */}
-                            <div className="p-6 bg-stone-900 border-t border-stone-800 space-y-4">
-                                <div className="space-y-2 text-sm">
+                            {/* Totals & Actions - Premium Glass Design */}
+                            <div className="p-5 bg-gradient-to-t from-black/40 to-stone-900/60 backdrop-blur-xl border-t border-white/10 space-y-4">
+                                <div className="space-y-2.5 text-sm">
                                     <div className="flex justify-between text-stone-400">
-                                        <span>Subtotal</span>
-                                        <span>{formatCurrency(subtotal)}</span>
+                                        <span className="font-medium">Subtotal</span>
+                                        <span className="font-semibold">{formatCurrency(subtotal)}</span>
                                     </div>
                                     {appliedDiscount > 0 && (
                                         <div className="flex justify-between text-pink-400">
-                                            <span>Discount</span>
-                                            <span>-{formatCurrency(appliedDiscount)}</span>
+                                            <span className="font-medium">Discount</span>
+                                            <span className="font-semibold">-{formatCurrency(appliedDiscount)}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between text-stone-400">
-                                        <span>Tax (8%)</span>
-                                        <span>{formatCurrency(tax)}</span>
+                                        <span className="font-medium">Tax (8%)</span>
+                                        <span className="font-semibold">{formatCurrency(tax)}</span>
                                     </div>
                                     {pricingSettings.showDualPricing ? (
                                         <>
-                                            <div className="flex justify-between text-xl font-bold text-white pt-2 border-t border-stone-800">
+                                            <div className="flex justify-between text-2xl font-bold text-white pt-3 mt-3 border-t border-white/10">
                                                 <span>Total (Cash)</span>
-                                                <span className="text-emerald-400">{formatCurrency(totalCash)}</span>
+                                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-400">{formatCurrency(totalCash)}</span>
                                             </div>
-                                            <div className="flex justify-between text-sm font-medium text-stone-400">
+                                            <div className="flex justify-between text-sm font-semibold text-stone-400">
                                                 <span>Total (Card)</span>
                                                 <span className="text-stone-300">{formatCurrency(totalCard)}</span>
                                             </div>
                                         </>
                                     ) : (
-                                        <div className="flex justify-between text-xl font-bold text-white pt-2 border-t border-stone-800">
+                                        <div className="flex justify-between text-2xl font-bold text-white pt-3 mt-3 border-t border-white/10">
                                             <span>Total</span>
-                                            <span className="text-emerald-400">{formatCurrency(totalCash)}</span>
+                                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-400">{formatCurrency(totalCash)}</span>
                                         </div>
                                     )}
                                 </div>
 
                                 <button
                                     onClick={async () => {
+                                        // Require staff selection before checkout
+                                        if (!selectedBarber) {
+                                            setToast({ message: 'Please select a staff member before checkout', type: 'error' })
+                                            return
+                                        }
                                         // Check if tips are enabled
                                         const user = session?.user as any
                                         if (tipSettings.enabled && user?.locationId) {
@@ -1851,8 +2299,9 @@ function POSContent() {
                                         }
                                     }}
                                     disabled={cart.length === 0}
-                                    className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-900/20"
+                                    className={`w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-xl flex items-center justify-center gap-2 ${cart.length > 0 ? 'bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 hover:from-orange-400 hover:via-amber-400 hover:to-orange-400 text-white shadow-orange-500/30 hover:shadow-orange-500/40 hover:scale-[1.02] active:scale-[0.98]' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}
                                 >
+                                    <ShoppingBag className="h-5 w-5" />
                                     Checkout
                                 </button>
                             </div>
@@ -1909,7 +2358,10 @@ function POSContent() {
                             <div className="w-full max-w-2xl bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                                 <div className="p-6 border-b border-stone-800 flex items-center justify-between">
                                     <h2 className="text-2xl font-bold text-white">Payment Method</h2>
-                                    <button onClick={() => setShowCheckoutModal(false)} className="text-stone-400 hover:text-white">
+                                    <button onClick={() => {
+                                        cancelPaymentOnDisplay()
+                                        setShowCheckoutModal(false)
+                                    }} className="text-stone-400 hover:text-white">
                                         <Trash2 className="h-6 w-6 rotate-45" />
                                     </button>
                                 </div>
@@ -1918,6 +2370,11 @@ function POSContent() {
                                     {/* Cash Payment */}
                                     <button
                                         onClick={() => {
+                                            // Require staff selection before proceeding
+                                            if (!selectedBarber) {
+                                                setToast({ message: 'Please select a staff member before checkout', type: 'error' })
+                                                return
+                                            }
                                             const totals = calculateTotal()
                                             setCashTenderingTotal(totals.totalWithTip)
                                             setCashReceived('')
@@ -1935,6 +2392,11 @@ function POSContent() {
                                     {/* Card Payment (PAX Terminal) */}
                                     <button
                                         onClick={() => {
+                                            // Require staff selection before proceeding
+                                            if (!selectedBarber) {
+                                                setToast({ message: 'Please select a staff member before checkout', type: 'error' })
+                                                return
+                                            }
                                             setIsSplitPayment(false) // Ensure not in split mode
                                             setShowCheckoutModal(false)
                                             setShowPaxModal(true)
@@ -1950,6 +2412,11 @@ function POSContent() {
                                     {/* Split Payment */}
                                     <button
                                         onClick={() => {
+                                            // Require staff selection before proceeding
+                                            if (!selectedBarber) {
+                                                setToast({ message: 'Please select a staff member before checkout', type: 'error' })
+                                                return
+                                            }
                                             const totals = calculateTotal()
                                             setSplitTotal(totals.totalWithTip)
                                             setSplitCashAmount('')
@@ -1971,10 +2438,10 @@ function POSContent() {
 
                     {/* Cash Tendering Modal */}
                     {showCashTendering && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
-                            <div className="w-full max-w-sm bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
-                                <div className="p-4 border-b border-stone-800 flex items-center justify-between">
-                                    <h2 className="text-xl font-bold text-white">Cash Payment</h2>
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+                            <div className="w-full max-w-sm bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                                <div className="p-3 border-b border-stone-800 flex items-center justify-between shrink-0">
+                                    <h2 className="text-lg font-bold text-white">Cash Payment</h2>
                                     <button
                                         onClick={() => {
                                             setShowCashTendering(false)
@@ -1986,7 +2453,7 @@ function POSContent() {
                                     </button>
                                 </div>
 
-                                <div className="p-4">
+                                <div className="p-3 flex-1 overflow-y-auto">
                                     {/* Amount Due */}
                                     <div className="text-center mb-4 bg-stone-800/50 rounded-xl p-3">
                                         <p className="text-stone-400 text-xs">Amount Due</p>
@@ -2030,7 +2497,7 @@ function POSContent() {
                                         ))}
                                         <button
                                             onClick={() => {
-                                                setCashReceived(Math.ceil(cashTenderingTotal).toString())
+                                                setCashReceived(cashTenderingTotal.toFixed(2))
                                                 setCashQuickSelect(true)
                                             }}
                                             className="py-2 bg-orange-900/30 hover:bg-orange-900/50 text-orange-300 rounded-lg text-sm font-medium transition-all border border-orange-500/30"
@@ -2049,7 +2516,7 @@ function POSContent() {
                                     </div>
 
                                     {/* Numpad */}
-                                    <div className="grid grid-cols-3 gap-1.5 mb-4">
+                                    <div className="grid grid-cols-3 gap-1.5">
                                         {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '←'].map(key => (
                                             <button
                                                 key={key}
@@ -2075,14 +2542,16 @@ function POSContent() {
                                                         }
                                                     }
                                                 }}
-                                                className="py-3 bg-stone-800 hover:bg-stone-700 text-white text-lg font-bold rounded-lg transition-all border border-stone-700"
+                                                className="py-2.5 bg-stone-800 hover:bg-stone-700 text-white text-lg font-bold rounded-lg transition-all border border-stone-700"
                                             >
                                                 {key}
                                             </button>
                                         ))}
                                     </div>
+                                </div>
 
-                                    {/* Complete Transaction Button */}
+                                {/* Complete Transaction Button - Fixed at bottom */}
+                                <div className="p-3 border-t border-stone-800 shrink-0 bg-stone-900">
                                     <button
                                         onClick={async () => {
                                             const received = parseFloat(cashReceived || '0')
@@ -2103,11 +2572,14 @@ function POSContent() {
                                                         tip: totals.tip,
                                                         total: cashTenderingTotal,
                                                         paymentMethod: 'CASH',
-                                                        cashDrawerSessionId: shift?.id
+                                                        cashDrawerSessionId: shift?.id,
+                                                        clientId: selectedCustomer?.id
                                                     })
                                                 })
                                                 if (res.ok) {
+                                                    const txData = await res.json()
                                                     const changeDue = received - cashTenderingTotal
+                                                    const savedCart = [...cart] // Save cart before clearing
                                                     setCart([])
                                                     setPendingTipAmount(0)
                                                     setShowCashTendering(false)
@@ -2124,10 +2596,24 @@ function POSContent() {
                                                             })
                                                         })
                                                     }
-                                                    setToast({
-                                                        message: `Transaction Complete! ${changeDue > 0 ? `Change: ${formatCurrency(changeDue)}` : ''}`,
-                                                        type: 'success'
+                                                    // Store transaction data and show receipt modal
+                                                    setLastTransactionData({
+                                                        ...txData.transaction || txData,
+                                                        lineItems: savedCart.map(item => ({
+                                                            name: item.name,
+                                                            quantity: item.quantity,
+                                                            price: item.price,
+                                                            total: item.price * item.quantity
+                                                        })),
+                                                        subtotal: totals.subtotal,
+                                                        tax: totals.tax,
+                                                        total: cashTenderingTotal,
+                                                        paymentMethod: 'CASH',
+                                                        change: changeDue,
+                                                        locationName: locationName,
+                                                        franchiseName: franchiseName
                                                     })
+                                                    setShowReceiptModal(true)
                                                     fetchTransactions()
                                                 } else {
                                                     setToast({ message: 'Transaction failed', type: 'error' })
@@ -2138,10 +2624,10 @@ function POSContent() {
                                             }
                                         }}
                                         disabled={parseFloat(cashReceived || '0') < cashTenderingTotal}
-                                        className="w-full py-3 bg-orange-600 hover:bg-orange-500 disabled:bg-stone-700 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg transition-all"
+                                        className="w-full py-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 disabled:from-stone-700 disabled:to-stone-700 disabled:cursor-not-allowed text-white rounded-xl font-bold text-base transition-all shadow-lg shadow-orange-500/20"
                                     >
                                         {parseFloat(cashReceived || '0') >= cashTenderingTotal
-                                            ? `Complete - Change: ${formatCurrency(parseFloat(cashReceived || '0') - cashTenderingTotal)}`
+                                            ? `✓ Complete - Change: ${formatCurrency(parseFloat(cashReceived || '0') - cashTenderingTotal)}`
                                             : 'Enter Cash Amount'
                                         }
                                     </button>
@@ -2359,6 +2845,7 @@ function POSContent() {
                     <PaxPaymentModal
                         isOpen={showPaxModal}
                         onClose={() => {
+                            cancelPaymentOnDisplay()
                             setShowPaxModal(false)
                             setIsSplitPayment(false) // Reset split mode on close
                         }}
@@ -2399,6 +2886,7 @@ function POSContent() {
                                 setShowTransactionModal(false)
                                 setSelectedTxForActions(null)
                             }}
+                            cashDrawerSessionId={shift?.id}
                             canProcessRefunds={(session?.user as any)?.canProcessRefunds || (session?.user as any)?.role === 'FRANCHISOR'}
                             canVoid={(session?.user as any)?.canProcessRefunds || (session?.user as any)?.role === 'FRANCHISOR'}
                             canDelete={(session?.user as any)?.role === 'FRANCHISOR'}
@@ -2438,6 +2926,8 @@ function POSContent() {
                                                 tipAmount: 0
                                             })
                                         })
+                                        // Also update customer display to exit tip prompt
+                                        cancelPaymentOnDisplay()
                                         setShowTipWaiting(false)
                                         setPendingTipAmount(0)
                                         setShowCheckoutModal(true) // Skip to checkout
@@ -2891,6 +3381,89 @@ function POSContent() {
                     </div>
                 )
             }
+
+            {/* Open Item Modal */}
+            {showOpenItemModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="bg-stone-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+                        <h3 className="text-xl font-bold text-white mb-4">Open Item</h3>
+                        <div className="bg-stone-950 rounded-xl p-4 border border-white/5 mb-4">
+                            <div className="text-stone-400 text-sm mb-1">Amount</div>
+                            <div className="text-4xl font-bold text-white flex items-center">
+                                <span className="text-orange-500 mr-2">$</span>
+                                {openItemPrice || '0'}
+                            </div>
+                        </div>
+
+                        {/* Custom Numpad */}
+                        <div className="grid grid-cols-3 gap-2 mb-4">
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0, '⌫'].map((key) => (
+                                <button
+                                    key={key}
+                                    onClick={() => {
+                                        if (key === '⌫') {
+                                            setOpenItemPrice(prev => prev.slice(0, -1))
+                                        } else if (key === '.' && openItemPrice.includes('.')) {
+                                            // Prevent multiple dots
+                                        } else {
+                                            setOpenItemPrice(prev => {
+                                                if (key === '.' && !prev) return '0.'
+                                                if (prev === '0' && key !== '.') return String(key)
+                                                return prev + key
+                                            })
+                                        }
+                                    }}
+                                    className={`p-4 rounded-xl font-bold text-xl transition-all active:scale-95 ${key === '⌫'
+                                        ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                                        : 'bg-stone-800 text-white hover:bg-stone-700 hover:text-orange-200'
+                                        }`}
+                                >
+                                    {key}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowOpenItemModal(false)}
+                                className="flex-1 py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-xl font-bold"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (!openItemPrice || parseFloat(openItemPrice) === 0) return
+                                    const amount = parseFloat(openItemPrice)
+                                    const newItem: CartItem = {
+                                        id: `open-${Date.now()}`,
+                                        type: 'PRODUCT',
+                                        name: 'Open Item',
+                                        price: amount,
+                                        quantity: 1
+                                    }
+                                    setCart([...cart, newItem])
+                                    setShowOpenItemModal(false)
+                                    setToast({ message: 'Added Open Item', type: 'success' })
+                                }}
+                                className="flex-1 py-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-xl font-bold shadow-lg shadow-orange-900/20 transition-all"
+                            >
+                                Add Item
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Existing Receipt Modal */}
+            <ReceiptModal
+                isOpen={showReceiptModal}
+                onClose={() => setShowReceiptModal(false)}
+                transactionData={lastTransactionData}
+                onComplete={() => {
+                    setShowReceiptModal(false)
+                    setToast({ message: 'Transaction Complete!', type: 'success' })
+                }}
+            />
         </>
     )
 }

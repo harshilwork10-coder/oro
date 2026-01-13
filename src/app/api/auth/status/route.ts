@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
                     select: {
                         approvalStatus: true,
                         needToDiscussProcessing: true,
+                        processingType: true,
                         voidCheckUrl: true,
                         driverLicenseUrl: true,
                         feinLetterUrl: true
@@ -38,12 +39,14 @@ export async function GET(req: NextRequest) {
         let status = 'PENDING'
         let documents = {}
         let needToDiscussProcessing = false
+        let processingType = 'POS_AND_PROCESSING'
 
         // PROVIDER, ADMIN, EMPLOYEE, MANAGER are always approved (no onboarding needed)
         if (['PROVIDER', 'ADMIN', 'EMPLOYEE', 'MANAGER'].includes(user.role)) {
             return NextResponse.json({
                 status: 'APPROVED',
                 needToDiscussProcessing: false,
+                processingType: 'POS_AND_PROCESSING',
                 documents: {}
             })
         }
@@ -52,6 +55,7 @@ export async function GET(req: NextRequest) {
         if (user.franchisor) {
             status = user.franchisor.approvalStatus || 'PENDING'
             needToDiscussProcessing = user.franchisor.needToDiscussProcessing || false
+            processingType = user.franchisor.processingType || 'POS_AND_PROCESSING'
             documents = {
                 voidCheck: !!user.franchisor.voidCheckUrl,
                 dl: !!user.franchisor.driverLicenseUrl,
@@ -65,6 +69,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
             status,
             needToDiscussProcessing,
+            processingType,
             documents
         })
 

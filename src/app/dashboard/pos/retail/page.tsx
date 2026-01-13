@@ -67,6 +67,9 @@ interface CartItem {
     sku?: string
     name: string
     price: number
+    // Dual Pricing Fields
+    cashPrice?: number // Cash price (base price)
+    cardPrice?: number // Card price = cashPrice × (1 + percentage)
     quantity: number
     discount?: number
     ageRestricted?: boolean
@@ -408,17 +411,14 @@ export default function RetailPOSPage() {
                     const paired = stationList.find((s: StationInfo) => s.id === pairedStationId)
                     if (paired) {
                         setSelectedStation(paired)
-                        console.log('[POS] Device paired to station:', paired.name)
                     } else {
                         // Paired station no longer exists - clear and show pairing
                         localStorage.removeItem('pairedStationId')
                         setShowStationPairing(true)
                     }
-                } else if (stationList.length === 1) {
                     // Only one station - auto-pair device to it
                     localStorage.setItem('pairedStationId', stationList[0].id)
                     setSelectedStation(stationList[0])
-                    console.log('[POS] Auto-paired device to only station:', stationList[0].name)
                 } else {
                     // Multiple stations, device not paired - show pairing screen (Provider only)
                     setShowStationPairing(true)
@@ -719,6 +719,9 @@ export default function RetailPOSPage() {
                 sku: product.sku,
                 name: product.name,
                 price: parseFloat(product.price),
+                // Dual Pricing - use cashPrice/cardPrice from product if available
+                cashPrice: product.cashPrice ? parseFloat(product.cashPrice) : parseFloat(product.price),
+                cardPrice: product.cardPrice ? parseFloat(product.cardPrice) : undefined,
                 quantity: qty,
                 ageRestricted: product.ageRestricted,
                 isEbtEligible,
@@ -923,7 +926,7 @@ export default function RetailPOSPage() {
         setShowPaymentModal(false) // Close modal if open
 
         try {
-            const { subtotal, tax, total } = calculateTotals()
+            const { subtotal, tax, total, cashTotal, cardTotal } = calculateTotals()
             const totalWithTip = total + tipAmount
 
             const res = await fetch('/api/pos/transaction', {
@@ -939,11 +942,17 @@ export default function RetailPOSPage() {
                         discount: item.discount,
                         taxRate: item.taxRate,
                         isEbtEligible: item.isEbtEligible,
-                        category: item.category
+                        category: item.category,
+                        // Dual pricing per item
+                        cashPrice: item.cashPrice || item.price,
+                        cardPrice: item.cardPrice
                     })),
                     subtotal,
                     tax,
                     total: totalWithTip,
+                    // Dual pricing totals - stored permanently
+                    totalCash: cashTotal,
+                    totalCard: cardTotal,
                     paymentMethod: method,
                     clientId: selectedCustomer?.id,
                     tipAmount: tipAmount,
@@ -2327,8 +2336,7 @@ export default function RetailPOSPage() {
                     transactions={recentTransactions}
                     onClose={() => setShowRecentTransactions(false)}
                     onSelectTransaction={(tx) => {
-                        // Could implement reprint/refund functionality here
-                        console.log('Selected transaction:', tx.id)
+                        // Could implement reprint/refund functionality here - tx.id available
                     }}
                 />
             )}

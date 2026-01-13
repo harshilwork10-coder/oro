@@ -6,7 +6,7 @@ import { hash } from 'bcrypt'
 export async function GET() {
     // CRITICAL SECURITY: Block in production
     if (process.env.NODE_ENV === 'production') {
-        console.warn('[SECURITY] Attempted to access seed endpoint in production!')
+        console.error('[SECURITY] Attempted to access seed endpoint in production!')
         return NextResponse.json(
             { error: 'This endpoint is disabled in production' },
             { status: 403 }
@@ -16,7 +16,7 @@ export async function GET() {
     // Additional check for NEXTAUTH_URL to detect production
     const baseUrl = process.env.NEXTAUTH_URL || ''
     if (baseUrl.includes('https://') && !baseUrl.includes('localhost')) {
-        console.warn('[SECURITY] Attempted to access seed endpoint on production URL!')
+        console.error('[SECURITY] Attempted to access seed endpoint on production URL!')
         return NextResponse.json(
             { error: 'This endpoint is disabled in production' },
             { status: 403 }
@@ -24,7 +24,6 @@ export async function GET() {
     }
 
     try {
-        console.log('🧹 Deleting all existing data...')
 
         // Get all table names and delete in order (SQLite)
         const tables = await prisma.$queryRaw<{ name: string }[]>`
@@ -45,8 +44,6 @@ export async function GET() {
 
         // Re-enable foreign key checks
         await prisma.$executeRaw`PRAGMA foreign_keys = ON`
-
-        console.log('🌱 Creating provider user...')
 
         const hashedPassword = await hash('password123', 10)
 

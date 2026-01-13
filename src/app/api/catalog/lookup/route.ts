@@ -162,9 +162,8 @@ export async function GET(request: NextRequest) {
                         })
                     }
                 }
-            } catch (apiError) {
-                console.log('[CATALOG_LOOKUP] External API error:', apiError)
-                // Continue to Open Food Facts fallback
+            } catch {
+                // External API failed, continue to Open Food Facts fallback
             }
 
             // Fallback 2: Open Food Facts (free, 2M+ products)
@@ -193,8 +192,8 @@ export async function GET(request: NextRequest) {
                         })
                     }
                 }
-            } catch (offError) {
-                console.log('[CATALOG_LOOKUP] Open Food Facts error:', offError)
+            } catch {
+                // Open Food Facts lookup failed
             }
 
             return NextResponse.json({ found: false, message: 'Product not found in any database' })

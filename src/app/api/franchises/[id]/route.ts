@@ -56,7 +56,8 @@ export async function GET(
     try {
         const session = await getServerSession(authOptions)
 
-        if (!session || (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR')) {
+        // Allow PROVIDER, FRANCHISOR, and EMPLOYEE to access franchise settings (needed for POS pricing)
+        if (!session || !['PROVIDER', 'FRANCHISOR', 'EMPLOYEE'].includes(session.user.role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -66,6 +67,7 @@ export async function GET(
             include: {
                 locations: true,
                 users: true,
+                settings: true, // Include FranchiseSettings for pricing, tips, etc.
             }
         })
 

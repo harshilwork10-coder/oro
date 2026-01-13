@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
 
         // Default manifest (fallback)
         const defaultManifest = {
-            name: 'Oro POS',
-            short_name: 'Oro',
+            name: 'Oro 9 Pulse',
+            short_name: 'Oro 9',
             description: 'Point of Sale System',
             start_url: '/dashboard',
             display: 'standalone',
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
 
             const franchise = user.franchise
             const settings = franchise?.settings
-            const shopName = settings?.storeDisplayName || franchise?.name || 'Oro'
+            const shopName = settings?.storeDisplayName || franchise?.name || 'Oro 9'
             const themeColor = settings?.primaryColor || '#7c3aed'
             const logoUrl = settings?.storeLogo || '/icons/icon-192x192.png'
 
@@ -170,8 +170,8 @@ export async function GET(request: NextRequest) {
         console.error('Error generating manifest:', error)
         // Return default manifest on error
         return NextResponse.json({
-            name: 'Oro POS',
-            short_name: 'Oro',
+            name: 'Oro 9 Pulse',
+            short_name: 'Oro 9',
             start_url: '/dashboard',
             display: 'standalone',
             background_color: '#0a0a0a',

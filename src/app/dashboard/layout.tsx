@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Menu } from 'lucide-react'
@@ -8,6 +8,8 @@ import Sidebar from "@/components/layout/Sidebar"
 import MobileHeader from "@/components/layout/MobileHeader"
 import SessionGuard from "@/components/security/SessionGuard"
 import AccountSelector from "@/components/layout/AccountSelector"
+import LocationToggle from "@/components/dashboard/LocationToggle"
+import PWAInstallPrompt from "@/components/pwa/PWAInstallPrompt"
 
 export default function DashboardLayout({
     children,
@@ -18,6 +20,13 @@ export default function DashboardLayout({
     const pathname = usePathname()
     const { data: session } = useSession()
     const user = session?.user as any
+
+    // Listen for toggleSidebar event from POS header
+    useEffect(() => {
+        const handleToggleSidebar = () => setSidebarOpen(true)
+        window.addEventListener('toggleSidebar', handleToggleSidebar)
+        return () => window.removeEventListener('toggleSidebar', handleToggleSidebar)
+    }, [])
 
     // POS pages get full screen experience
     const isPOS = pathname.startsWith('/dashboard/pos')
@@ -48,27 +57,29 @@ export default function DashboardLayout({
                     {!hideSidebar && <MobileHeader onMenuClick={() => setSidebarOpen(true)} />}
 
                     {/* Account Selector Bar - For Provider/Support to select which account to work on */}
-                    {showAccountSelector && !isPOS && (
+                    {/* Hide on /dashboard/provider page - that's the admin overview */}
+                    {showAccountSelector && !isPOS && !pathname.startsWith('/dashboard/provider') && (
                         <div className="relative z-20 px-4 py-3 border-b border-stone-800/50 bg-stone-900/50 backdrop-blur-sm">
                             <AccountSelector />
                         </div>
                     )}
 
-                    {/* Floating Menu Button for Salon POS only - opens sidebar overlay */}
-                    {pathname.startsWith('/dashboard/pos/salon') && (
-                        <button
-                            onClick={() => setSidebarOpen(true)}
-                            className="fixed top-4 left-4 z-50 p-3 bg-stone-800 hover:bg-stone-700 rounded-lg border border-stone-700 shadow-lg transition-colors"
-                            title="Open Navigation Menu"
-                        >
-                            <Menu className="h-5 w-5 text-stone-300" />
-                        </button>
+                    {/* Location Toggle Bar - For employees to switch their current working location */}
+                    {!showAccountSelector && !isPOS && (
+                        <div className="relative z-20 px-4 py-2 border-b border-stone-800/50 bg-stone-900/30 backdrop-blur-sm flex justify-end">
+                            <LocationToggle />
+                        </div>
                     )}
+
+                    {/* Floating Menu Button removed for Salon POS - it's now integrated into the POS header */}
 
                     <main className={`flex-1 overflow-y-auto relative z-10 ${hideSidebar ? 'overflow-hidden' : ''}`}>
                         {children}
                     </main>
                 </div>
+
+                {/* PWA Install Prompt - shows for employees on first login */}
+                {isEmployee && <PWAInstallPrompt />}
             </div>
         </SessionGuard>
     )

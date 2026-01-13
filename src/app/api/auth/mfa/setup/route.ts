@@ -133,8 +133,6 @@ export async function POST(req: Request) {
             }
         })
 
-        console.log(`[MFA] Enabled for user ${session.user.id}`)
-
         return NextResponse.json({
             success: true,
             message: 'MFA enabled successfully! Your account is now protected.'
@@ -210,8 +208,6 @@ export async function DELETE(req: Request) {
                 mfaSetupAt: null
             }
         })
-
-        console.log(`[MFA] Disabled for user ${session.user.id}`)
 
         return NextResponse.json({
             success: true,

@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         // Removed insecure providedUserId fallback that allowed unauthenticated uploads
 
         if (!userId) {
-            console.warn('[SECURITY] Rejected unauthenticated upload attempt')
+            console.error('[SECURITY] Rejected unauthenticated upload attempt')
             return NextResponse.json({ error: 'Unauthorized - valid session or magic link required' }, { status: 401 })
         }
 
@@ -81,8 +81,6 @@ export async function POST(request: NextRequest) {
             `onboarding/${userId}`,
             file.type
         )
-
-        console.log(`✅ Onboarding file uploaded to S3: ${s3Key} by user ${userId}`)
 
         return NextResponse.json({
             success: true,

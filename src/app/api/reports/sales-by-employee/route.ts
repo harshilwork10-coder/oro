@@ -21,10 +21,22 @@ export async function GET(request: NextRequest) {
 
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: { franchiseId: true }
+            select: { id: true, role: true, franchiseId: true }
         })
 
-        if (!user?.franchiseId) {
+        let franchiseId = user?.franchiseId
+
+        if (user?.role === 'FRANCHISOR' && !franchiseId) {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: user.id },
+                include: { franchises: { take: 1, select: { id: true } } }
+            })
+            if (franchisor?.franchises[0]) {
+                franchiseId = franchisor.franchises[0].id
+            }
+        }
+
+        if (!franchiseId) {
             return NextResponse.json({ employees: [] })
         }
 
@@ -32,7 +44,7 @@ export async function GET(request: NextRequest) {
         const employeeSales = await prisma.transaction.groupBy({
             by: ['employeeId'],
             where: {
-                franchiseId: user.franchiseId,
+                franchiseId: franchiseId,
                 createdAt: { gte: startDateTime, lte: endDateTime },
                 status: { in: ['COMPLETED', 'APPROVED'] }
             },
@@ -51,8 +63,8 @@ export async function GET(request: NextRequest) {
         const employeeMap = new Map(employees.map(e => [e.id, e.name]))
 
         const result = employeeSales.map(sale => {
-            const revenue = Number(sale._sum.total || 0)
-            const transactionCount = sale._count.id
+            const revenue = Number(sale._sum?.total || 0)
+            const transactionCount = sale._count?.id || 0
             return {
                 id: sale.employeeId || 'unknown',
                 name: employeeMap.get(sale.employeeId || '') || 'Unknown',

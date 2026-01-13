@@ -10,11 +10,6 @@ const isS3Configured = Boolean(
     process.env.AWS_S3_BUCKET
 )
 
-console.log(`[S3] Configuration status: ${isS3Configured ? 'CONFIGURED' : 'NOT CONFIGURED'}`)
-if (isS3Configured) {
-    console.log(`[S3] Bucket: ${process.env.AWS_S3_BUCKET}, Region: ${process.env.AWS_REGION || 'us-east-1'}`)
-}
-
 // Initialize S3 Client (only if configured)
 const s3Client = isS3Configured ? new S3Client({
     region: process.env.AWS_REGION || 'us-east-1',
@@ -59,7 +54,6 @@ export async function uploadToS3(
         })
 
         await s3Client.send(command)
-        console.log(`✅ Uploaded to S3: ${key}`)
         return key
     }
 
@@ -79,7 +73,6 @@ export async function uploadToS3(
 
     // Return relative path for serving
     const relativePath = `/uploads/${folder}/${localFileName}`
-    console.log(`✅ Uploaded to local storage: ${relativePath}`)
     return relativePath
 }
 
@@ -97,7 +90,6 @@ export async function getSignedDownloadUrl(key: string, expiresIn: number = 3600
 
     // If S3 is not configured, return the key as-is
     if (!isS3Configured || !s3Client) {
-        console.warn('S3 not configured - returning key as path')
         return key
     }
 

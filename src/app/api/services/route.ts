@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -19,23 +19,35 @@ export async function GET(req: NextRequest) {
         const search = searchParams.get('search')
         const categoryId = searchParams.get('categoryId')
 
-        if (!locationId) {
-            return ApiResponse.validationError('Location ID required')
-        }
+        let franchiseId: string | null = null
 
-        // Get franchiseId from location
-        const location = await prisma.location.findUnique({
-            where: { id: locationId },
-            select: { franchiseId: true }
-        })
+        if (locationId) {
+            // Get franchiseId from location
+            const location = await prisma.location.findUnique({
+                where: { id: locationId },
+                select: { franchiseId: true }
+            })
 
-        if (!location) {
-            return ApiResponse.notFound('Location')
+            if (!location) {
+                return ApiResponse.notFound('Location')
+            }
+            franchiseId = location.franchiseId
+        } else {
+            // If no locationId, get franchiseId from logged-in user
+            const user = await prisma.user.findUnique({
+                where: { id: session.user.id },
+                select: { franchiseId: true }
+            })
+
+            if (!user?.franchiseId) {
+                return NextResponse.json({ data: [], pagination: { nextCursor: null, hasMore: false, total: 0 } })
+            }
+            franchiseId = user.franchiseId
         }
 
         // Build where clause
         const whereClause: Record<string, unknown> = {
-            franchiseId: location.franchiseId
+            franchiseId: franchiseId
         }
 
         if (search) {

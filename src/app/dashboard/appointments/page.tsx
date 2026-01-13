@@ -73,19 +73,44 @@ export default function AppointmentsPage() {
     }
 
     async function handleAppointmentAction(id: string, action: 'approve' | 'cancel') {
+        const appointment = appointments.find(a => a.id === id)
+        if (!appointment) return
+
         setActionLoading(id)
         try {
-            const res = await fetch(`/api/appointments/${id}/approve`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: action === 'cancel' ? 'reject' : action })
-            })
+            let res
+
+            if (action === 'approve') {
+                res = await fetch(`/api/appointments/${id}/approve`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'approve' })
+                })
+            } else {
+                // Handle cancellation/rejection
+                if (appointment.status === 'PENDING_APPROVAL') {
+                    // "Reject" logic for pending appointments
+                    res = await fetch(`/api/appointments/${id}/approve`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'reject' })
+                    })
+                } else {
+                    // "Cancel" logic for confirmed/scheduled appointments
+                    res = await fetch(`/api/appointments/${id}/cancel`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reason: 'Cancelled by staff' })
+                    })
+                }
+            }
 
             if (res.ok) {
                 fetchAppointments()
                 setSelectedAppointment(null)
             } else {
-                setToast({ message: 'Failed to update appointment', type: 'error' })
+                const data = await res.json()
+                setToast({ message: data.error || 'Failed to update appointment', type: 'error' })
             }
         } catch (error) {
             setToast({ message: 'Something went wrong', type: 'error' })
@@ -240,54 +265,72 @@ export default function AppointmentsPage() {
                         )
                     })}
 
-                    {/* Appointments */}
+                    {/* Appointments - Simple Clean Design */}
                     {appointments.map((apt) => {
                         const start = new Date(apt.startTime)
-                        const end = new Date(apt.endTime)
                         const startHour = start.getHours()
                         const startMin = start.getMinutes()
-                        const duration = (end.getTime() - start.getTime()) / (1000 * 60)
 
-                        const top = ((startHour - 8) * 80) + ((startMin / 60) * 80)
-                        const height = (duration / 60) * 80
+                        // Fixed height cards positioned at their start time
+                        const top = ((startHour - 8) * 80) + ((startMin / 60) * 80) + 2
+                        const fixedHeight = 38 // Fixed small height
 
                         if (startHour < 8 || startHour > 20) return null
 
-                        const borderColors: Record<string, string> = {
-                            'PENDING_APPROVAL': 'border-amber-500 bg-amber-600/20',
-                            'SCHEDULED': 'border-emerald-500 bg-emerald-600/20',
-                            'CANCELLED': 'border-red-500 bg-red-600/20 opacity-50',
-                            'COMPLETED': 'border-blue-500 bg-blue-600/20',
-                        }
+                        const formattedTime = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
                         return (
                             <div
                                 key={apt.id}
-                                style={{ top: `${top}px`, height: `${Math.max(height, 40)}px`, left: '100px', right: '20px' }}
+                                style={{
+                                    top: `${top}px`,
+                                    height: `${fixedHeight}px`,
+                                    left: '90px',
+                                    right: '20px',
+                                }}
                                 onClick={() => setSelectedAppointment(apt)}
-                                className={`absolute border-l-4 rounded-r-lg p-3 hover:opacity-90 transition-all cursor-pointer overflow-hidden ${borderColors[apt.status] || 'border-purple-500 bg-purple-600/20'
-                                    }`}
+                                className={`
+                                    absolute cursor-pointer rounded-lg overflow-hidden
+                                    ${apt.status === 'SCHEDULED' ? 'bg-emerald-600' : ''}
+                                    ${apt.status === 'PENDING_APPROVAL' ? 'bg-amber-600' : ''}
+                                    ${apt.status === 'CANCELLED' ? 'bg-red-600 opacity-50' : ''}
+                                    ${apt.status === 'COMPLETED' ? 'bg-blue-600' : ''}
+                                    hover:brightness-110 transition-all
+                                `}
                             >
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-semibold text-white text-sm">
-                                            {apt.client.firstName} {apt.client.lastName}
-                                        </p>
-                                        <p className="text-xs text-stone-300">
-                                            {apt.service.name}
-                                        </p>
+                                {/* Simple Clean Card Content */}
+                                <div className="h-full p-3 flex items-center justify-between">
+                                    {/* Left: Customer & Service */}
+                                    <div className="flex items-center gap-4">
+                                        {/* Time Badge */}
+                                        <div className="bg-black/20 px-3 py-1.5 rounded-lg">
+                                            <span className="text-white font-bold text-lg">
+                                                {formattedTime}
+                                            </span>
+                                        </div>
+
+                                        {/* Customer Info */}
+                                        <div>
+                                            <p className="text-white font-bold text-lg">
+                                                {apt.client.firstName} {apt.client.lastName}
+                                            </p>
+                                            <p className="text-white/80 text-sm">
+                                                {apt.service.name} • {apt.employee.name}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                        {getStatusBadge(apt.status)}
-                                        <p className="text-xs text-stone-400 mt-1 flex items-center gap-1 justify-end">
-                                            <Clock className="h-3 w-3" />
-                                            {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                                        </p>
+
+                                    {/* Right: Status & Price */}
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-white/90 font-semibold">
+                                            ${apt.service.price}
+                                        </span>
+                                        <span className="bg-white/20 px-2 py-1 rounded text-white text-xs font-medium">
+                                            {apt.status === 'SCHEDULED' ? '✓ Confirmed' :
+                                                apt.status === 'PENDING_APPROVAL' ? '⏳ Pending' :
+                                                    apt.status === 'CANCELLED' ? '✕ Cancelled' : '★ Done'}
+                                        </span>
                                     </div>
-                                </div>
-                                <div className="mt-1 flex items-center gap-2 text-xs text-stone-400">
-                                    <User className="h-3 w-3" />
-                                    {apt.employee.name}
                                 </div>
                             </div>
                         )

@@ -19,7 +19,7 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
     const [step, setStep] = useState<'identity' | 'security' | 'processing'>('identity')
     const [error, setError] = useState('')
     const [user, setUser] = useState<{ id: string, name: string, email: string } | null>(null)
-    const [franchisor, setFranchisor] = useState<{ name: string, supportFee: string, type?: string, businessType?: string } | null>(null)
+    const [franchisor, setFranchisor] = useState<{ name: string, supportFee: string, type?: string, businessType?: string, processingType?: string } | null>(null)
     const [franchise, setFranchise] = useState<{ id: string, name: string } | null>(null)
 
     // Form Data
@@ -161,12 +161,18 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
             if (formData.password !== formData.confirmPassword) return setError('Passwords do not match.')
             setStep('processing')
         } else if (step === 'processing') {
+            // For POS_ONLY, only void check is required
+            const isPosOnly = franchisor?.processingType === 'POS_ONLY'
             if (!formData.needToDiscussProcessing) {
-                if (!formData.ssn && !formData.fein) return setError('Please provide SSN or FEIN.')
-                // Ideally check for docs too, but we can be lenient or strict. Let's be strict-ish.
-                if (!formData.voidedCheck || !formData.dl) return setError('Please upload required documents or select "I need help".')
+                if (isPosOnly) {
+                    // POS Only: just need void check
+                    if (!formData.voidedCheck) return setError('Please upload Voided Check or select "I need help".')
+                } else {
+                    // POS + Processing: need SSN/FEIN and full docs
+                    if (!formData.ssn && !formData.fein) return setError('Please provide SSN or FEIN.')
+                    if (!formData.voidedCheck || !formData.dl) return setError('Please upload required documents or select "I need help".')
+                }
             }
-            // setStep('branding') -> Removed, now we are done or show completion button
         }
     }
 
@@ -243,7 +249,7 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
             <div className="w-full lg:w-1/2 flex flex-col justify-center p-6 lg:p-12 overflow-y-auto">
                 <div className="max-w-xl mx-auto w-full">
                     <div className="mb-8">
-                        <img src="/oronext-logo.jpg" alt="OroNext" className="h-24 object-contain" />
+                        <img src="/ORO9.png" alt="ORO 9" className="h-24 object-contain" />
                     </div>
 
                     <div className="mb-8">
@@ -341,108 +347,134 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
                         )}
 
                         {/* STEP 3: PROCESSING */}
-                        {step === 'processing' && (
-                            <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-                                <h2 className="text-xl font-bold text-stone-900 flex items-center gap-2">
-                                    <CreditCard className="h-5 w-5 text-emerald-600" /> Processing Setup
-                                </h2>
+                        {step === 'processing' && (() => {
+                            const isPosOnly = franchisor?.processingType === 'POS_ONLY'
 
-                                <div className="p-4 bg-purple-50 border border-purple-100 rounded-xl mb-6">
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.needToDiscussProcessing ? 'bg-purple-600 border-purple-600' : 'border-stone-300 bg-white'}`}>
-                                            {formData.needToDiscussProcessing && <CheckSquare className="h-3.5 w-3.5 text-white" />}
-                                        </div>
-                                        <input type="checkbox" className="hidden" checked={formData.needToDiscussProcessing} onChange={e => setFormData(prev => ({ ...prev, needToDiscussProcessing: e.target.checked }))} />
-                                        <span className="font-medium text-purple-900">I need help / Let's discuss rates first</span>
-                                    </label>
-                                </div>
+                            return (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                                    <h2 className="text-xl font-bold text-stone-900 flex items-center gap-2">
+                                        <CreditCard className="h-5 w-5 text-emerald-600" />
+                                        {isPosOnly ? 'Bank Verification' : 'Processing Setup'}
+                                    </h2>
 
-                                {!formData.needToDiscussProcessing ? (
-                                    <div className="space-y-6">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">SSN</label>
-                                                <div className="relative">
-                                                    <input
-                                                        type={showSSN ? 'text' : 'password'}
-                                                        name="ssn"
-                                                        value={formData.ssn}
-                                                        onChange={handleInputChange}
-                                                        className="w-full p-3 pr-10 border border-stone-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-stone-900 font-mono"
-                                                        placeholder="•••••••••"
-                                                        maxLength={9}
-                                                        autoComplete="off"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowSSN(!showSSN)}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-                                                    >
-                                                        {showSSN ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                    </button>
+                                    {/* Service type badge */}
+                                    <div className={`p-3 rounded-xl text-sm ${isPosOnly ? 'bg-purple-50 border border-purple-100 text-purple-700' : 'bg-orange-50 border border-orange-100 text-orange-700'}`}>
+                                        <strong>{isPosOnly ? '📱 POS Only' : '💳 POS + Payment Processing'}</strong>
+                                        <p className="text-xs mt-1 opacity-80">
+                                            {isPosOnly
+                                                ? 'You are using your own payment processor. Only bank verification is required.'
+                                                : 'We\'ll set up payment processing for you. Please provide business verification details.'
+                                            }
+                                        </p>
+                                    </div>
+
+                                    {/* Only show help checkbox for POS + Processing */}
+                                    {!isPosOnly && (
+                                        <div className="p-4 bg-purple-50 border border-purple-100 rounded-xl">
+                                            <label className="flex items-center gap-3 cursor-pointer">
+                                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.needToDiscussProcessing ? 'bg-purple-600 border-purple-600' : 'border-stone-300 bg-white'}`}>
+                                                    {formData.needToDiscussProcessing && <CheckSquare className="h-3.5 w-3.5 text-white" />}
                                                 </div>
-                                                <p className="text-xs text-stone-400 mt-1">🔒 Encrypted</p>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">FEIN</label>
-                                                <div className="relative">
-                                                    <input
-                                                        type={showFEIN ? 'text' : 'password'}
-                                                        name="fein"
-                                                        value={formData.fein}
-                                                        onChange={handleInputChange}
-                                                        className="w-full p-3 pr-10 border border-stone-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-stone-900 font-mono"
-                                                        placeholder="••-•••••••"
-                                                        maxLength={10}
-                                                        autoComplete="off"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowFEIN(!showFEIN)}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-                                                    >
-                                                        {showFEIN ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                    </button>
-                                                </div>
-                                                <p className="text-xs text-stone-400 mt-1">🔒 Encrypted</p>
-                                            </div>
+                                                <input type="checkbox" className="hidden" checked={formData.needToDiscussProcessing} onChange={e => setFormData(prev => ({ ...prev, needToDiscussProcessing: e.target.checked }))} />
+                                                <span className="font-medium text-purple-900">I need help / Let's discuss first</span>
+                                            </label>
                                         </div>
+                                    )}
 
-                                        <div className="space-y-3">
-                                            <p className="text-sm font-medium text-stone-900">Required Documents</p>
-                                            {[
-                                                { id: 'voidedCheck', label: "Voided Check" },
-                                                { id: 'dl', label: "Driver's License" },
-                                                { id: 'feinLetter', label: "FEIN Letter" }
-                                            ].map(doc => (
-                                                <div key={doc.id} className="border border-stone-200 rounded-xl p-3 flex items-center justify-between bg-white">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="h-8 w-8 bg-stone-100 rounded-lg flex items-center justify-center">
-                                                            <Upload className="h-4 w-4 text-stone-500" />
+                                    {(!isPosOnly && formData.needToDiscussProcessing) ? (
+                                        <div className="text-center py-8 text-stone-500">
+                                            <Phone className="h-8 w-8 mx-auto mb-2 text-stone-300" />
+                                            <p>No problem! An onboarding specialist will contact you shortly to assist with setup.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            {/* SSN/FEIN - Only for POS + Processing */}
+                                            {!isPosOnly && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">SSN</label>
+                                                        <div className="relative">
+                                                            <input
+                                                                type={showSSN ? 'text' : 'password'}
+                                                                name="ssn"
+                                                                value={formData.ssn}
+                                                                onChange={handleInputChange}
+                                                                className="w-full p-3 pr-10 border border-stone-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-stone-900 font-mono"
+                                                                placeholder="•••••••••"
+                                                                maxLength={9}
+                                                                autoComplete="off"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowSSN(!showSSN)}
+                                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                                                            >
+                                                                {showSSN ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                            </button>
                                                         </div>
-                                                        <div>
-                                                            <p className="text-sm font-medium text-stone-900">{doc.label}</p>
-                                                            {/* @ts-ignore */}
-                                                            {formData[doc.id]?.uploaded && <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Uploaded</p>}
-                                                        </div>
+                                                        <p className="text-xs text-stone-400 mt-1">🔒 Encrypted</p>
                                                     </div>
-                                                    <label className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium cursor-pointer transition-colors flex items-center gap-2">
-                                                        <Upload className="h-4 w-4" />
-                                                        Upload
-                                                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleFileChange(e, doc.id)} />
-                                                    </label>
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">FEIN</label>
+                                                        <div className="relative">
+                                                            <input
+                                                                type={showFEIN ? 'text' : 'password'}
+                                                                name="fein"
+                                                                value={formData.fein}
+                                                                onChange={handleInputChange}
+                                                                className="w-full p-3 pr-10 border border-stone-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-stone-900 font-mono"
+                                                                placeholder="••-•••••••"
+                                                                maxLength={10}
+                                                                autoComplete="off"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowFEIN(!showFEIN)}
+                                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                                                            >
+                                                                {showFEIN ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-xs text-stone-400 mt-1">🔒 Encrypted</p>
+                                                    </div>
                                                 </div>
-                                            ))}
+                                            )}
+
+                                            <div className="space-y-3">
+                                                <p className="text-sm font-medium text-stone-900">Required Documents</p>
+                                                {/* Conditional document list based on processingType */}
+                                                {(isPosOnly
+                                                    ? [{ id: 'voidedCheck', label: "Voided Check" }]
+                                                    : [
+                                                        { id: 'voidedCheck', label: "Voided Check" },
+                                                        { id: 'dl', label: "Driver's License" },
+                                                        { id: 'feinLetter', label: "FEIN Letter" }
+                                                    ]
+                                                ).map(doc => (
+                                                    <div key={doc.id} className="border border-stone-200 rounded-xl p-3 flex items-center justify-between bg-white">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-8 w-8 bg-stone-100 rounded-lg flex items-center justify-center">
+                                                                <Upload className="h-4 w-4 text-stone-500" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-medium text-stone-900">{doc.label}</p>
+                                                                {/* @ts-ignore */}
+                                                                {formData[doc.id]?.uploaded && <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Uploaded</p>}
+                                                            </div>
+                                                        </div>
+                                                        <label className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium cursor-pointer transition-colors flex items-center gap-2">
+                                                            <Upload className="h-4 w-4" />
+                                                            Upload
+                                                            <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleFileChange(e, doc.id)} />
+                                                        </label>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-8 text-stone-500">
-                                        <Phone className="h-8 w-8 mx-auto mb-2 text-stone-300" />
-                                        <p>No problem! An onboarding specialist will contact you shortly to assist with processing setup.</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                    )}
+                                </div>
+                            )
+                        })()}
 
                         {/* Navigation */}
                         <div className="flex gap-4 mt-8 pt-6 border-t border-stone-100">

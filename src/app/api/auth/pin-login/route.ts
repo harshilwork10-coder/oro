@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
 
         // SECURITY: Log failed attempt for all employees at location
         // (We don't know which one they were trying to log in as)
-        console.warn(`[SECURITY] Failed PIN login attempt at location ${locationId} from IP ${clientIP}`)
+        console.error(`[SECURITY] Failed PIN login attempt at location ${locationId} from IP ${clientIP}`)
 
         return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 })
 

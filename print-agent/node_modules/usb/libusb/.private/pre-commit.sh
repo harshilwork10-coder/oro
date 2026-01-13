@@ -8,7 +8,7 @@
 # .git/hooks/ with the following content:
 # #!/bin/sh
 # if [ -x .private/pre-commit.sh ]; then
-#   . .private/pre-commit.sh
+#   source .private/pre-commit.sh
 # fi
 #
 # NOTE: These versioning hooks are intended to be used *INTERNALLY* by the
@@ -25,10 +25,6 @@
 ################################################################################
 BRANCH_OFFSET=10000
 ################################################################################
-
-if [ -n "$LIBUSB_SKIP_NANO" ]; then
-  exit 0
-fi
 
 if [ "$BASH_VERSION" = '' ]; then
   TYPE_CMD="type git >/dev/null 2>&1"

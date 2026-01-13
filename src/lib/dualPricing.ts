@@ -11,7 +11,7 @@ export interface ProviderSettings {
 export function getProviderSettings(): ProviderSettings {
     return {
         cashDiscountPercent: 3.5, // YOU set this percentage for ALL clients
-        platformName: 'OroNext POS',
+        platformName: 'ORO 9 POS',
         supportEmail: 'support@Oropos.com'
     }
 }
@@ -26,8 +26,6 @@ export function getProviderSettings(): ProviderSettings {
  */
 export async function isCashDiscountEnabled(franchisorId: string): Promise<boolean> {
     // Feature not implemented in schema - always return false
-    // TODO: Add cashDiscountEnabled field to Franchisor model when implementing dual pricing
-    console.log(`Cash discount check for franchisor ${franchisorId}: Feature not yet implemented in schema`)
     return false
 }
 

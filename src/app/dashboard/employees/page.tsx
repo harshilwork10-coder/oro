@@ -1,10 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Search, MoreVertical, Shield, User, Mail, Calendar, DollarSign, Key, X, Eye, EyeOff, Hash } from 'lucide-react'
+import { Plus, Search, MoreVertical, Shield, User, Mail, Calendar, DollarSign, Key, X, Eye, EyeOff, Hash, AlertTriangle, Trash2, Scissors } from 'lucide-react'
 import EmployeeModal from '@/components/employees/EmployeeModal'
+import AssignServicesModal from '@/components/employees/AssignServicesModal'
+import { useToast } from '@/components/providers/ToastProvider'
 
 export default function EmployeesPage() {
+    const toast = useToast()
     const [employees, setEmployees] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
@@ -18,15 +21,40 @@ export default function EmployeesPage() {
     const [pinModal, setPinModal] = useState<{ open: boolean; employee: any | null }>({ open: false, employee: null })
     const [newPin, setNewPin] = useState('')
     const [settingPin, setSettingPin] = useState(false)
+    const [deleteModal, setDeleteModal] = useState<{ open: boolean; employee: any | null; deleting: boolean }>({ open: false, employee: null, deleting: false })
+    const [servicesModal, setServicesModal] = useState<{ open: boolean; employee: any | null }>({ open: false, employee: null })
+    const [currentLocationId, setCurrentLocationId] = useState<string | null>(null)
     const menuRef = useRef<HTMLDivElement>(null)
 
-    const fetchEmployees = async () => {
+    // Fetch current location from the location toggle API
+    const fetchCurrentLocation = async () => {
         try {
-            const res = await fetch('/api/franchise/employees')
-            const data = await res.json()
-            if (Array.isArray(data)) {
-                setEmployees(data)
+            const res = await fetch('/api/employees/current-location')
+            if (res.ok) {
+                const data = await res.json()
+                const newLocationId = data.currentLocation?.id || null
+                // Only re-fetch employees if location changed
+                if (newLocationId !== currentLocationId) {
+                    setCurrentLocationId(newLocationId)
+                }
             }
+        } catch (error) {
+            console.error('Error fetching current location:', error)
+        }
+    }
+
+    const fetchEmployees = async (locationId?: string | null) => {
+        try {
+            const url = locationId
+                ? `/api/franchise/employees?locationId=${locationId}`
+                : '/api/franchise/employees'
+            const res = await fetch(url)
+            const response = await res.json()
+            // Handle both array and paginated response formats
+            const employeesArray = Array.isArray(response)
+                ? response
+                : (response.data || response.employees || [])
+            setEmployees(employeesArray)
         } catch (error) {
             console.error('Error fetching employees:', error)
         } finally {
@@ -34,9 +62,28 @@ export default function EmployeesPage() {
         }
     }
 
+    // Initial load: get current location first, then fetch employees
     useEffect(() => {
-        fetchEmployees()
+        fetchCurrentLocation()
     }, [])
+
+    // Fetch employees when location changes
+    useEffect(() => {
+        if (currentLocationId !== null) {
+            fetchEmployees(currentLocationId)
+        } else {
+            // If no specific location, fetch all
+            fetchEmployees()
+        }
+    }, [currentLocationId])
+
+    // Poll for location changes every 2 seconds (to detect dropdown changes)
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchCurrentLocation()
+        }, 2000)
+        return () => clearInterval(interval)
+    }, [currentLocationId])
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -51,21 +98,31 @@ export default function EmployeesPage() {
 
     const handleSaveEmployee = async (data: any) => {
         try {
+            let response;
             if (selectedEmployee) {
                 // Update
-                await fetch(`/api/franchise/employees/${selectedEmployee.id}`, {
+                response = await fetch(`/api/franchise/employees/${selectedEmployee.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 })
             } else {
                 // Create
-                await fetch('/api/franchise/employees', {
+                response = await fetch('/api/franchise/employees', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 })
             }
+
+            if (!response.ok) {
+                const errorData = await response.json()
+                console.error('Employee save failed:', errorData)
+                toast.error(errorData.error?.message || 'Failed to save employee')
+                throw new Error(errorData.error?.message || 'Failed to save employee')
+            }
+
+            toast.success(selectedEmployee ? 'Employee updated successfully!' : 'Employee added successfully!')
             fetchEmployees()
         } catch (error) {
             console.error('Error saving employee:', error)
@@ -73,15 +130,31 @@ export default function EmployeesPage() {
         }
     }
 
-    const handleDeleteEmployee = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this employee?')) return
+    const handleDeleteEmployee = (employee: any) => {
+        setDeleteModal({ open: true, employee, deleting: false })
+        setOpenMenuId(null)
+    }
+
+    const confirmDelete = async () => {
+        if (!deleteModal.employee) return
+        setDeleteModal(prev => ({ ...prev, deleting: true }))
         try {
-            await fetch(`/api/franchise/employees/${id}`, {
+            const res = await fetch(`/api/franchise/employees/${deleteModal.employee.id}`, {
                 method: 'DELETE'
             })
+            if (!res.ok) {
+                const data = await res.json()
+                toast.error(data.error || 'Failed to delete employee')
+                setDeleteModal(prev => ({ ...prev, deleting: false }))
+                return
+            }
+            toast.success('Employee deleted successfully!')
             fetchEmployees()
+            setDeleteModal({ open: false, employee: null, deleting: false })
         } catch (error) {
             console.error('Error deleting employee:', error)
+            toast.error('Failed to delete employee')
+            setDeleteModal(prev => ({ ...prev, deleting: false }))
         }
     }
 
@@ -232,6 +305,17 @@ export default function EmployeesPage() {
                                             <button
                                                 onClick={() => {
                                                     setOpenMenuId(null)
+                                                    setServicesModal({ open: true, employee })
+                                                }}
+                                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-stone-800 transition-colors flex items-center gap-3"
+                                                style={{ color: '#e7e5e4' }}
+                                            >
+                                                <Scissors className="h-4 w-4 text-pink-400" />
+                                                Assign Services
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setOpenMenuId(null)
                                                     setPasswordModal({ open: true, employee })
                                                 }}
                                                 className="w-full text-left px-4 py-2.5 text-sm hover:bg-stone-800 transition-colors flex items-center gap-3"
@@ -253,10 +337,7 @@ export default function EmployeesPage() {
                                             </button>
                                             <div style={{ borderTop: '1px solid #292524', margin: '4px 0' }} />
                                             <button
-                                                onClick={() => {
-                                                    handleDeleteEmployee(employee.id)
-                                                    setOpenMenuId(null)
-                                                }}
+                                                onClick={() => handleDeleteEmployee(employee)}
                                                 className="w-full text-left px-4 py-2.5 text-sm hover:bg-red-500/10 transition-colors flex items-center gap-3"
                                                 style={{ color: '#f87171' }}
                                             >
@@ -436,6 +517,59 @@ export default function EmployeesPage() {
                     </div>
                 </div>
             )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteModal.open && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="rounded-2xl w-full max-w-md shadow-2xl overflow-hidden" style={{ backgroundColor: '#1c1917' }}>
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-red-600 to-rose-600 px-6 py-5 flex items-center gap-4">
+                            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                                <AlertTriangle className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-white">Delete Employee</h3>
+                                <p className="text-white/80 text-sm">This action cannot be undone</p>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6">
+                            <p className="text-stone-300 mb-6">
+                                Are you sure you want to delete <strong className="text-white">{deleteModal.employee?.name}</strong>?
+                                All their data will be permanently removed.
+                            </p>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setDeleteModal({ open: false, employee: null, deleting: false })}
+                                    disabled={deleteModal.deleting}
+                                    className="flex-1 px-4 py-3 rounded-xl text-stone-300 hover:bg-stone-800 transition-colors disabled:opacity-50"
+                                    style={{ border: '1px solid #292524' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    disabled={deleteModal.deleting}
+                                    className="flex-1 px-4 py-3 rounded-xl text-white font-medium bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    {deleteModal.deleting ? 'Deleting...' : 'Delete'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Assign Services Modal */}
+            <AssignServicesModal
+                isOpen={servicesModal.open}
+                onClose={() => setServicesModal({ open: false, employee: null })}
+                employeeId={servicesModal.employee?.id || ''}
+                employeeName={servicesModal.employee?.name || ''}
+            />
         </div>
     )
 }

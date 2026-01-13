@@ -3,7 +3,7 @@
 import {
     Home, Users, Ticket, Monitor, HardDrive, FileText,
     CreditCard, Settings, Plus, Bell, Search, Menu, ChevronDown,
-    Building2, Package, LogOut, User
+    Building2, Package, LogOut, User, MapPin
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -15,6 +15,7 @@ import OroLogo from '@/components/ui/OroLogo';
 const PROVIDER_SIDEBAR = [
     { name: 'Home', href: '/provider/home', icon: Home },
     { name: 'Clients', href: '/provider/clients', icon: Building2 },
+    { name: 'Stores', href: '/provider/stores', icon: MapPin },
     { name: 'Onboarding', href: '/provider/onboarding', icon: FileText },
     { name: 'Tickets', href: '/provider/tickets', icon: Ticket },
     { name: 'Devices', href: '/provider/devices', icon: HardDrive },
@@ -27,6 +28,7 @@ const PROVIDER_SIDEBAR = [
 // Quick add menu items
 const ADD_MENU_ITEMS = [
     { name: 'New Client', href: '/provider/clients/new', icon: Building2 },
+    { name: 'New Store', href: '/provider/stores?action=add', icon: MapPin },
     { name: 'New Onboarding Request', href: '/provider/onboarding/new', icon: FileText },
     { name: 'New Ticket', href: '/provider/tickets/new', icon: Ticket },
     { name: 'Add Device to Inventory', href: '/provider/devices?action=add', icon: HardDrive },

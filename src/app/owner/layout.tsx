@@ -93,7 +93,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
                         ) : (
                             <Store size={24} className="text-[var(--primary)]" />
                         )}
-                        <span className="font-bold text-lg text-[var(--text-primary)]">OroNext</span>
+                        <span className="font-bold text-lg text-[var(--text-primary)]">ORO 9</span>
                     </div>
 
                     {/* Center: Location Selector */}

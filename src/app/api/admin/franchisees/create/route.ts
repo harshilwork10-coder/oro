@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
             }
         })
         */
-        console.log(`[Mock Email] To: ${email}, Subject: Welcome to ${franchisor.name} Network!, Magic Link: ${magicLinkUrl}`)
+        // Debug log removed
 
         return NextResponse.json({
             success: true,

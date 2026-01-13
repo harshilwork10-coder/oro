@@ -55,7 +55,7 @@ int main(void)
 	int r;
 	ssize_t cnt;
 
-	r = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
+	r = libusb_init(NULL);
 	if (r < 0)
 		return r;
 

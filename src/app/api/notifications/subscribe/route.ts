@@ -37,8 +37,6 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        console.log(`[Push] Subscribed user ${session.user.id} on device: ${deviceName || 'Unknown'}`)
-
         return NextResponse.json({ success: true })
 
     } catch (error: any) {
@@ -68,8 +66,6 @@ export async function DELETE(request: NextRequest) {
                 endpoint
             }
         })
-
-        console.log(`[Push] Unsubscribed user ${session.user.id}`)
 
         return NextResponse.json({ success: true })
 
