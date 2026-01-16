@@ -336,21 +336,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                     isOpen ? 'translate-x-0' : '-translate-x-full'
                 )}
             >
-                {/* Logo Header - Compact */}
-                <div className="flex h-20 xl:h-28 items-center justify-center border-b border-stone-800/50 px-4 bg-gradient-to-r from-stone-900/50 to-transparent">
-                    <div className="flex items-center justify-center group">
-                        <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
-                            <img src="/ORO9.png" alt="ORO 9" className="h-12 xl:h-16 object-contain" />
-                        </div>
-                    </div>
+                {/* Mobile Close Button - Separate row on mobile */}
+                <div className="lg:hidden flex items-center justify-start px-2 py-2 border-b border-stone-800/50">
                     <button
                         type="button"
-                        className="lg:hidden text-stone-400 hover:text-white transition-colors"
+                        className="text-stone-400 hover:text-white transition-colors p-2"
                         onClick={onClose}
                     >
                         <span className="sr-only">Close sidebar</span>
                         <X className="h-6 w-6" aria-hidden="true" />
                     </button>
+                </div>
+
+                {/* Logo Header - Centered on its own row */}
+                <div className="flex h-16 xl:h-24 items-center justify-center border-b border-stone-800/50 bg-gradient-to-r from-stone-900/50 to-transparent">
+                    <div className="transition-transform duration-300 hover:scale-105">
+                        <img src="/Oro-logo.jpg" alt="ORO 9" className="h-12 xl:h-16 w-auto object-contain" />
+                    </div>
                 </div>
 
                 {/* Navigation Links */}

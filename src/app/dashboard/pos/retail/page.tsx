@@ -443,7 +443,7 @@ export default function RetailPOSPage() {
                     setPricingSettings({
                         pricingModel: data.pricingModel || 'STANDARD',
                         cardSurchargeType: data.cardSurchargeType || 'PERCENTAGE',
-                        cardSurcharge: parseFloat(data.cardSurcharge) || 0,
+                        cardSurcharge: parseFloat(data.cardSurcharge) || 3.99,
                         showDualPricing: data.showDualPricing ?? false,
                         receiptPrintMode: data.receiptPrintMode || 'ALL',
                         openDrawerOnCash: data.openDrawerOnCash ?? true
@@ -766,67 +766,84 @@ export default function RetailPOSPage() {
         setToast({ message: 'Age-restricted item removed', type: 'error' })
     }
 
-    // Calculate totals (with dual pricing support)
+    // Round to 2 decimal places (standard half-up)
+    const round2 = (n: number) => Math.round(n * 100) / 100
+
+    // Calculate totals (with dual pricing support - Model 1: Tax on Final Charged Price)
     const calculateTotals = () => {
-        const subtotal = cart.reduce((sum, item) => {
+        const isDualPricing = pricingSettings?.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
+        const surcharge = pricingSettings?.cardSurcharge || 3.99
+        const isPercentage = pricingSettings?.cardSurchargeType === 'PERCENTAGE'
+
+        // === ITEM-BASED TRUTH ===
+        let subtotalCash = 0
+        let subtotalCard = 0
+        let taxCash = 0
+        let taxCard = 0
+
+        cart.forEach(item => {
             const itemTotal = item.price * item.quantity
-            const discount = item.discount ? itemTotal * (item.discount / 100) : 0
-            return sum + (itemTotal - discount)
-        }, 0)
+            const itemDiscount = item.discount ? itemTotal * (item.discount / 100) : 0
+            const cashPrice = round2(itemTotal - itemDiscount)
+            // Card price = cash price × (1 + surcharge%) - rounded per item
+            const cardPrice = isDualPricing && isPercentage
+                ? round2(cashPrice * (1 + surcharge / 100))
+                : cashPrice
+
+            subtotalCash += cashPrice
+            subtotalCard += cardPrice
+
+            // Calculate tax per item on the price that will be charged
+            const itemTaxRate = item.taxRate !== undefined ? item.taxRate / 100 : (config?.taxRate || 0) / 100
+            taxCash += round2(cashPrice * itemTaxRate)
+            taxCard += round2(cardPrice * itemTaxRate)
+        })
 
         // Apply transaction-level discount
         let transactionDiscountAmount = 0
         if (transactionDiscount) {
             if (transactionDiscount.type === 'PERCENT') {
-                transactionDiscountAmount = subtotal * (transactionDiscount.value / 100)
+                transactionDiscountAmount = subtotalCash * (transactionDiscount.value / 100)
             } else {
                 transactionDiscountAmount = transactionDiscount.value
             }
         }
 
-        const discountedSubtotal = subtotal - transactionDiscountAmount - promoDiscount
+        // Discount ratio for proportional tax reduction
+        const discountRatio = subtotalCash > 0 ? transactionDiscountAmount / subtotalCash : 0
+        const discountedSubtotalCash = round2(Math.max(0, subtotalCash - transactionDiscountAmount - promoDiscount))
+        const discountedSubtotalCard = round2(Math.max(0, subtotalCard - (transactionDiscountAmount + promoDiscount) * (subtotalCard / subtotalCash || 1)))
 
-        const tax = cart.reduce((sum, item) => {
-            const itemTotal = item.price * item.quantity
-            const itemDiscount = item.discount ? itemTotal * (item.discount / 100) : 0
-            const discountedItemTotal = itemTotal - itemDiscount
+        // Reduce taxes proportionally by discount
+        taxCash = round2(taxCash * (1 - discountRatio))
+        taxCard = round2(taxCard * (1 - discountRatio))
 
-            // Apply proportional transaction discount to each item for tax calculation
-            const proportion = subtotal > 0 ? discountedItemTotal / subtotal : 0
-            const itemTransactionDiscount = transactionDiscountAmount * proportion
-            const finalItemTotal = discountedItemTotal - itemTransactionDiscount
+        // Totals
+        let cashTotal = round2(discountedSubtotalCash + taxCash)
+        let cardTotal = round2(discountedSubtotalCard + taxCard)
 
-            // Use item specific tax rate if set, otherwise use global config rate
-            const itemTaxRate = item.taxRate !== undefined ? item.taxRate : (config?.taxRate || 0)
-
-            return sum + (finalItemTotal * (itemTaxRate / 100))
-        }, 0)
-
-        const cashTotal = discountedSubtotal + tax
-
-        // Calculate card total with surcharge (for dual pricing)
-        let cardTotal = cashTotal
-        if (pricingSettings?.pricingModel === 'DUAL_PRICING' && pricingSettings.cardSurcharge > 0) {
-            if (pricingSettings.cardSurchargeType === 'PERCENTAGE') {
-                cardTotal = cashTotal * (1 + pricingSettings.cardSurcharge / 100)
-            } else {
-                cardTotal = cashTotal + pricingSettings.cardSurcharge
-            }
+        // For FLAT_AMOUNT surcharge, add once at total level
+        if (isDualPricing && !isPercentage) {
+            cardTotal = round2(cashTotal + surcharge)
         }
 
         return {
-            subtotal,
+            subtotal: subtotalCash,
+            subtotalCash,
+            subtotalCard,
             promoDiscount,
             transactionDiscountAmount,
-            tax,
+            tax: taxCash,
+            taxCash,
+            taxCard,
             total: cashTotal,
             cashTotal,
             cardTotal,
             lotteryPayout, // Lottery payout amount (tracked separately, doesn't affect sales)
-            customerPayable: Math.max(0, cashTotal - lotteryPayout), // What customer actually pays after lottery offset
-            customerPayableCard: Math.max(0, cardTotal - lotteryPayout), // Card price after lottery offset
+            customerPayable: round2(Math.max(0, cashTotal - lotteryPayout)), // What customer actually pays after lottery offset
+            customerPayableCard: round2(Math.max(0, cardTotal - lotteryPayout)), // Card price after lottery offset
             itemCount: cart.reduce((sum, item) => sum + item.quantity, 0),
-            showDualPricing: pricingSettings?.showDualPricing && pricingSettings?.pricingModel === 'DUAL_PRICING'
+            showDualPricing: isDualPricing
         }
     }
 

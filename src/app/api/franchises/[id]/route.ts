@@ -163,8 +163,7 @@ export async function PATCH(
                 ...encryptedData,
                 voidCheckUrl: body.voidCheckUrl,
                 driverLicenseUrl: body.driverLicenseUrl,
-                feinLetterUrl: body.feinLetterUrl,
-                needToDiscussProcessing: body.needToDiscussProcessing
+                feinLetterUrl: body.feinLetterUrl
             }
         })
 

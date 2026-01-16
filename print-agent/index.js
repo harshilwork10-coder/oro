@@ -193,13 +193,31 @@ function formatReceiptAsText(receipt) {
 
     text += line() + '\n';
 
-    // Items
+    // Check for dual pricing
+    const hasDualPricing = receipt.cashTotal !== undefined && receipt.cardTotal !== undefined;
+
+    // Items (with dual pricing columns)
     if (receipt.items && receipt.items.length > 0) {
+        if (hasDualPricing) {
+            // Header row for dual pricing
+            text += 'ITEM              QTY   CASH   CARD\n';
+            text += line() + '\n';
+        }
+
         receipt.items.forEach(item => {
-            const name = (item.name || 'Item').substring(0, 24);
-            const total = `$${(item.total || 0).toFixed(2)}`;
-            const spaces = width - name.length - total.length;
-            text += name + ' '.repeat(Math.max(1, spaces)) + total + '\n';
+            if (hasDualPricing && item.cashPrice && item.cardPrice) {
+                // Column format: ITEM(18) QTY(4) CASH(7) CARD(7)
+                const name = (item.name || 'Item').substring(0, 18).padEnd(18);
+                const qty = String(item.quantity || 1).padStart(3);
+                const cashT = Number(item.cashPrice * (item.quantity || 1)).toFixed(2).padStart(7);
+                const cardT = Number(item.cardPrice * (item.quantity || 1)).toFixed(2).padStart(7);
+                text += `${name} ${qty} ${cashT} ${cardT}\n`;
+            } else {
+                const name = (item.name || 'Item').substring(0, 24);
+                const total = `$${(item.total || 0).toFixed(2)}`;
+                const spaces = width - name.length - total.length;
+                text += name + ' '.repeat(Math.max(1, spaces)) + total + '\n';
+            }
         });
     }
 
@@ -212,16 +230,32 @@ function formatReceiptAsText(receipt) {
         return label + ' '.repeat(Math.max(1, spaces)) + amountStr + '\n';
     };
 
-    if (receipt.subtotal !== undefined) {
-        text += formatTotal('Subtotal:', receipt.subtotal);
+    const fmtDualTotals = (label, cash, card) => {
+        const l = label.padEnd(24);
+        const c = Number(cash || 0).toFixed(2).padStart(7);
+        const cd = Number(card || 0).toFixed(2).padStart(7);
+        return `${l} ${c} ${cd}\n`;
+    };
+
+    if (hasDualPricing) {
+        text += fmtDualTotals('SUBTOTAL', receipt.subtotalCash || receipt.subtotal, receipt.subtotalCard || receipt.subtotal);
+        if ((receipt.taxCash || receipt.tax) > 0) {
+            text += fmtDualTotals('TAX', receipt.taxCash || receipt.tax, receipt.taxCard || receipt.tax);
+        }
+        text += line() + '\n';
+        text += fmtDualTotals('TOTAL', receipt.cashTotal, receipt.cardTotal);
+    } else {
+        if (receipt.subtotal !== undefined) {
+            text += formatTotal('Subtotal:', receipt.subtotal);
+        }
+        if (receipt.tax !== undefined) {
+            text += formatTotal('Tax:', receipt.tax);
+        }
+        if (receipt.discount !== undefined && receipt.discount > 0) {
+            text += formatTotal('Discount:', -receipt.discount);
+        }
+        text += formatTotal('TOTAL:', receipt.total || 0);
     }
-    if (receipt.tax !== undefined) {
-        text += formatTotal('Tax:', receipt.tax);
-    }
-    if (receipt.discount !== undefined && receipt.discount > 0) {
-        text += formatTotal('Discount:', -receipt.discount);
-    }
-    text += formatTotal('TOTAL:', receipt.total || 0);
 
     text += line() + '\n';
 
@@ -421,24 +455,29 @@ app.post('/print', async (req, res) => {
                 printer.text(receipt.date || new Date().toLocaleString());
                 printer.drawLine();
 
-                // === ITEMS (with dual pricing) ===
+                // === ITEMS (with dual pricing columns) ===
                 printer.align('lt');
                 const hasDualPricing = receipt.cashTotal !== undefined && receipt.cardTotal !== undefined;
 
                 if (receipt.items && receipt.items.length > 0) {
+                    // Print column header for dual pricing
+                    if (hasDualPricing) {
+                        printer.style('b');
+                        // For 42-char width: ITEM(18) QTY(4) CASH(9) CARD(9)
+                        printer.text('ITEM              QTY   CASH   CARD');
+                        printer.style('normal');
+                        printer.drawLine();
+                    }
+
                     receipt.items.forEach(item => {
-                        const name = (item.name || 'Item').substring(0, 18);
-                        const qty = item.quantity || 1;
+                        const name = (item.name || 'Item').substring(0, 18).padEnd(18);
+                        const qty = String(item.quantity || 1).padStart(3);
 
                         if (hasDualPricing && item.cashPrice && item.cardPrice) {
-                            // Show both cash and card prices per item
-                            const cashP = Number(item.cashPrice).toFixed(2);
-                            const cardP = Number(item.cardPrice).toFixed(2);
-                            const cashT = (Number(item.cashPrice) * qty).toFixed(2);
-                            const cardT = (Number(item.cardPrice) * qty).toFixed(2);
-                            printer.text(line(`${name} ${qty}x`, ''));
-                            printer.text(line(`  Cash: $${cashP}`, `$${cashT}`));
-                            printer.text(line(`  Card: $${cardP}`, `$${cardT}`));
+                            // Clean column format: ITEM(18) QTY(4) CASH(9) CARD(9)
+                            const cashT = Number(item.cashPrice * (item.quantity || 1)).toFixed(2).padStart(7);
+                            const cardT = Number(item.cardPrice * (item.quantity || 1)).toFixed(2).padStart(7);
+                            printer.text(`${name} ${qty} ${cashT} ${cardT}`);
                         } else {
                             const price = Number(item.price || 0).toFixed(2);
                             const total = Number(item.total || 0).toFixed(2);
@@ -448,24 +487,40 @@ app.post('/print', async (req, res) => {
                 }
                 printer.drawLine();
 
-                // === TOTALS ===
-                if (receipt.subtotal !== undefined)
-                    printer.text(line('Subtotal', `$${Number(receipt.subtotal).toFixed(2)}`));
-                if (receipt.tax !== undefined && receipt.tax > 0)
-                    printer.text(line('Tax', `$${Number(receipt.tax).toFixed(2)}`));
-
-                // Dual pricing totals
+                // === TOTALS (with dual pricing columns) ===
                 if (hasDualPricing) {
+                    // Column format matching items: label(24) CASH(9) CARD(9)
+                    const fmtTotals = (label, cash, card) => {
+                        const l = label.padEnd(24);
+                        const c = Number(cash).toFixed(2).padStart(7);
+                        const cd = Number(card).toFixed(2).padStart(7);
+                        return `${l} ${c} ${cd}`;
+                    };
+
+                    // Subtotal row
+                    printer.text(fmtTotals('SUBTOTAL', receipt.subtotalCash || receipt.subtotal, receipt.subtotalCard || receipt.subtotal));
+
+                    // Tax row (if applicable)
+                    if ((receipt.taxCash || receipt.tax) > 0) {
+                        const taxLabel = receipt.taxRate ? `TAX (${(receipt.taxRate * 100).toFixed(0)}%)` : 'TAX';
+                        printer.text(fmtTotals(taxLabel, receipt.taxCash || receipt.tax, receipt.taxCard || receipt.tax));
+                    }
+
+                    printer.drawLine();
                     printer.style('b');
-                    printer.text(line('CASH TOTAL', `$${Number(receipt.cashTotal).toFixed(2)}`));
-                    printer.text(line('CARD TOTAL', `$${Number(receipt.cardTotal).toFixed(2)}`));
+                    printer.text(fmtTotals('TOTAL', receipt.cashTotal, receipt.cardTotal));
+                    printer.style('normal');
+                } else {
+                    // Standard single-price totals
+                    if (receipt.subtotal !== undefined)
+                        printer.text(line('Subtotal', `$${Number(receipt.subtotal).toFixed(2)}`));
+                    if (receipt.tax !== undefined && receipt.tax > 0)
+                        printer.text(line('Tax', `$${Number(receipt.tax).toFixed(2)}`));
+                    printer.drawLine();
+                    printer.style('b');
+                    printer.text(line('TOTAL', `$${Number(receipt.total || 0).toFixed(2)}`));
                     printer.style('normal');
                 }
-
-                printer.drawLine();
-                printer.style('b');
-                printer.text(line('TOTAL', `$${Number(receipt.total || 0).toFixed(2)}`));
-                printer.style('normal');
                 printer.drawLine();
 
                 // === PAYMENT ===

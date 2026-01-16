@@ -25,10 +25,7 @@ export async function POST(req: NextRequest) {
             where: { id: franchisorId },
             select: {
                 name: true,
-                voidCheckUrl: true,
-                driverLicenseUrl: true,
-                feinLetterUrl: true,
-                needToDiscussProcessing: true
+                voidCheckUrl: true
             }
         })
 
@@ -36,25 +33,14 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })
         }
 
-        // Validation: For APPROVE action, check that documents are uploaded
+        // Validation: For APPROVE action, check that void check is uploaded
         if (action === 'APPROVE') {
-            const missingFields: string[] = []
-
-            // Only check documents
-            if (!existingFranchisor.driverLicenseUrl) missingFields.push('Driver License')
-            if (!existingFranchisor.voidCheckUrl) missingFields.push('Voided Check')
-
-            // If they didn't mark "discuss processing", they should upload FEIN
-            if (!existingFranchisor.needToDiscussProcessing && !existingFranchisor.feinLetterUrl) {
-                missingFields.push('FEIN Letter')
-            }
-
-            if (missingFields.length > 0) {
+            if (!existingFranchisor.voidCheckUrl) {
                 return NextResponse.json({
                     error: 'Cannot approve - documents incomplete',
-                    missingFields,
+                    missingFields: ['Voided Check'],
                     canSendReminder: true,
-                    message: `Client has not uploaded required documents: ${missingFields.join(', ')}`
+                    message: 'Client has not uploaded required documents: Voided Check'
                 }, { status: 400 })
             }
         }

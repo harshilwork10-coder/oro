@@ -43,21 +43,35 @@ export async function PATCH(
             'usesMobilePulse', 'pulseSeatCount', 'subscriptionTier', 'maxLocations',
             'maxUsers', 'acceptsEbt', 'acceptsChecks', 'acceptsOnAccount', 'shiftRequirement',
             'enableResources', 'tipType', 'tipSuggestions',
+            // Premium subscription features
+            'usesMobileApp', 'usesOroPulse', 'usesAdvancedReports',
             // Pricing fields
             'cashDiscountEnabled', 'cashDiscountPercent', 'pricingModel',
-            'cardSurchargeType', 'cardSurcharge', 'showDualPricing'
+            'cardSurchargeType', 'cardSurcharge', 'showDualPricing',
+            // Tax Configuration fields
+            'servicesTaxableDefault', 'productsTaxableDefault', 'taxInclusive', 'roundingRule'
         ]
 
-        // Handle storeLogo separately - save to FranchiseSettings record (not Franchise)
-        if (updates.storeLogo !== undefined) {
+        // Handle storeLogo and pricing settings - sync to FranchiseSettings (used by POS)
+        const pricingFields = ['pricingModel', 'cardSurchargeType', 'cardSurcharge', 'showDualPricing']
+        const hasPricingUpdate = pricingFields.some(f => updates[f] !== undefined)
+
+        if (updates.storeLogo !== undefined || hasPricingUpdate) {
             const franchise = await prisma.franchise.findFirst({
                 where: { franchisorId: id }
             })
             if (franchise) {
+                const settingsUpdate: Record<string, any> = {}
+                if (updates.storeLogo !== undefined) settingsUpdate.storeLogo = updates.storeLogo
+                if (updates.pricingModel !== undefined) settingsUpdate.pricingModel = updates.pricingModel
+                if (updates.cardSurchargeType !== undefined) settingsUpdate.cardSurchargeType = updates.cardSurchargeType
+                if (updates.cardSurcharge !== undefined) settingsUpdate.cardSurcharge = parseFloat(String(updates.cardSurcharge)) || 0
+                if (updates.showDualPricing !== undefined) settingsUpdate.showDualPricing = updates.showDualPricing
+
                 await prisma.franchiseSettings.upsert({
                     where: { franchiseId: franchise.id },
-                    create: { franchiseId: franchise.id, storeLogo: updates.storeLogo },
-                    update: { storeLogo: updates.storeLogo }
+                    create: { franchiseId: franchise.id, ...settingsUpdate },
+                    update: settingsUpdate
                 })
             }
         }

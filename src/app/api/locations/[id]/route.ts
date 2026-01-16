@@ -10,7 +10,9 @@ export async function GET(
     try {
         const session = await getServerSession(authOptions)
 
-        if (!session || (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR')) {
+        // Allow PROVIDER, FRANCHISOR, OWNER, and EMPLOYEE to access location details
+        // EMPLOYEE needs this for POS operations
+        if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 

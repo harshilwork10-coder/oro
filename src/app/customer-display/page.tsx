@@ -15,7 +15,11 @@ interface CartItem {
 interface CartData {
     items: CartItem[]
     subtotal: number
+    subtotalCash?: number
+    subtotalCard?: number
     tax: number
+    taxCash?: number
+    taxCard?: number
     total: number
     cashTotal?: number
     cardTotal?: number
@@ -389,13 +393,39 @@ function CustomerDisplayContent() {
                 <div className="flex-shrink-0 bg-stone-950 border-t border-stone-800 px-4 py-2">
                     <div className="max-w-xl mx-auto">
                         <div className="bg-stone-800 rounded-xl p-3">
+                            {/* Column headers for dual pricing */}
+                            {cart.showDualPricing && (
+                                <div className="flex justify-between text-xs text-stone-500 font-bold uppercase border-b border-stone-700 pb-1 mb-2">
+                                    <span></span>
+                                    <div className="flex gap-8">
+                                        <span className="text-green-500">CASH</span>
+                                        <span className="text-blue-400">CARD</span>
+                                    </div>
+                                </div>
+                            )}
+                            {/* Subtotal row */}
                             <div className="flex justify-between text-sm text-stone-400">
                                 <span>Subtotal</span>
-                                <span>{formatCurrency(cart.subtotal)}</span>
+                                {cart.showDualPricing ? (
+                                    <div className="flex gap-6">
+                                        <span className="text-green-400">{formatCurrency(cart.subtotalCash || cart.subtotal)}</span>
+                                        <span className="text-blue-400">{formatCurrency(cart.subtotalCard || cart.subtotal)}</span>
+                                    </div>
+                                ) : (
+                                    <span>{formatCurrency(cart.subtotal)}</span>
+                                )}
                             </div>
+                            {/* Tax row */}
                             <div className="flex justify-between text-sm text-stone-400 mt-0.5">
                                 <span>Tax</span>
-                                <span>{formatCurrency(cart.tax)}</span>
+                                {cart.showDualPricing ? (
+                                    <div className="flex gap-6">
+                                        <span className="text-green-400">{formatCurrency(cart.taxCash || cart.tax)}</span>
+                                        <span className="text-blue-400">{formatCurrency(cart.taxCard || cart.tax)}</span>
+                                    </div>
+                                ) : (
+                                    <span>{formatCurrency(cart.tax)}</span>
+                                )}
                             </div>
                             <div className="border-t border-stone-700 mt-2 pt-2">
                                 {cart.showDualPricing ? (

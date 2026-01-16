@@ -35,7 +35,7 @@ async function main() {
     const provider = await prisma.user.create({
         data: {
             name: 'OroNext Admin',
-            email: 'provider@oronext.com',
+            email: 'admin@oro9.com',
             password: hashedPassword,
             role: 'PROVIDER'
         }
@@ -389,7 +389,7 @@ async function main() {
     console.log('═══════════════════════════════════════════════════════')
     console.log('')
     console.log('📋 PROVIDER (Platform Admin):')
-    console.log('   Email: provider@oronext.com')
+    console.log('   Email: admin@oro9.com')
     console.log('   Password: password')
     console.log('')
     console.log('💇 SALON OWNER (Full Access + Pulse):')

@@ -537,15 +537,34 @@ function POSContent() {
                     const tax = discountedSubtotal * 0.08 // Use default 8% tax for display sync
                     const total = discountedSubtotal + tax
 
+                    // Calculate card amounts for dual pricing
+                    const isDual = pricingSettings.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
+                    const surcharge = pricingSettings.cardSurcharge || 0
+                    let subtotalCard = 0
+                    cart.forEach(item => {
+                        const cashPrice = getItemPrice(item)
+                        const cardPrice = isDual && pricingSettings.cardSurchargeType === 'PERCENTAGE'
+                            ? cashPrice * (1 + surcharge / 100)
+                            : cashPrice
+                        subtotalCard += cardPrice
+                    })
+                    const discountedSubtotalCard = Math.max(0, subtotalCard - appliedDiscount)
+                    const taxCard = discountedSubtotalCard * 0.08
+                    const totalCard = isDual
+                        ? (pricingSettings.cardSurchargeType === 'PERCENTAGE'
+                            ? discountedSubtotalCard + taxCard
+                            : total + surcharge) // FLAT adds to final total only
+                        : total
+
                     const cartData = cart.length === 0
-                        ? { items: [], status: 'IDLE', subtotal: 0, tax: 0, total: 0, cashTotal: 0, cardTotal: 0, showDualPricing: false, customerName: null }
+                        ? { items: [], status: 'IDLE', subtotal: 0, subtotalCash: 0, subtotalCard: 0, tax: 0, taxCash: 0, taxCard: 0, total: 0, cashTotal: 0, cardTotal: 0, showDualPricing: false, customerName: null }
                         : {
                             items: cart.map(item => {
                                 const cashPrice = getItemPrice(item)
-                                const cardPrice = pricingSettings.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
+                                const cardPrice = isDual
                                     ? (pricingSettings.cardSurchargeType === 'PERCENTAGE'
-                                        ? cashPrice * (1 + pricingSettings.cardSurcharge / 100)
-                                        : cashPrice + pricingSettings.cardSurcharge)
+                                        ? cashPrice * (1 + surcharge / 100)
+                                        : cashPrice + surcharge)
                                     : cashPrice
                                 return {
                                     name: item.name,
@@ -560,14 +579,14 @@ function POSContent() {
                             }),
                             status: 'ACTIVE',
                             subtotal: discountedSubtotal,
+                            subtotalCash: discountedSubtotal,
+                            subtotalCard: discountedSubtotalCard,
                             tax: tax,
+                            taxCash: tax,
+                            taxCard: taxCard,
                             total: total,
                             cashTotal: total,
-                            cardTotal: pricingSettings.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
-                                ? (pricingSettings.cardSurchargeType === 'PERCENTAGE'
-                                    ? total * (1 + pricingSettings.cardSurcharge / 100)
-                                    : total + pricingSettings.cardSurcharge)
-                                : total,
+                            cardTotal: totalCard,
                             showDualPricing: pricingSettings.showDualPricing,
                             customerName: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : null
                         }
@@ -628,7 +647,8 @@ function POSContent() {
                             ...prev,
                             pricingModel: data.settings.pricingModel || 'STANDARD',
                             cardSurchargeType: data.settings.cardSurchargeType || 'PERCENTAGE',
-                            cardSurcharge: parseFloat(data.settings.cardSurcharge) || 0,
+                            // Default to 3.99% if not set or 0 (schema default is 3.99)
+                            cardSurcharge: parseFloat(data.settings.cardSurcharge) || 3.99,
                         }))
                     }
                 }
@@ -638,58 +658,78 @@ function POSContent() {
         }
     }
 
-    const calculateTotal = () => {
-        const subtotal = cart.reduce((sum, item) => sum + getItemPrice(item), 0)
-        const discountedSubtotal = Math.max(0, subtotal - appliedDiscount)
+    // Round to 2 decimal places (standard half-up)
+    const round2 = (n: number) => Math.round(n * 100) / 100
 
-        // Calculate Tax based on config
-        let tax = 0
-        if (config) {
-            const taxableSubtotal = cart.reduce((sum, item) => {
-                const price = getItemPrice(item)
+    const calculateTotal = () => {
+        const isDualPricing = pricingSettings.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
+        const surcharge = pricingSettings.cardSurcharge || 3.99
+        const isPercentage = pricingSettings.cardSurchargeType === 'PERCENTAGE'
+
+        // === ITEM-BASED TRUTH ===
+        // Calculate cash and card prices per item, then sum
+        let subtotalCash = 0
+        let subtotalCard = 0
+        let taxableCash = 0
+        let taxableCard = 0
+
+        cart.forEach(item => {
+            const cashPrice = round2(getItemPrice(item))
+            // Card price = cash price × (1 + surcharge%) - rounded per item
+            const cardPrice = isDualPricing && isPercentage
+                ? round2(cashPrice * (1 + surcharge / 100))
+                : cashPrice // For FLAT_AMOUNT, item prices stay same
+
+            subtotalCash += cashPrice
+            subtotalCard += cardPrice
+
+            // Track taxable amounts by type
+            if (config) {
                 const isTaxable = (item.type === 'SERVICE' && config.taxServices) ||
                     (item.type === 'PRODUCT' && config.taxProducts)
-                return isTaxable ? sum + price : sum
-            }, 0)
-
-            // Apply global discount proportionally to taxable amount
-            if (subtotal > 0 && taxableSubtotal > 0) {
-                const ratio = taxableSubtotal / subtotal
-                const taxableDiscount = appliedDiscount * ratio
-                const taxableAmount = Math.max(0, taxableSubtotal - taxableDiscount)
-                tax = taxableAmount * (config.taxRate || 0)
+                if (isTaxable) {
+                    taxableCash += cashPrice
+                    taxableCard += cardPrice
+                }
             }
-        } else {
-            // Fallback to legacy 8% if config not loaded
-            tax = discountedSubtotal * 0.08
+        })
+
+        // Apply discount proportionally
+        const discountRatioCash = subtotalCash > 0 ? appliedDiscount / subtotalCash : 0
+        const discountedSubtotalCash = round2(Math.max(0, subtotalCash - appliedDiscount))
+        const discountedSubtotalCard = round2(Math.max(0, subtotalCard - (appliedDiscount * (subtotalCard / subtotalCash || 1))))
+
+        // Discount proportionally reduces taxable amounts
+        const discountedTaxableCash = round2(Math.max(0, taxableCash * (1 - discountRatioCash)))
+        const discountedTaxableCard = round2(Math.max(0, taxableCard * (1 - discountRatioCash)))
+
+        // === TAX ON FINAL CHARGED PRICE (Model 1) ===
+        // Cash tax and Card tax are calculated separately
+        const taxRate = config?.taxRate || 0.08
+        const taxCash = round2(discountedTaxableCash * taxRate)
+        const taxCard = round2(discountedTaxableCard * taxRate)
+
+        // Totals
+        let totalCash = round2(discountedSubtotalCash + taxCash)
+        let totalCard = round2(discountedSubtotalCard + taxCard)
+
+        // For FLAT_AMOUNT surcharge, add once at total level (not per item)
+        if (isDualPricing && !isPercentage) {
+            totalCard = round2(totalCash + surcharge)
         }
 
-        const totalCash = discountedSubtotal + tax
-
-        // Only apply card surcharge if dual pricing is enabled
-        let totalCard = totalCash
-        if (pricingSettings.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing) {
-            if (pricingSettings.cardSurchargeType === 'PERCENTAGE') {
-                totalCard = totalCash * (1 + pricingSettings.cardSurcharge / 100)
-            } else {
-                totalCard = totalCash + pricingSettings.cardSurcharge
-            }
-        }
-
-        const totalWithTip = totalCash + pendingTipAmount
-        let totalCardWithTip = totalWithTip
-        if (pricingSettings.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing) {
-            if (pricingSettings.cardSurchargeType === 'PERCENTAGE') {
-                totalCardWithTip = totalWithTip * (1 + pricingSettings.cardSurcharge / 100)
-            } else {
-                totalCardWithTip = totalWithTip + pricingSettings.cardSurcharge
-            }
-        }
+        // With tip
+        const totalWithTip = round2(totalCash + pendingTipAmount)
+        let totalCardWithTip = round2(totalCard + pendingTipAmount)
 
         return {
-            subtotal,
+            subtotal: subtotalCash,
+            subtotalCash,
+            subtotalCard,
             discount: appliedDiscount,
-            tax,
+            tax: taxCash,      // Default for display
+            taxCash,
+            taxCard,
             tip: pendingTipAmount,
             totalCash,
             totalCard,
@@ -955,7 +995,14 @@ function POSContent() {
             price: item.price,
             quantity: 1,
             discount: 0,
-            barberId: type === 'SERVICE' ? selectedBarber?.id : undefined
+            barberId: type === 'SERVICE' ? selectedBarber?.id : undefined,
+            // Dual pricing per item - used for receipt printing
+            cashPrice: item.price,
+            cardPrice: pricingSettings.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
+                ? (pricingSettings.cardSurchargeType === 'PERCENTAGE'
+                    ? item.price * (1 + (pricingSettings.cardSurcharge || 0) / 100)
+                    : item.price) // For FLAT, card price = cash price (fee added at total only)
+                : item.price
         }
 
         setCart(prev => {
@@ -1635,7 +1682,7 @@ function POSContent() {
         )
     }
 
-    const { subtotal, tax, totalCash, totalCard, totalWithTip, totalCardWithTip, tip } = calculateTotal()
+    const { subtotal, subtotalCash, subtotalCard, tax, taxCash, taxCard, totalCash, totalCard, totalWithTip, totalCardWithTip, tip } = calculateTotal()
 
     const getFilteredItems = () => {
         // Use services list based on barber selection or default menu
@@ -2225,9 +2272,27 @@ function POSContent() {
                             {/* Totals & Actions - Premium Glass Design */}
                             <div className="p-5 bg-gradient-to-t from-black/40 to-stone-900/60 backdrop-blur-xl border-t border-white/10 space-y-4">
                                 <div className="space-y-2.5 text-sm">
+                                    {/* Column headers for dual pricing */}
+                                    {pricingSettings.showDualPricing && (
+                                        <div className="flex justify-between text-xs text-stone-500 font-bold uppercase border-b border-white/10 pb-2">
+                                            <span></span>
+                                            <div className="flex gap-4">
+                                                <span className="text-emerald-500">CASH</span>
+                                                <span className="text-stone-400">CARD</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Subtotal row - dual pricing shows both cash/card */}
                                     <div className="flex justify-between text-stone-400">
                                         <span className="font-medium">Subtotal</span>
-                                        <span className="font-semibold">{formatCurrency(subtotal)}</span>
+                                        {pricingSettings.showDualPricing ? (
+                                            <div className="flex gap-4">
+                                                <span className="text-emerald-400">${subtotalCash.toFixed(2)}</span>
+                                                <span className="text-stone-300">${subtotalCard.toFixed(2)}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="font-semibold">{formatCurrency(subtotal)}</span>
+                                        )}
                                     </div>
                                     {appliedDiscount > 0 && (
                                         <div className="flex justify-between text-pink-400">
@@ -2235,9 +2300,17 @@ function POSContent() {
                                             <span className="font-semibold">-{formatCurrency(appliedDiscount)}</span>
                                         </div>
                                     )}
+                                    {/* Tax row - dual pricing shows both cash/card taxes */}
                                     <div className="flex justify-between text-stone-400">
                                         <span className="font-medium">Tax (8%)</span>
-                                        <span className="font-semibold">{formatCurrency(tax)}</span>
+                                        {pricingSettings.showDualPricing ? (
+                                            <div className="flex gap-4">
+                                                <span className="text-emerald-400">${taxCash.toFixed(2)}</span>
+                                                <span className="text-stone-300">${taxCard.toFixed(2)}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="font-semibold">{formatCurrency(tax)}</span>
+                                        )}
                                     </div>
                                     {pricingSettings.showDualPricing ? (
                                         <>

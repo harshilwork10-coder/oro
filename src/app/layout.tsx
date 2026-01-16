@@ -6,12 +6,12 @@ import { Providers } from "./providers";
 const outfit = Outfit({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Oro 9 Pulse | The Gold Standard in POS',
+  title: 'ORO 9 | The Gold Standard in POS',
   description: 'Complete franchise and business management platform with insights that see everything',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Oro 9 Pulse',
+    title: 'ORO 9',
   },
   formatDetection: {
     telephone: false,
@@ -48,7 +48,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Oro 9 Pulse" />
+        <meta name="apple-mobile-web-app-title" content="ORO 9" />
         <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
       </head>

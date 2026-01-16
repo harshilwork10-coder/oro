@@ -6,7 +6,8 @@ import Link from 'next/link';
 import {
     ArrowLeft, Building2, DollarSign, Settings, Star, Link2, MapPin,
     CreditCard, Gift, FileText, Clock, CheckCircle, AlertCircle, X,
-    Edit, Save, Plus, Trash2, Smartphone, RefreshCw, Image, Upload, Palette
+    Edit, Save, Plus, Trash2, Smartphone, RefreshCw, Image, Upload, Palette,
+    BarChart3, Users, Receipt
 } from 'lucide-react';
 import Toast from '@/components/ui/Toast';
 
@@ -41,6 +42,27 @@ interface ClientData {
     features: Record<string, boolean>;
     documents: { voidCheck: boolean; driverLicense: boolean; feinLetter: boolean };
     locations: LocationData[];
+    // Premium Subscription Features
+    usesMobileApp: boolean;
+    usesOroPulse: boolean;
+    usesAdvancedReports: boolean;
+    subscriptionTier: string;
+    // Tax Configuration
+    servicesTaxableDefault: boolean;
+    productsTaxableDefault: boolean;
+    taxInclusive: boolean;
+    roundingRule: 'PER_LINE' | 'PER_INVOICE';
+}
+
+interface MemberData {
+    id: string;
+    role: string;
+    isPrimary: boolean;
+    user: {
+        id: string;
+        name: string | null;
+        email: string;
+    };
 }
 
 // Helper to parse tip suggestions JSON from database
@@ -55,7 +77,7 @@ function parseTipSuggestions(tipSuggestions: string | undefined): number[] {
     }
 }
 
-type CategoryView = 'status' | 'sales' | 'features' | 'locations' | 'pricing' | 'shift' | 'tips' | 'payments' | 'documents' | 'branding' | null;
+type CategoryView = 'status' | 'sales' | 'features' | 'locations' | 'pricing' | 'shift' | 'tips' | 'payments' | 'tax' | 'documents' | 'branding' | 'pulse' | 'users' | null;
 
 export default function ProviderClientConfigPage() {
     const params = useParams();
@@ -68,6 +90,26 @@ export default function ProviderClientConfigPage() {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [storeLogo, setStoreLogo] = useState<string | null>(null);
+    const [members, setMembers] = useState<MemberData[]>([]);
+
+    // Add Partner Modal State
+    const [addPartnerModal, setAddPartnerModal] = useState(false);
+    const [partnerEmail, setPartnerEmail] = useState('');
+    const [partnerRole, setPartnerRole] = useState<'OWNER' | 'ADMIN' | 'FINANCE' | 'VIEWER'>('ADMIN');
+    const [addingPartner, setAddingPartner] = useState(false);
+
+    // Fetch business members
+    async function fetchMembers() {
+        try {
+            const response = await fetch(`/api/admin/memberships?franchisorId=${clientId}`);
+            if (response.ok) {
+                const data = await response.json();
+                setMembers(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch members:', error);
+        }
+    }
 
     // Fetch client data
     async function fetchClient() {
@@ -126,6 +168,16 @@ export default function ProviderClientConfigPage() {
                             address: l.address,
                             stations: l.stations || [],
                         })) || [],
+                        // Premium Features
+                        usesMobileApp: found.config?.usesMobileApp || false,
+                        usesOroPulse: found.config?.usesOroPulse || false,
+                        usesAdvancedReports: found.config?.usesAdvancedReports || false,
+                        subscriptionTier: found.config?.subscriptionTier || 'STARTER',
+                        // Tax Configuration
+                        servicesTaxableDefault: found.config?.servicesTaxableDefault ?? false,
+                        productsTaxableDefault: found.config?.productsTaxableDefault ?? true,
+                        taxInclusive: found.config?.taxInclusive ?? false,
+                        roundingRule: found.config?.roundingRule || 'PER_LINE',
                     });
                 }
             }
@@ -137,6 +189,13 @@ export default function ProviderClientConfigPage() {
     }
 
     useEffect(() => { fetchClient(); }, [clientId]);
+
+    // Fetch members when users view is opened
+    useEffect(() => {
+        if (categoryView === 'users') {
+            fetchMembers();
+        }
+    }, [categoryView]);
 
     // Update config
     async function updateConfig(updates: Record<string, any>) {
@@ -189,8 +248,11 @@ export default function ProviderClientConfigPage() {
         { id: 'shift', label: 'Shift/Drawer', value: client.shiftRequirement === 'NONE' ? 'No Shift' : client.shiftRequirement === 'CLOCK_IN_ONLY' ? 'Clock-in Only' : client.shiftRequirement === 'CASH_COUNT_ONLY' ? 'Cash Count' : 'Full (Clock + Cash)', icon: Clock, color: 'amber' },
         { id: 'tips', label: 'Tips', value: client.tipPercentages.join(', '), icon: Gift, color: 'green' },
         { id: 'payments', label: 'Payments', value: [client.acceptsCash ? 'Cash' : '', client.acceptsCard ? 'Card' : ''].filter(Boolean).join(' & ') || 'None', icon: CreditCard, color: 'orange' },
+        { id: 'tax', label: 'Tax', value: 'Configure', icon: Receipt, color: 'teal' },
         { id: 'documents', label: 'Documents', value: `${[client.documents.voidCheck, client.documents.driverLicense, client.documents.feinLetter].filter(Boolean).length}/3`, icon: FileText, color: 'emerald' },
         { id: 'branding', label: 'Branding', value: storeLogo ? 'Logo Set' : 'No Logo', icon: Palette, color: 'purple' },
+        { id: 'pulse', label: 'Oro Pulse', value: 'Analytics', icon: BarChart3, color: 'indigo' },
+        { id: 'users', label: 'Users', value: 'Manage', icon: Users, color: 'sky' },
     ];
 
     return (
@@ -237,6 +299,10 @@ export default function ProviderClientConfigPage() {
                         orange: 'bg-orange-500/20 text-orange-400',
                         emerald: 'bg-emerald-500/20 text-emerald-400',
                         purple: 'bg-purple-500/20 text-purple-400',
+                        amber: 'bg-amber-500/20 text-amber-400',
+                        indigo: 'bg-indigo-500/20 text-indigo-400',
+                        sky: 'bg-sky-500/20 text-sky-400',
+                        teal: 'bg-teal-500/20 text-teal-400',
                     };
 
                     return (
@@ -482,6 +548,11 @@ export default function ProviderClientConfigPage() {
                                             { id: 'usesAppointments', name: 'Appointments', desc: 'Online booking system' },
                                             { id: 'usesReviewManagement', name: 'Reviews', desc: 'Customer review collection' },
                                             { id: 'enableResources', name: 'Resources', desc: 'Resource booking (rooms, equipment)' },
+                                            // Premium Features
+                                            { id: 'usesMobileApp', name: '📱 Mobile App (Premium)', desc: 'Employee mobile POS app access', premium: true },
+                                            { id: 'usesOroPulse', name: '📊 Oro Pulse (Premium)', desc: 'Advanced analytics dashboard', premium: true },
+                                            { id: 'usesAdvancedReports', name: '📈 Advanced Reports (Premium)', desc: 'Custom report builder', premium: true },
+                                            { id: 'usesMultiLocation', name: '🏪 Multi-Location (Premium)', desc: 'Manage multiple stores', premium: true },
                                         ].map((feature) => {
                                             const isEnabled = client.features[feature.id] || false;
                                             return (
@@ -726,6 +797,290 @@ export default function ProviderClientConfigPage() {
                                     </button>
                                 </div>
                             )}
+
+                            {categoryView === 'tax' && (
+                                <div className="space-y-4">
+                                    <p className="text-stone-400">Configure tax defaults for all stores</p>
+
+                                    {/* Tax Defaults */}
+                                    <div className="space-y-3">
+                                        {/* Services Taxable Toggle */}
+                                        <button
+                                            onClick={() => updateConfig({ servicesTaxableDefault: !client.servicesTaxableDefault })}
+                                            disabled={saving}
+                                            className={`w-full p-4 rounded-lg border flex items-center justify-between text-left transition-colors ${client.servicesTaxableDefault
+                                                ? 'border-emerald-500/50 bg-emerald-500/10'
+                                                : 'border-stone-700 hover:border-stone-600'
+                                                }`}
+                                        >
+                                            <div>
+                                                <span className="font-medium text-stone-200">Services Taxable</span>
+                                                <p className="text-stone-500 text-xs">Default tax treatment for services</p>
+                                            </div>
+                                            <span className={client.servicesTaxableDefault ? 'text-emerald-400' : 'text-stone-500'}>
+                                                {client.servicesTaxableDefault ? <CheckCircle size={18} /> : '○'}
+                                            </span>
+                                        </button>
+
+                                        {/* Products Taxable Toggle */}
+                                        <button
+                                            onClick={() => updateConfig({ productsTaxableDefault: !client.productsTaxableDefault })}
+                                            disabled={saving}
+                                            className={`w-full p-4 rounded-lg border flex items-center justify-between text-left transition-colors ${client.productsTaxableDefault
+                                                ? 'border-emerald-500/50 bg-emerald-500/10'
+                                                : 'border-stone-700 hover:border-stone-600'
+                                                }`}
+                                        >
+                                            <div>
+                                                <span className="font-medium text-stone-200">Products Taxable</span>
+                                                <p className="text-stone-500 text-xs">Default tax treatment for products</p>
+                                            </div>
+                                            <span className={client.productsTaxableDefault ? 'text-emerald-400' : 'text-stone-500'}>
+                                                {client.productsTaxableDefault ? <CheckCircle size={18} /> : '○'}
+                                            </span>
+                                        </button>
+
+                                        {/* Tax Inclusive Toggle */}
+                                        <button
+                                            onClick={() => updateConfig({ taxInclusive: !client.taxInclusive })}
+                                            disabled={saving}
+                                            className={`w-full p-4 rounded-lg border flex items-center justify-between text-left transition-colors ${client.taxInclusive
+                                                ? 'border-emerald-500/50 bg-emerald-500/10'
+                                                : 'border-stone-700 hover:border-stone-600'
+                                                }`}
+                                        >
+                                            <div>
+                                                <span className="font-medium text-stone-200">Tax Inclusive Pricing</span>
+                                                <p className="text-stone-500 text-xs">Tax included in displayed prices</p>
+                                            </div>
+                                            <span className={client.taxInclusive ? 'text-emerald-400' : 'text-stone-500'}>
+                                                {client.taxInclusive ? <CheckCircle size={18} /> : '○'}
+                                            </span>
+                                        </button>
+                                    </div>
+
+                                    {/* Rounding Rule */}
+                                    <div>
+                                        <label className="block text-sm text-stone-300 mb-2">Tax Rounding</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                onClick={() => updateConfig({ roundingRule: 'PER_LINE' })}
+                                                disabled={saving}
+                                                className={`p-3 rounded-lg border text-sm transition-colors ${client.roundingRule === 'PER_LINE'
+                                                    ? 'border-teal-500 bg-teal-500/20 text-teal-400'
+                                                    : 'border-stone-700 hover:border-stone-600 text-stone-300'
+                                                    }`}
+                                            >
+                                                Per Line Item
+                                            </button>
+                                            <button
+                                                onClick={() => updateConfig({ roundingRule: 'PER_INVOICE' })}
+                                                disabled={saving}
+                                                className={`p-3 rounded-lg border text-sm transition-colors ${client.roundingRule === 'PER_INVOICE'
+                                                    ? 'border-teal-500 bg-teal-500/20 text-teal-400'
+                                                    : 'border-stone-700 hover:border-stone-600 text-stone-300'
+                                                    }`}
+                                            >
+                                                Per Invoice
+                                            </button>
+                                        </div>
+                                        <p className="text-stone-500 text-xs mt-1">How tax is rounded during calculation</p>
+                                    </div>
+
+                                    <div className="p-3 rounded-lg bg-stone-700/30 border border-stone-600">
+                                        <p className="text-stone-400 text-sm">
+                                            <strong className="text-teal-400">💡 Store-Level Taxes:</strong> Configure specific tax rates, jurisdictions, and category rules from the Location settings page.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {categoryView === 'pulse' && (
+                                <div className="space-y-4">
+                                    <p className="text-stone-400">Premium subscription features for this client</p>
+                                    <div className="space-y-3">
+                                        {/* Oro Pulse Toggle */}
+                                        <div className="p-4 rounded-xl border border-stone-700 bg-stone-800/50">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-10 w-10 bg-indigo-500/20 rounded-xl flex items-center justify-center">
+                                                        <BarChart3 className="h-5 w-5 text-indigo-400" />
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-stone-100 font-medium">Oro Pulse Analytics</span>
+                                                        <p className="text-stone-500 text-xs">Advanced analytics dashboard</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => updateConfig({ usesOroPulse: !client.usesOroPulse })}
+                                                    className={`relative w-12 h-6 rounded-full transition-colors ${client.usesOroPulse ? 'bg-indigo-500' : 'bg-stone-600'
+                                                        }`}
+                                                >
+                                                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${client.usesOroPulse ? 'left-7' : 'left-1'
+                                                        }`} />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Mobile App Toggle */}
+                                        <div className="p-4 rounded-xl border border-stone-700 bg-stone-800/50">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-10 w-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+                                                        <Smartphone className="h-5 w-5 text-emerald-400" />
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-stone-100 font-medium">Mobile POS App</span>
+                                                        <p className="text-stone-500 text-xs">Employee mobile app access</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => updateConfig({ usesMobileApp: !client.usesMobileApp })}
+                                                    className={`relative w-12 h-6 rounded-full transition-colors ${client.usesMobileApp ? 'bg-emerald-500' : 'bg-stone-600'
+                                                        }`}
+                                                >
+                                                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${client.usesMobileApp ? 'left-7' : 'left-1'
+                                                        }`} />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Advanced Reports Toggle */}
+                                        <div className="p-4 rounded-xl border border-stone-700 bg-stone-800/50">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-10 w-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                                                        <FileText className="h-5 w-5 text-amber-400" />
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-stone-100 font-medium">Advanced Reports</span>
+                                                        <p className="text-stone-500 text-xs">Custom report builder</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => updateConfig({ usesAdvancedReports: !client.usesAdvancedReports })}
+                                                    className={`relative w-12 h-6 rounded-full transition-colors ${client.usesAdvancedReports ? 'bg-amber-500' : 'bg-stone-600'
+                                                        }`}
+                                                >
+                                                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${client.usesAdvancedReports ? 'left-7' : 'left-1'
+                                                        }`} />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Info */}
+                                        <div className="p-3 rounded-lg border border-stone-700 bg-stone-700/30">
+                                            <p className="text-stone-500 text-xs">
+                                                Toggle features ON when client pays for the subscription.
+                                                Features will be available in the owner's dashboard immediately.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {categoryView === 'users' && (
+                                <div className="space-y-4">
+                                    <p className="text-stone-400">Manage business owners, partners, and employees</p>
+                                    <div className="space-y-4">
+                                        {/* Business Owners/Partners Section */}
+                                        <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-2">
+                                                    <Building2 className="h-4 w-4 text-amber-400" />
+                                                    <span className="font-medium text-amber-300">Business Owners & Partners</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => setAddPartnerModal(true)}
+                                                    className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+                                                >
+                                                    <Plus className="h-3 w-3" /> Add Partner
+                                                </button>
+                                            </div>
+                                            <div className="space-y-2 text-sm">
+                                                <p className="text-stone-500 text-xs">People with access to this business:</p>
+                                                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                                                    {members.length > 0 ? members.map((member) => (
+                                                        <div key={member.id} className="bg-stone-900/50 rounded-lg p-3 border border-stone-700">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className={`h-8 w-8 rounded-full flex items-center justify-center ${member.role === 'OWNER' ? 'bg-amber-500/20' :
+                                                                        member.role === 'ADMIN' ? 'bg-blue-500/20' :
+                                                                            member.role === 'FINANCE' ? 'bg-green-500/20' : 'bg-stone-700'
+                                                                        }`}>
+                                                                        <span className="text-xs font-bold">👤</span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-stone-200 font-medium text-sm">{member.user.name || member.user.email}</p>
+                                                                        <p className="text-stone-500 text-xs">{member.role}{member.isPrimary ? ' · Primary' : ''}</p>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    {member.isPrimary ? (
+                                                                        <span className="text-amber-400 text-xs bg-amber-500/20 px-2 py-1 rounded">Primary</span>
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                if (confirm(`Remove ${member.user.email} from this business?`)) {
+                                                                                    fetch(`/api/admin/memberships?id=${member.id}`, { method: 'DELETE' })
+                                                                                        .then(res => {
+                                                                                            if (res.ok) {
+                                                                                                setToast({ message: 'Member removed', type: 'success' });
+                                                                                                fetchMembers();
+                                                                                            } else {
+                                                                                                res.json().then(d => setToast({ message: d.error || 'Failed', type: 'error' }));
+                                                                                            }
+                                                                                        });
+                                                                                }
+                                                                            }}
+                                                                            className="p-1 hover:bg-red-500/20 rounded text-red-400 transition-colors"
+                                                                            title="Remove member"
+                                                                        >
+                                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )) : (
+                                                        <div className="bg-stone-900/50 rounded-lg p-3 border border-stone-700 text-center">
+                                                            <p className="text-stone-500 text-xs">No members found. Click "Add Partner" to add business owners.</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <p className="text-stone-600 text-xs italic mt-2">
+                                                    Tip: Partners will see this business in their Business Switcher on their next login.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Employees Link */}
+                                        <Link
+                                            href={`/provider/clients/${clientId}/employees`}
+                                            className="w-full p-4 bg-sky-500/20 border border-sky-500/50 rounded-lg flex items-center justify-between hover:bg-sky-500/30 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <Users className="h-5 w-5 text-sky-400" />
+                                                <div>
+                                                    <span className="text-sky-300 font-medium">Manage Employees</span>
+                                                    <p className="text-stone-500 text-xs">Staff with POS access (not business owners)</p>
+                                                </div>
+                                            </div>
+                                            <ArrowLeft className="h-4 w-4 text-sky-400 rotate-180" />
+                                        </Link>
+
+                                        <div className="p-3 rounded-lg border border-stone-700 bg-stone-700/30">
+                                            <p className="text-stone-400 text-sm font-medium mb-2">Access Levels:</p>
+                                            <ul className="space-y-1 text-stone-500 text-xs">
+                                                <li><span className="text-amber-400">OWNER</span> — Full access, billing, legal authority</li>
+                                                <li><span className="text-blue-400">ADMIN</span> — Manage staff, settings, reports</li>
+                                                <li><span className="text-green-400">FINANCE</span> — View reports, payroll (read-only)</li>
+                                                <li><span className="text-stone-400">VIEWER</span> — Dashboard view only</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -738,6 +1093,131 @@ export default function ProviderClientConfigPage() {
                     type={toast.type}
                     onClose={() => setToast(null)}
                 />
+            )}
+
+            {/* Add Partner Modal */}
+            {addPartnerModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-stone-800 border border-stone-700 rounded-2xl w-full max-w-md shadow-2xl">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-stone-700">
+                            <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                                    <Plus className="h-4 w-4 text-amber-400" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-stone-100">Add Business Partner</h3>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setAddPartnerModal(false);
+                                    setPartnerEmail('');
+                                    setPartnerRole('ADMIN');
+                                }}
+                                className="p-1 hover:bg-stone-700 rounded-lg transition-colors"
+                            >
+                                <X className="h-5 w-5 text-stone-400" />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-4 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-stone-300 mb-2">
+                                    Partner Email
+                                </label>
+                                <input
+                                    type="email"
+                                    value={partnerEmail}
+                                    onChange={(e) => setPartnerEmail(e.target.value)}
+                                    placeholder="partner@example.com"
+                                    className="w-full px-4 py-3 bg-stone-900 border border-stone-600 rounded-xl text-stone-100 placeholder:text-stone-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-stone-300 mb-2">
+                                    Access Level
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {(['OWNER', 'ADMIN', 'FINANCE', 'VIEWER'] as const).map((role) => (
+                                        <button
+                                            key={role}
+                                            onClick={() => setPartnerRole(role)}
+                                            className={`p-3 rounded-xl border text-left transition-all ${partnerRole === role
+                                                ? role === 'OWNER' ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                                                    : role === 'ADMIN' ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                                                        : role === 'FINANCE' ? 'bg-green-500/20 border-green-500 text-green-300'
+                                                            : 'bg-stone-600/20 border-stone-500 text-stone-300'
+                                                : 'bg-stone-900 border-stone-700 text-stone-400 hover:border-stone-500'
+                                                }`}
+                                        >
+                                            <span className="font-medium">{role}</span>
+                                            <p className="text-xs opacity-70 mt-0.5">
+                                                {role === 'OWNER' && 'Full access + billing'}
+                                                {role === 'ADMIN' && 'Manage staff & settings'}
+                                                {role === 'FINANCE' && 'Reports only'}
+                                                {role === 'VIEWER' && 'View dashboard'}
+                                            </p>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex gap-3 p-4 border-t border-stone-700">
+                            <button
+                                onClick={() => {
+                                    setAddPartnerModal(false);
+                                    setPartnerEmail('');
+                                    setPartnerRole('ADMIN');
+                                }}
+                                className="flex-1 px-4 py-2.5 bg-stone-700 hover:bg-stone-600 text-stone-300 rounded-xl font-medium transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!partnerEmail.trim()) {
+                                        setToast({ message: 'Please enter an email', type: 'error' });
+                                        return;
+                                    }
+                                    setAddingPartner(true);
+                                    try {
+                                        const res = await fetch('/api/admin/memberships', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                franchisorId: clientId,
+                                                email: partnerEmail.trim(),
+                                                role: partnerRole,
+                                                isPrimary: false
+                                            })
+                                        });
+                                        if (res.ok) {
+                                            setToast({ message: `${partnerEmail} added as ${partnerRole}`, type: 'success' });
+                                            setAddPartnerModal(false);
+                                            setPartnerEmail('');
+                                            setPartnerRole('ADMIN');
+                                            fetchMembers();
+                                        } else {
+                                            const data = await res.json();
+                                            setToast({ message: data.error || 'Failed to add partner', type: 'error' });
+                                        }
+                                    } catch {
+                                        setToast({ message: 'Failed to add partner', type: 'error' });
+                                    } finally {
+                                        setAddingPartner(false);
+                                    }
+                                }}
+                                disabled={addingPartner}
+                                className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-900 rounded-xl font-semibold transition-colors disabled:opacity-50"
+                            >
+                                {addingPartner ? 'Adding...' : 'Add Partner'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

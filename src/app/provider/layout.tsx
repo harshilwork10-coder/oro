@@ -14,8 +14,7 @@ import OroLogo from '@/components/ui/OroLogo';
 // Provider sidebar items
 const PROVIDER_SIDEBAR = [
     { name: 'Home', href: '/provider/home', icon: Home },
-    { name: 'Clients', href: '/provider/clients', icon: Building2 },
-    { name: 'Stores', href: '/provider/stores', icon: MapPin },
+    { name: 'Owners', href: '/provider/owners', icon: Users },
     { name: 'Onboarding', href: '/provider/onboarding', icon: FileText },
     { name: 'Tickets', href: '/provider/tickets', icon: Ticket },
     { name: 'Devices', href: '/provider/devices', icon: HardDrive },
@@ -27,8 +26,7 @@ const PROVIDER_SIDEBAR = [
 
 // Quick add menu items
 const ADD_MENU_ITEMS = [
-    { name: 'New Client', href: '/provider/clients/new', icon: Building2 },
-    { name: 'New Store', href: '/provider/stores?action=add', icon: MapPin },
+    { name: 'New Owner/Client', href: '/provider/clients/new', icon: Users },
     { name: 'New Onboarding Request', href: '/provider/onboarding/new', icon: FileText },
     { name: 'New Ticket', href: '/provider/tickets/new', icon: Ticket },
     { name: 'Add Device to Inventory', href: '/provider/devices?action=add', icon: HardDrive },
@@ -50,20 +48,22 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
             <aside
                 className={`fixed left-0 top-0 h-full bg-stone-900 border-r border-stone-800 transition-all duration-300 z-40 ${sidebarCollapsed ? 'w-16' : 'w-56'}`}
             >
-                {/* Logo area */}
-                <div className="h-14 flex items-center px-3 border-b border-stone-800">
+                {/* Toggle button row */}
+                <div className="h-12 flex items-center px-3 border-b border-stone-800/50">
                     <button
                         onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                         className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-stone-200 transition-colors"
                     >
                         <Menu size={20} />
                     </button>
-                    {!sidebarCollapsed && (
-                        <div className="ml-2">
-                            <OroLogo size="sm" />
-                        </div>
-                    )}
                 </div>
+
+                {/* Logo row - centered */}
+                {!sidebarCollapsed && (
+                    <div className="h-20 flex items-center justify-center border-b border-stone-800">
+                        <img src="/Oro-logo.jpg" alt="ORO 9" className="h-16 w-auto object-contain" />
+                    </div>
+                )}
 
                 {/* Navigation */}
                 <nav className="mt-4 px-2 space-y-1">

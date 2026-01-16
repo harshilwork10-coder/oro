@@ -88,36 +88,50 @@ export async function POST(request: NextRequest) {
             where: { email: sanitizedEmail }
         })
 
+        let user;
+        let isExistingUser = false;
+
         if (existingUser) {
-            return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 })
+            // User exists - we'll link them to a NEW business via membership
+            user = existingUser;
+            isExistingUser = true;
+        } else {
+            // New user - create them
+            const tempPassword = crypto.randomBytes(32).toString('hex')
+            const hashedPassword = await hash(tempPassword, 10)
+
+            user = await prisma.user.create({
+                data: {
+                    name: sanitizedName,
+                    email: sanitizedEmail,
+                    password: hashedPassword,
+                    role: 'FRANCHISOR'
+                }
+            })
         }
-
-        // Generate temp password
-        const tempPassword = crypto.randomBytes(32).toString('hex')
-        const hashedPassword = await hash(tempPassword, 10)
-
-        // Create user
-        const user = await prisma.user.create({
-            data: {
-                name: sanitizedName,
-                email: sanitizedEmail,
-                password: hashedPassword,
-                role: 'FRANCHISOR'
-            }
-        })
 
         // Use businessType from request, fall back to deriving from type if not provided
         const finalBusinessType = businessType || (type === 'BRAND' ? 'BRAND_FRANCHISOR' : 'MULTI_LOCATION_OWNER')
 
-        // Create franchisor company
+        // Create franchisor company (NEW business entity)
         const franchisor = await prisma.franchisor.create({
             data: {
                 name: sanitizedCompanyName,
                 ownerId: user.id,
                 businessType: finalBusinessType,
                 industryType: finalIndustryType,
-                processingType: finalProcessingType, // POS_ONLY or POS_AND_PROCESSING
+                processingType: finalProcessingType,
                 phone: sanitizedPhone,
+            }
+        })
+
+        // Create FranchisorMembership to link user to this business
+        await prisma.franchisorMembership.create({
+            data: {
+                userId: user.id,
+                franchisorId: franchisor.id,
+                role: 'OWNER',
+                isPrimary: !isExistingUser // Only primary if this is their first business
             }
         })
 
@@ -198,8 +212,11 @@ export async function POST(request: NextRequest) {
             success: true,
             user: { id: user.id, name: user.name, email: user.email },
             franchisor: { id: franchisor.id, name: franchisor.name },
-            magicLink: magicLinkUrl, // Keep returning for dev/testing convenience
-            message: 'Franchisor created successfully'
+            magicLink: magicLinkUrl,
+            isExistingUser,
+            message: isExistingUser
+                ? `New business "${sanitizedCompanyName}" linked to existing user ${sanitizedEmail}`
+                : 'Franchisor created successfully'
         })
 
     } catch (error) {

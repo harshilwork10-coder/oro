@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
     ChevronLeft, ChevronRight, Check, Users, MapPin,
@@ -52,10 +52,10 @@ function StepIndicator({ currentStep, totalSteps }: { currentStep: number; total
             {displaySteps.map((step, index) => (
                 <div key={step} className="flex items-center">
                     <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-colors ${index + 1 < currentStep
-                            ? 'bg-emerald-500 text-white'
-                            : index + 1 === currentStep
-                                ? 'bg-[var(--primary)] text-white'
-                                : 'bg-[var(--surface-hover)] text-[var(--text-muted)]'
+                        ? 'bg-emerald-500 text-white'
+                        : index + 1 === currentStep
+                            ? 'bg-[var(--primary)] text-white'
+                            : 'bg-[var(--surface-hover)] text-[var(--text-muted)]'
                         }`}>
                         {index + 1 < currentStep ? <Check size={16} /> : index + 1}
                     </div>
@@ -73,7 +73,7 @@ function StepIndicator({ currentStep, totalSteps }: { currentStep: number; total
     );
 }
 
-export default function NewRequestPage() {
+function NewRequestContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const requestType = (searchParams.get('type') as RequestType) || 'franchisee';
@@ -177,8 +177,8 @@ export default function NewRequestPage() {
                                         key={type}
                                         onClick={() => setFranchisee({ ...franchisee, businessType: type as BusinessType })}
                                         className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border transition-all ${franchisee.businessType === type
-                                                ? 'bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]'
-                                                : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--primary)]/50'
+                                            ? 'bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]'
+                                            : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--primary)]/50'
                                             }`}
                                     >
                                         <Icon size={20} />
@@ -544,3 +544,10 @@ export default function NewRequestPage() {
     );
 }
 
+export default function NewRequestPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]" /></div>}>
+            <NewRequestContent />
+        </Suspense>
+    );
+}

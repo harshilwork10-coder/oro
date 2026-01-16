@@ -43,9 +43,13 @@ export interface TransactionForPrint {
         quantity?: number | string;
         price?: string | number;
         total?: string | number;
-        // Name snapshots (NEVER null after Phase 1 fix)
+        // Name snapshots (preferred)
         serviceNameSnapshot?: string | null;
         productNameSnapshot?: string | null;
+        // Fallback: included service/product relations (for backwards compatibility)
+        service?: { name?: string } | null;
+        product?: { name?: string } | null;
+        name?: string; // Direct name field
         priceCharged?: string | number | null;
         // Dual pricing
         cashUnitPrice?: string | number | null;
@@ -97,11 +101,17 @@ export function validateTransactionForPrint(
     }
 
     // Validate each line item has a display name
+    // Allow fallback to service/product.name or direct name field for backwards compatibility
     if (tx.lineItems) {
         tx.lineItems.forEach((item, index) => {
-            const displayName = item.serviceNameSnapshot || item.productNameSnapshot;
+            const displayName =
+                item.serviceNameSnapshot ||
+                item.productNameSnapshot ||
+                item.service?.name ||
+                item.product?.name ||
+                item.name;
             if (!displayName) {
-                errors.push(`[PRINT] DTO_INVALID: Line item ${index} has no display name (serviceNameSnapshot or productNameSnapshot)`);
+                errors.push(`[PRINT] DTO_INVALID: Line item ${index} has no display name`);
             }
         });
     }
@@ -151,16 +161,21 @@ export function normalizeTransactionForPrint(
         throw new Error(`Print validation failed: ${validation.errors[0]}`);
     }
 
-    // Map line items - extract display name from snapshots
+    // Map line items - extract display name from snapshots or fallbacks
     const items = transaction.lineItems.map(item => {
-        // === DISPLAY NAME: Priority order per PRD ===
+        // === DISPLAY NAME: Priority order ===
         // 1. serviceNameSnapshot (for services)
         // 2. productNameSnapshot (for products)
-        // 3. NEVER fall back to "Item" - validation ensures this won't happen
+        // 3. service.name (backwards compat)
+        // 4. product.name (backwards compat)
+        // 5. name field (direct)
         const displayName =
             item.serviceNameSnapshot ||
             item.productNameSnapshot ||
-            `Unknown ${item.type || 'Item'}`;  // Fail-safe only (validation should catch)
+            item.service?.name ||
+            item.product?.name ||
+            item.name ||
+            `Unknown ${item.type || 'Item'}`;  // Fail-safe only
 
         const quantity = Number(item.quantity || 1);
         const price = Number(item.priceCharged || item.price || 0);

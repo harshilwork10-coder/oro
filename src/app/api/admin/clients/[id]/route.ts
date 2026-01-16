@@ -29,7 +29,6 @@ export async function GET(
                 // Processing & Tax info
                 ssn: true,
                 fein: true,
-                needToDiscussProcessing: true,
                 // Documents
                 voidCheckUrl: true,
                 driverLicenseUrl: true,

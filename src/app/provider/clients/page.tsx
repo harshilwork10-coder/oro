@@ -106,6 +106,7 @@ export default function ProviderClientsPage() {
             const res = await fetch('/api/admin/reset-owner-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ ownerId: passwordModal.ownerId, password: newPassword })
             });
             if (res.ok) {

@@ -69,8 +69,7 @@ export async function PATCH(
                 accountNumber: body.accountNumber,
                 voidCheckUrl: body.voidCheckUrl,
                 driverLicenseUrl: body.driverLicenseUrl,
-                feinLetterUrl: body.feinLetterUrl,
-                needToDiscussProcessing: body.needToDiscussProcessing
+                feinLetterUrl: body.feinLetterUrl
             }
         })
 

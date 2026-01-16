@@ -14,17 +14,16 @@ export default function MobileHeader({ onMenuClick, forceShow }: MobileHeaderPro
 
     return (
         <header className={`flex h-16 items-center justify-between border-b border-stone-800 bg-stone-950/80 backdrop-blur-md px-4 sticky top-0 z-50 ${forceShow ? '' : 'lg:hidden'}`}>
-            <div className="flex items-center gap-3">
-                <button
-                    onClick={onMenuClick}
-                    className="rounded-md p-2 text-stone-400 hover:bg-stone-800 hover:text-stone-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-orange-500"
-                >
-                    <span className="sr-only">Open sidebar</span>
-                    <Menu className="h-6 w-6" aria-hidden="true" />
-                </button>
-                <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-stone-100">ORO 9</span>
-                </div>
+            <button
+                onClick={onMenuClick}
+                className="rounded-md p-2 text-stone-400 hover:bg-stone-800 hover:text-stone-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-orange-500"
+            >
+                <span className="sr-only">Open sidebar</span>
+                <Menu className="h-6 w-6" aria-hidden="true" />
+            </button>
+
+            <div className="flex-1 flex items-center justify-center">
+                <img src="/Oro-logo.jpg" alt="ORO 9" className="h-10 w-auto object-contain" />
             </div>
 
             <div className="flex items-center gap-3">

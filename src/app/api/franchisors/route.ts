@@ -47,7 +47,6 @@ export async function GET(request: NextRequest) {
                 fein: true,
                 routingNumber: true,
                 accountNumber: true,
-                needToDiscussProcessing: true,
 
                 // Documents
                 voidCheckUrl: true,

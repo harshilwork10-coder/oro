@@ -53,8 +53,8 @@ export default function DashboardLayout({
                     {/* Ambient Background Glow */}
                     <div className="absolute top-0 left-0 w-full h-96 bg-orange-500/5 blur-[100px] pointer-events-none" />
 
-                    {/* MobileHeader - hide for POS pages and retail employees */}
-                    {!hideSidebar && <MobileHeader onMenuClick={() => setSidebarOpen(true)} />}
+                    {/* MobileHeader - hide for POS pages, retail employees, and when sidebar is open */}
+                    {!hideSidebar && !sidebarOpen && <MobileHeader onMenuClick={() => setSidebarOpen(true)} />}
 
                     {/* Account Selector Bar - For Provider/Support to select which account to work on */}
                     {/* Hide on /dashboard/provider page - that's the admin overview */}
