@@ -88,6 +88,18 @@ export default function StoreDetailsPage() {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [savingTax, setSavingTax] = useState(false);
 
+    // Add Tax Jurisdiction Modal State
+    const [showAddTaxModal, setShowAddTaxModal] = useState(false);
+    const [taxForm, setTaxForm] = useState({
+        displayName: '',
+        rate: '',
+        appliesProducts: true,
+        appliesServices: false,
+        appliesFood: false,
+        appliesAlcohol: false
+    });
+    const [taxJurisdictions, setTaxJurisdictions] = useState<TaxJurisdiction[]>([]);
+
     useEffect(() => {
         fetchData();
     }, [ownerId, llcId, storeId]);
@@ -98,11 +110,74 @@ export default function StoreDetailsPage() {
             if (res.ok) {
                 const result = await res.json();
                 setData(result);
+                // Fetch tax jurisdictions after getting store data
+                if (result.store?.id) {
+                    fetchTaxJurisdictions(result.store.id);
+                }
             }
         } catch (error) {
             console.error('Failed to fetch store:', error);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function fetchTaxJurisdictions(locationId: string) {
+        try {
+            const res = await fetch(`/api/admin/locations/${locationId}/taxes`);
+            if (res.ok) {
+                const result = await res.json();
+                setTaxJurisdictions(result.jurisdictions || []);
+            }
+        } catch (error) {
+            console.error('Failed to fetch tax jurisdictions:', error);
+        }
+    }
+
+    async function handleAddTaxJurisdiction() {
+        if (!data?.store?.id) return;
+
+        const rate = parseFloat(taxForm.rate);
+        if (isNaN(rate) || rate < 0 || rate > 100) {
+            setToast({ message: 'Invalid tax rate (0-100)', type: 'error' });
+            return;
+        }
+
+        setSavingTax(true);
+        try {
+            const res = await fetch(`/api/admin/locations/${data.store.id}/taxes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    displayName: taxForm.displayName || `Tax ${rate}%`,
+                    rate,
+                    appliesProducts: taxForm.appliesProducts,
+                    appliesServices: taxForm.appliesServices,
+                    appliesFood: taxForm.appliesFood,
+                    appliesAlcohol: taxForm.appliesAlcohol
+                })
+            });
+
+            if (res.ok) {
+                setToast({ message: 'Tax jurisdiction added', type: 'success' });
+                setShowAddTaxModal(false);
+                setTaxForm({
+                    displayName: '',
+                    rate: '',
+                    appliesProducts: true,
+                    appliesServices: false,
+                    appliesFood: false,
+                    appliesAlcohol: false
+                });
+                fetchTaxJurisdictions(data.store.id);
+            } else {
+                const err = await res.json();
+                setToast({ message: err.error || 'Failed to add tax', type: 'error' });
+            }
+        } catch (error) {
+            setToast({ message: 'Network error', type: 'error' });
+        } finally {
+            setSavingTax(false);
         }
     }
 
@@ -441,7 +516,10 @@ export default function StoreDetailsPage() {
                             <h3 className="font-semibold text-stone-200">Tax Configuration</h3>
                             <p className="text-stone-500 text-sm">Configure tax jurisdictions and category rules for this store</p>
                         </div>
-                        <button className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-stone-900 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                        <button
+                            onClick={() => setShowAddTaxModal(true)}
+                            className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-stone-900 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                        >
                             <Plus className="h-4 w-4" /> Add Tax Jurisdiction
                         </button>
                     </div>
@@ -455,12 +533,15 @@ export default function StoreDetailsPage() {
                             </h4>
                         </div>
 
-                        {(!data.taxJurisdictions || data.taxJurisdictions.length === 0) ? (
+                        {taxJurisdictions.length === 0 ? (
                             <div className="p-12 text-center">
                                 <Receipt className="h-12 w-12 text-stone-600 mx-auto mb-3" />
                                 <h4 className="text-lg font-medium text-stone-200 mb-2">No Tax Jurisdictions</h4>
                                 <p className="text-stone-400 text-sm mb-4">Add tax jurisdictions to apply sales tax, excise tax, or other taxes to this store.</p>
-                                <button className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-stone-900 rounded-lg text-sm font-medium inline-flex items-center gap-2 transition-colors">
+                                <button
+                                    onClick={() => setShowAddTaxModal(true)}
+                                    className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-stone-900 rounded-lg text-sm font-medium inline-flex items-center gap-2 transition-colors"
+                                >
                                     <Plus className="h-4 w-4" /> Add First Tax Jurisdiction
                                 </button>
                             </div>
@@ -476,7 +557,7 @@ export default function StoreDetailsPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-stone-700">
-                                    {data.taxJurisdictions.map((tax) => (
+                                    {taxJurisdictions.map((tax) => (
                                         <tr key={tax.id} className="hover:bg-stone-800/50">
                                             <td className="px-4 py-3">
                                                 <button
@@ -488,14 +569,11 @@ export default function StoreDetailsPage() {
                                                 </button>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <input
-                                                    type="text"
-                                                    defaultValue={tax.displayName || tax.jurisdiction.name}
-                                                    className="bg-stone-700 border border-stone-600 rounded px-2 py-1 text-stone-200 text-sm w-40"
-                                                    placeholder="e.g., Sales Tax"
-                                                />
+                                                <span className="text-stone-200 text-sm">
+                                                    {tax.displayName || tax.jurisdiction.name}
+                                                </span>
                                             </td>
-                                            <td className="px-4 py-3 text-stone-300">
+                                            <td className="px-4 py-3 text-teal-400 font-semibold">
                                                 {(tax.jurisdiction.rate * 100).toFixed(2)}%
                                             </td>
                                             <td className="px-4 py-3">
@@ -552,6 +630,121 @@ export default function StoreDetailsPage() {
                             <strong className="text-teal-400">💡 Tax Hierarchy:</strong> Item Override → Category Rule → Store Default.
                             Taxes are calculated per line item and grouped by display name on receipts.
                         </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Tax Jurisdiction Modal */}
+            {showAddTaxModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+                    <div className="bg-stone-800 border border-stone-700 rounded-2xl p-6 w-full max-w-md">
+                        <h3 className="text-lg font-semibold text-stone-100 mb-4">Add Tax Jurisdiction</h3>
+
+                        <div className="space-y-4">
+                            {/* Display Name */}
+                            <div>
+                                <label className="block text-sm text-stone-400 mb-1">Display Name (for receipts)</label>
+                                <input
+                                    type="text"
+                                    value={taxForm.displayName}
+                                    onChange={(e) => setTaxForm({ ...taxForm, displayName: e.target.value })}
+                                    placeholder="e.g., Sales Tax, State Tax"
+                                    className="w-full px-3 py-2 bg-stone-900 border border-stone-600 rounded-lg text-stone-200 focus:outline-none focus:border-teal-500"
+                                />
+                            </div>
+
+                            {/* Tax Rate */}
+                            <div>
+                                <label className="block text-sm text-stone-400 mb-1">Tax Rate (%)</label>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
+                                        value={taxForm.rate}
+                                        onChange={(e) => setTaxForm({ ...taxForm, rate: e.target.value })}
+                                        placeholder="8.25"
+                                        className="w-full px-3 py-2 bg-stone-900 border border-stone-600 rounded-lg text-stone-200 focus:outline-none focus:border-teal-500 pr-8"
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500">%</span>
+                                </div>
+                            </div>
+
+                            {/* Applies To */}
+                            <div>
+                                <label className="block text-sm text-stone-400 mb-2">Applies To</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTaxForm({ ...taxForm, appliesProducts: !taxForm.appliesProducts })}
+                                        className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${taxForm.appliesProducts
+                                                ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                                                : 'bg-stone-900 border-stone-600 text-stone-400'
+                                            }`}
+                                    >
+                                        ☑️ Products
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTaxForm({ ...taxForm, appliesServices: !taxForm.appliesServices })}
+                                        className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${taxForm.appliesServices
+                                                ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                                                : 'bg-stone-900 border-stone-600 text-stone-400'
+                                            }`}
+                                    >
+                                        ☑️ Services
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTaxForm({ ...taxForm, appliesFood: !taxForm.appliesFood })}
+                                        className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${taxForm.appliesFood
+                                                ? 'bg-amber-500/20 border-amber-500 text-amber-400'
+                                                : 'bg-stone-900 border-stone-600 text-stone-400'
+                                            }`}
+                                    >
+                                        ☑️ Food
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTaxForm({ ...taxForm, appliesAlcohol: !taxForm.appliesAlcohol })}
+                                        className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${taxForm.appliesAlcohol
+                                                ? 'bg-red-500/20 border-red-500 text-red-400'
+                                                : 'bg-stone-900 border-stone-600 text-stone-400'
+                                            }`}
+                                    >
+                                        ☑️ Alcohol
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button
+                                onClick={() => {
+                                    setShowAddTaxModal(false);
+                                    setTaxForm({
+                                        displayName: '',
+                                        rate: '',
+                                        appliesProducts: true,
+                                        appliesServices: false,
+                                        appliesFood: false,
+                                        appliesAlcohol: false
+                                    });
+                                }}
+                                className="px-4 py-2 text-stone-400 hover:text-stone-200 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleAddTaxJurisdiction}
+                                disabled={savingTax || !taxForm.rate}
+                                className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-stone-900 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {savingTax ? 'Adding...' : 'Add Tax'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
