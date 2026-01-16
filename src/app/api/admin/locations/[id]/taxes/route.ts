@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 // GET: Get tax jurisdictions for a location
 export async function GET(
     request: NextRequest,
-    { params }: { params: Promise<{ locationId: string }> }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -14,7 +14,7 @@ export async function GET(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { locationId } = await params
+        const { id: locationId } = await params
 
         const jurisdictions = await prisma.locationTaxJurisdiction.findMany({
             where: { locationId },
@@ -34,7 +34,7 @@ export async function GET(
 // POST: Add a new tax jurisdiction to a location
 export async function POST(
     request: NextRequest,
-    { params }: { params: Promise<{ locationId: string }> }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -42,7 +42,7 @@ export async function POST(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { locationId } = await params
+        const { id: locationId } = await params
         const body = await request.json()
 
         const {
@@ -113,7 +113,8 @@ export async function POST(
                 action: 'CREATED',
                 changes: JSON.stringify({
                     displayName,
-                    rate, appliesProducts,
+                    rate,
+                    appliesProducts,
                     appliesServices,
                     appliesFood,
                     appliesAlcohol
@@ -135,7 +136,7 @@ export async function POST(
 // DELETE: Remove a tax jurisdiction from a location
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: Promise<{ locationId: string }> }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -143,7 +144,7 @@ export async function DELETE(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { locationId } = await params
+        const { id: locationId } = await params
         const url = new URL(request.url)
         const jurisdictionId = url.searchParams.get('jurisdictionId')
 
