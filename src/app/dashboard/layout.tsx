@@ -9,7 +9,7 @@ import MobileHeader from "@/components/layout/MobileHeader"
 import SessionGuard from "@/components/security/SessionGuard"
 import AccountSelector from "@/components/layout/AccountSelector"
 import LocationToggle from "@/components/dashboard/LocationToggle"
-import PWAInstallPrompt from "@/components/pwa/PWAInstallPrompt"
+// PWA prompt removed during cleanup
 
 export default function DashboardLayout({
     children,
@@ -78,8 +78,7 @@ export default function DashboardLayout({
                     </main>
                 </div>
 
-                {/* PWA Install Prompt - shows for employees on first login */}
-                {isEmployee && <PWAInstallPrompt />}
+
             </div>
         </SessionGuard>
     )
