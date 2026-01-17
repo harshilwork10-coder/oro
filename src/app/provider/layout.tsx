@@ -26,7 +26,7 @@ const PROVIDER_SIDEBAR = [
 
 // Quick add menu items
 const ADD_MENU_ITEMS = [
-    { name: 'New Owner/Client', href: '/provider/clients/new', icon: Users },
+    { name: 'New Owner/Client', href: '/provider/onboarding/new', icon: Users },
     { name: 'New Onboarding Request', href: '/provider/onboarding/new', icon: FileText },
     { name: 'New Ticket', href: '/provider/tickets/new', icon: Ticket },
     { name: 'Add Device to Inventory', href: '/provider/devices?action=add', icon: HardDrive },
