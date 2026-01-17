@@ -52,6 +52,7 @@ interface ClientData {
     productsTaxableDefault: boolean;
     taxInclusive: boolean;
     roundingRule: 'PER_LINE' | 'PER_INVOICE';
+    defaultTaxRate: number | null;
 }
 
 interface MemberData {
@@ -178,6 +179,7 @@ export default function ProviderClientConfigPage() {
                         productsTaxableDefault: found.config?.productsTaxableDefault ?? true,
                         taxInclusive: found.config?.taxInclusive ?? false,
                         roundingRule: found.config?.roundingRule || 'PER_LINE',
+                        defaultTaxRate: found.config?.defaultTaxRate ?? null,
                     });
                 }
             }
@@ -859,16 +861,32 @@ export default function ProviderClientConfigPage() {
                                         </button>
                                     </div>
 
+                                    {/* Default Tax Rate */}
+                                    <div>
+                                        <label className="block text-sm text-stone-300 mb-2">Default Tax Rate (%)</label>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                max="100"
+                                                value={client.defaultTaxRate ?? ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    updateConfig({ defaultTaxRate: val ? parseFloat(val) : null });
+                                                }}
+                                                placeholder="e.g., 8.25"
+                                                className="w-full px-4 py-3 bg-stone-900 border border-stone-700 rounded-lg text-stone-200 focus:outline-none focus:border-teal-500 pr-10"
+                                            />
+                                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500">%</span>
+                                        </div>
+                                        <p className="text-stone-500 text-xs mt-1">Applied to all taxable items at this business</p>
+                                    </div>
+
                                     {/* Tax Rounding Info */}
                                     <div className="p-3 rounded-lg bg-stone-700/30 border border-stone-600">
                                         <p className="text-stone-400 text-sm">
                                             <strong className="text-teal-400">📐 Tax Rounding:</strong> Per Line Item (most accurate for compliance)
-                                        </p>
-                                    </div>
-
-                                    <div className="p-3 rounded-lg bg-stone-700/30 border border-stone-600">
-                                        <p className="text-stone-400 text-sm">
-                                            <strong className="text-teal-400">💡 Store-Level Taxes:</strong> Configure specific tax rates, jurisdictions, and category rules from the Location settings page.
                                         </p>
                                     </div>
                                 </div>

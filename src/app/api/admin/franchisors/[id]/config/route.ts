@@ -49,7 +49,7 @@ export async function PATCH(
             'cashDiscountEnabled', 'cashDiscountPercent', 'pricingModel',
             'cardSurchargeType', 'cardSurcharge', 'showDualPricing',
             // Tax Configuration fields
-            'servicesTaxableDefault', 'productsTaxableDefault', 'taxInclusive', 'roundingRule'
+            'servicesTaxableDefault', 'productsTaxableDefault', 'taxInclusive', 'roundingRule', 'defaultTaxRate'
         ]
 
         // Handle storeLogo and pricing settings - sync to FranchiseSettings (used by POS)
