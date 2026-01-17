@@ -859,32 +859,11 @@ export default function ProviderClientConfigPage() {
                                         </button>
                                     </div>
 
-                                    {/* Rounding Rule */}
-                                    <div>
-                                        <label className="block text-sm text-stone-300 mb-2">Tax Rounding</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <button
-                                                onClick={() => updateConfig({ roundingRule: 'PER_LINE' })}
-                                                disabled={saving}
-                                                className={`p-3 rounded-lg border text-sm transition-colors ${client.roundingRule === 'PER_LINE'
-                                                    ? 'border-teal-500 bg-teal-500/20 text-teal-400'
-                                                    : 'border-stone-700 hover:border-stone-600 text-stone-300'
-                                                    }`}
-                                            >
-                                                Per Line Item
-                                            </button>
-                                            <button
-                                                onClick={() => updateConfig({ roundingRule: 'PER_INVOICE' })}
-                                                disabled={saving}
-                                                className={`p-3 rounded-lg border text-sm transition-colors ${client.roundingRule === 'PER_INVOICE'
-                                                    ? 'border-teal-500 bg-teal-500/20 text-teal-400'
-                                                    : 'border-stone-700 hover:border-stone-600 text-stone-300'
-                                                    }`}
-                                            >
-                                                Per Invoice
-                                            </button>
-                                        </div>
-                                        <p className="text-stone-500 text-xs mt-1">How tax is rounded during calculation</p>
+                                    {/* Tax Rounding Info */}
+                                    <div className="p-3 rounded-lg bg-stone-700/30 border border-stone-600">
+                                        <p className="text-stone-400 text-sm">
+                                            <strong className="text-teal-400">📐 Tax Rounding:</strong> Per Line Item (most accurate for compliance)
+                                        </p>
                                     </div>
 
                                     <div className="p-3 rounded-lg bg-stone-700/30 border border-stone-600">
