@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import OroLogo from '@/components/ui/OroLogo'
+import EmployeeTiles from '@/components/pos/EmployeeTiles'
 import { DeviceTrust } from '@/lib/device-trust'
-import { Building2, Store, Key, Loader2, Settings, X } from 'lucide-react'
+import { Building2, ArrowLeft, Key, Loader2, Settings, X } from 'lucide-react'
 
 interface TerminalConfig {
     business: { id: string; name: string; industryType: string; logo?: string | null }
@@ -14,8 +15,11 @@ interface TerminalConfig {
 }
 
 export default function EmployeeLoginPage() {
-    const [step, setStep] = useState<'LOADING' | 'ENTER_CODE' | 'ENTER_PIN' | 'RESTORING'>('LOADING')
+    const [step, setStep] = useState<'LOADING' | 'ENTER_CODE' | 'SELECT_EMPLOYEE' | 'ENTER_PIN' | 'RESTORING'>('LOADING')
     const [terminalConfig, setTerminalConfig] = useState<TerminalConfig | null>(null)
+
+    // Selected employee for PIN entry
+    const [selectedEmployee, setSelectedEmployee] = useState<{ id: string; name: string } | null>(null)
 
     // Station code entry
     const [stationCode, setStationCode] = useState('')
@@ -45,7 +49,7 @@ export default function EmployeeLoginPage() {
                     const config = JSON.parse(savedConfig) as TerminalConfig
                     if (config.business && config.location) {
                         setTerminalConfig(config)
-                        setStep('ENTER_PIN')
+                        setStep('SELECT_EMPLOYEE') // Show employee tiles first
                         return
                     }
                 } catch {
@@ -83,7 +87,7 @@ export default function EmployeeLoginPage() {
                         if (data.stationId) localStorage.setItem('station_id', data.stationId)
 
                         setTerminalConfig(data.config)
-                        setStep('ENTER_PIN')
+                        setStep('SELECT_EMPLOYEE') // Show employee tiles
                         return
                     }
                 }
@@ -140,12 +144,16 @@ export default function EmployeeLoginPage() {
                     station: data.station
                 }
                 localStorage.setItem('terminal_config', JSON.stringify(config))
-                // Also store station ID separately for quick access
+                // Store station ID separately for quick access
                 if (data.station?.id) {
                     localStorage.setItem('station_id', data.station.id)
                 }
+                // CRITICAL: Store stationToken for PIN login (required for security)
+                if (data.stationToken) {
+                    localStorage.setItem('station_token', data.stationToken)
+                }
                 setTerminalConfig(config)
-                setStep('ENTER_PIN')
+                setStep('SELECT_EMPLOYEE') // Show employee tiles
             } else {
                 // Show detailed error if available
                 const detailedError = data.error ? `${data.error} (${res.status})` : `Invalid code (${res.status})`
@@ -189,12 +197,18 @@ export default function EmployeeLoginPage() {
         setError('')
 
         try {
+            // Get stationToken from localStorage (required for security)
+            const stationToken = localStorage.getItem('station_token')
+            const deviceId = localStorage.getItem('device_id') // From device-trust
+
             const res = await fetch('/api/auth/pin-login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     pin: pinCode,
-                    locationId: terminalConfig.location.id
+                    stationToken,   // Server derives locationId from this
+                    deviceId,       // For fingerprint verification
+                    employeeId: selectedEmployee?.id // For targeted PIN verification
                 })
             })
 
@@ -285,54 +299,88 @@ export default function EmployeeLoginPage() {
 
     // Step 1: Enter Setup Code
     if (step === 'ENTER_CODE') {
+        const handleKeyPress = (key: string) => {
+            if (key === '⌫') {
+                setStationCode(prev => prev.slice(0, -1))
+            } else if (key === 'C') {
+                setStationCode('')
+            } else if (stationCode.length < 8) {
+                setStationCode(prev => prev + key)
+            }
+            setCodeError('')
+        }
+
         return (
             <div className="min-h-screen bg-stone-950 flex items-center justify-center p-4">
-                <div className="w-full max-w-sm">
-                    <div className="flex justify-center mb-8">
-                        <OroLogo className="h-12 w-auto" />
+                <div className="w-full max-w-md">
+                    <div className="flex justify-center mb-6">
+                        <OroLogo className="h-10 w-auto" />
                     </div>
 
-                    <div className="bg-stone-900 rounded-2xl p-6">
+                    <div className="bg-stone-900 rounded-2xl p-5">
                         <div className="flex items-center justify-center gap-2 mb-2">
                             <Key className="h-5 w-5 text-orange-400" />
-                            <h1 className="text-xl font-bold">Terminal Setup</h1>
+                            <h1 className="text-lg font-bold">Terminal Setup</h1>
                         </div>
-                        <p className="text-stone-400 text-center text-sm mb-6">
-                            Enter the station code provided by your business owner
+                        <p className="text-stone-400 text-center text-xs mb-4">
+                            Enter the station code from your business owner
                         </p>
 
-                        <input
-                            type="text"
-                            value={stationCode}
-                            onChange={(e) => {
-                                setStationCode(e.target.value.toUpperCase())
-                                setCodeError('')
-                            }}
-                            placeholder="e.g. HUZUPR"
-                            className="w-full px-4 py-4 bg-stone-800 border border-stone-700 rounded-xl text-white text-center text-xl font-mono tracking-widest placeholder:text-stone-600 placeholder:text-base placeholder:tracking-normal focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleValidateCode()
-                            }}
-                        />
+                        {/* Code Display */}
+                        <div className="bg-stone-800 border-2 border-orange-500/50 rounded-xl px-4 py-4 mb-4">
+                            <p className="text-white text-center text-2xl font-mono tracking-[0.3em] min-h-[1.5em]">
+                                {stationCode || <span className="text-stone-600">------</span>}
+                            </p>
+                        </div>
 
                         {codeError && (
-                            <p className="text-red-400 text-sm text-center mt-3">{codeError}</p>
+                            <p className="text-red-400 text-sm text-center mb-3">{codeError}</p>
                         )}
+
+                        {/* Alphanumeric Keypad */}
+                        <div className="grid grid-cols-6 gap-2 mb-4">
+                            {['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'].map((key) => (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => handleKeyPress(key)}
+                                    className="h-12 rounded-lg bg-stone-800 text-white text-lg font-bold hover:bg-stone-700 active:bg-stone-600 transition-colors border border-stone-700"
+                                >
+                                    {key}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Bottom Row: Clear and Backspace */}
+                        <div className="grid grid-cols-2 gap-2 mb-4">
+                            <button
+                                type="button"
+                                onClick={() => handleKeyPress('C')}
+                                disabled={!stationCode}
+                                className="h-12 rounded-lg bg-red-600/20 text-red-400 font-bold hover:bg-red-600/30 transition-colors border border-red-600/30 disabled:opacity-30"
+                            >
+                                Clear
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleKeyPress('⌫')}
+                                disabled={!stationCode}
+                                className="h-12 rounded-lg bg-stone-800 text-amber-400 font-bold hover:bg-stone-700 transition-colors border border-stone-700 disabled:opacity-30"
+                            >
+                                ⌫ Delete
+                            </button>
+                        </div>
 
                         <button
                             onClick={handleValidateCode}
                             disabled={validating || !stationCode.trim()}
-                            className="w-full mt-4 py-4 bg-orange-600 hover:bg-orange-500 disabled:bg-stone-700 disabled:text-stone-500 rounded-xl font-bold transition-colors"
+                            className="w-full py-4 bg-orange-600 hover:bg-orange-500 disabled:bg-stone-700 disabled:text-stone-500 rounded-xl font-bold transition-colors"
                         >
                             {validating ? 'Validating...' : 'Pair Terminal'}
                         </button>
-
-                        <p className="text-stone-500 text-xs text-center mt-4">
-                            Contact your business owner for the station code
-                        </p>
                     </div>
 
-                    <div className="mt-8 text-center">
+                    <div className="mt-6 text-center">
                         <a href="/login" className="text-stone-500 text-sm hover:text-stone-400">
                             Owner/Admin Login →
                         </a>
@@ -342,34 +390,90 @@ export default function EmployeeLoginPage() {
         )
     }
 
-    // Step 2: Enter PIN (terminal is configured)
+    // Step 2: Select Employee (tap to continue to PIN entry)
+    if (step === 'SELECT_EMPLOYEE') {
+        const stationToken = typeof window !== 'undefined' ? localStorage.getItem('station_token') : null
+
+        return (
+            <div className="min-h-screen bg-stone-950 flex items-center justify-center p-4">
+                <div className="w-full max-w-2xl">
+                    {/* Header with store info and settings */}
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            {terminalConfig?.business.logo ? (
+                                <img
+                                    src={terminalConfig.business.logo}
+                                    alt={terminalConfig.business.name}
+                                    className="h-10 w-auto object-contain"
+                                />
+                            ) : (
+                                <OroLogo className="h-8 w-auto" />
+                            )}
+                            <div>
+                                <p className="text-white font-medium">{terminalConfig?.business.name}</p>
+                                <p className="text-stone-500 text-sm">
+                                    {terminalConfig?.location.name}
+                                    {terminalConfig?.station && ` • ${terminalConfig.station.name}`}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setShowAdminUnlock(true)}
+                            className="p-2 text-stone-500 hover:text-orange-400 rounded-lg hover:bg-stone-800"
+                            title="Reconfigure Terminal"
+                        >
+                            <Settings className="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    {/* Employee Tiles */}
+                    <div className="bg-stone-900/50 border border-stone-800 rounded-2xl p-6">
+                        <h1 className="text-2xl font-bold text-white text-center mb-2">
+                            Who's clocking in?
+                        </h1>
+
+                        <EmployeeTiles
+                            stationToken={stationToken}
+                            onEmployeeSelect={(employee) => {
+                                setSelectedEmployee(employee)
+                                setStep('ENTER_PIN')
+                            }}
+                            isLoading={loading}
+                        />
+                    </div>
+
+                    <div className="mt-6 text-center">
+                        <a href="/login" className="text-stone-500 text-sm hover:text-stone-400">
+                            Owner/Admin Login →
+                        </a>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    // Step 3: Enter PIN for selected employee
     return (
         <div className="min-h-screen bg-stone-950 flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
-                {/* Show store logo if available, otherwise show ORO logo */}
-                <div className="flex justify-center mb-8">
-                    {terminalConfig?.business.logo ? (
-                        <img
-                            src={terminalConfig.business.logo}
-                            alt={terminalConfig.business.name}
-                            className="h-16 w-auto object-contain max-w-[200px]"
-                        />
-                    ) : (
-                        <OroLogo className="h-12 w-auto" />
-                    )}
-                </div>
-
-                {/* Terminal Info */}
-                <div className="bg-stone-900/50 border border-stone-800 rounded-xl p-3 mb-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Building2 className="h-5 w-5 text-orange-400" />
-                        <div>
-                            <p className="text-sm font-medium text-white">{terminalConfig?.business.name}</p>
-                            <p className="text-xs text-stone-500">
-                                {terminalConfig?.location.name}
-                                {terminalConfig?.station && ` • ${terminalConfig.station.name}`}
-                            </p>
-                        </div>
+                {/* Back button and selected employee */}
+                <div className="flex items-center gap-4 mb-6">
+                    <button
+                        onClick={() => {
+                            setSelectedEmployee(null)
+                            setPin('')
+                            setError('')
+                            setStep('SELECT_EMPLOYEE')
+                        }}
+                        className="p-2 text-stone-400 hover:text-white rounded-lg hover:bg-stone-800"
+                    >
+                        <ArrowLeft className="h-5 w-5" />
+                    </button>
+                    <div className="flex-1">
+                        <p className="text-white font-medium">
+                            {selectedEmployee?.name || 'Employee'}
+                        </p>
+                        <p className="text-stone-500 text-sm">Enter your PIN</p>
                     </div>
                     <button
                         onClick={() => setShowAdminUnlock(true)}

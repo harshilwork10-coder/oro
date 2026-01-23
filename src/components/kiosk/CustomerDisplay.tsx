@@ -3,6 +3,7 @@
 import { ShoppingCart, User } from 'lucide-react'
 import TipModal from './TipModal'
 import ReviewModal from './ReviewModal'
+import CheckIn from './CheckIn'
 
 interface CustomerDisplayProps {
     cart: any
@@ -12,6 +13,7 @@ interface CustomerDisplayProps {
     showReviewModal?: boolean
     onReviewSubmit?: (rating: number, feedbackTag: string | null) => void
     onReviewSkip?: () => void
+    showCheckIn?: boolean // Option to show check-in flow when cart is empty
 }
 
 const MAX_VISIBLE_ITEMS = 7
@@ -23,9 +25,17 @@ export default function CustomerDisplay({
     onTipModalClose,
     showReviewModal = false,
     onReviewSubmit,
-    onReviewSkip
+    onReviewSkip,
+    showCheckIn = true // Default to showing check-in when cart is empty
 }: CustomerDisplayProps) {
+    // Show check-in flow when cart is empty
     if (!cart || !cart.items || cart.items.length === 0) {
+        if (showCheckIn) {
+            // Show full check-in flow: phone → name → liability → loyalty
+            return <CheckIn />
+        }
+
+        // Fallback: Simple welcome screen
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-4 text-center animate-in fade-in duration-500">
                 <div className="mb-6">

@@ -364,6 +364,24 @@ function POSContent() {
         }
     }, [session])
 
+    // Auto-load customers when customer modal opens
+    useEffect(() => {
+        const loadCustomers = async () => {
+            if (showCustomerModal && user?.franchiseId) {
+                try {
+                    const res = await fetch(`/api/clients/search?franchiseId=${user.franchiseId}`)
+                    if (res.ok) {
+                        const data = await res.json()
+                        setCheckedInCustomers(data)
+                    }
+                } catch (err) {
+                    console.error('Load customers error:', err)
+                }
+            }
+        }
+        loadCustomers()
+    }, [showCustomerModal, user?.franchiseId])
+
     // Load assigned station for display sync
     const loadAssignedStation = async () => {
         try {
@@ -1755,85 +1773,77 @@ function POSContent() {
             <div className="flex h-screen bg-stone-950 overflow-hidden">
                 {/* Left Side: Content Area */}
                 <div className="flex-1 flex flex-col border-r border-stone-800 min-w-0">
-                    {/* Header - Unified design with integrated menu button */}
-                    <div className="h-14 border-b border-white/5 flex items-center justify-between px-4 gap-4 bg-gradient-to-r from-stone-900/95 via-stone-900/90 to-stone-900/95 backdrop-blur-xl shadow-lg shadow-black/20">
-                        {/* Left Side - Menu + Register/History */}
-                        <div className="flex items-center gap-3 shrink-0">
-                            {/* Integrated Menu Button */}
+                    {/* Header - Clean Touch-Friendly Design */}
+                    <div className="h-16 border-b border-white/10 flex items-center px-3 gap-2 bg-stone-900">
+                        {/* Left - Menu + View Toggle */}
+                        <div className="flex items-center gap-2">
+                            {/* Menu Button */}
                             <button
                                 onClick={() => {
-                                    // Trigger sidebar - need to dispatch event since sidebar is in layout
                                     const event = new CustomEvent('toggleSidebar')
                                     window.dispatchEvent(event)
                                 }}
-                                className="p-2.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 text-stone-300 hover:text-white transition-all duration-200 border border-stone-700/50"
-                                title="Navigation Menu"
+                                className="p-3 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white transition-all border border-stone-700"
+                                title="Menu"
                             >
                                 <Menu className="h-5 w-5" />
                             </button>
+
                             {/* Register/History Toggle */}
-                            <div className="flex bg-black/30 rounded-lg p-1 border border-white/5">
+                            <div className="flex bg-stone-800 rounded-xl p-1 border border-stone-700">
                                 <button
                                     onClick={() => setView('POS')}
-                                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all duration-200 ${view === 'POS' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/25' : 'text-stone-400 hover:text-white hover:bg-white/5'}`}
+                                    className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${view === 'POS' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'text-stone-400 hover:text-white'}`}
                                 >
                                     Register
                                 </button>
                                 <button
                                     onClick={() => setView('HISTORY')}
-                                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all duration-200 ${view === 'HISTORY' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/25' : 'text-stone-400 hover:text-white hover:bg-white/5'}`}
+                                    className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${view === 'HISTORY' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'text-stone-400 hover:text-white'}`}
                                 >
                                     History
                                 </button>
                             </div>
                         </div>
 
-                        {/* Search - Flexible middle section */}
-                        {view === 'POS' && (
-                            <div className="relative flex-1 max-w-[200px] mx-2">
-                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-stone-500" />
-                                <input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full bg-black/30 border border-white/10 rounded pl-7 pr-2 py-1 text-xs text-stone-200 focus:ring-1 focus:ring-orange-500/50 placeholder:text-stone-600 transition-all"
-                                />
-                            </div>
-                        )}
-
-                        {/* Right Side Actions - Spaced out */}
-                        <div className="flex items-center gap-3 shrink-0">
-                            {/* Barber/Staff Selector */}
+                        {/* Center - Staff Selector (prominent) */}
+                        <div className="flex-1 flex justify-center">
                             <select
                                 value={selectedBarber?.id || ''}
                                 onChange={(e) => {
                                     const barber = barberList.find(b => b.id === e.target.value)
                                     setSelectedBarber(barber || null)
-                                    if (barber) {
-                                        setSelectedCategory('BARBER_SERVICE')
-                                    }
+                                    if (barber) setSelectedCategory('BARBER_SERVICE')
                                 }}
-                                className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-orange-500"
+                                className="min-w-[180px] bg-stone-800 border-2 border-amber-500/50 rounded-xl px-4 py-2.5 text-sm text-white font-medium focus:ring-2 focus:ring-amber-500 appearance-none cursor-pointer"
+                                style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em", paddingRight: "2.5rem" }}
                             >
-                                <option value="">Select Staff</option>
+                                <option value="">👤 Select Staff</option>
                                 {barberList.map(barber => (
                                     <option key={barber.id} value={barber.id}>
                                         {barber.name}
                                     </option>
                                 ))}
                             </select>
+                        </div>
 
-                            {/* Display Button */}
-                            <button
-                                onClick={() => setShowDisplayModal(true)}
-                                className="p-2.5 bg-blue-600/20 hover:bg-blue-600/40 rounded-lg text-blue-400 transition-colors border border-blue-500/20"
-                                title="Customer Display"
-                            >
-                                <Monitor className="h-5 w-5" />
-                            </button>
+                        {/* Right - Action Buttons */}
+                        <div className="flex items-center gap-2">
+                            {/* Search (POS only) */}
+                            {view === 'POS' && (
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-32 bg-stone-800 border border-stone-700 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder:text-stone-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                    />
+                                </div>
+                            )}
 
-                            {/* Fullscreen Toggle Button */}
+                            {/* Fullscreen */}
                             <button
                                 onClick={() => {
                                     if (!document.fullscreenElement) {
@@ -1842,35 +1852,31 @@ function POSContent() {
                                         document.exitFullscreen()
                                     }
                                 }}
-                                className="p-2.5 bg-purple-600/20 hover:bg-purple-600/40 rounded-lg text-purple-400 transition-colors border border-purple-500/20"
-                                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                                className="p-3 bg-stone-800 hover:bg-purple-600/30 rounded-xl text-purple-400 transition-all border border-stone-700 hover:border-purple-500/50"
+                                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
                             >
                                 {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
                             </button>
 
-                            {/* New Customer Button */}
-                            {view === 'POS' && (
+                            {/* New Customer / Shift Button */}
+                            {view === 'POS' ? (
                                 <button
                                     onClick={() => {
-                                        if (!shift) {
-                                            setShowShiftModal(true)
-                                        }
+                                        if (!shift) setShowShiftModal(true)
                                     }}
-                                    className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-orange-500/20 flex items-center gap-2"
+                                    className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white rounded-xl font-bold transition-all shadow-lg flex items-center gap-2"
                                     title="New Customer"
                                 >
-                                    <UserPlus className="h-4 w-4" />
-                                    <span>New</span>
+                                    <UserPlus className="h-5 w-5" />
+                                    <span className="hidden sm:inline">New</span>
                                 </button>
-                            )}
-
-                            {view === 'HISTORY' && (
+                            ) : (
                                 <button
                                     onClick={() => setShowShiftModal(true)}
-                                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+                                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-colors flex items-center gap-2"
                                     title={shift ? 'Close Shift' : 'Open Shift'}
                                 >
-                                    <DollarSign className="h-4 w-4" />
+                                    <DollarSign className="h-5 w-5" />
                                     <span>{shift ? 'Close' : 'Open'}</span>
                                 </button>
                             )}
@@ -2155,28 +2161,28 @@ function POSContent() {
                                     {cart.length > 0 && (
                                         <button
                                             onClick={() => setShowClearCartConfirm(true)}
-                                            className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all duration-200 border border-red-500/20 hover:border-red-500/30"
+                                            className="p-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all duration-200 border border-red-500/20 hover:border-red-500/30"
                                             title="Clear Cart"
                                         >
-                                            <Trash2 className="h-5 w-5" />
+                                            <Trash2 className="h-6 w-6" />
                                         </button>
                                     )}
 
                                     {/* Customer Button */}
                                     <button
                                         onClick={() => setShowCustomerModal(true)}
-                                        className={`p-2.5 rounded-xl transition-all duration-200 border ${selectedCustomer ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'hover:bg-white/5 text-stone-400 border-white/10 hover:border-white/20'}`}
+                                        className={`p-3 rounded-xl transition-all duration-200 border ${selectedCustomer ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'hover:bg-white/5 text-stone-400 border-white/10 hover:border-white/20'}`}
                                         title={selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : 'Select Customer'}
                                     >
-                                        <User className="h-5 w-5" />
+                                        <User className="h-6 w-6" />
                                     </button>
                                     {/* Discounts Button */}
                                     <button
                                         onClick={() => setShowDiscounts(true)}
-                                        className={`p-2.5 rounded-xl transition-all duration-200 border ${appliedDiscount > 0 ? 'bg-pink-500/20 text-pink-400 border-pink-500/30' : 'hover:bg-white/5 text-purple-400 border-white/10 hover:border-white/20'}`}
+                                        className={`p-3 rounded-xl transition-all duration-200 border ${appliedDiscount > 0 ? 'bg-pink-500/20 text-pink-400 border-pink-500/30' : 'hover:bg-white/5 text-purple-400 border-white/10 hover:border-white/20'}`}
                                         title="Customer Discounts"
                                     >
-                                        <Gift className="h-5 w-5" />
+                                        <Gift className="h-6 w-6" />
                                     </button>
                                 </div>
                             </div>
@@ -3271,7 +3277,7 @@ function POSContent() {
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
                             <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-stone-700 max-h-[80vh] flex flex-col">
                                 <h2 className="text-xl font-bold text-white text-center mb-2">Select Customer</h2>
-                                <p className="text-stone-400 text-center text-sm mb-4">Choose a checked-in customer or search by phone</p>
+                                <p className="text-stone-400 text-center text-sm mb-4">Choose a customer or search by name/phone</p>
 
                                 {/* Search Input */}
                                 <div className="relative mb-4">
@@ -3280,16 +3286,31 @@ function POSContent() {
                                         type="text"
                                         placeholder="Search by name or phone..."
                                         className="w-full pl-10 pr-4 py-3 bg-stone-800 border border-stone-700 rounded-xl text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                                        onChange={async (e) => {
-                                            const query = e.target.value
-                                            if (query.length >= 3 && user?.franchiseId) {
+                                        onFocus={async () => {
+                                            // Load all customers when focusing the search field
+                                            if (user?.franchiseId && checkedInCustomers.length === 0) {
                                                 try {
-                                                    const res = await fetch(`/api/clients/search?query=${encodeURIComponent(query)}&franchiseId=${user.franchiseId}`)
+                                                    const res = await fetch(`/api/clients/search?franchiseId=${user.franchiseId}`)
                                                     if (res.ok) {
                                                         const data = await res.json()
-                                                        if (data.length > 0) {
-                                                            setCheckedInCustomers(data)
-                                                        }
+                                                        setCheckedInCustomers(data)
+                                                    }
+                                                } catch (err) {
+                                                    console.error('Load customers error:', err)
+                                                }
+                                            }
+                                        }}
+                                        onChange={async (e) => {
+                                            const query = e.target.value
+                                            if (user?.franchiseId) {
+                                                try {
+                                                    const url = query.length >= 2
+                                                        ? `/api/clients/search?query=${encodeURIComponent(query)}&franchiseId=${user.franchiseId}`
+                                                        : `/api/clients/search?franchiseId=${user.franchiseId}`
+                                                    const res = await fetch(url)
+                                                    if (res.ok) {
+                                                        const data = await res.json()
+                                                        setCheckedInCustomers(data)
                                                     }
                                                 } catch (err) {
                                                     console.error('Search error:', err)

@@ -23,7 +23,7 @@ export default function MobileHeader({ onMenuClick, forceShow }: MobileHeaderPro
             </button>
 
             <div className="flex-1 flex items-center justify-center">
-                <img src="/Oro-logo.jpg" alt="ORO 9" className="h-10 w-auto object-contain" />
+                <img src="/ORO_9.jpg" alt="ORO 9" className="h-10 w-auto object-contain" />
             </div>
 
             <div className="flex items-center gap-3">

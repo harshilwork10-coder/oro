@@ -25,7 +25,9 @@ export default function OnboardingDetailPage() {
             try {
                 const response = await fetch('/api/admin/franchisors');
                 if (response.ok) {
-                    const franchisors = await response.json();
+                    const result = await response.json();
+                    // API returns { data: [...], meta: {...} } - extract the array
+                    const franchisors = result.data || result;
                     const franchisor = franchisors.find((f: any) => f.id === requestId);
 
                     if (franchisor) {

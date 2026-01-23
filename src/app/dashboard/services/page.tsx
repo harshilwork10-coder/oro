@@ -196,20 +196,12 @@ export default function ServicesPage() {
     return (
         <div className="p-8 bg-stone-950 min-h-screen">
             {/* Franchise vs Multi-Store Badge */}
-            {isFranchise ? (
+            {isFranchise && (
                 <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3">
                     <Lock className="h-5 w-5 text-amber-400" />
                     <div>
                         <p className="text-amber-200 font-semibold">Managed by {franchiseName || 'Franchisor'}</p>
                         <p className="text-amber-400/70 text-sm">Menu is controlled by headquarters. Contact your franchisor for changes.</p>
-                    </div>
-                </div>
-            ) : (
-                <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-3">
-                    <Building2 className="h-5 w-5 text-emerald-400" />
-                    <div>
-                        <p className="text-emerald-200 font-semibold">Your Custom Menu</p>
-                        <p className="text-emerald-400/70 text-sm">You have full control over your services and pricing.</p>
                     </div>
                 </div>
             )}

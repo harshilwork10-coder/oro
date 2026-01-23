@@ -40,7 +40,8 @@ import {
     Plus,
     Settings,
     ChevronDown,
-    ChevronRight
+    ChevronRight,
+    Download
 } from 'lucide-react'
 import clsx from 'clsx'
 import { hasPermission, Role } from '@/lib/permissions'
@@ -145,16 +146,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Documents', href: '/dashboard/documents', icon: FileText },
         { name: 'Merchant Applications', href: '/dashboard/merchant-applications', icon: FileText },
     ]
-
-    // BRAND FRANCHISOR: Sells franchises
+    // Brand HQ sidebar links - UPDATED 2026-01-20
     const brandFranchisorLinks = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Franchisees', href: '/dashboard/brand/sub-franchisees', icon: Users },
-        { name: 'Services Catalog', href: '/dashboard/services/catalog', icon: Briefcase },
-        { name: 'Reports', href: '/dashboard/reports', icon: FileText },
-        { name: 'Compliance', href: '/dashboard/compliance', icon: Shield },
-        { name: 'Documents', href: '/dashboard/documents', icon: FileText },
-        { name: 'Brand Settings', href: '/dashboard/brand/settings', icon: Settings },
+        { name: 'Home', href: '/franchisor/home', icon: LayoutDashboard },
+        { name: 'Franchisees', href: '/franchisor/franchisees', icon: Users },
+        { name: 'Locations', href: '/franchisor/locations', icon: MapPin },
+        { name: 'Brand Catalog', href: '/franchisor/catalog', icon: Briefcase },
+        { name: 'Reports', href: '/franchisor/reports', icon: BarChart3 },
+        { name: 'Download Reports', href: '/franchisor/reports/download', icon: Download },
+        { name: 'Support', href: '/franchisor/support', icon: Headphones },
+        { name: 'Settings', href: '/franchisor/settings', icon: Settings },
     ]
 
 
@@ -182,7 +183,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Lottery', href: '/dashboard/lottery', icon: Ticket, feature: 'lotteryEnabled' as const, industry: ['RETAIL'] as const },
         { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
-        { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },
+        { name: 'Reports', href: '/dashboard/reports', icon: BarChart3, always: true },
+        { name: 'Download Reports', href: '/dashboard/reports/download', icon: Download, always: true },
         // RETAIL only - Multi-Store Dashboard and Competitor Pricing
         { name: 'Multi-Store', href: '/dashboard/multi-store', icon: Store, industry: ['RETAIL'] as const },
         { name: 'Competitor Pricing', href: '/dashboard/pricing/competitor', icon: TrendingUp, industry: ['RETAIL'] as const },
@@ -351,7 +353,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 {/* Logo Header - Centered on its own row */}
                 <div className="flex h-16 xl:h-24 items-center justify-center border-b border-stone-800/50 bg-gradient-to-r from-stone-900/50 to-transparent">
                     <div className="transition-transform duration-300 hover:scale-105">
-                        <img src="/Oro-logo.jpg" alt="ORO 9" className="h-12 xl:h-16 w-auto object-contain" />
+                        <img src="/ORO_9.jpg" alt="ORO 9" className="h-12 xl:h-16 w-auto object-contain" />
                     </div>
                 </div>
 
@@ -512,8 +514,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                         </div>
                     </div>
 
-                    {/* ORO 9 Pulse App - For Owners/Managers */}
-                    {(role === 'FRANCHISOR' || role === 'FRANCHISEE' || role === 'MANAGER') && (
+                    {/* ORO 9 Pulse App - For Owners/Managers (NOT Brand HQ - they have their own Reports) */}
+                    {(role === 'FRANCHISOR' || role === 'FRANCHISEE' || role === 'MANAGER') && businessType !== 'BRAND_FRANCHISOR' && (
                         <Link
                             href="/pulse"
                             className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 px-3 py-2 mb-2 text-xs xl:text-sm font-medium text-orange-300 hover:from-orange-500/20 hover:to-amber-500/20 hover:text-orange-200 transition-all duration-200 group"

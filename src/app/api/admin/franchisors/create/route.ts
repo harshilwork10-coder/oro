@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { name, email, phone, companyName, storeName, supportFee, type, businessType, industryType, processingType, billingMethod, enableCommission } = body
+        const { name, email, phone, companyName, storeName, supportFee, type, businessType, industryType, processingType, billingMethod, enableCommission, dealerBrandingId } = body
 
         if (!name || !email || !companyName) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
                 industryType: finalIndustryType,
                 processingType: finalProcessingType,
                 phone: sanitizedPhone,
+                dealerBrandingId: dealerBrandingId || null,  // Dealer co-branding assignment
             }
         })
 

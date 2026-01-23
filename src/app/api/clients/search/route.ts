@@ -15,21 +15,28 @@ export async function GET(req: NextRequest) {
         const query = searchParams.get('query')
         const franchiseId = searchParams.get('franchiseId')
 
-        if (!query || !franchiseId) {
-            return NextResponse.json({ error: 'Query and franchise ID required' }, { status: 400 })
+        if (!franchiseId) {
+            return NextResponse.json({ error: 'Franchise ID required' }, { status: 400 })
+        }
+
+        // Build where clause
+        let whereClause: Record<string, unknown> = { franchiseId }
+
+        if (query && query.length >= 2) {
+            whereClause = {
+                ...whereClause,
+                OR: [
+                    { firstName: { contains: query, mode: 'insensitive' } },
+                    { lastName: { contains: query, mode: 'insensitive' } },
+                    { email: { contains: query, mode: 'insensitive' } },
+                    { phone: { contains: query } },
+                ],
+            }
         }
 
         const clients = await prisma.client.findMany({
-            where: {
-                franchiseId,
-                OR: [
-                    { firstName: { contains: query } },
-                    { lastName: { contains: query } },
-                    { email: { contains: query } },
-                    { phone: { contains: query } },
-                ],
-            },
-            take: 10,
+            where: whereClause,
+            take: 20,
             orderBy: {
                 createdAt: 'desc',
             },
@@ -41,4 +48,3 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to search clients' }, { status: 500 })
     }
 }
-

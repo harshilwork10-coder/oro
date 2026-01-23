@@ -16,6 +16,44 @@ export default function CheckIn() {
     const [liabilitySigned, setLiabilitySigned] = useState(false)
     const [loyaltyJoined, setLoyaltyJoined] = useState(false)
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+    const [storeName, setStoreName] = useState('Our Store') // Dynamic store name
+
+    // Load store name from terminal_config and refresh from server
+    useEffect(() => {
+        const loadConfig = async () => {
+            try {
+                const savedConfig = localStorage.getItem('terminal_config')
+                const stationId = localStorage.getItem('station_id')
+
+                // First, use cached value for immediate display
+                if (savedConfig) {
+                    const config = JSON.parse(savedConfig)
+                    if (config.business?.name) {
+                        setStoreName(config.business.name)
+                    }
+                }
+
+                // Then refresh from server to get latest (in case Provider changed it)
+                if (stationId) {
+                    const res = await fetch(`/api/pos/refresh-config?stationId=${stationId}`)
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data.success && data.config) {
+                            // Update localStorage with fresh config
+                            localStorage.setItem('terminal_config', JSON.stringify(data.config))
+                            // Update display
+                            if (data.config.business?.name) {
+                                setStoreName(data.config.business.name)
+                            }
+                        }
+                    }
+                }
+            } catch {
+                // Fallback to cached value if refresh fails
+            }
+        }
+        loadConfig()
+    }, [])
 
     const handlePhoneSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -282,10 +320,10 @@ export default function CheckIn() {
                                     <strong>LIABILITY WAIVER AND RELEASE FORM</strong>
                                 </p>
                                 <p className="mb-4">
-                                    I hereby acknowledge that I am voluntarily participating in services provided by Oro. I understand that these services may involve risks, including but not limited to allergic reactions to products, minor cuts, or other injuries.
+                                    I hereby acknowledge that I am voluntarily participating in services provided by {storeName}. I understand that these services may involve risks, including but not limited to allergic reactions to products, minor cuts, or other injuries.
                                 </p>
                                 <p className="mb-4">
-                                    I agree to release and hold harmless Oro, its employees, and agents from any and all liability, claims, or causes of action arising out of my participation in these services.
+                                    I agree to release and hold harmless {storeName}, its employees, and agents from any and all liability, claims, or causes of action arising out of my participation in these services.
                                 </p>
                                 <p>
                                     By clicking "Accept", I acknowledge that I have read and understood this waiver and agree to its terms.
@@ -308,7 +346,7 @@ export default function CheckIn() {
                                 <div className="mx-auto w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-purple-500/20">
                                     <span className="text-4xl">🎁</span>
                                 </div>
-                                <h2 className="text-3xl font-bold text-stone-100 mb-2">Join ORO 9 Rewards?</h2>
+                                <h2 className="text-3xl font-bold text-stone-100 mb-2">Join {storeName} Rewards?</h2>
                                 <p className="text-stone-400 text-lg">Earn points on every visit and get exclusive offers!</p>
                             </div>
 

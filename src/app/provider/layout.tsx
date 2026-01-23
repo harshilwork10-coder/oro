@@ -3,7 +3,7 @@
 import {
     Home, Users, Ticket, Monitor, HardDrive, FileText,
     CreditCard, Settings, Plus, Bell, Search, Menu, ChevronDown,
-    Building2, Package, LogOut, User, MapPin
+    Building2, Package, LogOut, User, MapPin, ClipboardList
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -16,9 +16,11 @@ const PROVIDER_SIDEBAR = [
     { name: 'Home', href: '/provider/home', icon: Home },
     { name: 'Owners', href: '/provider/owners', icon: Users },
     { name: 'Onboarding', href: '/provider/onboarding', icon: FileText },
+    { name: 'Provisioning', href: '/provider/provisioning', icon: MapPin },
     { name: 'Tickets', href: '/provider/tickets', icon: Ticket },
     { name: 'Devices', href: '/provider/devices', icon: HardDrive },
     { name: 'Monitoring', href: '/provider/monitoring', icon: Monitor },
+    { name: 'Audit Logs', href: '/provider/audit-logs', icon: ClipboardList },
     { name: 'Billing', href: '/provider/billing', icon: CreditCard },
     { name: 'UPC Import', href: '/provider/upc-import', icon: Package },
     { name: 'System', href: '/provider/system', icon: Settings },
@@ -61,7 +63,7 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
                 {/* Logo row - centered */}
                 {!sidebarCollapsed && (
                     <div className="h-20 flex items-center justify-center border-b border-stone-800">
-                        <img src="/Oro-logo.jpg" alt="ORO 9" className="h-16 w-auto object-contain" />
+                        <img src="/ORO_9.jpg" alt="ORO 9" className="h-16 w-auto object-contain" />
                     </div>
                 )}
 

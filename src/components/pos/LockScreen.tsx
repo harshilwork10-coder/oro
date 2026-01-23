@@ -80,18 +80,24 @@ export default function LockScreen({ isOpen, onUnlock, user }: LockScreenProps) 
                     <p className="text-slate-400">Enter your 4-digit PIN to unlock</p>
                 </div>
 
-                {/* PIN Display */}
-                <div className="flex justify-center gap-4 mb-8">
+                {/* PIN Display - Centered row matching keypad width */}
+                <div className="flex justify-center gap-4 max-w-xs mx-auto mb-8">
                     {[0, 1, 2, 3].map((i) => (
                         <div
                             key={i}
-                            className={`w-4 h-4 rounded-full transition-all duration-300 ${i < pin.length
+                            className={`w-14 h-14 rounded-xl border-2 flex items-center justify-center transition-all duration-200 ${i < pin.length
                                     ? error
-                                        ? 'bg-red-500 scale-125'
-                                        : 'bg-blue-500 scale-125'
-                                    : 'bg-slate-700'
+                                        ? 'bg-red-500/20 border-red-500'
+                                        : 'bg-amber-500/20 border-amber-500'
+                                    : i === pin.length
+                                        ? 'bg-slate-800 border-amber-500/50'
+                                        : 'bg-slate-800/50 border-slate-700'
                                 }`}
-                        />
+                        >
+                            {i < pin.length && (
+                                <div className={`w-3 h-3 rounded-full ${error ? 'bg-red-500' : 'bg-amber-500'}`} />
+                            )}
+                        </div>
                     ))}
                 </div>
 
@@ -102,7 +108,7 @@ export default function LockScreen({ isOpen, onUnlock, user }: LockScreenProps) 
                 )}
 
                 {/* Keypad */}
-                <div className="grid grid-cols-3 gap-4 max-w-xs mx-auto">
+                <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                         <button
                             key={num}
@@ -113,7 +119,14 @@ export default function LockScreen({ isOpen, onUnlock, user }: LockScreenProps) 
                             {num}
                         </button>
                     ))}
-                    <div className="h-20" /> {/* Empty slot */}
+                    {/* Clear button */}
+                    <button
+                        onClick={() => setPin('')}
+                        disabled={loading || pin.length === 0}
+                        className="h-20 rounded-2xl bg-slate-800/50 text-amber-400 text-xl font-bold hover:bg-slate-800 hover:text-amber-300 active:bg-slate-700 transition-all flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                        C
+                    </button>
                     <button
                         onClick={() => handleNumberClick(0)}
                         disabled={loading}

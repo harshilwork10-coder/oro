@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
                     data: {
                         locationId: locationId,
                         name: 'Register 1',
-                        pairingCode: `S1-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+                        pairingCode: Array.from({ length: 8 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join(''),
                         paymentMode: 'CASH_ONLY',
                         isActive: true
                     },

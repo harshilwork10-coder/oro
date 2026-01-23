@@ -18,11 +18,40 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const entityType = searchParams.get('entityType')
     const entityId = searchParams.get('entityId')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const action = searchParams.get('action')
+    const franchiseId = searchParams.get('franchiseId')
+    const dateFrom = searchParams.get('dateFrom')
+    const dateTo = searchParams.get('dateTo')
+    const search = searchParams.get('search')
+    const limit = parseInt(searchParams.get('limit') || '500')
 
     const where: any = {}
     if (entityType) where.entityType = entityType
     if (entityId) where.entityId = entityId
+    if (action && action !== 'ALL') where.action = action
+
+    // Franchise/Store filter - filter by franchiseId in the changes JSON
+    if (franchiseId && franchiseId !== 'ALL') {
+        where.changes = {
+            contains: franchiseId
+        }
+    }
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+        where.createdAt = {}
+        if (dateFrom) where.createdAt.gte = new Date(dateFrom)
+        if (dateTo) where.createdAt.lte = new Date(dateTo + 'T23:59:59')
+    }
+
+    // Search filter (by email or entityId)
+    if (search) {
+        where.OR = [
+            { userEmail: { contains: search } },
+            { entityId: { contains: search } },
+            { action: { contains: search } }
+        ]
+    }
 
     const logs = await prisma.auditLog.findMany({
         where,
@@ -30,7 +59,13 @@ export async function GET(request: NextRequest) {
         take: limit
     })
 
-    return NextResponse.json({ logs })
+    // Parse changes JSON for each log
+    const parsedLogs = logs.map(log => ({
+        ...log,
+        changes: log.changes ? JSON.parse(log.changes) : null
+    }))
+
+    return NextResponse.json({ logs: parsedLogs })
 }
 
 // POST - Create a new audit log entry

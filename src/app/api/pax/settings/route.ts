@@ -1,31 +1,54 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 
 // GET - Get PAX settings for current user's location
-export async function GET() {
+// Supports both Web (session) and Android (getAuthUser) authentication
+export async function GET(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.email) {
+        let userId: string | null = null
+        let userEmail: string | null = null
+
+        // Try Android mobile auth first (Authorization header)
+        const mobileUser = await getAuthUser(request)
+        if (mobileUser) {
+            userId = mobileUser.id
+            userEmail = mobileUser.email
+            console.log('[PAX Settings] Mobile auth:', mobileUser.email)
+        } else {
+            // Fall back to web session auth
+            const session = await getServerSession(authOptions)
+            if (session?.user?.email) {
+                userEmail = session.user.email
+                console.log('[PAX Settings] Session auth:', session.user.email)
+            }
+        }
+
+        if (!userId && !userEmail) {
+            console.log('[PAX Settings] No auth found')
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get user with their location
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: userId ? { id: userId } : { email: userEmail! },
             include: {
                 location: true
             }
         })
 
         if (!user?.location) {
+            console.log('[PAX Settings] User has no location:', userEmail || userId)
             return NextResponse.json({
                 error: 'No location assigned',
                 paxTerminalIP: null,
                 paxTerminalPort: '10009'
             })
         }
+
+        console.log('[PAX Settings] Location:', user.location.name, 'PAX IP:', user.location.paxTerminalIP)
 
         return NextResponse.json({
             paxTerminalIP: user.location.paxTerminalIP,

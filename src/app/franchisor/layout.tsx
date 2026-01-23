@@ -1,38 +1,33 @@
 'use client';
 
 import {
-    Home, Users, MapPin, Package, BarChart3, Ticket, FileText,
-    Plus, Bell, Search, Menu, ChevronDown, Building2, HardDrive, User, LogOut, Settings
+    Home, Users, MapPin, BarChart3, Settings,
+    Bell, Search, Menu, ChevronDown, LogOut,
+    Briefcase, Headphones, Download
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 
-// Franchisor sidebar items (8 items as specified)
+// Franchisor sidebar - SIMPLE (Provider handles hardware/support)
 const FRANCHISOR_SIDEBAR = [
     { name: 'Home', href: '/franchisor/home', icon: Home },
     { name: 'Franchisees', href: '/franchisor/franchisees', icon: Users },
     { name: 'Locations', href: '/franchisor/locations', icon: MapPin },
-    { name: 'Brand Catalog', href: '/franchisor/catalog', icon: Package },
-    { name: 'Reports', href: '/franchisor/reports', icon: BarChart3 },
-    { name: 'Support', href: '/franchisor/support', icon: Ticket },
-    { name: 'Requests', href: '/franchisor/requests', icon: FileText },
-    { name: 'Users', href: '/franchisor/users', icon: User },
+    { name: 'Brand Catalog', href: '/franchisor/catalog', icon: Briefcase },
+    { name: 'Reports', href: '/franchisor/reports/download', icon: BarChart3 },
+    { name: 'Support', href: '/franchisor/support', icon: Headphones },
+    { name: 'Settings', href: '/franchisor/settings', icon: Settings },
 ];
 
-// Quick add menu items (Franchisor-allowed actions only)
-const NEW_MENU_ITEMS = [
-    { name: 'New Ticket', href: '/franchisor/support?action=new', icon: Ticket },
-    { name: 'New Onboarding Request', href: '/franchisor/requests/new', icon: FileText },
-    { name: 'Request Device Change', href: '/franchisor/support?action=device-change', icon: HardDrive },
-];
+
 
 export default function FranchisorLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { data: session } = useSession();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [newMenuOpen, setNewMenuOpen] = useState(false);
+
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -90,7 +85,7 @@ export default function FranchisorLayout({ children }: { children: React.ReactNo
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-[var(--text-primary)] truncate">{user?.name || 'Franchisor'}</p>
-                                <p className="text-xs text-[var(--text-muted)] truncate">Brand Owner</p>
+                                <p className="text-xs text-[var(--text-muted)] truncate">{user?.role === 'PROVIDER' ? 'Provider Admin' : user?.role === 'FRANCHISOR' ? 'Franchisor' : 'Brand Owner'}</p>
                             </div>
                         </div>
                         <button
@@ -130,47 +125,42 @@ export default function FranchisorLayout({ children }: { children: React.ReactNo
                             <span className="absolute top-1 right-1 w-2 h-2 bg-[var(--primary)] rounded-full"></span>
                         </button>
 
-                        {/* + New Button Dropdown */}
+
+
+                        {/* Profile Dropdown */}
                         <div className="relative">
                             <button
-                                onClick={() => setNewMenuOpen(!newMenuOpen)}
-                                className="flex items-center gap-1 px-3 py-2 bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white rounded-lg text-sm font-medium transition-colors"
+                                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                                className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--surface-hover)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                             >
-                                <Plus size={18} />
-                                New
+                                <div className="w-8 h-8 bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] rounded-full flex items-center justify-center text-white text-sm font-medium">
+                                    {user?.name?.charAt(0) || 'F'}
+                                </div>
                                 <ChevronDown size={14} />
                             </button>
 
-                            {newMenuOpen && (
+                            {profileMenuOpen && (
                                 <>
                                     <div
                                         className="fixed inset-0 z-40"
-                                        onClick={() => setNewMenuOpen(false)}
+                                        onClick={() => setProfileMenuOpen(false)}
                                     />
-                                    <div className="absolute right-0 top-full mt-2 w-56 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1">
-                                        {NEW_MENU_ITEMS.map((item) => (
-                                            <Link
-                                                key={item.name}
-                                                href={item.href}
-                                                onClick={() => setNewMenuOpen(false)}
-                                                className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] transition-colors"
-                                            >
-                                                <item.icon size={16} />
-                                                {item.name}
-                                            </Link>
-                                        ))}
+                                    <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1">
+                                        <div className="px-4 py-2 border-b border-[var(--border)]">
+                                            <p className="text-sm font-medium text-[var(--text-primary)]">{user?.name || 'Brand Owner'}</p>
+                                            <p className="text-xs text-[var(--text-muted)]">{user?.role === 'PROVIDER' ? 'Provider Admin' : user?.role === 'FRANCHISOR' ? 'Franchisor' : 'Brand Owner'}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => signOut({ callbackUrl: '/login' })}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-[var(--surface-hover)] transition-colors"
+                                        >
+                                            <LogOut size={16} />
+                                            Sign out
+                                        </button>
                                     </div>
                                 </>
                             )}
                         </div>
-
-                        {/* Profile */}
-                        <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--surface-hover)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                            <div className="w-8 h-8 bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] rounded-full flex items-center justify-center text-white text-sm font-medium">
-                                F
-                            </div>
-                            <ChevronDown size={14} />
-                        </button>
                     </div>
                 </header>
 

@@ -53,6 +53,8 @@ interface ClientData {
     taxInclusive: boolean;
     roundingRule: 'PER_LINE' | 'PER_INVOICE';
     defaultTaxRate: number | null;
+    // Business Type for conditional display
+    businessType: 'BRAND_FRANCHISOR' | 'MULTI_LOCATION_OWNER' | 'FRANCHISE' | string;
 }
 
 interface MemberData {
@@ -180,6 +182,8 @@ export default function ProviderClientConfigPage() {
                         taxInclusive: found.config?.taxInclusive ?? false,
                         roundingRule: found.config?.roundingRule || 'PER_LINE',
                         defaultTaxRate: found.config?.defaultTaxRate ?? null,
+                        // Business Type
+                        businessType: found.businessType || 'MULTI_LOCATION_OWNER',
                     });
                 }
             }
@@ -257,11 +261,18 @@ export default function ProviderClientConfigPage() {
         { id: 'users', label: 'Users', value: 'Manage', icon: Users, color: 'sky' },
     ];
 
+    // Filter cards for Brand Franchisors - only show relevant tiles
+    const isBrandFranchisor = client.businessType === 'BRAND_FRANCHISOR';
+    const franchisorOnlyCards = ['status', 'features', 'locations', 'branding', 'users', 'pulse'];
+    const displayCards = isBrandFranchisor
+        ? configCards.filter(card => franchisorOnlyCards.includes(card.id))
+        : configCards;
+
     return (
         <div>
             {/* Header */}
             <div className="mb-6">
-                <Link href="/provider/clients" className="flex items-center gap-2 text-stone-400 hover:text-stone-200 text-sm mb-4">
+                <Link href="/provider/onboarding" className="flex items-center gap-2 text-stone-400 hover:text-stone-200 text-sm mb-4">
                     <ArrowLeft size={16} />
                     Back to All Clients
                 </Link>
@@ -290,7 +301,7 @@ export default function ProviderClientConfigPage() {
 
             {/* Config Cards Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {configCards.map((card) => {
+                {displayCards.map((card) => {
                     const Icon = card.icon;
                     const colorClasses: Record<string, string> = {
                         cyan: 'bg-cyan-500/20 text-cyan-400',

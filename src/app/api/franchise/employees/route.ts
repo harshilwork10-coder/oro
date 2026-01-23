@@ -23,7 +23,10 @@ export async function GET(request: NextRequest) {
     const locationId = searchParams.get('locationId')
 
     // Build where clause based on user role
-    const whereClause: Record<string, unknown> = { role: 'EMPLOYEE' }
+    const whereClause: Record<string, unknown> = {
+        role: 'EMPLOYEE',
+        isActive: true  // Hide deactivated/soft-deleted employees
+    }
 
     if (user.role === 'FRANCHISOR') {
         const franchisor = await prisma.franchisor.findUnique({

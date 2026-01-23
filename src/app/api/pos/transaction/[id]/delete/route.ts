@@ -35,6 +35,32 @@ export async function POST(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // POS COMPLIANCE: Transaction Immutability (Industry Standard)
+        // Transactions are financial records - they CANNOT be deleted.
+        // You can only: VOID (before close), REFUND (after settle), or ARCHIVE
+        // See: pos_transaction_standards.md
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // ALL transactions are protected once created - no hard deletes allowed
+        const protectedStatuses = ['COMPLETED', 'REFUNDED', 'VOIDED', 'PENDING', 'PARTIALLY_REFUNDED']
+        if (protectedStatuses.includes(transaction.status)) {
+            return NextResponse.json({
+                error: `Transactions cannot be deleted - they are immutable financial records. Use Void (same day) or Refund (after settlement) instead.`
+            }, { status: 400 })
+        }
+
+        // Also prevent deletion if this transaction has refund children
+        const hasRefunds = await prisma.transaction.count({
+            where: { originalTransactionId: transactionId }
+        })
+        if (hasRefunds > 0) {
+            return NextResponse.json({
+                error: 'Cannot delete transaction with associated refunds.'
+            }, { status: 400 })
+        }
+        // ═══════════════════════════════════════════════════════════════════════
+
         // Log deletion
         // Debug log removed deleting transaction ${transactionId}. Reason: ${reason}`)
 

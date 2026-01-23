@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse, NextRequest } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateInvoiceNumber } from '@/lib/invoice'
@@ -53,11 +53,13 @@ const transactionRequestSchema = z.object({
     tip: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
 })
 
-export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
+export async function POST(req: NextRequest) {
+    // Support both session (web) and Bearer token (mobile)
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) {
         return unauthorizedResponse()
     }
+
 
     // Validate request body
     const validation = await validateBody(req, transactionRequestSchema)
@@ -65,15 +67,53 @@ export async function POST(req: Request) {
 
     const { items, subtotal, tax, total, subtotalCash, subtotalCard, taxCash, taxCard, totalCash, totalCard, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType, tip } = validation.data
 
-    // Enforce Open Shift Rule
-    if (!cashDrawerSessionId) {
-        return badRequestResponse('No open shift. Transaction rejected.')
-    }
-    const sessionCheck = await prisma.cashDrawerSession.findUnique({
-        where: { id: cashDrawerSessionId }
+    // Shift validation (OWNER-CONTROLLED via BusinessConfig.shiftRequirement setting)
+    // Look up through franchise -> franchisor -> businessConfig
+    // NONE or no config = No shift required, allow transactions without shift
+    // CLOCK_IN_ONLY, CASH_COUNT_ONLY, BOTH = Require open shift
+    // ALSO: Check if THIS USER has requiresTimeClock=false (per-employee bypass)
+
+    // First check if this specific user requires time clock
+    const userRecord = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { requiresTimeClock: true, role: true }
     })
-    if (!sessionCheck || sessionCheck.endTime) {
-        return badRequestResponse('Shift is closed or invalid. Cannot process transaction.')
+
+    // Owners/Franchisors never require shift
+    const isOwnerOrAbove = ['OWNER', 'FRANCHISOR', 'PROVIDER', 'ADMIN'].includes(userRecord?.role || user.role)
+    // Employee-level bypass if owner set requiresTimeClock=false for this user
+    const userBypassesShift = userRecord?.requiresTimeClock === false
+
+    const franchiseRecord = await prisma.franchise.findUnique({
+        where: { id: user.franchiseId },
+        select: { franchisorId: true }
+    })
+
+    let shiftSetting: string | null = null
+    if (franchiseRecord?.franchisorId) {
+        const businessConfig = await prisma.businessConfig.findUnique({
+            where: { franchisorId: franchiseRecord.franchisorId },
+            select: { shiftRequirement: true }
+        })
+        shiftSetting = businessConfig?.shiftRequirement ?? null
+    }
+
+    // Only require shift if:
+    // 1. Owner explicitly set a non-NONE shift requirement AND
+    // 2. This user is NOT an owner/above AND
+    // 3. This user has requiresTimeClock=true (or not set, default behavior)
+    const requiresShift = shiftSetting !== null && shiftSetting !== 'NONE' && !isOwnerOrAbove && !userBypassesShift
+
+    if (requiresShift) {
+        if (!cashDrawerSessionId) {
+            return badRequestResponse('No open shift. Please open a shift before processing transactions.')
+        }
+        const sessionCheck = await prisma.cashDrawerSession.findUnique({
+            where: { id: cashDrawerSessionId }
+        })
+        if (!sessionCheck || sessionCheck.endTime) {
+            return badRequestResponse('Shift is closed or invalid. Cannot process transaction.')
+        }
     }
 
     // Determine chargedMode based on payment method
@@ -84,7 +124,7 @@ export async function POST(req: Request) {
     // Prevents duplicate transaction processing (double-charge protection)
     const idempotencyKey = getIdempotencyKey(req)
     if (idempotencyKey) {
-        const idempotencyResult = await checkIdempotency(idempotencyKey, session.user.franchiseId)
+        const idempotencyResult = await checkIdempotency(idempotencyKey, user.franchiseId)
         if (idempotencyResult.isDuplicate) {
             return NextResponse.json(idempotencyResult.cachedResponse)
         }
@@ -102,13 +142,13 @@ export async function POST(req: Request) {
         }
 
         // Generate sequential invoice number
-        const invoiceNumber = await generateInvoiceNumber(session.user.franchiseId)
+        const invoiceNumber = await generateInvoiceNumber(user.franchiseId)
 
         // Ensure numeric values are converted to strings for Prisma Decimal type
         const transactionData = {
             invoiceNumber,
-            franchiseId: session.user.franchiseId,
-            employeeId: session.user.id,
+            franchiseId: user.franchiseId,
+            employeeId: user.id,
             clientId: clientId || null,
             subtotal: subtotal.toString(),
             tax: tax.toString(),
@@ -282,10 +322,10 @@ export async function POST(req: Request) {
 
                 // Employee Permission Check for MANUAL discounts
                 // Employees cannot apply manual discounts unless explicitly authorized with limits
-                if (item.discount > 0 && session.user.role === 'EMPLOYEE') {
+                if (item.discount > 0 && user.role === 'EMPLOYEE') {
                     // Fetch fresh user permissions
                     const employee = await prisma.user.findUnique({
-                        where: { id: session.user.id },
+                        where: { id: user.id },
                         select: { canApplyDiscounts: true, maxDiscountPercent: true, maxDiscountAmount: true }
                     })
 
@@ -376,12 +416,11 @@ export async function POST(req: Request) {
         // ===== END ATOMIC TRANSACTION BLOCK =====
 
         // ===== AUDIT LOG - Record this sale for legal protection =====
-        const user = session.user as any
         await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role,
-            franchiseId: session.user.franchiseId,
+            franchiseId: user.franchiseId,
             action: ActionTypes.SALE_COMPLETED,
             entityType: 'TRANSACTION',
             entityId: transaction.id,
@@ -401,7 +440,7 @@ export async function POST(req: Request) {
 
         // ===== STORE IDEMPOTENCY KEY =====
         if (idempotencyKey) {
-            await storeIdempotencyKey(idempotencyKey, session.user.franchiseId, transaction)
+            await storeIdempotencyKey(idempotencyKey, user.franchiseId, transaction)
         }
         // ===== END STORE IDEMPOTENCY KEY =====
 
@@ -428,9 +467,10 @@ export async function POST(req: Request) {
     }
 }
 
-export async function GET(req: Request) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
+export async function GET(req: NextRequest) {
+    // Support both session (web) and Bearer token (mobile)
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -458,7 +498,7 @@ export async function GET(req: Request) {
             }
 
             // Security: Verify transaction belongs to user's franchise
-            if (transaction.franchiseId !== session.user.franchiseId) {
+            if (transaction.franchiseId !== user.franchiseId) {
                 return NextResponse.json({ error: 'Access denied' }, { status: 403 })
             }
 
@@ -471,7 +511,7 @@ export async function GET(req: Request) {
 
             const dailyCount = await prisma.transaction.count({
                 where: {
-                    franchiseId: session.user.franchiseId,
+                    franchiseId: user.franchiseId,
                     createdAt: {
                         gte: startOfDay,
                         lte: transaction.createdAt // Count up to this transaction
@@ -501,7 +541,7 @@ export async function GET(req: Request) {
         const invoiceNumber = searchParams.get('invoiceNumber')
 
         const where: any = {
-            franchiseId: session.user.franchiseId
+            franchiseId: user.franchiseId
         }
 
         // Date range filter

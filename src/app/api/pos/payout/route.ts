@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 interface CashPayoutData {
@@ -15,8 +14,8 @@ interface CashPayoutData {
 // POST - Record a cash payout (lottery, scratch, vendor)
 export async function POST(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        // Support both session (web) and Bearer token (mobile)
+        const user = await getAuthUser(request)
 
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -104,8 +103,8 @@ export async function POST(request: NextRequest) {
 // GET - List payouts for reporting
 export async function GET(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        // Support both session (web) and Bearer token (mobile)
+        const user = await getAuthUser(request)
 
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

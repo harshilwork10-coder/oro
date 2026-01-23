@@ -2,26 +2,40 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 
 // GET - Fetch all categories for the franchise
-export async function GET() {
+// Supports both web session and mobile Bearer token
+export async function GET(request: Request) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        // Try mobile auth first, then fall back to session
+        const authUser = await getAuthUser(request)
+
+        let franchiseId: string | undefined
+
+        if (authUser?.franchiseId) {
+            franchiseId = authUser.franchiseId
+        } else {
+            // Fall back to session auth for web dashboard
+            const session = await getServerSession(authOptions)
+            if (!session?.user) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            }
+
+            const user = await prisma.user.findUnique({
+                where: { email: session.user.email! },
+                include: { franchise: true }
+            })
+
+            franchiseId = user?.franchiseId || undefined
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email! },
-            include: { franchise: true }
-        })
-
-        if (!user?.franchiseId) {
+        if (!franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
         const categories = await prisma.serviceCategory.findMany({
-            where: { franchiseId: user.franchiseId },
+            where: { franchiseId },
             orderBy: { sortOrder: 'asc' }
         })
 
@@ -31,6 +45,7 @@ export async function GET() {
         return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 })
     }
 }
+
 
 // POST - Create a new category
 export async function POST(request: Request) {

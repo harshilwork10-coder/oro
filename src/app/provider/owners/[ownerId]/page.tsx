@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
     ArrowLeft, Building2, Store, Users, Plus, Settings, ArrowRight,
-    CheckCircle, Clock, XCircle, Mail, Phone, Smartphone, BarChart3, Crown, X, Loader2
+    CheckCircle, Clock, XCircle, Mail, Phone, Smartphone, BarChart3, Crown, X, Loader2,
+    AlertTriangle, Archive, Download, UserX, Key
 } from 'lucide-react';
 import Toast from '@/components/ui/Toast';
 
@@ -69,6 +70,18 @@ export default function OwnerBusinessesPage() {
     });
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+    // Offboarding Modal State
+    const [showOffboardModal, setShowOffboardModal] = useState(false);
+    const [offboardingBusiness, setOffboardingBusiness] = useState<BusinessData | null>(null);
+    const [offboardingReason, setOffboardingReason] = useState('');
+    const [offboardingStep, setOffboardingStep] = useState<'confirm' | 'processing' | 'done'>('confirm');
+    const [graceDays, setGraceDays] = useState(30);
+
+    // Password Reset Modal State
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [resettingPassword, setResettingPassword] = useState(false);
+
     useEffect(() => {
         fetchOwner();
     }, [ownerId]);
@@ -99,13 +112,12 @@ export default function OwnerBusinessesPage() {
 
         setAddingBusiness(true);
         try {
-            // Use the existing franchisor creation endpoint with owner's email
             const res = await fetch('/api/admin/franchisors/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     email: owner?.email,
-                    ownerName: owner?.name || 'Business Owner',
+                    name: owner?.name || 'Business Owner',  // API expects 'name' not 'ownerName'
                     companyName: businessForm.legalCompany,
                     storeName: businessForm.storeName,
                     businessType: businessForm.ownerType,
@@ -138,6 +150,42 @@ export default function OwnerBusinessesPage() {
             setAddingBusiness(false);
         }
     }
+
+    async function handleStartOffboarding() {
+        if (!offboardingBusiness) return;
+        setOffboardingStep('processing');
+
+        try {
+            const accountType = offboardingBusiness.llc.businessType === 'BRAND_FRANCHISOR'
+                ? 'BRAND_FRANCHISOR'
+                : 'MULTI_LOCATION';
+
+            const res = await fetch('/api/admin/offboarding/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    accountType,
+                    accountId: offboardingBusiness.llc.id,
+                    reason: offboardingReason,
+                    graceDays
+                })
+            });
+
+            if (res.ok) {
+                setOffboardingStep('done');
+                setToast({ message: 'Account suspended - offboarding started', type: 'success' });
+                fetchOwner(); // Refresh
+            } else {
+                const err = await res.json();
+                setToast({ message: err.error || 'Failed to start offboarding', type: 'error' });
+                setOffboardingStep('confirm');
+            }
+        } catch {
+            setToast({ message: 'Error starting offboarding', type: 'error' });
+            setOffboardingStep('confirm');
+        }
+    }
+
     function getStatusBadge(status: string) {
         switch (status) {
             case 'APPROVED':
@@ -175,6 +223,34 @@ export default function OwnerBusinessesPage() {
                 return '🍽️';
             default:
                 return '🏢';
+        }
+    }
+
+    async function handleResetPassword() {
+        if (!newPassword || newPassword.length < 6) {
+            setToast({ message: 'Password must be at least 6 characters', type: 'error' });
+            return;
+        }
+        setResettingPassword(true);
+        try {
+            const res = await fetch(`/api/provider/owners/${ownerId}/reset-password`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newPassword })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setToast({ message: data.message || 'Password reset successfully!', type: 'success' });
+                setShowPasswordModal(false);
+                setNewPassword('');
+            } else {
+                const err = await res.json();
+                setToast({ message: err.error || 'Failed to reset password', type: 'error' });
+            }
+        } catch {
+            setToast({ message: 'Error resetting password', type: 'error' });
+        } finally {
+            setResettingPassword(false);
         }
     }
 
@@ -240,13 +316,27 @@ export default function OwnerBusinessesPage() {
                         </div>
                     </div>
                 </div>
-                <button
-                    onClick={() => setShowAddModal(true)}
-                    className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-900 rounded-xl font-medium flex items-center gap-2 transition-colors"
-                >
-                    <Plus className="h-4 w-4" />
-                    Add Business
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* Reset Password Button */}
+                    <button
+                        onClick={() => setShowPasswordModal(true)}
+                        className="px-3 py-2 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                        title="Reset owner password"
+                    >
+                        <Key className="h-4 w-4" />
+                        Reset Password
+                    </button>
+                    {/* Hide Add Business for Brand Franchisors - they manage via HQ portal */}
+                    {!owner.businesses.some(b => b.llc.businessType === 'BRAND_FRANCHISOR') && (
+                        <button
+                            onClick={() => setShowAddModal(true)}
+                            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-900 rounded-xl font-medium flex items-center gap-2 transition-colors"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add Business
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Stats Summary */}
@@ -364,20 +454,59 @@ export default function OwnerBusinessesPage() {
 
                             {/* Card Actions */}
                             <div className="p-3 bg-stone-900/30 flex items-center gap-2">
-                                <Link
-                                    href={`/provider/owners/${ownerId}/${business.llc.id}`}
-                                    className="flex-1 px-4 py-2 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
-                                >
-                                    <Store className="h-4 w-4" />
-                                    View Stores
-                                </Link>
-                                <Link
-                                    href={`/provider/clients/${business.llc.id}/config`}
-                                    className="px-4 py-2 text-stone-400 hover:text-stone-200 hover:bg-stone-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
-                                >
-                                    <Settings className="h-4 w-4" />
-                                    Settings
-                                </Link>
+                                {business.llc.businessType === 'BRAND_FRANCHISOR' ? (
+                                    <>
+                                        <Link
+                                            href="/provider/provisioning"
+                                            className="flex-1 px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+                                        >
+                                            <Store className="h-4 w-4" />
+                                            Provisioning
+                                        </Link>
+                                        <Link
+                                            href={`/provider/clients/${business.llc.id}/config`}
+                                            className="px-4 py-2 text-stone-400 hover:text-stone-200 hover:bg-stone-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                                        >
+                                            <Settings className="h-4 w-4" />
+                                        </Link>
+                                        <button
+                                            onClick={() => {
+                                                setOffboardingBusiness(business);
+                                                setShowOffboardModal(true);
+                                                setOffboardingStep('confirm');
+                                            }}
+                                            className="px-4 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                                        >
+                                            <UserX className="h-4 w-4" />
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Link
+                                            href={`/provider/owners/${ownerId}/${business.llc.id}`}
+                                            className="flex-1 px-4 py-2 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+                                        >
+                                            <Store className="h-4 w-4" />
+                                            Stores
+                                        </Link>
+                                        <Link
+                                            href={`/provider/clients/${business.llc.id}/config`}
+                                            className="px-4 py-2 text-stone-400 hover:text-stone-200 hover:bg-stone-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                                        >
+                                            <Settings className="h-4 w-4" />
+                                        </Link>
+                                        <button
+                                            onClick={() => {
+                                                setOffboardingBusiness(business);
+                                                setShowOffboardModal(true);
+                                                setOffboardingStep('confirm');
+                                            }}
+                                            className="px-4 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                                        >
+                                            <UserX className="h-4 w-4" />
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -604,6 +733,108 @@ export default function OwnerBusinessesPage() {
                 </>
             )}
 
+            {/* Offboarding Modal */}
+            {showOffboardModal && offboardingBusiness && (
+                <>
+                    <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setShowOffboardModal(false)} />
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="bg-stone-900 border border-stone-800 rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                            {offboardingStep === 'confirm' && (
+                                <>
+                                    <div className="p-5 border-b border-stone-800">
+                                        <div className="flex items-center gap-3 text-red-400 mb-2">
+                                            <AlertTriangle className="h-6 w-6" />
+                                            <h3 className="text-xl font-semibold">Offboard Client</h3>
+                                        </div>
+                                        <p className="text-stone-400 text-sm">
+                                            This will suspend <strong className="text-stone-200">{offboardingBusiness.llc.name}</strong> and start the offboarding process.
+                                        </p>
+                                    </div>
+
+                                    <div className="p-5 space-y-4">
+                                        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                                            <p className="text-red-300 text-sm">
+                                                <strong>Warning:</strong> The client will immediately lose access. Transaction data will be retained for compliance.
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-stone-400 text-sm mb-1">Reason (optional)</label>
+                                            <input
+                                                type="text"
+                                                value={offboardingReason}
+                                                onChange={(e) => setOffboardingReason(e.target.value)}
+                                                placeholder="e.g., Non-payment, Contract ended..."
+                                                className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-200"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-stone-400 text-sm mb-1">Grace Period Before Anonymization</label>
+                                            <select
+                                                value={graceDays}
+                                                onChange={(e) => setGraceDays(Number(e.target.value))}
+                                                className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-200"
+                                            >
+                                                <option value={7}>7 days</option>
+                                                <option value={14}>14 days</option>
+                                                <option value={30}>30 days (recommended)</option>
+                                                <option value={60}>60 days</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3 p-5 border-t border-stone-800">
+                                        <button
+                                            onClick={() => setShowOffboardModal(false)}
+                                            className="flex-1 px-4 py-3 border border-stone-700 text-stone-300 rounded-lg font-medium"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleStartOffboarding}
+                                            className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2"
+                                        >
+                                            <UserX className="h-4 w-4" />
+                                            Start Offboarding
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {offboardingStep === 'processing' && (
+                                <div className="p-8 text-center">
+                                    <Loader2 className="h-12 w-12 animate-spin text-amber-400 mx-auto mb-4" />
+                                    <p className="text-stone-200">Suspending account...</p>
+                                </div>
+                            )}
+
+                            {offboardingStep === 'done' && (
+                                <div className="p-8 text-center">
+                                    <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <CheckCircle className="h-8 w-8 text-emerald-400" />
+                                    </div>
+                                    <h3 className="text-xl font-semibold text-stone-100 mb-2">Offboarding Started</h3>
+                                    <p className="text-stone-400 mb-4">
+                                        Account suspended. Anonymization scheduled in {graceDays} days.
+                                    </p>
+                                    <button
+                                        onClick={() => {
+                                            setShowOffboardModal(false);
+                                            setOffboardingBusiness(null);
+                                            setOffboardingReason('');
+                                        }}
+                                        className="px-6 py-3 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg font-medium"
+                                    >
+                                        Done
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
+
             {/* Toast */}
             {toast && (
                 <Toast
@@ -611,6 +842,73 @@ export default function OwnerBusinessesPage() {
                     type={toast.type}
                     onClose={() => setToast(null)}
                 />
+            )}
+
+            {/* Password Reset Modal */}
+            {showPasswordModal && (
+                <>
+                    <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setShowPasswordModal(false)} />
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="bg-stone-900 border border-stone-800 rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                            <div className="p-5 border-b border-stone-800">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                                        <Key className="h-5 w-5 text-amber-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-stone-100">Reset Password</h3>
+                                        <p className="text-stone-500 text-sm">{owner.email}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-5 space-y-4">
+                                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                                    <p className="text-amber-300 text-sm">
+                                        <strong>Note:</strong> You'll need to share the new password securely with the owner.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-stone-400 text-sm mb-1">New Password</label>
+                                    <input
+                                        type="text"
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        placeholder="Enter new password (min 6 chars)"
+                                        className="w-full px-3 py-2.5 bg-stone-800 border border-stone-700 rounded-lg text-stone-200 placeholder:text-stone-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 p-5 border-t border-stone-800">
+                                <button
+                                    onClick={() => { setShowPasswordModal(false); setNewPassword(''); }}
+                                    className="flex-1 px-4 py-3 border border-stone-700 text-stone-300 rounded-lg font-medium hover:bg-stone-800"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleResetPassword}
+                                    disabled={resettingPassword || newPassword.length < 6}
+                                    className="flex-1 px-4 py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-500/50 text-stone-900 rounded-lg font-semibold flex items-center justify-center gap-2"
+                                >
+                                    {resettingPassword ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Resetting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Key className="h-4 w-4" />
+                                            Reset Password
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </>
             )}
         </div>
     );

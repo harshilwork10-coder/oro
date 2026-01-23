@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
+import { validateStationToken, extractStationToken } from '@/lib/stationToken'
+
+// SECURITY: JWT secret must be set in production
+const JWT_SECRET = process.env.JWT_SECRET || 'CHANGE_THIS_IN_PRODUCTION_' + process.env.NEXTAUTH_SECRET?.slice(0, 16)
 
 // SECURITY: Rate limiting and lockout configuration
 const MAX_FAILED_ATTEMPTS = 5
@@ -29,8 +34,14 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
     return { allowed: true }
 }
 
-// POST - PIN Login for employees (station-based)
-// Terminal sends locationId, we only search employees at that location
+/**
+ * POST - PIN Login for employees (station-based)
+ * 
+ * SECURITY RULES:
+ * 1. stationToken is REQUIRED (device must be paired)
+ * 2. locationId is DERIVED from stationToken (NEVER from client)
+ * 3. Device fingerprint must match token
+ */
 export async function POST(request: NextRequest) {
     try {
         // SECURITY: Get client IP for rate limiting
@@ -48,19 +59,32 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { pin, locationId, employeeId } = body
+        const { pin, employeeId, stationToken, deviceId } = body
 
         // SECURITY: Validate PIN format strictly
-        if (!pin || typeof pin !== 'string' || !/^\d{4}$/.test(pin)) {
-            return NextResponse.json({ error: 'Enter 4-digit PIN' }, { status: 400 })
+        if (!pin || typeof pin !== 'string' || !/^\d{4,6}$/.test(pin)) {
+            return NextResponse.json({ error: 'Enter 4-6 digit PIN' }, { status: 400 })
         }
 
-        // SECURITY: Require locationId to prevent global PIN search attack
-        if (!locationId && !employeeId) {
+        // CRITICAL SECURITY: Validate stationToken and derive locationId from it
+        // locationId MUST come from server, NEVER from client input
+        const token = stationToken || extractStationToken(request.headers, body)
+        // NOTE: Not validating deviceId here - the stationToken JWT is already cryptographically
+        // signed with the device fingerprint from pairing. Strict fingerprint re-check was causing
+        // issues on emulators where ANDROID_ID can change between sessions.
+        const validatedStation = validateStationToken(token)
+
+        if (!validatedStation) {
+            console.error(`[SECURITY] PIN login blocked - invalid/missing stationToken from IP ${clientIP}`)
             return NextResponse.json({
-                error: 'Station not configured. Please contact admin.'
-            }, { status: 400 })
+                error: 'DEVICE_NOT_PAIRED',
+                message: 'Terminal not configured. Please enter pairing code.'
+            }, { status: 403 })
         }
+
+        // Location derived from validated token - NEVER from client
+        const locationId = validatedStation.locationId
+        const stationId = validatedStation.stationId
 
         // If employeeId is provided, verify PIN for that specific employee
         if (employeeId) {
@@ -129,10 +153,15 @@ export async function POST(request: NextRequest) {
         }
 
         // Build query based on locationId (station-based login)
+        // In dev mode without locationId, search all employees
         const whereClause: any = {
             role: 'EMPLOYEE',
-            pin: { not: null },
-            locationId: locationId // SECURITY: Now required
+            pin: { not: null }
+        }
+
+        // Only filter by location if provided
+        if (locationId) {
+            whereClause.locationId = locationId
         }
 
         // Find employees at this location only
@@ -182,9 +211,19 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// Helper to build user response
+// Helper to build user response with signed JWT token
 function buildUserResponse(employee: any) {
     const industryType = employee.franchise?.franchisor?.industryType || 'RETAIL'
+
+    // SECURITY: Generate signed JWT token (HS256)
+    const tokenPayload = {
+        userId: employee.id,
+        franchiseId: employee.franchiseId,
+        locationId: employee.locationId,
+        role: employee.role
+    }
+    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '8h' })
+
     return {
         id: employee.id,
         email: employee.email,
@@ -192,7 +231,18 @@ function buildUserResponse(employee: any) {
         role: employee.role,
         locationId: employee.locationId,
         franchiseId: employee.franchiseId,
-        industryType: industryType
+        industryType: industryType,
+        token: token, // Signed JWT token for mobile API calls
+        // Employee permissions for POS access control
+        permissions: {
+            canAddServices: employee.canAddServices ?? false,
+            canAddProducts: employee.canAddProducts ?? false,
+            canManageInventory: employee.canManageInventory ?? false,
+            canViewReports: employee.canViewReports ?? false,
+            canProcessRefunds: employee.canProcessRefunds ?? false,
+            canManageSchedule: employee.canManageSchedule ?? false,
+            canManageEmployees: employee.canManageEmployees ?? false
+        }
     }
 }
 

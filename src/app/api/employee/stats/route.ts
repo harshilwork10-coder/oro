@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { startOfDay, endOfDay } from 'date-fns'
 
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        // Support both session (web) and Bearer token (mobile)
+        const user = await getAuthUser(req)
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const employeeId = session.user.id
+        const employeeId = user.id
         const todayStart = startOfDay(new Date())
         const todayEnd = endOfDay(new Date())
 

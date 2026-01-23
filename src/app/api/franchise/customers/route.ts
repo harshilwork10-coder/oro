@@ -21,8 +21,21 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('query')
 
-    if (!query) {
-        return NextResponse.json([])
+    // If no query, return recent customers
+    if (!query || query.length < 2) {
+        const recentCustomers = await prisma.client.findMany({
+            where: { franchiseId: user.franchiseId },
+            take: 10,
+            orderBy: { createdAt: 'desc' }
+        })
+        return NextResponse.json(recentCustomers.map(c => ({
+            id: c.id,
+            name: `${c.firstName} ${c.lastName}`.trim(),
+            email: c.email,
+            phone: c.phone,
+            loyaltyPoints: 0,
+            visits: 0
+        })))
     }
 
     try {
@@ -30,20 +43,24 @@ export async function GET(request: Request) {
             where: {
                 franchiseId: user.franchiseId,
                 OR: [
-                    { firstName: { contains: query } },
-                    { lastName: { contains: query } },
-                    { email: { contains: query } },
+                    { firstName: { contains: query, mode: 'insensitive' } },
+                    { lastName: { contains: query, mode: 'insensitive' } },
+                    { email: { contains: query, mode: 'insensitive' } },
                     { phone: { contains: query } }
                 ]
             },
-            take: 10,
+            take: 20,
             orderBy: { createdAt: 'desc' }
         })
 
-        // Map Client to expected format if needed, or just return
+        // Map Client to expected format
         const mappedCustomers = customers.map(c => ({
-            ...c,
-            name: `${c.firstName} ${c.lastName}`
+            id: c.id,
+            name: `${c.firstName} ${c.lastName}`.trim(),
+            email: c.email,
+            phone: c.phone,
+            loyaltyPoints: 0,
+            visits: 0
         }))
 
         return NextResponse.json(mappedCustomers)

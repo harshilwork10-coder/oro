@@ -33,17 +33,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })
         }
 
-        // Validation: For APPROVE action, check that void check is uploaded
-        if (action === 'APPROVE') {
-            if (!existingFranchisor.voidCheckUrl) {
-                return NextResponse.json({
-                    error: 'Cannot approve - documents incomplete',
-                    missingFields: ['Voided Check'],
-                    canSendReminder: true,
-                    message: 'Client has not uploaded required documents: Voided Check'
-                }, { status: 400 })
-            }
-        }
+        // NOTE: Document validation removed - Provider handles documents directly
+        // No longer requiring voidCheckUrl before approval
 
         // Update Franchisor
         const franchisor = await prisma.franchisor.update({

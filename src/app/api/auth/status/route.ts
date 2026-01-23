@@ -86,6 +86,13 @@ export async function GET(req: NextRequest) {
             const primaryMembership = memberships.find(m => m.isPrimary) || memberships[0]
 
             status = approvedMembership ? 'APPROVED' : (primaryMembership?.franchisor.approvalStatus || 'PENDING')
+
+            // Provider-created accounts: Provider handles all documents, so mark as complete
+            documents = {
+                voidCheck: true,
+                dl: true,
+                feinLetter: true
+            }
         } else if (user.franchisor) {
             // Legacy: Check 1:1 franchisor relation
             status = user.franchisor.approvalStatus || 'PENDING'

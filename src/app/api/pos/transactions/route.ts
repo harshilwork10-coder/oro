@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
 
 export async function GET(req: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
+    // Support both session (web) and Bearer token (mobile)
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) {
         return ApiResponse.unauthorized()
     }
 
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
         // Build where clause
         const whereClause: Record<string, unknown> = {
-            franchiseId: session.user.franchiseId
+            franchiseId: user.franchiseId
         }
 
         if (status !== 'all') {
@@ -54,7 +54,10 @@ export async function GET(req: NextRequest) {
             include: {
                 lineItems: true,
                 employee: { select: { name: true } },
-                client: { select: { firstName: true, lastName: true } }
+                client: { select: { firstName: true, lastName: true } },
+                // P0 SOP: For "View Original" / "View Refund(s)" links
+                originalTransaction: { select: { id: true, invoiceNumber: true } },
+                refunds: { select: { id: true, invoiceNumber: true, total: true, createdAt: true } }
             },
             orderBy: orderBy || { createdAt: 'desc' }
         }

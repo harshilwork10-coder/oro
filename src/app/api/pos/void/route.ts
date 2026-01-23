@@ -1,6 +1,5 @@
-import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { validateBody, unauthorizedResponse, badRequestResponse } from '@/lib/validation'
@@ -13,12 +12,30 @@ const voidRequestSchema = z.object({
     cashDrawerSessionId: z.string().optional()
 })
 
-export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
-    const user = session?.user as any
+export async function POST(req: NextRequest) {
+    // Support both session (web) and Bearer token (mobile)
+    const user = await getAuthUser(req)
 
     if (!user?.franchiseId) {
         return unauthorizedResponse()
+    }
+
+    // SECURITY: Permission check - lookup user permissions from DB
+    // Using canProcessRefunds for both refunds and voids (financial reversal permission)
+    const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { canProcessRefunds: true, role: true }
+    })
+
+    // Only users with refund/void permission or owners/franchisors can void transactions
+    const canVoid = dbUser?.canProcessRefunds ||
+        dbUser?.role === 'OWNER' ||
+        dbUser?.role === 'FRANCHISOR' ||
+        user.role === 'OWNER' ||
+        user.role === 'FRANCHISOR'
+
+    if (!canVoid) {
+        return NextResponse.json({ error: 'Permission denied: Cannot void transactions' }, { status: 403 })
     }
 
     // Validate request body
@@ -27,15 +44,15 @@ export async function POST(req: Request) {
 
     const { transactionId, reason, cashDrawerSessionId } = validation.data
 
-    // Enforce Open Shift Rule
-    if (!cashDrawerSessionId) {
-        return badRequestResponse('No open shift. Void rejected.')
-    }
-    const sessionCheck = await prisma.cashDrawerSession.findUnique({
-        where: { id: cashDrawerSessionId }
-    })
-    if (!sessionCheck || sessionCheck.endTime) {
-        return badRequestResponse('Shift is closed. Cannot void transaction.')
+    // Shift validation (OPTIONAL - matches transaction behavior)
+    // Only validate if cashDrawerSessionId is provided
+    if (cashDrawerSessionId) {
+        const sessionCheck = await prisma.cashDrawerSession.findUnique({
+            where: { id: cashDrawerSessionId }
+        })
+        if (sessionCheck && sessionCheck.endTime) {
+            return badRequestResponse('Shift is closed. Cannot void transaction.')
+        }
     }
 
     try {

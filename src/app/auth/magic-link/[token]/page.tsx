@@ -16,7 +16,7 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
     const token = unwrappedParams.token
 
     const [status, setStatus] = useState<'loading' | 'valid' | 'invalid' | 'completed' | 'success'>('loading')
-    const [step, setStep] = useState<'identity' | 'security' | 'processing'>('identity')
+    const [step, setStep] = useState<'terms' | 'security' | 'processing'>('terms') // Simplified: terms → security → (processing only if needed)
     const [error, setError] = useState('')
     const [user, setUser] = useState<{ id: string, name: string, email: string } | null>(null)
     const [franchisor, setFranchisor] = useState<{ name: string, supportFee: string, type?: string, businessType?: string, processingType?: string } | null>(null)
@@ -152,8 +152,7 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
 
     const nextStep = () => {
         setError('')
-        if (step === 'identity') {
-            if (!formData.storeName || !formData.storeAddress || !formData.ownerName) return setError('Please fill in all required fields.')
+        if (step === 'terms') {
             if (!acceptedTerms) return setError('Please accept the terms.')
             setStep('security')
         } else if (step === 'security') {
@@ -178,7 +177,7 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
 
     const prevStep = () => {
         setError('')
-        if (step === 'security') setStep('identity')
+        if (step === 'security') setStep('terms')
         else if (step === 'processing') setStep('security')
     }
 
@@ -257,11 +256,11 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
                         <p className="text-stone-500">Let's get your {isFranchisee ? 'location' : 'business'} set up in 4 simple steps.</p>
                     </div>
 
-                    {/* Progress */}
+                    {/* Progress - 2 steps for Provider-created accounts */}
                     <div className="flex items-center gap-2 mb-8">
-                        {['identity', 'security', 'processing'].map((s, i) => {
+                        {['terms', 'security'].map((s, i) => {
                             const isActive = s === step
-                            const isCompleted = ['identity', 'security', 'processing'].indexOf(step) > i
+                            const isCompleted = ['terms', 'security'].indexOf(step) > i
                             return (
                                 <div key={s} className="flex-1 h-1.5 rounded-full bg-stone-200 overflow-hidden">
                                     <div className={`h-full transition-all duration-500 ${isCompleted ? 'bg-purple-600 w-full' : isActive ? 'bg-purple-600 w-1/2' : 'w-0'}`} />
@@ -278,21 +277,19 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
 
                     <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-6 lg:p-8">
 
-                        {/* STEP 1: IDENTITY */}
-                        {step === 'identity' && (
+                        {/* STEP 1: TERMS (Simplified) */}
+                        {step === 'terms' && (
                             <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                                 <h2 className="text-xl font-bold text-stone-900 flex items-center gap-2">
-                                    <Building2 className="h-5 w-5 text-purple-600" /> {isFranchisee ? 'Location Details' : 'Business Identity'}
+                                    <FileText className="h-5 w-5 text-purple-600" /> Accept Terms
                                 </h2>
 
-                                <div className="grid grid-cols-1 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">{isFranchisee ? 'Location Name' : 'Business Name'}</label>
-                                        <input name="storeName" value={formData.storeName} onChange={handleInputChange} className="w-full p-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-stone-900" placeholder={isFranchisee ? "e.g. Downtown Location" : "e.g. Downtown Bakery"} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">{isFranchisee ? 'Location Address' : 'Business Address'}</label>
-                                        <input name="storeAddress" value={formData.storeAddress} onChange={handleInputChange} className="w-full p-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-stone-900" placeholder="123 Main St" />
+                                <div className="bg-stone-50 rounded-xl p-4 border border-stone-200">
+                                    <p className="text-sm text-stone-600 mb-2"><strong>Your business has been set up by ORO 9.</strong></p>
+                                    <div className="text-sm text-stone-500 space-y-1">
+                                        <p>• Business: <strong className="text-stone-700">{franchisor?.name}</strong></p>
+                                        <p>• Owner: <strong className="text-stone-700">{user?.name}</strong></p>
+                                        <p>• Email: <strong className="text-stone-700">{user?.email}</strong></p>
                                     </div>
                                 </div>
 
@@ -302,7 +299,7 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
                                             {acceptedTerms && <CheckSquare className="h-3.5 w-3.5 text-white" />}
                                         </div>
                                         <input type="checkbox" className="hidden" checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)} />
-                                        <span className="text-sm text-stone-600 font-medium">I agree to the Terms of Service and Privacy Policy.</span>
+                                        <span className="text-sm text-stone-600 font-medium">I agree to the <a href="/terms" className="text-purple-600 underline">Terms of Service</a> and <a href="/privacy" className="text-purple-600 underline">Privacy Policy</a>.</span>
                                     </label>
                                 </div>
                             </div>
@@ -478,13 +475,13 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
 
                         {/* Navigation */}
                         <div className="flex gap-4 mt-8 pt-6 border-t border-stone-100">
-                            {step !== 'identity' && (
+                            {step !== 'terms' && (
                                 <button onClick={prevStep} className="px-6 py-3 border border-stone-200 rounded-xl font-medium hover:bg-stone-50 transition-colors flex items-center gap-2 text-stone-600">
                                     <ChevronLeft className="h-4 w-4" /> Back
                                 </button>
                             )}
 
-                            {step === 'processing' ? (
+                            {step === 'security' ? (
                                 <button
                                     onClick={handleSubmit}
                                     disabled={submitting}

@@ -1,36 +1,60 @@
-import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { logActivity, ActionTypes } from '@/lib/auditLog'
 import { badRequestResponse } from '@/lib/validation'
 
-export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
-    const user = session?.user as any
+export async function POST(req: NextRequest) {
+    // Support both session (web) and Bearer token (mobile)
+    const user = await getAuthUser(req)
 
     if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Permission check: Only users with refund permission or franchise owners
-    if (!user.canProcessRefunds && user.role !== 'FRANCHISOR') {
+    // Permission check: lookup user permissions from DB
+    const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { canProcessRefunds: true, role: true }
+    })
+
+    // Only users with refund permission or owners/franchisors can process refunds
+    const canRefund = dbUser?.canProcessRefunds ||
+        dbUser?.role === 'OWNER' ||
+        dbUser?.role === 'FRANCHISOR' ||
+        user.role === 'OWNER' ||
+        user.role === 'FRANCHISOR'
+
+    if (!canRefund) {
         return NextResponse.json({ error: 'Permission denied: Cannot process refunds' }, { status: 403 })
     }
 
     try {
         const body = await req.json()
-        const { originalTransactionId, refundType, items, reason, refundMethod, cashDrawerSessionId } = body
+        // Extract PAX card details for industry-standard refund tracking
+        const {
+            originalTransactionId,
+            refundType,
+            items,
+            reason,
+            refundMethod,
+            cashDrawerSessionId,
+            authCode,      // PAX authorization code
+            cardLast4,     // Last 4 digits of card
+            gatewayTxId    // PAX transaction ID
+        } = body
 
-        // Enforce Open Shift Rule
-        if (!cashDrawerSessionId) {
-            return badRequestResponse('No open shift. Refund rejected.')
-        }
-        const sessionCheck = await prisma.cashDrawerSession.findUnique({
-            where: { id: cashDrawerSessionId }
-        })
-        if (!sessionCheck || sessionCheck.endTime) {
-            return badRequestResponse('Shift is closed. Cannot process refund.')
+        // NOTE: Shift requirement is handled on transaction create, not on refund
+        // Refunds just need a valid reference to original transaction
+
+        // Check shift if provided
+        if (cashDrawerSessionId) {
+            const sessionCheck = await prisma.cashDrawerSession.findUnique({
+                where: { id: cashDrawerSessionId }
+            })
+            if (sessionCheck && sessionCheck.endTime) {
+                return badRequestResponse('Shift is closed. Cannot process refund.')
+            }
         }
 
         // Fetch original transaction with line items
@@ -142,6 +166,7 @@ export async function POST(req: Request) {
         // All refund operations are wrapped for rollback safety
         const refundTx = await prisma.$transaction(async (tx) => {
             // Create Refund Transaction (Negative values)
+            // Include PAX card data for industry-standard audit trail
             const refundTransaction = await tx.transaction.create({
                 data: {
                     franchiseId: user.franchiseId,
@@ -155,6 +180,11 @@ export async function POST(req: Request) {
                     total: -refundTotal,
                     voidReason: reason || 'No reason provided',
                     cashDrawerSessionId: cashDrawerSessionId, // USE CURRENT SESSION ID
+                    // ====== INDUSTRY-STANDARD CARD DATA STORAGE ======
+                    authCode: authCode || null,        // PAX authorization code
+                    cardLast4: cardLast4 || originalTx.cardLast4,  // Card last 4 (from PAX or original)
+                    gatewayTxId: gatewayTxId || null,  // PAX transaction ID
+                    // =================================================
                     lineItems: {
                         create: refundItems
                     }

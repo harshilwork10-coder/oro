@@ -1,0 +1,5 @@
+const { PrismaClient } = require('@prisma/client')
+const p = new PrismaClient()
+p.franchisor.findMany({ select: { id: true, name: true } })
+    .then(r => { console.log('Franchisors:'); r.forEach(f => console.log(`  ${f.id} - ${f.name || 'unnamed'}`)) })
+    .finally(() => p.$disconnect())

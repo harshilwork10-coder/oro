@@ -66,15 +66,27 @@ export function checkRateLimit(
 }
 
 /**
- * Get rate limit key from request (IP-based)
+ * Get rate limit key from request
+ * PRODUCTION: Use (stationId + route) not IP
  */
-export function getRateLimitKey(request: Request, prefix: string = 'api'): string {
-    // Try to get real IP from headers (for proxied requests)
+export function getRateLimitKey(request: Request, route: string = 'api'): string {
+    // Prefer stationId from headers (set by Android POS)
+    const stationId = request.headers.get('x-station-id')
+    const locationId = request.headers.get('x-location-id')
+
+    // Fall back to IP if no station context
+    if (stationId) {
+        return `station:${stationId}:${route}`
+    }
+    if (locationId) {
+        return `location:${locationId}:${route}`
+    }
+
+    // Fallback to IP (for web requests)
     const forwarded = request.headers.get('x-forwarded-for')
     const realIp = request.headers.get('x-real-ip')
     const ip = forwarded?.split(',')[0] || realIp || 'unknown'
-
-    return `${prefix}:${ip}`
+    return `ip:${ip}:${route}`
 }
 
 /**
@@ -133,6 +145,43 @@ export const RATE_LIMITS = {
     sms: { windowMs: 60 * 60 * 1000, maxRequests: 10 },
 
     // Password reset - very strict
-    passwordReset: { windowMs: 15 * 60 * 1000, maxRequests: 3 }
+    passwordReset: { windowMs: 15 * 60 * 1000, maxRequests: 3 },
+
+    // ═══════════════════════════════════════════════════════════════════
+    // POS API RATE LIMITS - Non-critical endpoints only
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Menu/catalog fetches - should use bootstrap instead
+    posMenu: { windowMs: 60 * 1000, maxRequests: 30 },
+
+    // Client search - with debounce on client, this should be low
+    posClients: { windowMs: 60 * 1000, maxRequests: 60 },
+
+    // Smart tiles - cached on server, shouldn't need frequent calls
+    posSmartTiles: { windowMs: 60 * 1000, maxRequests: 30 },
+
+    // Transaction list - paginated, shouldn't refresh constantly
+    posTransactions: { windowMs: 60 * 1000, maxRequests: 30 },
+}
+
+// Routes that should NEVER be rate limited (critical POS operations)
+export const NEVER_THROTTLE_ROUTES = [
+    '/api/pos/transaction',      // Checkout
+    '/api/pos/refund',           // Refunds
+    '/api/pos/void',             // Voids
+    '/api/pos/shift',            // Shift open/close
+    '/api/pos/timeclock',        // Clock in/out
+    '/api/pos/bootstrap',        // Startup - essential
+    '/api/pos/email-receipt',    // Receipt sending
+    '/api/pos/sms-receipt',      // Receipt sending
+    '/api/pos/payout',           // Cash payouts
+    '/api/drawer-activity',      // Cash drawer
+]
+
+/**
+ * Check if a route should never be rate limited (critical POS flow)
+ */
+export function isCriticalRoute(route: string): boolean {
+    return NEVER_THROTTLE_ROUTES.some(r => route.includes(r))
 }
 

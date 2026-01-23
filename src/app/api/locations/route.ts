@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
 
-        if (!session || (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR')) {
+        if (!session) {
             return ApiResponse.unauthorized()
         }
 
@@ -20,7 +20,38 @@ export async function GET(request: NextRequest) {
 
         let whereClause: Record<string, unknown> = {}
 
-        if (session.user.role === 'FRANCHISOR') {
+        // Handle different roles
+        const dashboardRoles = ['OWNER', 'MANAGER', 'EMPLOYEE', 'FRANCHISEE']
+        if (dashboardRoles.includes(session.user.role as string)) {
+            // For dashboard users: use session data first, then query if needed
+            if (session.user.franchiseId) {
+                whereClause = { franchiseId: session.user.franchiseId }
+            } else if (session.user.locationId) {
+                // Get location to find its franchise
+                const location = await prisma.location.findUnique({
+                    where: { id: session.user.locationId as string },
+                    select: { franchiseId: true }
+                })
+                if (location?.franchiseId) {
+                    whereClause = { franchiseId: location.franchiseId }
+                } else {
+                    whereClause = { id: session.user.locationId as string }
+                }
+            } else {
+                // Fallback: query user record for franchiseId
+                const user = await prisma.user.findUnique({
+                    where: { id: session.user.id },
+                    select: { franchiseId: true, locationId: true }
+                })
+                if (user?.franchiseId) {
+                    whereClause = { franchiseId: user.franchiseId }
+                } else if (user?.locationId) {
+                    whereClause = { id: user.locationId }
+                } else {
+                    return ApiResponse.success({ data: [], pagination: { hasMore: false, nextCursor: null } })
+                }
+            }
+        } else if (session.user.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({
                 where: { ownerId: session.user.id },
                 include: { franchises: true }
@@ -71,6 +102,9 @@ export async function GET(request: NextRequest) {
             }
 
             whereClause = { franchise: { franchisorId: franchisor.id } }
+        } else if (session.user.role !== 'PROVIDER') {
+            // Any other role that isn't PROVIDER can't access
+            return ApiResponse.unauthorized()
         }
 
         // Add search filter

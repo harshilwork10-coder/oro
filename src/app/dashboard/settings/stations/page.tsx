@@ -148,14 +148,11 @@ export default function StationsPage() {
             return
         }
 
-        // Auto-generate pairing code from name (uppercase, no spaces)
-        const autoPairingCode = newStation.name.toUpperCase().replace(/\s+/g, '')
-
         try {
-            // Include locationId for PROVIDER
+            // DON'T pass pairingCode - let backend generate secure 8-char code
             const payload = isProvider && selectedLocationId
-                ? { ...newStation, pairingCode: autoPairingCode, locationId: selectedLocationId }
-                : { ...newStation, pairingCode: autoPairingCode }
+                ? { name: newStation.name, paymentMode: newStation.paymentMode, terminalId: newStation.terminalId, locationId: selectedLocationId }
+                : { name: newStation.name, paymentMode: newStation.paymentMode, terminalId: newStation.terminalId }
             const res = await fetch('/api/settings/stations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -420,10 +417,9 @@ export default function StationsPage() {
                                 onChange={(e) => setNewStation({ ...newStation, name: e.target.value })}
                                 className="px-3 py-2 bg-stone-700 rounded-lg"
                             />
-                            {/* Auto-generated pairing code preview */}
-                            <div className="px-3 py-2 bg-stone-600/50 rounded-lg font-mono text-stone-400 flex items-center gap-2">
-                                <span className="text-xs text-stone-500">Code:</span>
-                                <span className="text-emerald-400">{newStation.name ? newStation.name.toUpperCase().replace(/\s+/g, '') : '—'}</span>
+                            {/* Auto-generated pairing code note */}
+                            <div className="px-3 py-2 bg-emerald-500/10 rounded-lg font-mono text-emerald-400 flex items-center gap-2 text-sm">
+                                <span>🔒 Secure 8-char code will be auto-generated</span>
                             </div>
                             <select
                                 value={newStation.paymentMode}

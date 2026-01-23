@@ -1,13 +1,12 @@
-import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
-    const user = session?.user as any
+export async function POST(req: NextRequest) {
+    // Support both session (web) and Bearer token (mobile)
+    const user = await getAuthUser(req)
 
-    if (!user || !user.id) {
+    if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -113,9 +112,9 @@ export async function POST(req: Request) {
     }
 }
 
-export async function GET(req: Request) {
-    const session = await getServerSession(authOptions)
-    const user = session?.user as any
+export async function GET(req: NextRequest) {
+    // Support both session (web) and Bearer token (mobile)
+    const user = await getAuthUser(req)
 
     if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

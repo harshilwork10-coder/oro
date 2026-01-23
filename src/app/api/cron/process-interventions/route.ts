@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { InterventionAutomationService } from '@/lib/automation/intervention-scheduler'
 
-// This endpoint should be secured with a CRON_SECRET in production
+// This endpoint is secured with CRON_SECRET in production
 export async function POST(request: NextRequest) {
     try {
-        // In a real app, verify authorization header
-        // const authHeader = request.headers.get('authorization')
-        // if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) { ... }
+        // SECURITY: Verify authorization header in production
+        const authHeader = request.headers.get('authorization')
+        if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
         const results = await InterventionAutomationService.processPendingInterventions()
 

@@ -12,6 +12,7 @@ import {
     CreditCard,
     Banknote,
     User,
+    Users,
     FileText,
     History,
     X,
@@ -60,6 +61,7 @@ import {
 } from '@/lib/print-agent'
 import { useOfflineMode } from '@/lib/use-offline-mode'
 import { OfflineStatusIndicator } from '@/components/pos/OfflineStatusIndicator'
+import QuickSwitchModal from '@/components/pos/QuickSwitchModal'
 
 interface CartItem {
     id: string
@@ -193,6 +195,9 @@ export default function RetailPOSPage() {
     // SMS Receipt Modal
     const [showReceiptModal, setShowReceiptModal] = useState(false)
     const [pendingReceiptData, setPendingReceiptData] = useState<any>(null)
+
+    // Quick Switch (Toast POS style employee switching)
+    const [showQuickSwitch, setShowQuickSwitch] = useState(false)
 
     // Auto-detect screen size for responsive POS layout
     // Small screens (< 800px height) = compact mode
@@ -1962,6 +1967,15 @@ export default function RetailPOSPage() {
                                 {selectedCustomer.firstName} {selectedCustomer.lastName}
                             </div>
                         )}
+
+                        {/* Quick Switch - Employee switching */}
+                        <button
+                            onClick={() => setShowQuickSwitch(true)}
+                            className="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-400 transition-colors text-sm"
+                        >
+                            <Users className="h-4 w-4" />
+                            <span>Switch User</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2427,6 +2441,33 @@ export default function RetailPOSPage() {
                     setPendingReceiptData(null)
                     setToast({ message: 'Payment successful!', type: 'success' })
                 }}
+            />
+
+            {/* Quick Switch Modal - Toast POS style employee switching */}
+            <QuickSwitchModal
+                isOpen={showQuickSwitch}
+                onClose={() => setShowQuickSwitch(false)}
+                onSwitch={async (employeeId, pin) => {
+                    try {
+                        const res = await fetch('/api/pos/timeclock/quick-switch', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ employeeId, pin })
+                        })
+                        if (res.ok) {
+                            const data = await res.json()
+                            // Refresh the page to update session
+                            setToast({ message: `Switched to ${data.employee.name}`, type: 'success' })
+                            setTimeout(() => window.location.reload(), 500)
+                            return true
+                        }
+                        return false
+                    } catch {
+                        return false
+                    }
+                }}
+                currentEmployeeId={user?.id}
+                storeId={user?.storeId || user?.locationId || ''}
             />
         </div>
     )

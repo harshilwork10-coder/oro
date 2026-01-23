@@ -39,6 +39,16 @@ enum PaymentMethod {
   GIFT_CARD
 }
 
+// Ledger-based Transaction Types (immutable accounting)
+enum TransactionType {
+  SALE        // Regular sale (positive amount)
+  REFUND      // Refund (negative, linked to original)
+  VOID        // Void (cancels before settlement)
+  TIP_ADJUST  // Tip adjustment after sale
+  PAYIN       // Cash added to drawer
+  PAYOUT      // Cash removed from drawer
+}
+
 enum AppointmentStatus {
   SCHEDULED
   CONFIRMED
@@ -62,7 +72,77 @@ enum TaxRoundingRule {
   PER_INVOICE
 }
 
-// ============ PROVIDER (TOP-LEVEL TENANT) ============
+// ============ OFFBOARDING ENUMS ============
+
+enum OffboardingAccountType {
+  BRAND_FRANCHISOR
+  FRANCHISE
+  MULTI_LOCATION
+}
+
+enum OffboardingStatus {
+  SUSPENDED
+  OFFBOARDING_EXPORT
+  OFFBOARDING_ANONYMIZE
+  ARCHIVED
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEATURE FLAGS (Production-Ready Rollout System)
+// Resolution order: Station → Location → FranchiseeBusiness → Franchisor → Vertical Default → Global Default
+// ═══════════════════════════════════════════════════════════════════════════
+
+model FeatureFlag {
+  id           String   @id @default(cuid())
+  key          String   @unique // e.g., "appointments_v2", "inventory_advanced"
+  description  String?
+  defaultValue Boolean  @default(false)
+  
+  // Targeting - JSON array of verticals or null for all
+  // Example: ["SALON", "RETAIL"] or null = all verticals
+  targetVerticals Json?
+  
+  // Rollout controls
+  status       String   @default("ACTIVE") // ACTIVE, DEPRECATED
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  overrides    FeatureFlagOverride[]
+  
+  @@index([key])
+  @@index([status])
+}
+
+model FeatureFlagOverride {
+  id          String   @id @default(cuid())
+  flagId      String
+  flag        FeatureFlag @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  
+  // Scope targeting - most specific wins
+  scopeType   String   // FRANCHISOR | FRANCHISEE_BUSINESS | LOCATION | STATION
+  scopeId     String   // ID of the targeted entity
+  
+  value       Boolean  // Override value (true = enabled, false = disabled)
+  reason      String?  // Required for audit: "Pilot testing", "Bug workaround", etc.
+  
+  updatedById String?  // Who made this change
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  
+  @@index([flagId])
+  @@index([scopeType, scopeId])
+  @@unique([flagId, scopeType, scopeId]) // One override per scope per flag
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PROVIDER (TOP-LEVEL TENANT)
 // This is THE single Oronex provider - the root of all hierarchy
 
 model Provider {
@@ -168,6 +248,31 @@ model RoleDefaultPermission {
   @@unique([role, permissionId])
 }
 
+// ============ FINE-GRAINED LOCATION ACCESS ============
+// For cases like "Manager has access to 2 of 3 stores"
+// Used in addition to role-based access (scope enforcement)
+model UserLocationAccess {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation("UserLocationAccess", fields: [userId], references: [id], onDelete: Cascade)
+  locationId String
+  
+  // Access level at this specific location
+  accessRole String   @default("VIEW") // VIEW, OPERATE, MANAGE, FULL
+  
+  // Reporting access
+  canViewReports     Boolean @default(false)
+  canExportReports   Boolean @default(false)
+  canViewFinancials  Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, locationId])
+  @@index([userId])
+  @@index([locationId])
+}
+
 model User {
   id        String  @id @default(cuid())
   name      String?
@@ -269,9 +374,7 @@ model User {
   commissionRule     CommissionRule?     @relation(fields: [commissionRuleId], references: [id])
   cashDrawerSessions CashDrawerSession[]
   drawerActivities   DrawerActivity[] // Fraud prevention - all drawer opens logged
-  // Global Catalog (Centralized Management)
-  globalServices     GlobalService[]
-  globalProducts     GlobalProduct[]
+  paymentLogs        PaymentLog[] @relation("PaymentLogs") // Payment attempt logs
 
   // Sub-Franchisee Link (Phase 2)
   subFranchisee SubFranchisee?
@@ -292,6 +395,9 @@ model User {
 
   // Normalized Permissions (new system - replaces boolean columns)
   permissions UserPermission[]
+
+  // Fine-grained Location Access (for manager/employee with limited store access)
+  locationAccess UserLocationAccess[] @relation("UserLocationAccess")
 
   // Pulse Device Tokens (for quick mobile login)
   pulseDeviceTokens PulseDeviceToken[]
@@ -340,6 +446,9 @@ model User {
   priceOverrides    EmployeeServicePriceOverride[] @relation("PriceOverrides")
   allowedServices   BarberAllowedService[]         @relation("AllowedServices")
   assignedResources UserResource[]
+
+  // SMS Marketing Campaigns created by this user
+  dealCampaignsCreated DealCampaign[] @relation("DealCampaignsCreated")
 }
 
 model Franchise {
@@ -444,13 +553,14 @@ model Franchise {
   printers PrinterConfig[]
 
   // === Account Offboarding (GDPR/CCPA Compliant) ===
-  accountStatus       String    @default("ACTIVE") // ACTIVE, SUSPENDED, PENDING_DELETION, DELETED
+  accountStatus       AccountStatus @default(ACTIVE)
   suspendedAt         DateTime?
   suspendedReason     String?
   suspendedBy         String? // User ID who suspended
   scheduledDeletionAt DateTime? // When data will be permanently deleted
   deletedAt           DateTime?
   dataExportedAt      DateTime? // When client downloaded their data
+  offboardingCases    OffboardingCase[] @relation("FranchiseOffboarding")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -717,6 +827,23 @@ model Location {
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
+  // ============ PROVISIONING WORKFLOW ============
+  // Brand HQ (franchisor) that owns this location chain
+  franchisorId String?
+  franchisor   Franchisor? @relation("FranchisorLocations", fields: [franchisorId], references: [id])
+  
+  // The franchisee LLC/business that operates this specific location
+  franchiseeBusinessId String?
+  
+  // Provisioning status for new locations
+  provisioningStatus String @default("PROVISIONING_PENDING") // PROVISIONING_PENDING, READY_FOR_INSTALL, ACTIVE, SUSPENDED
+  
+  // Brand Catalog Permissions (franchisor grants per-location)
+  canCustomizePricing Boolean @default(false) // If true, location can override brand prices
+  
+  // Provisioning tasks for this location
+  provisioningTasks LocationProvisioningTask[]
+
   // Terminal Setup Code - used to pair POS devices to this location
   setupCode String? @unique // e.g. "MIKE-1234" - permanent code for pairing terminals
 
@@ -737,6 +864,7 @@ model Location {
   schedules          Schedule[]
   drawerActivities   DrawerActivity[] // Fraud prevention audit trail
   stations           Station[] // POS stations/registers
+  paymentLogs        PaymentLog[] @relation("PaymentLogs") // Payment attempt logs
   paymentTerminals   PaymentTerminal[] // Card terminals at this location
 
   // Payment Processor Configuration
@@ -805,7 +933,8 @@ model Location {
   paymentProfiles LocationPaymentProfile[]
 
   // Location Item Overrides (price/availability per store) - CRITICAL NEW
-  itemOverrides LocationItemOverride[]
+  itemOverrides    LocationItemOverride[]
+  serviceOverrides LocationServiceOverride[] @relation("LocationServiceOverrides")
 
   // Stock On Hand (inventory per location) - CRITICAL NEW
   stockOnHand StockOnHand[]
@@ -829,6 +958,12 @@ model Location {
 
   // Compensation Plans for this location
   compensationPlans CompensationPlan[] @relation("CompensationPlans")
+
+  // SMS Marketing + Quota System
+  smsUsageLogs     SmsUsageLedger[]   @relation("SmsUsageLogs")
+  smsMonthlyUsage  SmsMonthlyUsage[]  @relation("SmsMonthlyUsage")
+  dealSuggestions  DealSuggestion[]   @relation("DealSuggestions")
+  dealCampaigns    DealCampaign[]     @relation("DealCampaigns")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -885,7 +1020,16 @@ model Station {
   dedicatedTerminal   PaymentTerminal? @relation(fields: [dedicatedTerminalId], references: [id])
 
   // Pairing code for device-station assignment (e.g., "REG1", "REG2")
-  pairingCode String? @unique
+  pairingCode          String?   @unique
+  pairingCodeExpiresAt DateTime? // Code expires after 24 hours (security)
+  pairingCodeUsedAt    DateTime? // One-time use - set when first paired
+
+  // Device binding - once paired, only this device can use station
+  pairingStatus   String    @default("UNPAIRED") // UNPAIRED, PAIRED
+  pairedDeviceId  String?   // UUID from device (fingerprint)
+  pairedAt        DateTime? // When pairing was completed
+  lastHeartbeatAt DateTime? // Last API call from paired device
+  isTrusted       Boolean   @default(false) // Set true after successful pairing
 
   // Currently logged-in employee (for shift tracking)
   currentUserId String?
@@ -895,11 +1039,13 @@ model Station {
 
   // Trusted Devices (Persistent Pairing)
   trustedDevices TrustedDevice[]
+  paymentLogs    PaymentLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([locationId])
+  @@index([pairedDeviceId])
 }
 
 // Trusted Device - Persistent "Cockroach" binding for stations
@@ -974,25 +1120,94 @@ model ExpansionRequest {
 
 // ============ GLOBAL CATALOG (FRANCHISOR MANAGED) ============
 
+// ============ BRAND CATALOG (Franchisor-Level Templates) ============
+// Template + Override Architecture: Brand defines templates, locations can override
+
+model GlobalServiceCategory {
+  id           String     @id @default(cuid())
+  franchisorId String
+  franchisor   Franchisor @relation("GlobalServiceCategories", fields: [franchisorId], references: [id], onDelete: Cascade)
+
+  name      String
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  services GlobalService[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([franchisorId, isActive])
+}
+
 model GlobalService {
   id           String     @id @default(cuid())
   franchisorId String
   franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
 
-  name         String
-  description  String?
-  duration     Int // in minutes
-  defaultPrice Decimal
-  category     String?
-  isArchived   Boolean @default(false)
+  name        String
+  description String?
+  duration    Int     // in minutes
+  basePrice   Decimal // Default price
+
+  // Salon pricing modes
+  priceMode String @default("FIXED") // FIXED, FROM, TIERED
+
+  // Tiered pricing (for TIERED mode - e.g., Short/Medium/Long hair)
+  tierShortPrice  Decimal? // Short hair
+  tierMediumPrice Decimal? // Medium hair
+  tierLongPrice   Decimal? // Long hair
+
+  // Category (brand-level organization)
+  categoryId String?
+  category   GlobalServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  // Business rules
+  commissionable       Boolean @default(true) // Some services excluded from commission
+  taxTreatmentOverride String? // null = use store default, SERVICE_EXEMPT, TAXABLE
+  isAddOn              Boolean @default(false) // For upselling
+  isActive             Boolean @default(true)
+  isArchived           Boolean @default(false)
 
   // Relations: One global service spawns many local instances
   localInstances Service[]
+  overrides      LocationServiceOverride[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  User      User?    @relation(fields: [userId], references: [id])
-  userId    String?
+
+  @@index([franchisorId, isActive])
+}
+
+model LocationServiceOverride {
+  id               String        @id @default(cuid())
+  globalServiceId  String
+  globalService    GlobalService @relation(fields: [globalServiceId], references: [id], onDelete: Cascade)
+  locationId       String
+  location         Location      @relation("LocationServiceOverrides", fields: [locationId], references: [id], onDelete: Cascade)
+
+  // Override fields (null = use brand value)
+  name        String?
+  description String?
+  duration    Int?
+  price       Decimal? // Local price override
+  cashPrice   Decimal?
+  cardPrice   Decimal?
+
+  // Tier overrides (for TIERED mode)
+  tierShortPrice  Decimal?
+  tierMediumPrice Decimal?
+  tierLongPrice   Decimal?
+
+  // Local controls
+  isEnabled Boolean @default(true)  // Disable service at this location
+  isLocked  Boolean @default(false) // Prevent brand sync updates
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([globalServiceId, locationId])
+  @@index([locationId])
 }
 
 model GlobalProduct {
@@ -1012,8 +1227,6 @@ model GlobalProduct {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  User      User?    @relation(fields: [userId], references: [id])
-  userId    String?
 }
 
 // ============ SHARED UPC DATABASE (Crowdsourced) ============
@@ -1374,6 +1587,15 @@ model Appointment {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Reporting indexes
+  @@index([locationId])
+  @@index([locationId, startTime])
+  @@index([locationId, status])
+  @@index([employeeId])
+  @@index([clientId])
+  @@index([startTime])
+  @@index([status])
 }
 
 model Schedule {
@@ -1571,10 +1793,11 @@ model TagAlongItem {
 
 // POS Transaction (sale/checkout)
 model Transaction {
-  id            String    @id @default(cuid())
-  invoiceNumber String?   @unique // Sequential invoice number for IRS compliance
+  id            String          @id @default(cuid())
+  invoiceNumber String?         @unique // Sequential invoice number for IRS compliance
+  type          TransactionType @default(SALE) // Ledger transaction type
   franchiseId   String
-  franchise     Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  franchise     Franchise       @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   clientId String?
   client   Client? @relation(fields: [clientId], references: [id])
@@ -1614,6 +1837,7 @@ model Transaction {
   cardType    String? // Visa, MasterCard, etc.
 
   status String @default("COMPLETED") // COMPLETED, REFUNDED, VOIDED
+  source String @default("WEB_POS")    // ANDROID_POS, WEB_POS, API (POS compliance)
 
   // Void Tracking (Audit Trail)
   voidedById String? // User who voided this transaction
@@ -1629,6 +1853,7 @@ model Transaction {
   refunds               Transaction[] @relation("RefundRelation")
 
   lineItems        TransactionLineItem[]
+  taxLines         TransactionTaxLine[] // Detailed tax breakdown per jurisdiction
   itemLineItems    ItemLineItem[] // Unified Item line items (new system)
   drawerActivities DrawerActivity[] // Drawer opens related to this transaction
 
@@ -1689,6 +1914,25 @@ model TransactionLineItem {
   lineItemStatus      String?   @default("PAID") // PAID, REFUNDED, VOIDED
 
   createdAt DateTime @default(now())
+}
+
+// Tax Line Items for ledger-based tax tracking (immutable)
+// Each transaction can have multiple tax lines (state, city, special district, etc.)
+model TransactionTaxLine {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  taxName       String  // "State Sales Tax", "City Tax", "Special District"
+  taxRate       Decimal // 0.0625 for 6.25%
+  taxableAmount Decimal // Pre-tax amount this rate applies to
+  taxAmount     Decimal // Computed tax amount
+
+  // Audit fields
+  jurisdictionId String? // Optional link to TaxJurisdiction
+  createdAt      DateTime @default(now())
+
+  @@index([transactionId])
 }
 
 // Royalty Configuration (customizable by each franchisor)
@@ -2237,10 +2481,10 @@ model Franchisor {
   // Approval Status
   approvalStatus String @default("PENDING") // PENDING, APPROVED, REJECTED
 
-  // Account Status (for suspension/termination)
-  accountStatus   String    @default("ACTIVE") // ACTIVE, SUSPENDED, TERMINATED
-  suspendedAt     DateTime?
-  suspendedReason String?
+  // Account Status (for suspension/termination) - uses ENUM for type safety
+  accountStatus    AccountStatus @default(ACTIVE)
+  suspendedAt      DateTime?
+  suspendedReason  String?
 
   // Business Type (Owner Type)
   businessType String @default("MULTI_LOCATION_OWNER") // "BRAND_FRANCHISOR" | "MULTI_LOCATION_OWNER"
@@ -2274,11 +2518,12 @@ model Franchisor {
   subFranchisees SubFranchisee[]
 
   // Existing Relations
-  franchises         Franchise[]
-  globalServices     GlobalService[]
-  globalProducts     GlobalProduct[]
-  royaltyConfig      RoyaltyConfig?
-  onboardingRequests OnboardingRequest[]
+  franchises              Franchise[]
+  globalServiceCategories GlobalServiceCategory[] @relation("GlobalServiceCategories")
+  globalServices          GlobalService[]
+  globalProducts          GlobalProduct[]
+  royaltyConfig           RoyaltyConfig?
+  onboardingRequests      OnboardingRequest[]
 
   // Onboarding Fields
   address        String?
@@ -2309,6 +2554,9 @@ model Franchisor {
   faviconUrl          String? // URL to favicon
   domain              String? // Custom domain e.g. "app.mysalon.com"
 
+  // Offboarding relation
+  offboardingCases OffboardingCase[] @relation("FranchisorOffboarding")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2320,6 +2568,123 @@ model Franchisor {
 
   // Feature Requests
   featureRequests FeatureRequest[]
+  
+  // Locations owned by this franchisor (for BRAND_FRANCHISOR model)
+  locations LocationProvisioningTask[] @relation("FranchisorProvisioningTasks")
+  ownedLocations Location[] @relation("FranchisorLocations")
+  
+  // ============ DEALER CO-BRANDING ============
+  // Links this franchisor to a dealer/reseller for co-branded experience
+  dealerBrandingId String?
+  dealerBranding   DealerBranding? @relation(fields: [dealerBrandingId], references: [id])
+}
+
+// ============ DEALER CO-BRANDING SYSTEM ============
+// Allows dealers/resellers to have their branding + support info displayed
+// Mode: ORO_ONLY = no dealer shown, CO_BRANDED = dealer shown with "Powered by ORO 9"
+model DealerBranding {
+  id           String @id @default(cuid())
+  
+  // Dealer Identity
+  dealerName   String    // "ABC Payments"
+  logoUrl      String?   // Small dealer logo URL
+  
+  // Dealer Support Contact (shown in POS + receipts)
+  supportPhone String?   // "630-xxx-xxxx"
+  supportEmail String?   // "support@abcpayments.com"
+  supportUrl   String?   // Optional support website
+  
+  // Clients using this dealer branding
+  franchisors  Franchisor[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ============ LOCATION PROVISIONING WORKFLOW ============
+// When HQ creates a location, Provider must provision it before go-live
+model LocationProvisioningTask {
+  id                    String   @id @default(cuid())
+  
+  // The location being provisioned
+  locationId            String
+  location              Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  
+  // Brand HQ that requested this
+  franchisorId          String
+  franchisor            Franchisor @relation("FranchisorProvisioningTasks", fields: [franchisorId], references: [id])
+  
+  // The franchisee LLC operating this location
+  franchiseeBusinessId  String
+  
+  // Request details
+  requestedByUserId     String?  // HQ admin who created the location
+  requestedDevicesCount Int?     // How many POS terminals needed
+  notes                 String?  // Special instructions from HQ
+  
+  // Assignment
+  assignedToUserId      String?  // Provider staff assigned to this
+  
+  // Status: OPEN -> IN_PROGRESS -> DONE
+  status                String   @default("OPEN") // OPEN, IN_PROGRESS, DONE
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([status])
+  @@index([franchisorId, status])
+  @@index([locationId])
+}
+
+// ============ OFFBOARDING CASE (COMPLIANCE AUDIT TRAIL) ============
+// One case per offboarding attempt - tracks the full workflow for legal compliance
+// Provider-only control: customers can request, only Provider can execute
+model OffboardingCase {
+  id                       String   @id @default(cuid())
+  
+  // Account being offboarded (exactly ONE must be set)
+  accountType              OffboardingAccountType
+  franchisorId             String?
+  franchisor               Franchisor? @relation("FranchisorOffboarding", fields: [franchisorId], references: [id])
+  franchiseId              String?
+  franchise                Franchise? @relation("FranchiseOffboarding", fields: [franchiseId], references: [id])
+  
+  // Status tracking (enum for type safety)
+  status                   OffboardingStatus @default(SUSPENDED)
+  
+  // Request details
+  reason                   String?
+  requestedByUserId        String?  // Customer who requested
+  approvedByProviderUserId String?  // Provider staff who approved
+  
+  // Stage timestamps (audit trail)
+  startedAt                DateTime @default(now())
+  suspendedAt              DateTime?
+  exportGeneratedAt        DateTime?
+  anonymizedAt             DateTime?
+  archivedAt               DateTime?
+  
+  // Configuration (Provider-settable per case)
+  retentionYears           Int      @default(7)  // 3, 5, 7, 10
+  graceDays                Int      @default(30) // 7, 14, 30, 60
+  
+  // Export tracking
+  exportFileUrl            String?
+  exportFileExpiresAt      DateTime?
+  
+  // Financial obligations check
+  hasOpenChargebacks       Boolean  @default(false)
+  hasPendingSettlements    Boolean  @default(false)
+  financialClearanceAt     DateTime?
+  financialClearedBy       String?
+  
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  
+  @@index([franchisorId])
+  @@index([franchiseId])
+  @@index([status])
+  @@index([accountType, status])
 }
 
 // BUSINESS CONFIGURATION (PROVIDER-CONTROLLED)
@@ -2498,12 +2863,20 @@ model AuditLog {
   id String @id @default(cuid())
 
   // Who performed the action
-  entityType String // Lead, Note, Activity, Task, Franchisor, User, etc.
+  entityType String // Lead, Note, Activity, Task, Franchisor, User, TRANSACTION, SHIFT, etc.
   entityId   String
-  action     String // CREATED, UPDATED, DELETED, VIEWED, LOGIN, LOGOUT
+  action     String // CREATED, UPDATED, DELETED, VIEWED, LOGIN, LOGOUT, VOID, REFUND, DISCOUNT_OVERRIDE
   userId     String
   userEmail  String?
   userRole   String?
+
+  // POS Compliance Fields (added for transaction standards)
+  franchiseId String?  // Which franchise
+  locationId  String?  // Which location
+  stationId   String?  // Which terminal
+  source      String   @default("WEB_POS") // ANDROID_POS, WEB_POS, API, SYSTEM
+  reason      String?  // User-provided reason (required for voids/refunds)
+  approvedBy  String?  // Manager who approved action
 
   // Context
   changes   String? // JSON before/after
@@ -2519,6 +2892,7 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([entityType])
+  @@index([franchiseId])
   @@index([createdAt])
 }
 
@@ -4695,3 +5069,229 @@ model SubFranchisee {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ============ ANDROID POS SUPPORT ============
+
+// Payment Log - Track payment attempts for dispute resolution
+model PaymentLog {
+  id            String   @id @default(cuid())
+  transactionId String   @unique // Idempotency key from Android app
+  status        String   // SENT, APPROVED, DECLINED, UNKNOWN, ERROR, VOIDED, REFUNDED
+  amount        Int?     // Amount in cents
+  authCode      String?  // Authorization code from processor
+  cardLast4     String?  // Last 4 digits (masked)
+  cardBrand     String?  // VISA, MASTERCARD, AMEX, DISCOVER
+  terminalId    String?  // PAX terminal identifier
+  reason        String?  // Decline reason or error message
+
+  // Relations
+  stationId  String?
+  station    Station?  @relation(fields: [stationId], references: [id])
+  locationId String?
+  location   Location? @relation("PaymentLogs", fields: [locationId], references: [id])
+  userId     String?
+  user       User?     @relation("PaymentLogs", fields: [userId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  @@index([status])
+  @@index([locationId])
+  @@index([createdAt])
+}
+
+// System Alert - For UNKNOWN payment states that need reconciliation
+model SystemAlert {
+  id       String @id @default(cuid())
+  type     String // PAYMENT_RECONCILIATION, LOW_STOCK, etc.
+  severity String // LOW, MEDIUM, HIGH, CRITICAL
+  title    String
+  message  String
+
+  // Context
+  locationId String?
+  metadata   Json? // Additional context data
+
+  // Status
+  acknowledged   Boolean   @default(false)
+  acknowledgedBy String?
+  acknowledgedAt DateTime?
+  resolved       Boolean   @default(false)
+  resolvedBy     String?
+  resolvedAt     DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([severity])
+  @@index([locationId])
+  @@index([acknowledged])
+}
+
+// ============ SMS MARKETING + QUOTA SYSTEM ============
+
+// SMS Usage Ledger - Append-only truth for billing proof
+model SmsUsageLedger {
+  id                String   @id @default(cuid())
+  locationId        String
+  campaignId        String?  // Reference to DealCampaign
+  customerId        String?  // Reference to Client
+  phone             String
+  messageType       String   // PROMO | TRANSACTIONAL
+  messageContent    String?  // Template snapshot for audit
+  units             Int      @default(1) // SMS segments
+  monthKey          String   // "2026-01" in location timezone
+  billCategory      String   // FREE | OVERAGE
+  providerMessageId String?  // Provider's message ID
+  status            String   // QUEUED | SENT | DELIVERED | FAILED | OPTED_OUT | SUPPRESSED_*
+  carrierCode       String?  // Carrier response code
+  suppressedReason  String?  // NO_CONSENT | OPTED_OUT | FREQUENCY_CAP | DELIVERY_FAILURE | REDEEMED | RECENT_VISIT
+  sentAt            DateTime?
+  createdAt         DateTime @default(now())
+
+  location Location @relation("SmsUsageLogs", fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, monthKey])
+  @@index([campaignId])
+  @@index([phone])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// SMS Monthly Usage - Fast counters per location/month
+model SmsMonthlyUsage {
+  id               String   @id @default(cuid())
+  locationId       String
+  monthKey         String   // "2026-01"
+  freeUnitsUsed    Int      @default(0)
+  overageUnitsUsed Int      @default(0)
+  updatedAt        DateTime @updatedAt
+
+  location Location @relation("SmsMonthlyUsage", fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, monthKey])
+}
+
+// SMS Opt-Out - Suppression list
+model SmsOptOut {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  reason    String   // STOP | DELIVERY_FAILURE | SPAM_REPORT
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+}
+
+// ============ DEAL SUGGESTIONS + CAMPAIGNS ============
+
+// Deal Suggestion - Weekly generated suggestions
+model DealSuggestion {
+  id              String   @id @default(cuid())
+  locationId      String
+  weekOf          DateTime // Start of the week this suggestion is for
+  dealType        String   // SLOW_DAY | WIN_BACK | REBOOK
+  title           String
+  description     String
+  discountType    String   // FIXED_AMOUNT | PERCENTAGE | FREE_ADDON
+  discountValue   Decimal
+  priceFloor      Decimal? // Min final price (profit lock)
+  minSpend        Decimal? // Min spend to qualify
+  targetDays      String[] // ["MONDAY", "TUESDAY"]
+  targetTimeStart String?  // "10:00"
+  targetTimeEnd   String?  // "14:00"
+  audienceCount   Int      @default(0) // Eligible customers
+  status          String   @default("PENDING") // PENDING | SCHEDULED | SENT | EXPIRED
+  scheduledFor    DateTime?
+  sentAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  location  Location       @relation("DealSuggestions", fields: [locationId], references: [id], onDelete: Cascade)
+  campaigns DealCampaign[]
+
+  @@index([locationId, weekOf])
+  @@index([status])
+}
+
+// Deal Campaign - Scheduled SMS campaign (linked to suggestion or standalone)
+model DealCampaign {
+  id               String   @id @default(cuid())
+  locationId       String
+  dealSuggestionId String?  // Optional - may be custom campaign
+  templateHash     String   // Hash of content for duplicate detection
+  audienceType     String   // INACTIVE_35 | NEW_14 | VIP | ALL | CUSTOM
+  audienceCount    Int      @default(0)
+  estimatedUnits   Int      @default(0)
+  estimatedFree    Int      @default(0)
+  estimatedOverage Int      @default(0)
+  actualUnits      Int?
+  status           String   @default("DRAFT") // DRAFT | SCHEDULED | SENDING | SENT | BLOCKED
+  blockedReason    String?  // DUPLICATE_WITHIN_7_DAYS | FOOTER_MISSING | etc.
+  scheduledFor     DateTime
+  sentAt           DateTime?
+  createdById      String
+  
+  // Message content
+  messageTemplate  String   // SMS template with placeholders
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  location       Location        @relation("DealCampaigns", fields: [locationId], references: [id], onDelete: Cascade)
+  dealSuggestion DealSuggestion? @relation(fields: [dealSuggestionId], references: [id], onDelete: SetNull)
+  createdBy      User            @relation("DealCampaignsCreated", fields: [createdById], references: [id])
+
+  @@index([locationId, status])
+  @@index([locationId, scheduledFor])
+  @@index([templateHash])
+}
+
+// ============ API CALL LOGGING (Cost & Performance Monitoring) ============
+// Used to track API usage per location/device for optimization
+// RETENTION: Raw logs 7-14 days, rollups 12-24 months
+
+model ApiLog {
+  id            String   @id @default(cuid())
+  locationId    String?
+  stationId     String?
+  userId        String?
+  route         String   // API endpoint path
+  method        String   // GET, POST, PUT, DELETE
+  status        Int      // HTTP status code
+  statusClass   String   // "2xx", "4xx", "5xx"
+  latencyMs     Int      // Response time in milliseconds
+  responseBytes Int?     // Response body size in bytes
+  userAgent     String?
+  sampled       Boolean  @default(true) // false = skipped due to sampling
+  createdAt     DateTime @default(now())
+
+  @@index([locationId, createdAt])
+  @@index([route, createdAt])
+  @@index([createdAt])
+}
+
+// Daily aggregated API usage (rollup from ApiLog)
+// Use this for dashboards, not raw ApiLog
+model ApiUsageDaily {
+  id           String   @id @default(cuid())
+  date         DateTime @db.Date
+  locationId   String?
+  route        String
+  
+  // Metrics
+  totalCalls   Int      @default(0)
+  successCalls Int      @default(0) // 2xx
+  clientErrors Int      @default(0) // 4xx
+  serverErrors Int      @default(0) // 5xx
+  avgLatencyMs Int      @default(0)
+  p95LatencyMs Int      @default(0)
+  totalBytes   BigInt   @default(0)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([date, locationId, route])
+  @@index([locationId, date])
+  @@index([date])
+}
+

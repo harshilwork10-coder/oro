@@ -67,6 +67,7 @@ export default function DevicesPage() {
     // Requests State
     const [requests, setRequests] = useState<any[]>([]);
     const [approving, setApproving] = useState<string | null>(null);
+    const [regeneratingStationId, setRegeneratingStationId] = useState<string | null>(null);
 
     // Modals
     const [showAddModal, setShowAddModal] = useState(false);
@@ -204,12 +205,12 @@ export default function DevicesPage() {
     };
 
     const handleAddStation = async (locationId: string) => {
-        if (!newStationName || !newStationCode) return;
+        if (!newStationName) return;  // Code not needed - backend generates it
         try {
             const res = await fetch('/api/settings/stations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ locationId, name: newStationName, pairingCode: newStationCode })
+                body: JSON.stringify({ locationId, name: newStationName })  // No pairingCode - backend generates 8-char
             });
             if (res.ok) {
                 fetchStationsForLocation(locationId);
@@ -230,6 +231,25 @@ export default function DevicesPage() {
                 setToast({ message: 'Station deleted', type: 'success' });
             }
         } catch (e) { console.error(e); }
+    };
+
+    // Regenerate pairing code (for hardware replacement)
+    const handleRegenerateCode = async (locationId: string, stationId: string) => {
+        setRegeneratingStationId(stationId);
+        try {
+            const res = await fetch(`/api/settings/stations/${stationId}/regenerate-code`, { method: 'POST' });
+            if (res.ok) {
+                fetchStationsForLocation(locationId);
+                setToast({ message: 'New pairing code generated', type: 'success' });
+            } else {
+                setToast({ message: 'Failed to regenerate code', type: 'error' });
+            }
+        } catch (e) {
+            console.error(e);
+            setToast({ message: 'Error regenerating code', type: 'error' });
+        } finally {
+            setRegeneratingStationId(null);
+        }
     };
 
     // Request Functions
@@ -524,35 +544,18 @@ export default function DevicesPage() {
                                                         maxLength={30}
                                                         className="flex-1 px-3 py-2 bg-stone-900 border border-stone-700 rounded-lg text-stone-100 text-sm"
                                                     />
-                                                    {newStationCode ? (
-                                                        <span className="px-3 py-2 bg-emerald-500/20 text-emerald-400 font-mono text-sm rounded-lg border border-emerald-500/30">
-                                                            {newStationCode}
-                                                        </span>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => {
-                                                                // Generate random 6-char alphanumeric pairing code
-                                                                const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-                                                                let code = '';
-                                                                for (let i = 0; i < 6; i++) {
-                                                                    code += chars.charAt(Math.floor(Math.random() * chars.length));
-                                                                }
-                                                                setNewStationCode(code);
-                                                            }}
-                                                            className="px-4 py-2 bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 rounded-lg text-sm font-medium border border-orange-500/30"
-                                                        >
-                                                            PAIRING CODE
-                                                        </button>
-                                                    )}
+                                                    <span className="px-3 py-2 bg-emerald-500/10 text-emerald-400 text-xs rounded-lg border border-emerald-500/30">
+                                                        🔒 8-char code auto
+                                                    </span>
                                                     <button
                                                         onClick={() => handleAddStation(terminal.locationId)}
-                                                        disabled={!newStationName || !newStationCode}
+                                                        disabled={!newStationName}
                                                         className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         <Check size={16} />
                                                     </button>
                                                     <button
-                                                        onClick={() => { setAddingStationFor(null); setNewStationName(''); setNewStationCode(''); }}
+                                                        onClick={() => { setAddingStationFor(null); setNewStationName(''); }}
                                                         className="px-3 py-2 bg-stone-700 hover:bg-stone-600 text-white rounded-lg"
                                                     >
                                                         <X size={16} />
@@ -573,12 +576,22 @@ export default function DevicesPage() {
                                                                 <p className="text-stone-500 text-xs font-mono">{station.pairingCode}</p>
                                                             </div>
                                                         </div>
-                                                        <button
-                                                            onClick={() => handleDeleteStation(terminal.locationId, station.id)}
-                                                            className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
+                                                        <div className="flex gap-1">
+                                                            <button
+                                                                onClick={() => handleRegenerateCode(terminal.locationId, station.id)}
+                                                                disabled={regeneratingStationId === station.id}
+                                                                className="p-2 text-orange-400 hover:bg-orange-500/20 rounded-lg disabled:opacity-50"
+                                                                title="Regenerate pairing code"
+                                                            >
+                                                                <RefreshCw size={14} className={regeneratingStationId === station.id ? 'animate-spin' : ''} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteStation(terminal.locationId, station.id)}
+                                                                className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 ))
                                             )}

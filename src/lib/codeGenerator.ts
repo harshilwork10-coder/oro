@@ -43,17 +43,16 @@ export function generateStoreCode(locationName: string, existingCodes: string[] 
 
 /**
  * Generate a Station Pairing Code
- * Format: S[STATION#]-[RANDOM4] e.g., "S1-ABC7", "S2-XY9Z"
- * - Easy to read/type
- * - 7-8 characters total
+ * Format: 8 random alphanumeric chars (32^8 = ~1 trillion combinations)
+ * - Secure: hard to guess
+ * - No prefix: doesn't leak station number
  */
 export function generateStationCode(stationNumber: number = 1, existingCodes: string[] = []): string {
     let attempts = 0
     let code: string
 
     do {
-        const random = randomChars(4)
-        code = `S${stationNumber}-${random}`
+        code = randomChars(8) // 8 chars for security
         attempts++
     } while (existingCodes.includes(code) && attempts < 100)
 
@@ -82,9 +81,13 @@ export function isValidStoreCode(code: string): boolean {
 
 /**
  * Validate a station pairing code format
+ * Accepts 8-char codes (new) and legacy S#-XXXX format
  */
 export function isValidStationCode(code: string): boolean {
-    // S followed by number, dash, then 4 chars
-    return /^S\d+-[A-Z0-9]{4}$/.test(code) || /^[A-Z0-9]{4,8}$/.test(code)
+    // New format: 8 alphanumeric chars
+    if (/^[A-Z0-9]{8}$/.test(code)) return true
+    // Legacy format: S followed by number, dash, then 4 chars
+    if (/^S\d+-[A-Z0-9]{4}$/.test(code)) return true
+    return false
 }
 

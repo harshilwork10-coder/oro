@@ -5,8 +5,47 @@ import { compare } from 'bcryptjs'
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_DURATION_MINUTES = 15
 
+// SECURITY: Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60 * 1000 // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 10 // Max 10 attempts per minute per IP
+
+// Simple in-memory rate limiter (use Redis in production)
+const ipAttempts = new Map<string, { count: number; resetAt: number }>()
+
+function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
+    const now = Date.now()
+    const record = ipAttempts.get(ip)
+
+    if (!record || now > record.resetAt) {
+        ipAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+        return { allowed: true }
+    }
+
+    if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+        const retryAfter = Math.ceil((record.resetAt - now) / 1000)
+        return { allowed: false, retryAfter }
+    }
+
+    record.count++
+    return { allowed: true }
+}
+
 export async function POST(request: NextRequest) {
     try {
+        // SECURITY: Get client IP for rate limiting
+        const clientIP = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+            || request.headers.get('x-real-ip')
+            || 'unknown'
+
+        // SECURITY: Check rate limit first
+        const rateCheck = checkRateLimit(clientIP)
+        if (!rateCheck.allowed) {
+            return NextResponse.json({
+                error: 'Too many login attempts. Please try again later.',
+                retryAfter: rateCheck.retryAfter
+            }, { status: 429 })
+        }
+
         const { phone, pin } = await request.json()
 
         if (!phone || !pin) {

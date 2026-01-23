@@ -15,7 +15,7 @@ export default function UsersPage() {
     useEffect(() => {
         const fetchUsers = async () => {
             try {
-                const res = await fetch('/api/admin/users')
+                const res = await fetch('/api/franchisor/users')
                 if (res.ok) {
                     const data = await res.json()
                     const usersArray = Array.isArray(data) ? data : (data.users || data.data || [])
