@@ -57,7 +57,7 @@ export interface TransactionPayoutResult {
 // ============ DEFAULT CONFIG ============
 
 export const DEFAULT_PAYOUT_CONFIG: PayoutConfig = {
-    commissionSplit: 50,              // 50% to barber by default
+    commissionSplit: 40,              // 40% to barber by default
     tipHandling: 'BARBER_KEEPS',      // Barber keeps tips by default
     taxRate: 0                        // No default tax, should be passed in
 }

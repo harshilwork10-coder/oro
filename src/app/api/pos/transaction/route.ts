@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
                     barberId: item.barberId || null
                 }))
 
-                // Calculate payouts using central engine (50% default commission)
+                // Calculate payouts using central engine (40% default commission)
                 const payoutResult = calculateTransactionPayouts(
                     lineItemInputs,
                     Number(tip || 0),
