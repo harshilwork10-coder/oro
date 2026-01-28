@@ -136,12 +136,16 @@ export default function DevicesPage() {
 
     const fetchStationsForLocation = async (locationId: string) => {
         try {
+            console.log('[Devices] Fetching stations for location:', locationId);
             const res = await fetch(`/api/settings/stations?locationId=${locationId}`);
+            const data = await res.json();
+            console.log('[Devices] Stations API response for', locationId, ':', res.status, data);
             if (res.ok) {
-                const data = await res.json();
                 setStationsByLocation(prev => ({ ...prev, [locationId]: data.stations || [] }));
+            } else {
+                console.error('[Devices] Error fetching stations:', data.error);
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error('[Devices] fetchStationsForLocation error:', e); }
     };
 
     // PAX Terminal Functions
