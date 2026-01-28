@@ -20,6 +20,7 @@ export default function SettingsPage() {
     const [pricingModel, setPricingModel] = useState('DUAL_PRICING')
     const [surchargeType, setSurchargeType] = useState('PERCENTAGE')
     const [surchargeValue, setSurchargeValue] = useState('3.99')
+    const [taxRate, setTaxRate] = useState('8.25') // Tax rate as percentage (8.25 = 8.25%)
 
     // Tip Settings
     const [tipEnabled, setTipEnabled] = useState(true)
@@ -52,6 +53,10 @@ export default function SettingsPage() {
                     setPricingModel(data.pricingModel || 'STANDARD')
                     setSurchargeType(data.cardSurchargeType || 'PERCENTAGE')
                     setSurchargeValue(data.cardSurcharge?.toString() || '3.99')
+                    // Tax rate - convert from decimal (0.0825) to percentage (8.25)
+                    if (data.taxRate) {
+                        setTaxRate((parseFloat(data.taxRate) * 100).toFixed(2))
+                    }
                     // Tip settings
                     setTipEnabled(data.tipPromptEnabled ?? true)
                     setTipType(data.tipType || 'PERCENT')
@@ -97,6 +102,8 @@ export default function SettingsPage() {
                     cardSurchargeType: surchargeType,
                     cardSurcharge: parseFloat(surchargeValue),
                     showDualPricing: pricingModel === 'DUAL_PRICING',
+                    // Tax rate - convert from percentage (8.25) to decimal (0.0825)
+                    taxRate: parseFloat(taxRate) / 100,
                     // Tip settings
                     tipPromptEnabled: tipEnabled,
                     tipType,
@@ -315,6 +322,33 @@ export default function SettingsPage() {
                             </div>
                         </>
                     )}
+
+                    {/* Tax Rate */}
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Sales Tax Rate
+                        </label>
+                        <div className="flex items-center gap-4">
+                            <div className="relative flex-1 max-w-xs">
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max="25"
+                                    value={taxRate}
+                                    onChange={(e) => setTaxRate(e.target.value)}
+                                    className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none text-lg font-semibold"
+                                />
+                                <span className="absolute right-4 top-3 text-gray-500 text-lg">%</span>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                                Example: $100 item → ${(100 * (1 + parseFloat(taxRate || '0') / 100)).toFixed(2)} with tax
+                            </div>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-2">
+                            This is the default sales tax rate applied to all taxable items at your store.
+                        </p>
+                    </div>
                 </div>
             </div>
 

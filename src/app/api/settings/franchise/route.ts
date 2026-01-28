@@ -98,6 +98,7 @@ export async function POST(request: Request) {
             cardSurchargeType,
             cardSurcharge,
             showDualPricing,
+            taxRate,
             tipPromptEnabled,
             tipType,
             tipSuggestions,
@@ -112,14 +113,16 @@ export async function POST(request: Request) {
                 pricingModel,
                 cardSurchargeType,
                 cardSurcharge,
-                showDualPricing: showDualPricing ?? (pricingModel === 'DUAL_PRICING')
+                showDualPricing: showDualPricing ?? (pricingModel === 'DUAL_PRICING'),
+                ...(taxRate !== undefined && { taxRate })
             },
             create: {
                 franchiseId: user.franchiseId,
                 pricingModel,
                 cardSurchargeType,
                 cardSurcharge,
-                showDualPricing: showDualPricing ?? (pricingModel === 'DUAL_PRICING')
+                showDualPricing: showDualPricing ?? (pricingModel === 'DUAL_PRICING'),
+                ...(taxRate !== undefined && { taxRate })
             }
         })
 

@@ -118,6 +118,20 @@ export async function PUT(request: Request) {
         } as any
     }) as any
 
+    // Auto-generate customerId if storeZip is provided and franchise doesn't have one yet
+    if (storeZip && user.franchise && !user.franchise.customerId) {
+        try {
+            const { assignCustomerId } = await import('@/lib/customerId')
+            const customerId = await assignCustomerId(user.franchiseId)
+            if (customerId) {
+                console.log(`Auto-generated customerId ${customerId} for franchise ${user.franchiseId}`)
+            }
+        } catch (error) {
+            console.error('Failed to auto-generate customerId:', error)
+            // Don't fail the request, just log the error
+        }
+    }
+
     return NextResponse.json({
         success: true,
         settings: {

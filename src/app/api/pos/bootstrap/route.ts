@@ -179,8 +179,13 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
         // ═══════════════════════════════════════════════════════════════════
         // 3. SETTINGS & TAX CONFIG
         // ═══════════════════════════════════════════════════════════════════
+        // Tax rate hierarchy: Location override (TODO) > FranchiseSettings > default
+        const taxRate = settings?.taxRate
+            ? parseFloat(settings.taxRate.toString())
+            : 0.0825  // Default 8.25%
+
         const taxConfig = {
-            taxRate: 0.0825, // TODO: Load from location tax config
+            taxRate,
             taxIncluded: false
         }
 

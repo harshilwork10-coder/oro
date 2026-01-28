@@ -93,6 +93,48 @@ enum AccountStatus {
   ARCHIVED
 }
 
+// ============ STATION & DEVICE ENUMS ============
+
+enum StationPaymentMode {
+  DEDICATED
+  CASH_ONLY
+}
+
+enum PairingStatus {
+  UNPAIRED
+  PAIRED
+}
+
+enum TrustedDeviceStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum TerminalType {
+  PAX
+  CLOVER
+  STRIPE_READER
+}
+
+// ============ FINANCIAL STATUS ENUMS ============
+
+enum CashDrawerStatus {
+  OPEN
+  CLOSED
+}
+
+enum RoyaltyRecordStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  FINALIZED
+  PAID
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // FEATURE FLAGS (Production-Ready Rollout System)
 // Resolution order: Station → Location → FranchiseeBusiness → Franchisor → Vertical Default → Global Default
@@ -323,7 +365,7 @@ model User {
   canSetOwnPrices    Boolean @default(false) // Chair rental/booth renter can set their own service prices
   canApplyDiscounts  Boolean @default(false) // Can apply manual discounts
   maxDiscountPercent Int     @default(0) // Max discount percentage allowed (e.g., 20)
-  maxDiscountAmount  Decimal @default(0) // Max discount flat amount allowed (e.g., 10.00)
+  maxDiscountAmount  Decimal @default(0) @db.Decimal(12, 2) // Max discount flat amount allowed (e.g., 10.00)
 
   // Shift Management Permissions
   requiresTimeClock Boolean @default(false) // Employee must clock in/out
@@ -455,6 +497,10 @@ model Franchise {
   id   String @id @default(cuid())
   name String
   slug String @unique // e.g. "aura-salon"
+  
+  // Customer ID: Format ZIPCODE-0001 (e.g., 75001-0001)
+  // Generated based on storeZip from FranchiseSettings + sequential number
+  customerId String? @unique // Auto-generated on first save with zip
 
   approvalStatus String @default("PENDING") // PENDING, APPROVED, REJECTED
 
@@ -588,10 +634,13 @@ model FranchiseSettings {
   // Pricing Model Configuration
   pricingModel      String  @default("DUAL_PRICING") // STANDARD, DUAL_PRICING
   cardSurchargeType String  @default("PERCENTAGE") // PERCENTAGE, FLAT_AMOUNT
-  cardSurcharge     Decimal @default(3.99) // Percentage (e.g., 3.99 for 3.99%) or flat amount (e.g., 0.50 for $0.50)
+  cardSurcharge     Decimal @default(3.99) @db.Decimal(7, 4) // Percentage (e.g., 3.99 for 3.99%) or flat amount (e.g., 0.50 for $0.50)
 
   // Display Options
   showDualPricing Boolean @default(true) // Show both cash/card prices
+
+  // Tax Configuration
+  taxRate Decimal @default(0.0825) @db.Decimal(7, 4) // Sales tax rate (e.g., 0.0825 for 8.25%)
 
   // Service Industry Feature Toggles
   enablePackages         Boolean @default(true) // Service packages/bundles
@@ -601,7 +650,7 @@ model FranchiseSettings {
 
   // Promotion Stacking Rules
   promoStackingMode  String  @default("BEST_ONLY") // BEST_ONLY, STACK_ALL, STACK_WITH_CAP
-  maxDiscountPercent Decimal @default(50) // Max discount cap (50% default)
+  maxDiscountPercent Decimal @default(50) @db.Decimal(5, 2) // Max discount cap (50% default)
 
   // Receipt Printing Settings
   receiptPrintMode String  @default("ALL") // ALL, CARD_ONLY, EBT_ONLY, CARD_AND_EBT, NONE
@@ -619,10 +668,10 @@ model FranchiseSettings {
   // Payment & Protection
   enablePrepayment   Boolean @default(false) // Require payment at booking
   prepaymentType     String  @default("FULL") // FULL, DEPOSIT, PERCENTAGE
-  prepaymentAmount   Decimal @default(0) // Deposit amount or percentage
+  prepaymentAmount   Decimal @default(0) @db.Decimal(12, 2) // Deposit amount or percentage
   enableNoShowCharge Boolean @default(false) // Charge card for no-shows
   noShowFeeType      String  @default("FLAT") // FLAT, PERCENTAGE
-  noShowFeeAmount    Decimal @default(25) // Fee amount
+  noShowFeeAmount    Decimal @default(25) @db.Decimal(12, 2) // Fee amount
 
   // Communication
   enableSmsReminders       Boolean @default(false) // SMS appointment reminders
@@ -1013,7 +1062,7 @@ model Station {
   isActive Boolean @default(true)
 
   // Payment capability: DEDICATED (has terminal) or CASH_ONLY
-  paymentMode String @default("CASH_ONLY") // DEDICATED, CASH_ONLY
+  paymentMode StationPaymentMode @default(CASH_ONLY)
 
   // Dedicated terminal assignment (1:1 mapping)
   dedicatedTerminalId String?          @unique
@@ -1025,7 +1074,7 @@ model Station {
   pairingCodeUsedAt    DateTime? // One-time use - set when first paired
 
   // Device binding - once paired, only this device can use station
-  pairingStatus   String    @default("UNPAIRED") // UNPAIRED, PAIRED
+  pairingStatus   PairingStatus @default(UNPAIRED)
   pairedDeviceId  String?   // UUID from device (fingerprint)
   pairedAt        DateTime? // When pairing was completed
   lastHeartbeatAt DateTime? // Last API call from paired device
@@ -1060,7 +1109,7 @@ model TrustedDevice {
   lastSeenAt DateTime @default(now())
   lastIp     String?
 
-  status String @default("ACTIVE") // ACTIVE, REVOKED
+  status TrustedDeviceStatus @default(ACTIVE)
 
   // Security & Rotation
   lastRotatedAt DateTime @default(now())
@@ -1079,7 +1128,7 @@ model PaymentTerminal {
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   name         String // "Terminal 1", "Counter Left"
-  terminalType String  @default("PAX") // PAX, CLOVER, STRIPE_READER
+  terminalType TerminalType @default(PAX)
   terminalIP   String // "192.168.1.101"
   terminalPort String  @default("10009")
   isActive     Boolean @default(true)
@@ -1148,15 +1197,15 @@ model GlobalService {
   name        String
   description String?
   duration    Int     // in minutes
-  basePrice   Decimal // Default price
+  basePrice   Decimal @db.Decimal(12, 2) // Default price
 
   // Salon pricing modes
   priceMode String @default("FIXED") // FIXED, FROM, TIERED
 
   // Tiered pricing (for TIERED mode - e.g., Short/Medium/Long hair)
-  tierShortPrice  Decimal? // Short hair
-  tierMediumPrice Decimal? // Medium hair
-  tierLongPrice   Decimal? // Long hair
+  tierShortPrice  Decimal? @db.Decimal(12, 2) // Short hair
+  tierMediumPrice Decimal? @db.Decimal(12, 2) // Medium hair
+  tierLongPrice   Decimal? @db.Decimal(12, 2) // Long hair
 
   // Category (brand-level organization)
   categoryId String?
@@ -1190,14 +1239,14 @@ model LocationServiceOverride {
   name        String?
   description String?
   duration    Int?
-  price       Decimal? // Local price override
-  cashPrice   Decimal?
-  cardPrice   Decimal?
+  price       Decimal? @db.Decimal(12, 2) // Local price override
+  cashPrice   Decimal? @db.Decimal(12, 2)
+  cardPrice   Decimal? @db.Decimal(12, 2)
 
   // Tier overrides (for TIERED mode)
-  tierShortPrice  Decimal?
-  tierMediumPrice Decimal?
-  tierLongPrice   Decimal?
+  tierShortPrice  Decimal? @db.Decimal(12, 2)
+  tierMediumPrice Decimal? @db.Decimal(12, 2)
+  tierLongPrice   Decimal? @db.Decimal(12, 2)
 
   // Local controls
   isEnabled Boolean @default(true)  // Disable service at this location
@@ -1217,8 +1266,8 @@ model GlobalProduct {
 
   name         String
   description  String?
-  defaultPrice Decimal
-  defaultCost  Decimal?
+  defaultPrice Decimal @db.Decimal(12, 2)
+  defaultCost  Decimal? @db.Decimal(12, 2)
   sku          String?
   category     String?
   isArchived   Boolean  @default(false)
@@ -1247,7 +1296,7 @@ model SharedUPCProduct {
   imageUrl    String?
 
   // Pricing reference (average suggested price)
-  avgPrice Decimal?
+  avgPrice Decimal? @db.Decimal(12, 2)
 
   // Trust/quality tracking
   contributorCount Int      @default(1) // How many merchants have confirmed this data
@@ -1311,7 +1360,7 @@ model Item {
   // === UNIVERSAL FIELDS (All item types) ===
   name        String
   description String?
-  price       Decimal
+  price       Decimal @db.Decimal(12, 2)
   isActive    Boolean @default(true)
   sortOrder   Int     @default(0)
   imageUrl    String?
@@ -1330,13 +1379,13 @@ model Item {
   // === SERVICE FIELDS (nullable) ===
   duration        Int? // Duration in minutes (for appointments)
   requiresDeposit Boolean  @default(false)
-  depositAmount   Decimal?
+  depositAmount   Decimal? @db.Decimal(12, 2)
 
   // === PRODUCT FIELDS (nullable) ===
   barcode      String? // UPC/EAN barcode
   sku          String? // Internal SKU
   stock        Int? // Current stock quantity
-  cost         Decimal? // Cost price (for profit calculation)
+  cost         Decimal? @db.Decimal(12, 2) // Cost price (for profit calculation)
   reorderPoint Int? // Alert when stock <= this
   brand        String? // Product brand
   size         String? // Size/weight (e.g., "750ml", "12 oz")
@@ -1355,7 +1404,7 @@ model Item {
 
   // === TAX CONFIGURATION ===
   taxExempt Boolean  @default(false)
-  taxRate   Decimal? // Override tax rate (null = use default)
+  taxRate   Decimal? @db.Decimal(7, 4) // Override tax rate (null = use default)
 
   // === TRACKING ===
   createdAt DateTime @default(now())
@@ -1391,10 +1440,10 @@ model ItemLineItem {
   item   Item   @relation(fields: [itemId], references: [id])
 
   quantity  Int
-  unitPrice Decimal
-  discount  Decimal @default(0)
-  tax       Decimal @default(0)
-  total     Decimal
+  unitPrice Decimal @db.Decimal(12, 2)
+  discount  Decimal @default(0) @db.Decimal(12, 2)
+  tax       Decimal @default(0) @db.Decimal(12, 2)
+  total     Decimal @db.Decimal(12, 2)
 
   // Optional: who performed the service (for commissions)
   performedById String?
@@ -1805,12 +1854,12 @@ model Transaction {
   employeeId String? // Who processed the sale
   employee   User?   @relation("ProcessedTransactions", fields: [employeeId], references: [id])
 
-  subtotal Decimal
-  tax      Decimal @default(0)
-  tip      Decimal @default(0)
-  discount Decimal @default(0)
-  cardFee  Decimal @default(0) // Card processing fee if applicable
-  total    Decimal
+  subtotal Decimal @db.Decimal(12, 2)
+  tax      Decimal @default(0) @db.Decimal(12, 2)
+  tip      Decimal @default(0) @db.Decimal(12, 2)
+  discount Decimal @default(0) @db.Decimal(12, 2)
+  cardFee  Decimal @default(0) @db.Decimal(12, 2) // Card processing fee if applicable
+  total    Decimal @db.Decimal(12, 2)
 
   paymentMethod  String // CASH, DEBIT_CARD, CREDIT_CARD, SPLIT
   processingPlan String? // STANDARD, SURCHARGE, DUAL_PRICE (from merchant config)
@@ -1818,17 +1867,17 @@ model Transaction {
   // Dual Pricing Totals (compliant dual price system)
   // Both cash and card totals are calculated at cart time
   // chargedMode determines which total was actually charged
-  subtotalCash Decimal? // Sum of all cashLineTotals
-  subtotalCard Decimal? // Sum of all cardLineTotals
-  taxCash      Decimal? // Tax calculated on cash subtotal
-  taxCard      Decimal? // Tax calculated on card subtotal
-  totalCash    Decimal? // subtotalCash + taxCash
-  totalCard    Decimal? // subtotalCard + taxCard
+  subtotalCash Decimal? @db.Decimal(12, 2) // Sum of all cashLineTotals
+  subtotalCard Decimal? @db.Decimal(12, 2) // Sum of all cardLineTotals
+  taxCash      Decimal? @db.Decimal(12, 2) // Tax calculated on cash subtotal
+  taxCard      Decimal? @db.Decimal(12, 2) // Tax calculated on card subtotal
+  totalCash    Decimal? @db.Decimal(12, 2) // subtotalCash + taxCash
+  totalCard    Decimal? @db.Decimal(12, 2) // subtotalCard + taxCard
   chargedMode  String? // "CASH" or "CARD" - which price set was charged
 
   // Split Payment Fields
-  cashAmount Decimal @default(0) // Amount paid in cash (for SPLIT payments)
-  cardAmount Decimal @default(0) // Amount paid by card (for SPLIT payments)
+  cashAmount Decimal @default(0) @db.Decimal(12, 2) // Amount paid in cash (for SPLIT payments)
+  cardAmount Decimal @default(0) @db.Decimal(12, 2) // Amount paid by card (for SPLIT payments)
 
   // PAX / Gateway Details
   gatewayTxId String? // Transaction ID from PAX/Processor
@@ -1888,28 +1937,28 @@ model TransactionLineItem {
   product   Product? @relation(fields: [productId], references: [id])
   quantity  Int      @default(1)
 
-  price    Decimal // Price per item (legacy)
-  discount Decimal @default(0)
-  total    Decimal // Total for this line item (legacy)
+  price    Decimal @db.Decimal(12, 2) // Price per item (legacy)
+  discount Decimal @default(0) @db.Decimal(12, 2)
+  total    Decimal @db.Decimal(12, 2) // Total for this line item (legacy)
 
   // Dual Pricing Line Fields (compliant dual price system)
-  cashUnitPrice   Decimal? // Cash price per unit
-  cardUnitPrice   Decimal? // Card price per unit
-  cashLineTotal   Decimal? // qty × cashUnitPrice
-  cardLineTotal   Decimal? // qty × cardUnitPrice
+  cashUnitPrice   Decimal? @db.Decimal(12, 2) // Cash price per unit
+  cardUnitPrice   Decimal? @db.Decimal(12, 2) // Card price per unit
+  cashLineTotal   Decimal? @db.Decimal(12, 2) // qty × cashUnitPrice
+  cardLineTotal   Decimal? @db.Decimal(12, 2) // qty × cardUnitPrice
   lineChargedMode String? // "CASH" or "CARD" - which price was used
 
   // === SNAPSHOT FIELDS (immutable after checkout) ===
   // These fields are set at checkout and NEVER change
   serviceNameSnapshot String? // Service/product name frozen at checkout
   productNameSnapshot String? // Product name frozen at checkout
-  priceCharged        Decimal? // Actual price charged per unit
-  discountAllocated   Decimal? // Discount amount on this line item
-  taxAllocated        Decimal? // Tax amount on this line item
-  tipAllocated        Decimal? // Tip allocated to this line (for services)
-  commissionSplitUsed Decimal? // Commission % used (e.g., 50 for 50%)
-  commissionAmount    Decimal? // Amount barber/staff earns
-  ownerAmount         Decimal? // Amount owner keeps
+  priceCharged        Decimal? @db.Decimal(12, 2) // Actual price charged per unit
+  discountAllocated   Decimal? @db.Decimal(12, 2) // Discount amount on this line item
+  taxAllocated        Decimal? @db.Decimal(12, 2) // Tax amount on this line item
+  tipAllocated        Decimal? @db.Decimal(12, 2) // Tip allocated to this line (for services)
+  commissionSplitUsed Decimal? @db.Decimal(5, 2) // Commission % used (e.g., 50 for 50%)
+  commissionAmount    Decimal? @db.Decimal(12, 2) // Amount barber/staff earns
+  ownerAmount         Decimal? @db.Decimal(12, 2) // Amount owner keeps
   businessDate        DateTime? // Business date (location timezone)
   lineItemStatus      String?   @default("PAID") // PAID, REFUNDED, VOIDED
 
@@ -1924,9 +1973,9 @@ model TransactionTaxLine {
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
   taxName       String  // "State Sales Tax", "City Tax", "Special District"
-  taxRate       Decimal // 0.0625 for 6.25%
-  taxableAmount Decimal // Pre-tax amount this rate applies to
-  taxAmount     Decimal // Computed tax amount
+  taxRate       Decimal @db.Decimal(7, 4) // 0.0625 for 6.25%
+  taxableAmount Decimal @db.Decimal(12, 2) // Pre-tax amount this rate applies to
+  taxAmount     Decimal @db.Decimal(12, 2) // Computed tax amount
 
   // Audit fields
   jurisdictionId String? // Optional link to TaxJurisdiction
@@ -1941,8 +1990,8 @@ model RoyaltyConfig {
   franchisorId String     @unique
   franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
 
-  percentage        Decimal // e.g., 6.0 for 6%
-  minimumMonthlyFee Decimal? // Optional minimum fee
+  percentage        Decimal @db.Decimal(5, 2) // e.g., 6.0 for 6%
+  minimumMonthlyFee Decimal? @db.Decimal(12, 2) // Optional minimum fee
   calculationPeriod String   @default("MONTHLY") // MONTHLY, WEEKLY, DAILY
 
   createdAt DateTime @default(now())
@@ -1958,9 +2007,9 @@ model RoyaltyRecord {
   periodStart DateTime
   periodEnd   DateTime
 
-  grossRevenue  Decimal // Total revenue for period
-  royaltyAmount Decimal // Calculated royalty
-  status        String  @default("PENDING") // PENDING, PAID, OVERDUE
+  grossRevenue  Decimal @db.Decimal(12, 2) // Total revenue for period
+  royaltyAmount Decimal @db.Decimal(12, 2) // Calculated royalty
+  status        RoyaltyRecordStatus @default(PENDING)
 
   paidAt DateTime?
   notes  String?
@@ -1976,9 +2025,9 @@ model ActiveCart {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   items    String // JSON string of cart items
-  subtotal Decimal
-  tax      Decimal
-  total    Decimal
+  subtotal Decimal @db.Decimal(12, 2)
+  tax      Decimal @db.Decimal(12, 2)
+  total    Decimal @db.Decimal(12, 2)
 
   customerName String? // To show "Hi, John" on display
   status       String  @default("IDLE") // IDLE, ACTIVE, REVIEW
@@ -2231,12 +2280,12 @@ model CashDrawerSession {
   startTime DateTime  @default(now())
   endTime   DateTime?
 
-  startingCash Decimal
-  endingCash   Decimal? // Actual cash counted
-  expectedCash Decimal? // Calculated cash (Start + Cash Sales - Drops)
-  variance     Decimal? // Ending - Expected
+  startingCash Decimal @db.Decimal(12, 2)
+  endingCash   Decimal? @db.Decimal(12, 2) // Actual cash counted
+  expectedCash Decimal? @db.Decimal(12, 2) // Calculated cash (Start + Cash Sales - Drops)
+  variance     Decimal? @db.Decimal(12, 2) // Ending - Expected
 
-  status String  @default("OPEN") // OPEN, CLOSED
+  status CashDrawerStatus @default(OPEN)
   notes  String?
 
   cashDrops        CashDrop[]
@@ -2258,7 +2307,7 @@ model CashDrop {
   sessionId String
   session   CashDrawerSession @relation(fields: [sessionId], references: [id])
 
-  amount    Decimal
+  amount    Decimal @db.Decimal(12, 2)
   reason    String // "SAFE_DROP", "PAYOUT", "OTHER"
   droppedBy String // Employee ID
 
@@ -2275,7 +2324,7 @@ model Discount {
   name  String
   code  String? // Optional promo code
   type  String // PERCENTAGE, FIXED_AMOUNT
-  value Decimal // e.g., 20.0 for 20% or 10.0 for $10
+  value Decimal @db.Decimal(12, 2) // e.g., 20.0 for 20% or 10.0 for $10
 
   appliesTo String // ALL, SERVICE, PRODUCT, SPECIFIC_ITEM
   itemIds   String? // JSON array of specific Service/Product IDs if applicable
@@ -2308,7 +2357,7 @@ model Promotion {
   // FIXED_PRICE = 12.99 means total price is $12.99 for qualifying items
   // FREE_ITEM = quantity specified in getQty is free
   discountType  String  @default("PERCENT") // PERCENT, FIXED_AMOUNT, FIXED_PRICE, FREE_ITEM
-  discountValue Decimal @default(0)
+  discountValue Decimal @default(0) @db.Decimal(12, 2)
 
   // Quantity Requirements
   requiredQty Int? // Buy X items to qualify
@@ -3732,7 +3781,7 @@ model TaxJurisdiction {
   code String? // FIPS code or jurisdiction identifier
 
   // Sales Tax (percentage-based)
-  salesTaxRate Decimal @default(0) // e.g., 6.25 for 6.25%
+  salesTaxRate Decimal @default(0) @db.Decimal(7, 4) // e.g., 6.25 for 6.25%
 
   // Description for display
   description String?
@@ -3765,13 +3814,13 @@ model ExciseTaxRule {
   productType String // BEER, WINE_LIGHT, WINE_HEAVY, SPIRITS, TOBACCO_PACK, TOBACCO_CARTON
 
   // Tax calculation
-  ratePerGallon Decimal? // For liquids - rate per gallon (will be prorated by ml)
-  ratePerUnit   Decimal? // For non-liquids - flat rate per unit (e.g., per cigarette pack)
-  ratePerOz     Decimal? // Alternative - per ounce
+  ratePerGallon Decimal? @db.Decimal(12, 4) // For liquids - rate per gallon (will be prorated by ml)
+  ratePerUnit   Decimal? @db.Decimal(12, 4) // For non-liquids - flat rate per unit (e.g., per cigarette pack)
+  ratePerOz     Decimal? @db.Decimal(12, 4) // Alternative - per ounce
 
   // ABV thresholds for wine classification
-  minAbv Decimal? // Minimum ABV for this rule to apply
-  maxAbv Decimal? // Maximum ABV for this rule to apply
+  minAbv Decimal? @db.Decimal(5, 2) // Minimum ABV for this rule to apply
+  maxAbv Decimal? @db.Decimal(5, 2) // Maximum ABV for this rule to apply
 
   description String? // "Cook County Spirits Tax"
   isActive    Boolean @default(true)
