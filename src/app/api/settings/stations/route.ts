@@ -45,6 +45,7 @@ async function verifyLocationAccess(user: any, targetLocationId: string) {
 export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
+        console.log('[stations] No session')
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -52,12 +53,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const locationId = searchParams.get('locationId')
 
+    console.log('[stations] Request for locationId:', locationId, 'by user:', user.email, 'role:', user.role)
+
     if (!locationId) {
         return NextResponse.json({ stations: [] }) // Default empty if no location specified
     }
 
     // Verify Access
     const hasAccess = await verifyLocationAccess(user, locationId)
+    console.log('[stations] hasAccess:', hasAccess)
     if (!hasAccess) {
         return NextResponse.json({ error: 'Unauthorized access to this location' }, { status: 403 })
     }
@@ -67,6 +71,8 @@ export async function GET(request: NextRequest) {
         include: { dedicatedTerminal: true },
         orderBy: { name: 'asc' }
     })
+
+    console.log('[stations] Found', stations.length, 'stations for location', locationId)
 
     return NextResponse.json({ stations })
 }
