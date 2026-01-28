@@ -98,7 +98,14 @@ export default function DevicesPage() {
         setPaxLoading(true);
         try {
             const res = await fetch('/api/terminals/manage');
-            if (res.ok) setPaxTerminals(await res.json());
+            if (res.ok) {
+                const terminals = await res.json();
+                setPaxTerminals(terminals);
+                // Pre-fetch stations for all locations so counts display correctly
+                terminals.forEach((t: PaxTerminal) => {
+                    fetchStationsForLocation(t.locationId);
+                });
+            }
         } catch (e) { console.error(e); }
         finally { setPaxLoading(false); setIsLoading(false); }
     };
