@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { StationPaymentMode } from '@prisma/client';
 
 // Generate a unique 8-char pairing code for security (32^8 = ~1 trillion combinations)
 function generatePairingCode(): string {
@@ -63,7 +64,7 @@ export async function POST(
         data: {
             locationId,
             name: stationName,
-            paymentMode: 'CASH_ONLY', // Will be DEDICATED once terminal assigned
+            paymentMode: StationPaymentMode.CASH_ONLY, // Will be DEDICATED once terminal assigned
             pairingCode,
             isActive: true,
         }

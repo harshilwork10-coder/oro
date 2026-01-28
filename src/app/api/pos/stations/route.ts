@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { StationPaymentMode } from '@prisma/client'
 
 // GET - Get stations for current user's location (with terminal info)
 export async function GET(request: NextRequest) {
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
                         locationId: locationId,
                         name: 'Register 1',
                         pairingCode: Array.from({ length: 8 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join(''),
-                        paymentMode: 'CASH_ONLY',
+                        paymentMode: StationPaymentMode.CASH_ONLY,
                         isActive: true
                     },
                     include: {

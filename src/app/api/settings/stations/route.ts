@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { StationPaymentMode } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateStationCode } from '@/lib/codeGenerator'
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
             locationId,
             name,
             pairingCode,
-            paymentMode: paymentMode || 'CASH_ONLY',
+            paymentMode: paymentMode || StationPaymentMode.CASH_ONLY,
             dedicatedTerminalId: terminalId || null,
             isActive: true
         }
