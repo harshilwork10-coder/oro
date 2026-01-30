@@ -29,8 +29,8 @@ async function getUserLocationId(user: any): Promise<string | null> {
 async function verifyLocationAccess(user: any, targetLocationId: string) {
     if (user.role === 'PROVIDER') return true
 
-    // For Franchisors/Franchisees, check if the location belongs to their franchise
-    if (user.role === 'FRANCHISOR' || user.role === 'FRANCHISEE') {
+    // For Owners/Franchisors/Franchisees, check if the location belongs to their franchise
+    if (user.role === 'OWNER' || user.role === 'FRANCHISOR' || user.role === 'FRANCHISEE') {
         const location = await prisma.location.findUnique({
             where: { id: targetLocationId },
             select: { franchiseId: true }
@@ -43,38 +43,43 @@ async function verifyLocationAccess(user: any, targetLocationId: string) {
 
 // GET - List all stations for a location
 export async function GET(request: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-        console.log('[stations] No session')
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    try {
+        const session = await getServerSession(authOptions)
+        if (!session?.user) {
+            console.log('[stations] No session')
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const user = session.user as any
+        const { searchParams } = new URL(request.url)
+        const locationId = searchParams.get('locationId')
+
+        console.log('[stations] Request for locationId:', locationId, 'by user:', user.email, 'role:', user.role)
+
+        if (!locationId) {
+            return NextResponse.json({ stations: [] }) // Default empty if no location specified
+        }
+
+        // Verify Access
+        const hasAccess = await verifyLocationAccess(user, locationId)
+        console.log('[stations] hasAccess:', hasAccess)
+        if (!hasAccess) {
+            return NextResponse.json({ error: 'Unauthorized access to this location' }, { status: 403 })
+        }
+
+        const stations = await prisma.station.findMany({
+            where: { locationId },
+            include: { dedicatedTerminal: true },
+            orderBy: { name: 'asc' }
+        })
+
+        console.log('[stations] Found', stations.length, 'stations for location', locationId)
+
+        return NextResponse.json({ stations })
+    } catch (error) {
+        console.error('[stations] GET error:', error)
+        return NextResponse.json({ error: 'Failed to fetch stations' }, { status: 500 })
     }
-
-    const user = session.user as any
-    const { searchParams } = new URL(request.url)
-    const locationId = searchParams.get('locationId')
-
-    console.log('[stations] Request for locationId:', locationId, 'by user:', user.email, 'role:', user.role)
-
-    if (!locationId) {
-        return NextResponse.json({ stations: [] }) // Default empty if no location specified
-    }
-
-    // Verify Access
-    const hasAccess = await verifyLocationAccess(user, locationId)
-    console.log('[stations] hasAccess:', hasAccess)
-    if (!hasAccess) {
-        return NextResponse.json({ error: 'Unauthorized access to this location' }, { status: 403 })
-    }
-
-    const stations = await prisma.station.findMany({
-        where: { locationId },
-        include: { dedicatedTerminal: true },
-        orderBy: { name: 'asc' }
-    })
-
-    console.log('[stations] Found', stations.length, 'stations for location', locationId)
-
-    return NextResponse.json({ stations })
 }
 
 // POST - Create new station

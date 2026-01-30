@@ -23,26 +23,26 @@ export async function POST(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Only PROVIDER can regenerate codes
-        if (session.user.role !== 'PROVIDER') {
-            return NextResponse.json({ error: 'Forbidden - Provider access required' }, { status: 403 });
-        }
-
+        const user = session.user as any;
         const { stationId } = await params;
 
         if (!stationId) {
             return NextResponse.json({ error: 'Station ID required' }, { status: 400 });
         }
 
-        // Verify station exists
+        // Verify station exists and get location for access check
         const station = await prisma.station.findUnique({
             where: { id: stationId },
             select: {
                 id: true,
                 name: true,
                 pairingStatus: true,
+                locationId: true,
                 location: {
-                    select: { name: true }
+                    select: {
+                        name: true,
+                        franchiseId: true
+                    }
                 }
             }
         });
@@ -51,15 +51,26 @@ export async function POST(
             return NextResponse.json({ error: 'Station not found' }, { status: 404 });
         }
 
+        // Access check: PROVIDER can access all, others need franchise match
+        let hasAccess = user.role === 'PROVIDER';
+        if (!hasAccess && (user.role === 'OWNER' || user.role === 'FRANCHISOR' || user.role === 'FRANCHISEE')) {
+            hasAccess = station.location.franchiseId === user.franchiseId;
+        }
+
+        if (!hasAccess) {
+            console.log(`[regenerate-code] Access denied: user ${user.email} (role: ${user.role}) tried to access station ${stationId}`);
+            return NextResponse.json({ error: 'Forbidden - Access denied to this station' }, { status: 403 });
+        }
+
         // Generate new 8-character code
-        const newCode = await generateStationCode();
+        const newCode = generateStationCode();
 
         // Update station with new code and reset pairing status
         const updatedStation = await prisma.station.update({
             where: { id: stationId },
             data: {
                 pairingCode: newCode,
-                pairingStatus: 'PENDING',  // Reset to allow new pairing
+                pairingStatus: 'UNPAIRED',  // Reset to allow new pairing
                 pairedDeviceId: null,       // Clear old device binding
                 pairedAt: null,
                 pairingCodeExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours

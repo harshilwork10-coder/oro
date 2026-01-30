@@ -29,7 +29,7 @@ export default function OroLogo({ size = 'md', className = '' }: OroLogoProps) {
     return (
         <div className={className}>
             <Image
-                src="/ORO_9.jpg"
+                src="/oro9-gold.png"
                 alt="ORO 9"
                 width={width}
                 height={height}

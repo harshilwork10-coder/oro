@@ -27,53 +27,50 @@ export default function OroLogo({ size = 'md', showText = true, showTagline = fa
         gap = sizeConfig.gap
     }
 
-    const orange = '#F97316'
-    const green = '#22C55E'
-    const white = '#FFFFFF'
+    // Unified GOLD branding colors
+    const gold = '#D4A843'
+    const goldLight = '#E8C252'
+    const goldBright = '#F5C842'
+    const darkBg = '#0A1628'
 
     return (
         <div className={`flex flex-col ${className}`}>
             <div className="flex items-center" style={{ gap }}>
-                {/* POS Terminal Icon */}
+                {/* ORO 9 Icon - Gold on Dark */}
                 <svg
                     width={icon}
                     height={icon}
-                    viewBox="0 0 100 120"
+                    viewBox="0 0 100 100"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
                 >
-                    {/* Terminal body */}
-                    <rect x="15" y="10" width="70" height="100" rx="8" stroke={orange} strokeWidth="4" fill="none" />
-                    {/* Screen */}
-                    <rect x="22" y="18" width="56" height="30" rx="4" stroke={orange} strokeWidth="3" fill="none" />
-                    {/* Keypad buttons */}
-                    <rect x="24" y="54" width="14" height="10" rx="2" fill={orange} />
-                    <rect x="43" y="54" width="14" height="10" rx="2" fill={orange} />
-                    <rect x="62" y="54" width="14" height="10" rx="2" fill={orange} />
-                    <rect x="24" y="68" width="14" height="10" rx="2" fill={orange} />
-                    <rect x="43" y="68" width="14" height="10" rx="2" fill={orange} />
-                    <rect x="62" y="68" width="14" height="10" rx="2" fill={orange} />
-                    <rect x="24" y="82" width="14" height="10" rx="2" fill="#EF4444" />
-                    <rect x="43" y="82" width="14" height="10" rx="2" fill={orange} />
-                    <rect x="62" y="82" width="14" height="10" rx="2" fill={green} />
-                    {/* Card slot */}
-                    <rect x="35" y="96" width="30" height="8" rx="2" stroke={orange} strokeWidth="2" fill="none" />
+                    {/* Background */}
+                    <rect width="100" height="100" rx="12" fill={darkBg} />
+                    {/* O */}
+                    <text x="10" y="55" fontSize="38" fontWeight="bold" fontFamily="Inter, sans-serif" fill={gold}>O</text>
+                    {/* R */}
+                    <text x="32" y="55" fontSize="38" fontWeight="bold" fontFamily="Inter, sans-serif" fill={goldLight}>R</text>
+                    {/* O */}
+                    <text x="54" y="55" fontSize="38" fontWeight="bold" fontFamily="Inter, sans-serif" fill={gold}>O</text>
+                    {/* 9 */}
+                    <text x="76" y="55" fontSize="38" fontWeight="bold" fontFamily="Inter, sans-serif" fill={goldBright}>9</text>
                 </svg>
 
-                {/* Wordmark - "ORO 9" */}
+                {/* Wordmark - "ORO 9" - Gold gradient effect */}
                 {showText && (
                     <span
                         style={{
                             fontSize: text,
                             fontWeight: 700,
                             fontFamily: "'Inter', 'Segoe UI', sans-serif",
-                            letterSpacing: '-0.02em'
+                            letterSpacing: '-0.02em',
+                            background: 'linear-gradient(135deg, #D4A843 0%, #E8C252 50%, #F5C842 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text'
                         }}
                     >
-                        <span style={{ color: orange }}>O</span>
-                        <span style={{ color: white }}>R</span>
-                        <span style={{ color: green }}>O</span>
-                        <span style={{ color: white }}> 9</span>
+                        ORO 9
                     </span>
                 )}
             </div>
@@ -94,5 +91,4 @@ export default function OroLogo({ size = 'md', showText = true, showTagline = fa
 
 // Keep backward compatibility
 export { OroLogo as OroLogo }
-
 
