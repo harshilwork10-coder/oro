@@ -12,7 +12,8 @@
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "verify": "ts-node --compiler-options {\"module\":\"CommonJS\"} verify-login.ts"
+    "verify": "ts-node --compiler-options {\"module\":\"CommonJS\"} verify-login.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
