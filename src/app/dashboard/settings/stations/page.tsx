@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Settings, Plus, Trash2, Save, Monitor, CreditCard, DollarSign, Edit2, User, Users, MapPin, ShieldCheck } from 'lucide-react'
+import { Settings, Plus, Trash2, Save, Monitor, CreditCard, DollarSign, Edit2, User, Users, MapPin, ShieldCheck, RefreshCw } from 'lucide-react'
 
 interface Terminal {
     id: string
@@ -23,6 +23,7 @@ interface Station {
     id: string
     name: string
     pairingCode: string
+    pairingStatus?: 'UNPAIRED' | 'PAIRED'
     paymentMode: 'DEDICATED' | 'CASH_ONLY'
     dedicatedTerminal?: Terminal | null
     assignedEmployees?: Employee[]
@@ -265,6 +266,28 @@ export default function StationsPage() {
         return employees.filter(e => !assignedIds.has(e.id))
     }
 
+    // Reset station pairing (allows re-pairing with new device)
+    const handleResetPairing = async (stationId: string, stationName: string) => {
+        if (!confirm(`Reset pairing for "${stationName}"? The station will need to be paired again from the Android device.`)) return
+
+        try {
+            const res = await fetch(`/api/settings/stations/${stationId}/reset-pairing`, {
+                method: 'POST'
+            })
+
+            if (res.ok) {
+                const data = await res.json()
+                setToast({ message: data.message, type: 'success' })
+                fetchData() // Reload to update pairing status
+            } else {
+                const err = await res.json()
+                setToast({ message: err.error || 'Failed to reset', type: 'error' })
+            }
+        } catch (error) {
+            setToast({ message: 'Failed to reset pairing', type: 'error' })
+        }
+    }
+
     if (loading) {
         return (
             <div className="min-h-screen bg-stone-950 text-white flex items-center justify-center">
@@ -482,6 +505,17 @@ export default function StationsPage() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            {/* Pairing Status Badge */}
+                                            <span className={`px-2 py-1 text-xs rounded-full ${station.pairingStatus === 'PAIRED' ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                                {station.pairingStatus === 'PAIRED' ? '🔗 Paired' : '⏳ Unpaired'}
+                                            </span>
+                                            <button
+                                                onClick={() => handleResetPairing(station.id, station.name)}
+                                                className="p-2 text-amber-400 hover:bg-amber-500/20 rounded-lg"
+                                                title="Reset Pairing (allow new device)"
+                                            >
+                                                <RefreshCw className="w-5 h-5" />
+                                            </button>
                                             <button
                                                 onClick={() => setEditingStation(station)}
                                                 className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg"
