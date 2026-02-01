@@ -242,6 +242,20 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             taxIncluded: false
         }
 
+        // DUAL PRICING DEBUG - Log entire settings object
+        console.log('='.repeat(50))
+        console.log('[Bootstrap DUAL PRICING DEBUG]')
+        console.log('  settings object:', settings ? JSON.stringify({
+            id: settings.id,
+            pricingModel: settings.pricingModel,
+            cardSurcharge: settings.cardSurcharge,
+            showDualPricing: settings.showDualPricing
+        }) : 'NULL SETTINGS!')
+        console.log('  franchiseId:', franchiseId)
+        console.log('  locationId:', location.id)
+        console.log('  Computed dualPricingEnabled:', settings?.pricingModel === 'DUAL_PRICING')
+        console.log('='.repeat(50))
+
         const stationConfig = {
             locationId: location.id,
             locationName: location.name,
