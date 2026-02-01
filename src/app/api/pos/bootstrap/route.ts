@@ -58,16 +58,25 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
     // ETag support for full 304 response
     const clientETag = req.headers.get('If-None-Match')
 
+    // Force refresh parameter - bypasses cache entirely
+    const forceRefresh = url.searchParams.get('force') === 'true'
+
     try {
         // ═══════════════════════════════════════════════════════════════════
         // REDIS CACHE CHECK: Skip all DB queries if cached response exists
         // At 200K terminals, this reduces DB load by ~90%
         // ═══════════════════════════════════════════════════════════════════
         const cacheKey = CACHE_KEYS.BOOTSTRAP(locationId)
-        const cachedResponse = await cacheGet<{
+
+        // Skip cache if force refresh requested
+        const cachedResponse = forceRefresh ? null : await cacheGet<{
             body: Record<string, unknown>
             versions: { menu: string; staff: string; config: string }
         }>(cacheKey)
+
+        if (forceRefresh) {
+            console.log(`[Bootstrap] FORCE REFRESH requested for location ${locationId}`)
+        }
 
         if (cachedResponse) {
             const { body, versions } = cachedResponse
