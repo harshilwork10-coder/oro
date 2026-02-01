@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { invalidateLocationCache } from '@/lib/cache'
 
 export async function GET(req: NextRequest) {
     try {
@@ -131,6 +132,19 @@ export async function PATCH(req: NextRequest) {
             },
             update: body
         })
+
+        // CRITICAL: Invalidate cache for ALL locations so Android gets updated settings IMMEDIATELY
+        const allFranchises = await prisma.franchise.findMany({
+            where: { franchisorId: user.franchisor.id },
+            include: { locations: { select: { id: true } } }
+        })
+        const allLocationIds = allFranchises.flatMap(f => f.locations.map(l => l.id))
+        if (allLocationIds.length > 0) {
+            console.log(`[BusinessConfig] Settings update - invalidating ${allLocationIds.length} location caches`)
+            for (const locId of allLocationIds) {
+                await invalidateLocationCache(locId)
+            }
+        }
 
         return NextResponse.json({ success: true, config })
 

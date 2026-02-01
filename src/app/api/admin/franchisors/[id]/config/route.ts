@@ -113,6 +113,20 @@ export async function PATCH(
             update: filteredUpdates
         })
 
+        // CRITICAL: Invalidate cache for ALL locations so Android gets updated settings IMMEDIATELY
+        // This applies to ALL config changes: tips, features, tax, shift, payments, etc.
+        const allFranchises = await prisma.franchise.findMany({
+            where: { franchisorId: id },
+            include: { locations: { select: { id: true } } }
+        })
+        const allLocationIds = allFranchises.flatMap(f => f.locations.map(l => l.id))
+        if (allLocationIds.length > 0) {
+            console.log(`[Config] Settings update - invalidating ${allLocationIds.length} location caches for fields: ${Object.keys(filteredUpdates).join(', ')}`)
+            for (const locId of allLocationIds) {
+                await invalidateLocationCache(locId)
+            }
+        }
+
         // Log the change to audit trail
         const user = session.user as any
         await prisma.auditLog.create({

@@ -1,0 +1,23 @@
+Status: 200
+
+=== PARSED RESPONSE ===
+{
+  "success": true,
+  "data": {
+    "stationId": "cmkvpt2z70007gpa4e9o2yxig",
+    "stationName": "REG 1",
+    "locationId": "cmkkhhu4c000f13da88o5h1tc",
+    "locationName": "Shubh Beauty scamburg",
+    "businessType": "SALON",
+    "franchiseId": "cmkkgkw20000913dahqiw9yx4",
+    "franchiseName": "nice llc",
+    "franchisorId": "cmkkggtwg000213da0bio7rbo",
+    "stationConfig": {
+      "paxTerminalIP": "10.0.0.138",
+      "paxTerminalPort": "10009",
+      "paymentMode": "CASH_ONLY",
+      "dedicatedTerminal": null
+    },
+    "stationToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdGF0aW9uSWQiOiJjbWt2cHQyejcwMDA3Z3BhNGU5bzJ5eGlnIiwibG9jYXRpb25JZCI6ImNta2toaHU0YzAwMGYxM2RhODhvNWgxdGMiLCJmcmFuY2hpc2VJZCI6ImNta2tna3cyMDAwMDkxM2RhaHFpdzl5eDQiLCJkZXZpY2VGaW5nZXJwcmludCI6InRlc3QtZGV2aWNlLWFuZHJvaWQtMTIzIiwic3RhdGlvbk5hbWUiOiJSRUcgMSIsImlzc3VlZEF0IjoxNzY5NzEzNDk2Nzk5LCJpYXQiOjE3Njk3MTM0OTYsImV4cCI6MTc3MjMwNTQ5Nn0.EzeolcecaoG0F-kc6lEsFFD_lOnE3PLpwNvMq2j1zas"
+  }
+}
