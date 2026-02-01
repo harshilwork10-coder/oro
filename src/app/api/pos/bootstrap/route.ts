@@ -271,8 +271,8 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             stationName: stationName,
             businessType: location.businessType || 'RETAIL',
 
-            // Dual pricing
-            dualPricingEnabled: settings?.pricingModel === 'DUAL_PRICING',
+            // Dual pricing - requires BOTH pricingModel AND showDualPricing flag (matches web POS logic)
+            dualPricingEnabled: settings?.pricingModel === 'DUAL_PRICING' && settings?.showDualPricing === true,
             cashDiscountPercent: settings?.cardSurcharge ? parseFloat(settings.cardSurcharge.toString()) : 4.0,
 
             // PAX Terminal
