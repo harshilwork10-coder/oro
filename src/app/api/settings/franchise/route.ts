@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { invalidateLocationCache } from '@/lib/cache'
 
 // GET: Fetch franchise settings
 export async function GET() {
@@ -126,11 +127,22 @@ export async function POST(request: Request) {
             }
         })
 
+        // CRITICAL: Invalidate cache for all locations so Android gets updated pricing settings
+        const franchiseLocations = await prisma.location.findMany({
+            where: { franchiseId: user.franchiseId },
+            select: { id: true }
+        })
+        console.log(`[FranchiseSettings] Pricing update - invalidating ${franchiseLocations.length} location caches`)
+        for (const loc of franchiseLocations) {
+            await invalidateLocationCache(loc.id)
+        }
+
         // Also update tip and payment settings in BusinessConfig if user's franchisor has one
         const franchise = await prisma.franchise.findUnique({
             where: { id: user.franchiseId },
             include: { franchisor: true }
         })
+
 
         if (franchise?.franchisorId) {
             await prisma.businessConfig.upsert({
