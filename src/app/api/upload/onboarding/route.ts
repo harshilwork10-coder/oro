@@ -4,13 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { uploadToS3 } from '@/lib/s3'
 import { prisma } from '@/lib/prisma'
 
-// Route segment config - Allow larger body size for file uploads
-export const config = {
-    api: {
-        bodyParser: false,
-        responseLimit: false,
-    },
-}
+// Note: 'export const config' is deprecated in App Router
+// Body parsing is handled automatically by Next.js for formData()
 
 // Increase timeout for large files
 export const maxDuration = 60
