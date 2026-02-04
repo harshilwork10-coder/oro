@@ -3,6 +3,15 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// AUDIT STANDARD: Proper decimal rounding to prevent penny errors
+function roundCurrency(value: number): number {
+    return Math.round(value * 100) / 100
+}
+
+// Standardized transaction statuses for financial reports (CPA-compliant)
+const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
+const REFUNDED_STATUSES = ['REFUNDED', 'VOIDED', 'CANCELLED'] as const
+
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
@@ -37,7 +46,7 @@ export async function GET(request: NextRequest) {
                 gte: startOfDay,
                 lte: endOfDay
             },
-            status: 'COMPLETED'
+            status: { in: [...COMPLETED_STATUSES] }
         }
 
         // Filter by location for employees/managers, by franchise for franchisees
@@ -72,13 +81,50 @@ export async function GET(request: NextRequest) {
             orderBy: { createdAt: 'asc' }
         })
 
-        // Calculate summary
-        const totalSales = transactions.reduce((sum, tx) => sum + Number(tx.total), 0)
+        // Calculate summary - AUDIT CORRECTED: Use subtotal for sales, total for grand totals
+        const totalSales = roundCurrency(transactions.reduce((sum, tx) => sum + Number(tx.total), 0))
         const cashTransactions = transactions.filter(tx => tx.paymentMethod === 'CASH')
         const cardTransactions = transactions.filter(tx => tx.paymentMethod === 'CARD')
 
-        const cashSales = cashTransactions.reduce((sum, tx) => sum + Number(tx.total), 0)
-        const cardSales = cardTransactions.reduce((sum, tx) => sum + Number(tx.total), 0)
+        const cashSales = roundCurrency(cashTransactions.reduce((sum, tx) => sum + Number(tx.total), 0))
+        const cardSales = roundCurrency(cardTransactions.reduce((sum, tx) => sum + Number(tx.total), 0))
+
+        // ============ REFUND SUMMARY ============
+        // Build refund query with same location/franchise filtering
+        const refundWhereClause: any = {
+            createdAt: {
+                gte: startOfDay,
+                lte: endOfDay
+            },
+            status: { in: [...REFUNDED_STATUSES] }
+        }
+
+        // Apply same location/franchise filters for refunds
+        if (user.role === 'EMPLOYEE' || user.role === 'MANAGER') {
+            if (user.locationId) {
+                refundWhereClause.cashDrawerSession = { locationId: user.locationId }
+            }
+        } else if (user.role === 'FRANCHISEE') {
+            if (user.franchiseId) {
+                refundWhereClause.cashDrawerSession = { location: { franchiseId: user.franchiseId } }
+            }
+        }
+
+        const refundedTransactions = await prisma.transaction.findMany({
+            where: refundWhereClause,
+            select: {
+                id: true,
+                total: true,
+                tax: true,
+                subtotal: true,
+                paymentMethod: true
+            }
+        })
+
+        // Use Math.abs() because refund transactions may have negative totals
+        const refundTotal = roundCurrency(refundedTransactions.reduce((sum, tx) => sum + Math.abs(Number(tx.total)), 0))
+        const refundCount = refundedTransactions.length
+        const refundTax = roundCurrency(refundedTransactions.reduce((sum, tx) => sum + Math.abs(Number(tx.tax)), 0))
 
         // ============ LOTTERY SUMMARY ============
         // Query lottery transactions for the day
@@ -136,13 +182,13 @@ export async function GET(request: NextRequest) {
             .sort((a, b) => b.sales - a.sales)
             .slice(0, 10)
 
-        // Tax calculation
-        const subtotal = transactions.reduce((sum, tx) => sum + Number(tx.subtotal), 0)
-        const tax = transactions.reduce((sum, tx) => sum + Number(tx.tax), 0)
+        // Tax calculation - AUDIT: Use proper rounding
+        const subtotal = roundCurrency(transactions.reduce((sum, tx) => sum + Number(tx.subtotal), 0))
+        const tax = roundCurrency(transactions.reduce((sum, tx) => sum + Number(tx.tax), 0))
 
-        // Cash reconciliation includes lottery flows
+        // Cash reconciliation includes lottery flows - AUDIT: Use proper rounding
         // Expected = Opening + Cash Sales + Lottery Sales (in) - Lottery Payouts (out)
-        const expectedCash = openingCash + cashSales + lotterySales - lotteryPayouts
+        const expectedCash = roundCurrency(openingCash + cashSales + lotterySales - lotteryPayouts)
 
         const reportData = {
             summary: {
@@ -151,7 +197,13 @@ export async function GET(request: NextRequest) {
                 cardSales,
                 cashCount: cashTransactions.length,
                 cardCount: cardTransactions.length,
-                totalTransactions: transactions.length
+                totalTransactions: transactions.length,
+                // Refund data
+                refundTotal,
+                refundCount,
+                refundTax,
+                // Net sales = Gross - Refunds
+                netSales: roundCurrency(totalSales - refundTotal)
             },
             cashReconciliation: {
                 opening: openingCash,
@@ -173,7 +225,12 @@ export async function GET(request: NextRequest) {
             taxSummary: {
                 subtotal,
                 tax,
-                total: subtotal + tax
+                total: roundCurrency(subtotal + tax)
+            },
+            refunds: {
+                total: refundTotal,
+                count: refundCount,
+                tax: refundTax
             }
         }
 

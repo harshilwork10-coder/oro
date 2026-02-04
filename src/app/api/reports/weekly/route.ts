@@ -3,6 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// AUDIT STANDARD: Proper decimal rounding to prevent penny errors
+function roundCurrency(value: number): number {
+    return Math.round(value * 100) / 100
+}
+
+// Standardized transaction statuses for financial reports (CPA-compliant)
+const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
+
 // GET - Generate weekly report as HTML for PDF
 export async function GET(request: NextRequest) {
     try {
@@ -36,15 +44,15 @@ export async function GET(request: NextRequest) {
             where: {
                 franchiseId: user.franchiseId,
                 createdAt: { gte: startDate, lte: endDate },
-                status: { in: ['COMPLETED', 'APPROVED'] }
+                status: { in: [...COMPLETED_STATUSES] }
             }
         })
 
-        const totalSales = transactions.reduce((sum, t) => sum + Number(t.total || 0), 0)
-        const totalTax = transactions.reduce((sum, t) => sum + Number(t.tax || 0), 0)
+        const totalSales = roundCurrency(transactions.reduce((sum, t) => sum + Number(t.total || 0), 0))
+        const totalTax = roundCurrency(transactions.reduce((sum, t) => sum + Number(t.tax || 0), 0))
         const transactionCount = transactions.length
 
-        // Daily breakdown
+        // Daily breakdown - AUDIT: Use proper rounding
         const dailyTotals = new Map<string, { sales: number, count: number }>()
         for (let i = 6; i >= 0; i--) {
             const d = new Date()
@@ -54,15 +62,15 @@ export async function GET(request: NextRequest) {
         transactions.forEach(t => {
             const day = t.createdAt.toISOString().split('T')[0]
             const curr = dailyTotals.get(day) || { sales: 0, count: 0 }
-            dailyTotals.set(day, { sales: curr.sales + Number(t.total || 0), count: curr.count + 1 })
+            dailyTotals.set(day, { sales: roundCurrency(curr.sales + Number(t.total || 0)), count: curr.count + 1 })
         })
 
-        // Payment breakdown
+        // Payment breakdown - AUDIT: Use proper rounding
         const paymentTotals: Record<string, number> = { CASH: 0, CARD: 0, EBT: 0, OTHER: 0 }
         transactions.forEach(t => {
             const method = (t.paymentMethod || 'OTHER').toUpperCase()
-            if (method in paymentTotals) paymentTotals[method] += Number(t.total || 0)
-            else paymentTotals.OTHER += Number(t.total || 0)
+            if (method in paymentTotals) paymentTotals[method] = roundCurrency(paymentTotals[method] + Number(t.total || 0))
+            else paymentTotals.OTHER = roundCurrency(paymentTotals.OTHER + Number(t.total || 0))
         })
 
         const html = `

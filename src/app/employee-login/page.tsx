@@ -302,7 +302,7 @@ export default function EmployeeLoginPage() {
         const handleKeyPress = (key: string) => {
             if (key === '⌫') {
                 setStationCode(prev => prev.slice(0, -1))
-            } else if (key === 'C') {
+            } else if (key === 'CLEAR') {
                 setStationCode('')
             } else if (stationCode.length < 8) {
                 setStationCode(prev => prev + key)
@@ -355,7 +355,7 @@ export default function EmployeeLoginPage() {
                         <div className="grid grid-cols-2 gap-2 mb-4">
                             <button
                                 type="button"
-                                onClick={() => handleKeyPress('C')}
+                                onClick={() => handleKeyPress('CLEAR')}
                                 disabled={!stationCode}
                                 className="h-12 rounded-lg bg-red-600/20 text-red-400 font-bold hover:bg-red-600/30 transition-colors border border-red-600/30 disabled:opacity-30"
                             >

@@ -71,7 +71,7 @@ export default function NewOnboardingPage() {
         ownerType: 'MULTI_LOCATION_OWNER',
         monthlyFee: 0,
         servicePackage: 'POS_PROCESSING',
-        industryType: 'SERVICE',
+        industryType: '',
         dealerBrandingId: '',  // Dealer assignment
     });
 

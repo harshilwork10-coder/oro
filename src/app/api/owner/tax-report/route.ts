@@ -3,6 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// AUDIT STANDARD: Proper decimal rounding to prevent penny errors
+function roundCurrency(value: number): number {
+    return Math.round(value * 100) / 100
+}
+
+// Standardized transaction statuses for financial reports (CPA-compliant)
+const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
+
 // GET - Generate Sales Tax Report
 export async function GET(request: NextRequest) {
     try {
@@ -54,7 +62,7 @@ export async function GET(request: NextRequest) {
         const transactions = await prisma.transaction.findMany({
             where: {
                 createdAt: { gte: startDate, lte: endDate },
-                status: 'COMPLETED',
+                status: { in: [...COMPLETED_STATUSES] },
                 ...(franchiseId ? { franchiseId } : {}),
                 ...(locationId !== 'all' ? { cashDrawerSession: { locationId } } : {})
             },
@@ -109,26 +117,26 @@ export async function GET(request: NextRequest) {
             const subtotal = Number(tx.subtotal)
             const tax = Number(tx.tax)
 
-            taxByLocation[locId].grossSales += subtotal + tax
-            taxByLocation[locId].taxCollected += tax
+            taxByLocation[locId].grossSales = roundCurrency(taxByLocation[locId].grossSales + subtotal + tax)
+            taxByLocation[locId].taxCollected = roundCurrency(taxByLocation[locId].taxCollected + tax)
             taxByLocation[locId].transactionCount++
 
             // Estimate taxable vs non-taxable (if tax > 0, it was taxable)
             if (tax > 0) {
-                taxByLocation[locId].taxableSales += subtotal
+                taxByLocation[locId].taxableSales = roundCurrency(taxByLocation[locId].taxableSales + subtotal)
             } else {
-                taxByLocation[locId].nonTaxableSales += subtotal
+                taxByLocation[locId].nonTaxableSales = roundCurrency(taxByLocation[locId].nonTaxableSales + subtotal)
             }
         }
 
         const locationBreakdown = Object.values(taxByLocation).filter(l => l.transactionCount > 0)
 
-        // Calculate totals
+        // Calculate totals - AUDIT: Use proper rounding
         const totals = {
-            grossSales: locationBreakdown.reduce((sum, l) => sum + l.grossSales, 0),
-            taxableSales: locationBreakdown.reduce((sum, l) => sum + l.taxableSales, 0),
-            nonTaxableSales: locationBreakdown.reduce((sum, l) => sum + l.nonTaxableSales, 0),
-            taxCollected: locationBreakdown.reduce((sum, l) => sum + l.taxCollected, 0),
+            grossSales: roundCurrency(locationBreakdown.reduce((sum, l) => sum + l.grossSales, 0)),
+            taxableSales: roundCurrency(locationBreakdown.reduce((sum, l) => sum + l.taxableSales, 0)),
+            nonTaxableSales: roundCurrency(locationBreakdown.reduce((sum, l) => sum + l.nonTaxableSales, 0)),
+            taxCollected: roundCurrency(locationBreakdown.reduce((sum, l) => sum + l.taxCollected, 0)),
             transactionCount: locationBreakdown.reduce((sum, l) => sum + l.transactionCount, 0)
         }
 
@@ -154,8 +162,8 @@ export async function GET(request: NextRequest) {
             if (!dailyTax[dateKey]) {
                 dailyTax[dateKey] = { date: dateKey, sales: 0, tax: 0 }
             }
-            dailyTax[dateKey].sales += Number(tx.subtotal)
-            dailyTax[dateKey].tax += Number(tx.tax)
+            dailyTax[dateKey].sales = roundCurrency(dailyTax[dateKey].sales + Number(tx.subtotal))
+            dailyTax[dateKey].tax = roundCurrency(dailyTax[dateKey].tax + Number(tx.tax))
         }
         const dailyBreakdown = Object.values(dailyTax).sort((a, b) => a.date.localeCompare(b.date))
 

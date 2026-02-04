@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 
 /**
  * GET - Refresh terminal config by station ID
@@ -22,24 +22,17 @@ export async function GET(request: NextRequest) {
                 location: {
                     include: {
                         franchise: {
-                            select: {
-                                id: true,
-                                name: true,
-                                industryType: true,
-                                logo: true
+                            include: {
+                                franchisor: {
+                                    select: {
+                                        industryType: true
+                                    }
+                                }
                             }
                         }
                     }
                 },
-                dedicatedTerminal: {
-                    select: {
-                        id: true,
-                        name: true,
-                        terminalIP: true,
-                        terminalPort: true,
-                        terminalType: true
-                    }
-                }
+                dedicatedTerminal: true
             }
         })
 
@@ -49,6 +42,7 @@ export async function GET(request: NextRequest) {
 
         const location = station.location
         const franchise = location.franchise
+        const franchisor = franchise.franchisor
 
         // Return fresh terminal config matching the format stored in localStorage
         return NextResponse.json({
@@ -57,8 +51,8 @@ export async function GET(request: NextRequest) {
                 business: {
                     id: franchise.id,
                     name: franchise.name,
-                    industryType: franchise.industryType,
-                    logo: franchise.logo
+                    industryType: franchisor.industryType,
+                    logo: null // Removed - logo is on franchisor
                 },
                 location: {
                     id: location.id,

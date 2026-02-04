@@ -3,6 +3,15 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// AUDIT STANDARD: Proper decimal rounding to prevent penny errors
+function roundCurrency(value: number): number {
+    return Math.round(value * 100) / 100
+}
+
+// Standardized transaction statuses for financial reports (CPA-compliant)
+const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
+const VOIDED_STATUSES = ['VOIDED', 'REFUNDED', 'CANCELLED'] as const
+
 // GET - Generate comprehensive daily report
 export async function GET(request: NextRequest) {
     try {
@@ -51,7 +60,7 @@ export async function GET(request: NextRequest) {
             where: {
                 franchiseId: user.franchiseId,
                 createdAt: { gte: startOfDay, lte: endOfDay },
-                status: { in: ['COMPLETED', 'APPROVED'] }
+                status: { in: [...COMPLETED_STATUSES] }
             },
             include: { employee: { select: { name: true } } },
             orderBy: { createdAt: 'asc' }
@@ -62,7 +71,7 @@ export async function GET(request: NextRequest) {
             where: {
                 franchiseId: user.franchiseId,
                 createdAt: { gte: startOfDay, lte: endOfDay },
-                status: { in: ['VOIDED', 'REFUNDED', 'CANCELLED'] }
+                status: { in: [...VOIDED_STATUSES] }
             }
         })
 
@@ -108,13 +117,13 @@ export async function GET(request: NextRequest) {
             lotteryData.net = lotteryData.sales - lotteryData.payouts
         } catch { /* Lottery table may not exist */ }
 
-        // ===== CORE METRICS =====
-        const grossSales = transactions.reduce((sum, t) => sum + Number(t.total || 0), 0)
-        const totalTax = transactions.reduce((sum, t) => sum + Number(t.tax || 0), 0)
+        // ===== CORE METRICS - AUDIT: Use proper rounding =====
+        const grossSales = roundCurrency(transactions.reduce((sum, t) => sum + Number(t.total || 0), 0))
+        const totalTax = roundCurrency(transactions.reduce((sum, t) => sum + Number(t.tax || 0), 0))
         const transactionCount = transactions.length
-        const avgTransaction = transactionCount > 0 ? grossSales / transactionCount : 0
+        const avgTransaction = transactionCount > 0 ? roundCurrency(grossSales / transactionCount) : 0
 
-        // ===== PAYMENT BREAKDOWN =====
+        // ===== PAYMENT BREAKDOWN - AUDIT: Use proper rounding =====
         let cashSales = 0, cardSales = 0, ebtSales = 0, otherSales = 0
         let cashCount = 0, cardCount = 0, ebtCount = 0, otherCount = 0
         transactions.forEach(t => {
@@ -125,6 +134,11 @@ export async function GET(request: NextRequest) {
             else if (method.includes('CARD') || method.includes('CREDIT') || method.includes('DEBIT')) { cardSales += total; cardCount++ }
             else { otherSales += total; otherCount++ }
         })
+        // Round all payment totals
+        cashSales = roundCurrency(cashSales)
+        cardSales = roundCurrency(cardSales)
+        ebtSales = roundCurrency(ebtSales)
+        otherSales = roundCurrency(otherSales)
 
         // ===== EMPLOYEE PERFORMANCE =====
         const employeeSales: Map<string, { name: string, sales: number, transactions: number }> = new Map()
@@ -137,8 +151,8 @@ export async function GET(request: NextRequest) {
         })
         const topEmployees = Array.from(employeeSales.values()).sort((a, b) => b.sales - a.sales)
 
-        // ===== VOIDS & REFUNDS =====
-        const voidTotal = voidedTransactions.reduce((sum, t) => sum + Number(t.total || 0), 0)
+        // Use Math.abs() because refund transactions may have negative totals
+        const voidTotal = roundCurrency(voidedTransactions.reduce((sum, t) => sum + Math.abs(Number(t.total || 0)), 0))
         const voidCount = voidedTransactions.length
 
         // Generate HTML report

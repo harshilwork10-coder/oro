@@ -66,7 +66,7 @@ export default function OwnerBusinessesPage() {
         ownerType: 'MULTI_LOCATION',
         monthlyFee: 0,
         servicePackage: 'POS_PROCESSING',
-        industryType: 'SERVICE',
+        industryType: '',
     });
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -137,7 +137,7 @@ export default function OwnerBusinessesPage() {
                     ownerType: 'MULTI_LOCATION',
                     monthlyFee: 0,
                     servicePackage: 'POS_PROCESSING',
-                    industryType: 'SERVICE',
+                    industryType: '',
                 });
                 fetchOwner(); // Refresh the list
             } else {

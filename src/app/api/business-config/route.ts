@@ -21,7 +21,9 @@ export async function GET(req: NextRequest) {
             include: {
                 // Direct franchisor ownership (for owners)
                 franchisor: {
-                    include: {
+                    select: {
+                        id: true,
+                        industryType: true,
                         config: true
                     }
                 },
@@ -29,7 +31,9 @@ export async function GET(req: NextRequest) {
                 franchise: {
                     include: {
                         franchisor: {
-                            include: {
+                            select: {
+                                id: true,
+                                industryType: true,
                                 config: true
                             }
                         }
@@ -55,7 +59,13 @@ export async function GET(req: NextRequest) {
             })
         }
 
-        // Return existing config or default values
+        // Determine posMode from franchisor's industryType (RETAIL → 'RETAIL', SERVICE → 'SALON')
+        const franchisor = user?.franchisor || user?.franchise?.franchisor
+        const industryType = franchisor?.industryType || 'SERVICE'
+        const derivedPosMode = industryType === 'RETAIL' ? 'RETAIL' :
+            industryType === 'RESTAURANT' ? 'RESTAURANT' : 'SALON'
+
+        // Return existing config or default values with derived posMode
         const config = targetConfig || {
             id: null,
             franchisorId: user?.franchisor?.id || user?.franchise?.franchisorId,
@@ -76,7 +86,7 @@ export async function GET(req: NextRequest) {
             taxProducts: true,
             usesRetailProducts: true,
             usesServices: true,
-            posMode: 'SALON', // Default POS mode
+            posMode: derivedPosMode, // Derived from industryType, not hardcoded
             usesEmailMarketing: true,
             usesSMSMarketing: true,
             usesReviewManagement: true,

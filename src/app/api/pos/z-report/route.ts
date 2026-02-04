@@ -3,6 +3,11 @@ import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { startOfDay, endOfDay } from 'date-fns'
 
+// AUDIT STANDARD: Proper decimal rounding to prevent penny errors
+function roundCurrency(value: number): number {
+    return Math.round(value * 100) / 100
+}
+
 // GET /api/pos/z-report - Get Z-Report data for today
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
@@ -56,7 +61,8 @@ export async function GET(req: NextRequest) {
             const tax = Number(tx.tax) || 0
             const tip = Number(tx.tip) || 0
 
-            if (tx.status === 'COMPLETED') {
+            // Check for completed transactions (include APPROVED status)
+            if (tx.status === 'COMPLETED' || tx.status === 'APPROVED') {
                 grossSales += total
                 taxCollected += tax
                 tipsCollected += tip
@@ -72,15 +78,25 @@ export async function GET(req: NextRequest) {
                 }
             } else if (tx.status === 'VOIDED') {
                 voidedCount++
-            } else if (tx.status === 'REFUNDED') {
-                refundAmount += total
+            } else if (tx.status === 'REFUNDED' || tx.status === 'CANCELLED') {
+                // Include both REFUNDED and CANCELLED in refund totals
+                // Use Math.abs() because refund transactions may have negative totals
+                refundAmount += Math.abs(total)
                 refundedCount++
             }
         }
 
-        netSales = grossSales - refundAmount
-        const totalWithTax = netSales + taxCollected
-        const avgTicket = completedCount > 0 ? grossSales / completedCount : 0
+        // Apply proper rounding to all financial values
+        netSales = roundCurrency(grossSales - refundAmount)
+        grossSales = roundCurrency(grossSales)
+        refundAmount = roundCurrency(refundAmount)
+        taxCollected = roundCurrency(taxCollected)
+        tipsCollected = roundCurrency(tipsCollected)
+        cashSales = roundCurrency(cashSales)
+        cardSales = roundCurrency(cardSales)
+        otherSales = roundCurrency(otherSales)
+        const totalWithTax = roundCurrency(netSales + taxCollected)
+        const avgTicket = completedCount > 0 ? roundCurrency(grossSales / completedCount) : 0
         const totalTransactions = transactions.length
 
         return NextResponse.json({

@@ -69,9 +69,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Invalid business type' }, { status: 400 })
         }
 
-        // Validate industryType
+        // Validate industryType - REQUIRED, no default
         const validIndustryTypes = ['SERVICE', 'RETAIL', 'RESTAURANT']
-        const finalIndustryType = validIndustryTypes.includes(industryType) ? industryType : 'SERVICE'
+        if (!industryType || !validIndustryTypes.includes(industryType)) {
+            return NextResponse.json({ error: 'Industry type is required (SERVICE, RETAIL, or RESTAURANT)' }, { status: 400 })
+        }
+        const finalIndustryType = industryType
 
         // Validate processingType
         const validProcessingTypes = ['POS_ONLY', 'POS_AND_PROCESSING']
