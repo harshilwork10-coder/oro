@@ -38,48 +38,47 @@ export async function POST(
         // ═══════════════════════════════════════════════════════════════════════
         // POS COMPLIANCE: Transaction Immutability (Industry Standard)
         // Transactions are financial records - they CANNOT be deleted.
-        // You can only: VOID (before close), REFUND (after settle), or ARCHIVE
-        // See: pos_transaction_standards.md
+        // Instead, we VOID them which marks them as cancelled but preserves
+        // the audit trail.
         // ═══════════════════════════════════════════════════════════════════════
 
-        // ALL transactions are protected once created - no hard deletes allowed
-        const protectedStatuses = ['COMPLETED', 'REFUNDED', 'VOIDED', 'PENDING', 'PARTIALLY_REFUNDED']
-        if (protectedStatuses.includes(transaction.status)) {
+        // Check if already voided or refunded
+        if (transaction.status === 'VOIDED') {
             return NextResponse.json({
-                error: `Transactions cannot be deleted - they are immutable financial records. Use Void (same day) or Refund (after settlement) instead.`
+                error: 'Transaction is already voided.'
             }, { status: 400 })
         }
 
-        // Also prevent deletion if this transaction has refund children
-        const hasRefunds = await prisma.transaction.count({
-            where: { originalTransactionId: transactionId }
-        })
-        if (hasRefunds > 0) {
+        if (transaction.status === 'REFUNDED' || transaction.status === 'PARTIALLY_REFUNDED') {
             return NextResponse.json({
-                error: 'Cannot delete transaction with associated refunds.'
+                error: 'Cannot void a refunded transaction.'
             }, { status: 400 })
         }
-        // ═══════════════════════════════════════════════════════════════════════
 
-        // Log deletion
-        // Debug log removed deleting transaction ${transactionId}. Reason: ${reason}`)
-
-        // Delete line items first (due to foreign key constraint)
-        await prisma.transactionLineItem.deleteMany({
-            where: { transactionId }
+        // Void the transaction instead of deleting
+        const voidedTransaction = await prisma.transaction.update({
+            where: { id: transactionId },
+            data: {
+                status: 'VOIDED',
+                voidedById: session.user.id,
+                voidedAt: new Date(),
+                voidReason: reason
+            }
         })
 
-        // Delete transaction
-        await prisma.transaction.delete({
-            where: { id: transactionId }
-        })
+        // Log the void for audit purposes
+        console.log(`[TRANSACTION_VOIDED] ID: ${transactionId}, Reason: ${reason}, By: ${session.user.email}`)
 
         return NextResponse.json({
             success: true,
-            message: 'Transaction deleted successfully'
+            message: 'Transaction voided successfully',
+            transaction: {
+                id: voidedTransaction.id,
+                status: voidedTransaction.status
+            }
         })
     } catch (error: any) {
-        console.error('[POS_TRANSACTION_DELETE]', error)
+        console.error('[POS_TRANSACTION_VOID]', error)
         return NextResponse.json({
             error: error.message || 'Internal Server Error'
         }, { status: 500 })

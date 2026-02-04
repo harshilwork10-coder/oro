@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { invalidateLocationCache, CACHE_KEYS, cacheDelete } from '@/lib/cache'
 
 // PATCH: Update client feature configuration
 export async function PATCH(
@@ -58,7 +59,8 @@ export async function PATCH(
 
         if (updates.storeLogo !== undefined || hasPricingUpdate) {
             const franchise = await prisma.franchise.findFirst({
-                where: { franchisorId: id }
+                where: { franchisorId: id },
+                include: { locations: { select: { id: true } } }
             })
             if (franchise) {
                 const settingsUpdate: Record<string, any> = {}
@@ -73,6 +75,14 @@ export async function PATCH(
                     create: { franchiseId: franchise.id, ...settingsUpdate },
                     update: settingsUpdate
                 })
+
+                // CRITICAL: Invalidate cache for all locations so Android gets updated settings
+                if (hasPricingUpdate && franchise.locations) {
+                    console.log(`[Config] Pricing update - invalidating ${franchise.locations.length} location caches`)
+                    for (const loc of franchise.locations) {
+                        await invalidateLocationCache(loc.id)
+                    }
+                }
             }
         }
 
@@ -102,6 +112,20 @@ export async function PATCH(
             },
             update: filteredUpdates
         })
+
+        // CRITICAL: Invalidate cache for ALL locations so Android gets updated settings IMMEDIATELY
+        // This applies to ALL config changes: tips, features, tax, shift, payments, etc.
+        const allFranchises = await prisma.franchise.findMany({
+            where: { franchisorId: id },
+            include: { locations: { select: { id: true } } }
+        })
+        const allLocationIds = allFranchises.flatMap(f => f.locations.map(l => l.id))
+        if (allLocationIds.length > 0) {
+            console.log(`[Config] Settings update - invalidating ${allLocationIds.length} location caches for fields: ${Object.keys(filteredUpdates).join(', ')}`)
+            for (const locId of allLocationIds) {
+                await invalidateLocationCache(locId)
+            }
+        }
 
         // Log the change to audit trail
         const user = session.user as any

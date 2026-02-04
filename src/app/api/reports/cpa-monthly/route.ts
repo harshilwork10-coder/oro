@@ -3,6 +3,15 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// AUDIT STANDARD: Proper decimal rounding to prevent penny errors
+function roundCurrency(value: number): number {
+    return Math.round(value * 100) / 100
+}
+
+// Standardized transaction statuses for financial reports (CPA-compliant)
+const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
+const VOIDED_STATUSES = ['VOIDED', 'REFUNDED', 'CANCELLED'] as const
+
 // GET - Generate CPA Monthly Tax Report
 export async function GET(request: NextRequest) {
     try {
@@ -62,11 +71,21 @@ export async function GET(request: NextRequest) {
         const storePhone = settings?.storePhone || ''
 
         // Fetch all completed transactions for the month
+        // AUDIT: Include transaction IDs for audit trail
         const transactions = await prisma.transaction.findMany({
             where: {
                 franchiseId: user.franchiseId,
                 createdAt: { gte: startOfMonth, lte: endOfMonth },
-                status: { in: ['COMPLETED', 'APPROVED'] }
+                status: { in: [...COMPLETED_STATUSES] }
+            },
+            select: {
+                id: true,
+                subtotal: true,
+                tax: true,
+                total: true,
+                tip: true,
+                paymentMethod: true,
+                createdAt: true
             }
         })
 
@@ -75,16 +94,27 @@ export async function GET(request: NextRequest) {
             where: {
                 franchiseId: user.franchiseId,
                 createdAt: { gte: startOfMonth, lte: endOfMonth },
-                status: { in: ['VOIDED', 'REFUNDED', 'CANCELLED'] }
+                status: { in: [...VOIDED_STATUSES] }
+            },
+            select: {
+                id: true,
+                subtotal: true,
+                tax: true,
+                total: true
             }
         })
 
-        // ===== CPA METRICS =====
-        const grossSales = transactions.reduce((sum, t) => sum + Number(t.total || 0), 0)
-        const salesTaxCollected = transactions.reduce((sum, t) => sum + Number(t.tax || 0), 0)
-        const netSales = grossSales - salesTaxCollected
+        // ===== CPA METRICS (AUDIT-CORRECTED) =====
+        // CRITICAL FIX: Use subtotal for sales figures, NOT total (which includes tax)
+        // This prevents double-counting tax in gross sales
+        const netSales = roundCurrency(transactions.reduce((sum, t) => sum + Number(t.subtotal || 0), 0))
+        const salesTaxCollected = roundCurrency(transactions.reduce((sum, t) => sum + Number(t.tax || 0), 0))
+        const tipsCollected = roundCurrency(transactions.reduce((sum, t) => sum + Number(t.tip || 0), 0))
+        const grossSales = roundCurrency(netSales + salesTaxCollected) // Total collected = subtotal + tax
         const transactionCount = transactions.length
-        const refundTotal = voidedTransactions.reduce((sum, t) => sum + Number(t.total || 0), 0)
+        // Use Math.abs() because refund transactions may have negative totals
+        const refundTotal = roundCurrency(voidedTransactions.reduce((sum, t) => sum + Math.abs(Number(t.total || 0)), 0))
+        const refundTax = roundCurrency(voidedTransactions.reduce((sum, t) => sum + Math.abs(Number(t.tax || 0)), 0))
         const refundCount = voidedTransactions.length
 
         // Payment method breakdown (important for reconciliation)
@@ -92,12 +122,17 @@ export async function GET(request: NextRequest) {
         let cashCount = 0, cardCount = 0, ebtCount = 0, otherCount = 0
         transactions.forEach(t => {
             const method = (t.paymentMethod || '').toUpperCase()
-            const total = Number(t.total || 0)
+            const total = roundCurrency(Number(t.subtotal || 0) + Number(t.tax || 0))
             if (method.includes('CASH')) { cashTotal += total; cashCount++ }
             else if (method.includes('EBT')) { ebtTotal += total; ebtCount++ }
             else if (method.includes('CARD') || method.includes('CREDIT') || method.includes('DEBIT')) { cardTotal += total; cardCount++ }
             else { otherTotal += total; otherCount++ }
         })
+        // Round payment totals
+        cashTotal = roundCurrency(cashTotal)
+        cardTotal = roundCurrency(cardTotal)
+        ebtTotal = roundCurrency(ebtTotal)
+        otherTotal = roundCurrency(otherTotal)
 
         // Weekly breakdown for CPA
         const weeklyData: { week: string, sales: number, tax: number, count: number }[] = []
@@ -108,8 +143,8 @@ export async function GET(request: NextRequest) {
             const weekTxns = transactions.filter(t => t.createdAt >= weekStart && t.createdAt <= weekEnd)
             weeklyData.push({
                 week: `Week ${w + 1} (${weekStart.getDate()}-${weekEnd.getDate()})`,
-                sales: weekTxns.reduce((s, t) => s + Number(t.total || 0), 0),
-                tax: weekTxns.reduce((s, t) => s + Number(t.tax || 0), 0),
+                sales: roundCurrency(weekTxns.reduce((s, t) => s + Number(t.subtotal || 0), 0)),
+                tax: roundCurrency(weekTxns.reduce((s, t) => s + Number(t.tax || 0), 0)),
                 count: weekTxns.length
             })
         }
@@ -123,8 +158,8 @@ export async function GET(request: NextRequest) {
             if (dayTxns.length > 0) {
                 dailyData.push({
                     date: `${month + 1}/${d}/${year}`,
-                    sales: dayTxns.reduce((s, t) => s + Number(t.total || 0), 0),
-                    tax: dayTxns.reduce((s, t) => s + Number(t.tax || 0), 0),
+                    sales: roundCurrency(dayTxns.reduce((s, t) => s + Number(t.subtotal || 0), 0)),
+                    tax: roundCurrency(dayTxns.reduce((s, t) => s + Number(t.tax || 0), 0)),
                     count: dayTxns.length
                 })
             }

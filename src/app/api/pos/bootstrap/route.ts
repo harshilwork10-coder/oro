@@ -58,16 +58,25 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
     // ETag support for full 304 response
     const clientETag = req.headers.get('If-None-Match')
 
+    // Force refresh parameter - bypasses cache entirely
+    const forceRefresh = url.searchParams.get('force') === 'true'
+
     try {
         // ═══════════════════════════════════════════════════════════════════
         // REDIS CACHE CHECK: Skip all DB queries if cached response exists
         // At 200K terminals, this reduces DB load by ~90%
         // ═══════════════════════════════════════════════════════════════════
         const cacheKey = CACHE_KEYS.BOOTSTRAP(locationId)
-        const cachedResponse = await cacheGet<{
+
+        // Skip cache if force refresh requested
+        const cachedResponse = forceRefresh ? null : await cacheGet<{
             body: Record<string, unknown>
             versions: { menu: string; staff: string; config: string }
         }>(cacheKey)
+
+        if (forceRefresh) {
+            console.log(`[Bootstrap] FORCE REFRESH requested for location ${locationId}`)
+        }
 
         if (cachedResponse) {
             const { body, versions } = cachedResponse
@@ -242,14 +251,28 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             taxIncluded: false
         }
 
+        // DUAL PRICING DEBUG - Log entire settings object
+        console.log('='.repeat(50))
+        console.log('[Bootstrap DUAL PRICING DEBUG]')
+        console.log('  settings object:', settings ? JSON.stringify({
+            id: settings.id,
+            pricingModel: settings.pricingModel,
+            cardSurcharge: settings.cardSurcharge,
+            showDualPricing: settings.showDualPricing
+        }) : 'NULL SETTINGS!')
+        console.log('  franchiseId:', franchiseId)
+        console.log('  locationId:', location.id)
+        console.log('  Computed dualPricingEnabled:', settings?.pricingModel === 'DUAL_PRICING')
+        console.log('='.repeat(50))
+
         const stationConfig = {
             locationId: location.id,
             locationName: location.name,
             stationName: stationName,
             businessType: location.businessType || 'RETAIL',
 
-            // Dual pricing
-            dualPricingEnabled: settings?.pricingModel === 'DUAL_PRICING',
+            // Dual pricing - requires BOTH pricingModel AND showDualPricing flag (matches web POS logic)
+            dualPricingEnabled: settings?.pricingModel === 'DUAL_PRICING' && settings?.showDualPricing === true,
             cashDiscountPercent: settings?.cardSurcharge ? parseFloat(settings.cardSurcharge.toString()) : 4.0,
 
             // PAX Terminal

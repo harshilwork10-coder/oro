@@ -8,11 +8,12 @@ interface EmployeeModalProps {
     onClose: () => void
     employee?: any
     onSave: (data: any) => Promise<void>
+    vertical?: 'SALON' | 'RETAIL' | 'RESTAURANT' | string
 }
 
 type CompensationType = 'CHAIR_RENTAL' | 'HOURLY' | 'SALARY' | 'COMMISSION' | ''
 
-export default function EmployeeModal({ isOpen, onClose, employee, onSave }: EmployeeModalProps) {
+export default function EmployeeModal({ isOpen, onClose, employee, onSave, vertical = 'RETAIL' }: EmployeeModalProps) {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -365,8 +366,12 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSave }: Emp
                         </h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                             {[
-                                { type: 'CHAIR_RENTAL', label: 'Chair Rental', icon: Armchair, color: 'blue' },
-                                { type: 'COMMISSION', label: 'Commission', icon: Percent, color: 'purple' },
+                                // Salon-specific compensation types
+                                ...(vertical === 'SALON' ? [
+                                    { type: 'CHAIR_RENTAL', label: 'Chair Rental', icon: Armchair, color: 'blue' },
+                                    { type: 'COMMISSION', label: 'Commission', icon: Percent, color: 'purple' },
+                                ] : []),
+                                // Universal compensation types (all verticals)
                                 { type: 'HOURLY', label: 'Hourly', icon: Clock, color: 'orange' },
                                 { type: 'SALARY', label: 'Salary', icon: DollarSign, color: 'green' },
                             ].map(({ type, label, icon: Icon, color }) => (

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { invalidateLocationCache } from '@/lib/cache'
 
 export async function GET(req: NextRequest) {
     try {
@@ -20,7 +21,9 @@ export async function GET(req: NextRequest) {
             include: {
                 // Direct franchisor ownership (for owners)
                 franchisor: {
-                    include: {
+                    select: {
+                        id: true,
+                        industryType: true,
                         config: true
                     }
                 },
@@ -28,7 +31,9 @@ export async function GET(req: NextRequest) {
                 franchise: {
                     include: {
                         franchisor: {
-                            include: {
+                            select: {
+                                id: true,
+                                industryType: true,
                                 config: true
                             }
                         }
@@ -54,7 +59,13 @@ export async function GET(req: NextRequest) {
             })
         }
 
-        // Return existing config or default values
+        // Determine posMode from franchisor's industryType (RETAIL → 'RETAIL', SERVICE → 'SALON')
+        const franchisor = user?.franchisor || user?.franchise?.franchisor
+        const industryType = franchisor?.industryType || 'SERVICE'
+        const derivedPosMode = industryType === 'RETAIL' ? 'RETAIL' :
+            industryType === 'RESTAURANT' ? 'RESTAURANT' : 'SALON'
+
+        // Return existing config or default values with derived posMode
         const config = targetConfig || {
             id: null,
             franchisorId: user?.franchisor?.id || user?.franchise?.franchisorId,
@@ -75,7 +86,7 @@ export async function GET(req: NextRequest) {
             taxProducts: true,
             usesRetailProducts: true,
             usesServices: true,
-            posMode: 'SALON', // Default POS mode
+            posMode: derivedPosMode, // Derived from industryType, not hardcoded
             usesEmailMarketing: true,
             usesSMSMarketing: true,
             usesReviewManagement: true,
@@ -131,6 +142,19 @@ export async function PATCH(req: NextRequest) {
             },
             update: body
         })
+
+        // CRITICAL: Invalidate cache for ALL locations so Android gets updated settings IMMEDIATELY
+        const allFranchises = await prisma.franchise.findMany({
+            where: { franchisorId: user.franchisor.id },
+            include: { locations: { select: { id: true } } }
+        })
+        const allLocationIds = allFranchises.flatMap(f => f.locations.map(l => l.id))
+        if (allLocationIds.length > 0) {
+            console.log(`[BusinessConfig] Settings update - invalidating ${allLocationIds.length} location caches`)
+            for (const locId of allLocationIds) {
+                await invalidateLocationCache(locId)
+            }
+        }
 
         return NextResponse.json({ success: true, config })
 

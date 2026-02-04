@@ -3,6 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// AUDIT STANDARD: Proper decimal rounding to prevent penny errors
+function roundCurrency(value: number): number {
+    return Math.round(value * 100) / 100
+}
+
+// Standardized transaction statuses for financial reports (CPA-compliant)
+const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
+
 // GET - Tips report by employee and date range
 export async function GET(request: NextRequest) {
     try {
@@ -38,7 +46,7 @@ export async function GET(request: NextRequest) {
         const transactions = await prisma.transaction.findMany({
             where: {
                 franchiseId,
-                status: 'COMPLETED',
+                status: { in: [...COMPLETED_STATUSES] },
                 tip: { gt: 0 },
                 ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
                 ...(employeeId && { employeeId })
@@ -59,7 +67,7 @@ export async function GET(request: NextRequest) {
             orderBy: { createdAt: 'desc' }
         })
 
-        // Aggregate by employee
+        // Aggregate by employee - AUDIT: Use proper rounding
         const tipsByEmployee: Record<string, {
             employeeId: string,
             employeeName: string,
@@ -71,8 +79,8 @@ export async function GET(request: NextRequest) {
         let grandTotal = 0
 
         for (const tx of transactions) {
-            const tipAmount = Number(tx.tip)
-            grandTotal += tipAmount
+            const tipAmount = roundCurrency(Number(tx.tip))
+            grandTotal = roundCurrency(grandTotal + tipAmount)
 
             if (tx.employeeId) {
                 if (!tipsByEmployee[tx.employeeId]) {
@@ -84,15 +92,15 @@ export async function GET(request: NextRequest) {
                         averageTip: 0
                     }
                 }
-                tipsByEmployee[tx.employeeId].totalTips += tipAmount
+                tipsByEmployee[tx.employeeId].totalTips = roundCurrency(tipsByEmployee[tx.employeeId].totalTips + tipAmount)
                 tipsByEmployee[tx.employeeId].transactionCount++
             }
         }
 
-        // Calculate averages
+        // Calculate averages - AUDIT: Use proper rounding
         Object.values(tipsByEmployee).forEach(emp => {
             emp.averageTip = emp.transactionCount > 0
-                ? emp.totalTips / emp.transactionCount
+                ? roundCurrency(emp.totalTips / emp.transactionCount)
                 : 0
         })
 
@@ -100,7 +108,7 @@ export async function GET(request: NextRequest) {
             summary: {
                 totalTips: grandTotal,
                 transactionCount: transactions.length,
-                averageTip: transactions.length > 0 ? grandTotal / transactions.length : 0
+                averageTip: transactions.length > 0 ? roundCurrency(grandTotal / transactions.length) : 0
             },
             byEmployee: Object.values(tipsByEmployee).sort((a, b) => b.totalTips - a.totalTips),
             transactions: transactions.slice(0, 100) // Limit to last 100

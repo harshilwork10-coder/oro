@@ -2544,8 +2544,8 @@ model Franchisor {
   // Multi-Business Memberships (allows multiple users to access this business)
   memberships FranchisorMembership[] @relation("FranchisorMemberships")
 
-  // Industry Type (for conditional feature access)
-  industryType String @default("SERVICE") // "SERVICE" | "RETAIL" | "RESTAURANT"
+  // Industry Type (for conditional feature access) - REQUIRED, set by Provider
+  industryType String // "SERVICE" | "RETAIL" | "RESTAURANT" - no default, must be explicitly set
 
   // ============ BRAND MODE (Phase 1) ============
   // For businessType = BRAND_FRANCHISOR - turns this into a full brand entity
