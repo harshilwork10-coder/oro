@@ -2,8 +2,133 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { User, Check, ChevronRight } from 'lucide-react'
+import { User, Check, ChevronRight, Delete } from 'lucide-react'
 import OroLogo from '@/components/ui/OroLogo'
+
+// On-Screen Keyboard Component
+function OnScreenKeyboard({
+    value,
+    onChange,
+    onDone,
+    label
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    onDone: () => void;
+    label: string;
+}) {
+    const [isShift, setIsShift] = useState(true) // Start with caps for name
+
+    const rows = [
+        ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+        ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
+        ['shift', 'z', 'x', 'c', 'v', 'b', 'n', 'm', 'backspace'],
+        ['space', 'done']
+    ]
+
+    const handleKey = (key: string) => {
+        if (key === 'backspace') {
+            onChange(value.slice(0, -1))
+        } else if (key === 'space') {
+            onChange(value + ' ')
+        } else if (key === 'shift') {
+            setIsShift(!isShift)
+        } else if (key === 'done') {
+            onDone()
+        } else {
+            const char = isShift ? key.toUpperCase() : key
+            onChange(value + char)
+            // Auto-lowercase after first letter
+            if (isShift && value.length === 0) {
+                setIsShift(false)
+            }
+        }
+    }
+
+    return (
+        <div className="bg-stone-900/80 backdrop-blur rounded-2xl p-3 border border-stone-700">
+            {/* Display current value */}
+            <div className="mb-3 text-center">
+                <span className="text-xs text-stone-500 uppercase tracking-wider">{label}</span>
+                <div className="text-2xl font-bold text-white min-h-[40px] flex items-center justify-center">
+                    {value || <span className="text-stone-600">Type here...</span>}
+                    <span className="animate-pulse text-orange-400">|</span>
+                </div>
+            </div>
+
+            {/* Keyboard rows */}
+            <div className="space-y-1.5">
+                {rows.map((row, rowIdx) => (
+                    <div key={rowIdx} className="flex justify-center gap-1">
+                        {row.map((key) => {
+                            if (key === 'shift') {
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => handleKey(key)}
+                                        className={`w-14 h-11 text-sm font-medium rounded-lg transition-all active:scale-95 ${isShift
+                                                ? 'bg-orange-500 text-white'
+                                                : 'bg-stone-700 text-stone-300 hover:bg-stone-600'
+                                            }`}
+                                    >
+                                        ⇧
+                                    </button>
+                                )
+                            }
+                            if (key === 'backspace') {
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => handleKey(key)}
+                                        className="w-14 h-11 bg-stone-700 hover:bg-stone-600 text-stone-300 rounded-lg transition-all active:scale-95 flex items-center justify-center"
+                                    >
+                                        <Delete className="w-5 h-5" />
+                                    </button>
+                                )
+                            }
+                            if (key === 'space') {
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => handleKey(key)}
+                                        className="flex-1 max-w-[200px] h-11 bg-stone-700 hover:bg-stone-600 text-stone-400 text-sm rounded-lg transition-all active:scale-95"
+                                    >
+                                        space
+                                    </button>
+                                )
+                            }
+                            if (key === 'done') {
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => handleKey(key)}
+                                        className="w-20 h-11 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-sm rounded-lg transition-all active:scale-95 hover:shadow-lg hover:shadow-orange-500/30"
+                                    >
+                                        Done
+                                    </button>
+                                )
+                            }
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => handleKey(key)}
+                                    className="w-9 h-11 bg-stone-800 hover:bg-stone-700 text-white text-lg font-medium rounded-lg transition-all active:scale-95 border border-stone-700"
+                                >
+                                    {isShift ? key.toUpperCase() : key}
+                                </button>
+                            )
+                        })}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
 
 export default function KioskCheckInPage() {
     const router = useRouter()
@@ -14,6 +139,7 @@ export default function KioskCheckInPage() {
     const [loading, setLoading] = useState(false)
     const [isExistingCustomer, setIsExistingCustomer] = useState(false)
     const [waiverAccepted, setWaiverAccepted] = useState(false)
+    const [activeInput, setActiveInput] = useState<'first' | 'last'>('first')
 
     const handlePhoneSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -42,8 +168,10 @@ export default function KioskCheckInPage() {
         }
     }
 
-    const handleNameSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+    const handleNameSubmit = async (e?: React.FormEvent) => {
+        e?.preventDefault()
+        if (!firstName || !lastName) return
+
         setLoading(true)
 
         try {
@@ -242,21 +370,21 @@ export default function KioskCheckInPage() {
             <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-amber-600/5 blur-[120px] rounded-full z-0" />
 
             {/* Header */}
-            <div className="relative z-10 bg-stone-900/50 backdrop-blur-md border-b border-stone-800 p-6 shadow-lg flex items-center justify-center">
+            <div className="relative z-10 bg-stone-900/50 backdrop-blur-md border-b border-stone-800 p-4 shadow-lg flex items-center justify-center">
                 <div className="flex items-center gap-3 group">
                     <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
                         <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                         <OroLogo size={32} className="relative z-10 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
                     </div>
                     <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-amber-200 to-orange-400 bg-clip-text text-transparent bg-[length:200%_auto] animate-text-shimmer">
-                        Oro
+                        ORO 9
                     </span>
                 </div>
             </div>
 
             <div className="flex-1 flex items-center justify-center p-4 relative z-10">
-                <div className="max-w-md w-full glass-panel rounded-2xl shadow-2xl p-6 border border-stone-800">
-                    {step === 'phone' ? (
+                {step === 'phone' ? (
+                    <div className="max-w-md w-full glass-panel rounded-2xl shadow-2xl p-6 border border-stone-800">
                         <form onSubmit={handlePhoneSubmit} className="space-y-4">
                             <div className="text-center mb-4">
                                 <h2 className="text-xl font-bold text-stone-100">Welcome! 👋</h2>
@@ -318,52 +446,76 @@ export default function KioskCheckInPage() {
                                 {!loading && <ChevronRight className="h-5 w-5" />}
                             </button>
                         </form>
-                    ) : (
-                        <form onSubmit={handleNameSubmit} className="space-y-6">
-                            <div className="text-center mb-8">
-                                <h2 className="text-2xl font-bold text-stone-100">Nice to meet you!</h2>
-                                <p className="text-stone-400">Please tell us your name.</p>
+                    </div>
+                ) : (
+                    /* Name Entry Step with On-Screen Keyboard */
+                    <div className="max-w-xl w-full space-y-4">
+                        {/* Header */}
+                        <div className="text-center">
+                            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500/20 to-amber-500/20 rounded-full mb-4 border border-orange-500/30">
+                                <User className="w-8 h-8 text-orange-400" />
                             </div>
+                            <h2 className="text-2xl font-bold text-stone-100">Nice to meet you!</h2>
+                            <p className="text-stone-400 text-sm">Please tell us your name</p>
+                        </div>
 
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-stone-400 mb-2">First Name</label>
-                                    <input
-                                        type="text"
-                                        value={firstName}
-                                        onChange={(e) => setFirstName(e.target.value)}
-                                        className="w-full text-xl p-4 bg-stone-900/50 border-2 border-stone-800 rounded-2xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 text-white placeholder-stone-700 transition-all"
-                                        placeholder="Jane"
-                                        autoFocus
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-stone-400 mb-2">Last Name</label>
-                                    <input
-                                        type="text"
-                                        value={lastName}
-                                        onChange={(e) => setLastName(e.target.value)}
-                                        className="w-full text-xl p-4 bg-stone-900/50 border-2 border-stone-800 rounded-2xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 text-white placeholder-stone-700 transition-all"
-                                        placeholder="Doe"
-                                        required
-                                    />
-                                </div>
-                            </div>
-
+                        {/* Input Selection Tabs */}
+                        <div className="flex gap-2">
                             <button
-                                type="submit"
-                                disabled={loading || !firstName || !lastName}
-                                className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+                                type="button"
+                                onClick={() => setActiveInput('first')}
+                                className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${activeInput === 'first'
+                                        ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
+                                        : 'bg-stone-800/50 text-stone-400 border border-stone-700'
+                                    }`}
                             >
-                                {loading ? 'Saving...' : 'Check In'}
-                                {!loading && <Check className="h-5 w-5" />}
+                                First Name {firstName && `✓`}
                             </button>
-                        </form>
-                    )}
-                </div>
+                            <button
+                                type="button"
+                                onClick={() => setActiveInput('last')}
+                                className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${activeInput === 'last'
+                                        ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
+                                        : 'bg-stone-800/50 text-stone-400 border border-stone-700'
+                                    }`}
+                            >
+                                Last Name {lastName && `✓`}
+                            </button>
+                        </div>
+
+                        {/* On-Screen Keyboard */}
+                        <OnScreenKeyboard
+                            value={activeInput === 'first' ? firstName : lastName}
+                            onChange={(val) => activeInput === 'first' ? setFirstName(val) : setLastName(val)}
+                            onDone={() => {
+                                if (activeInput === 'first') {
+                                    setActiveInput('last')
+                                } else if (firstName && lastName) {
+                                    handleNameSubmit()
+                                }
+                            }}
+                            label={activeInput === 'first' ? 'First Name' : 'Last Name'}
+                        />
+
+                        {/* Submit Button */}
+                        <button
+                            type="button"
+                            onClick={() => handleNameSubmit()}
+                            disabled={loading || !firstName || !lastName}
+                            className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+                        >
+                            {loading ? (
+                                'Saving...'
+                            ) : (
+                                <>
+                                    Continue
+                                    <ChevronRight className="h-5 w-5" />
+                                </>
+                            )}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     )
 }
-
