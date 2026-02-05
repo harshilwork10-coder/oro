@@ -3,6 +3,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import OroLogo from '@/components/ui/OronexLogo';
 import {
     Home, ShoppingCart, Package, Calendar, Users, BarChart3, Settings,
     Menu, X, Bell, Search, ChevronDown, MapPin, Store, Scissors, LogOut,
@@ -138,12 +139,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
                         </button>
 
                         <div className="flex items-center gap-2">
-                            {currentLocation?.type === 'salon' ? (
-                                <Scissors size={24} className="text-[var(--primary)]" />
-                            ) : (
-                                <Store size={24} className="text-[var(--primary)]" />
-                            )}
-                            <span className="font-bold text-lg text-[var(--text-primary)]">ORO 9</span>
+                            <OroLogo size="sm" showText={true} />
                         </div>
 
                         {/* Center: Business Switcher (if multiple) + Location Selector */}
