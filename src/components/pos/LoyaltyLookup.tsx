@@ -11,7 +11,8 @@ import {
     Loader2,
     CheckCircle,
     Plus,
-    Sparkles
+    Sparkles,
+    Delete
 } from 'lucide-react'
 
 interface LoyaltyMember {
@@ -61,27 +62,52 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
     const [showEnroll, setShowEnroll] = useState(false)
     const [redeemPoints, setRedeemPoints] = useState('')
     const [message, setMessage] = useState('')
+    const [showNameInput, setShowNameInput] = useState(false)
 
-    // Format phone as user types
-    const formatPhone = (value: string) => {
-        const digits = value.replace(/\D/g, '')
+    // Format phone for display
+    const formatPhoneDisplay = (digits: string) => {
         if (digits.length <= 3) return digits
         if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
         return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`
     }
 
-    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const formatted = formatPhone(e.target.value)
-        setPhone(formatted)
-        setData(null)
+    // ═══════════════════════════════════════════════════════════════
+    // ON-SCREEN NUMPAD - Touch-first phone entry
+    // ═══════════════════════════════════════════════════════════════
+    const handleNumpadClick = (key: string) => {
         setError('')
-        setShowEnroll(false)
         setMessage('')
+
+        if (key === 'CLEAR') {
+            setPhone('')
+            setData(null)
+            setShowEnroll(false)
+            return
+        }
+        if (key === 'BACKSPACE') {
+            setPhone(prev => prev.slice(0, -1))
+            setData(null)
+            setShowEnroll(false)
+            return
+        }
+
+        // Only allow 10 digits
+        if (phone.length >= 10) return
+
+        setPhone(prev => prev + key)
+        setData(null)
+        setShowEnroll(false)
     }
 
+    // Auto-lookup when 10 digits entered
+    useEffect(() => {
+        if (phone.length === 10) {
+            handleLookup()
+        }
+    }, [phone])
+
     const handleLookup = async () => {
-        const cleanPhone = phone.replace(/\D/g, '')
-        if (cleanPhone.length < 10) {
+        if (phone.length < 10) {
             setError('Please enter a valid 10-digit phone number')
             return
         }
@@ -89,7 +115,7 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
         setLoading(true)
         setError('')
         try {
-            const res = await fetch(`/api/loyalty/members?phone=${cleanPhone}&franchiseId=${franchiseId}`)
+            const res = await fetch(`/api/loyalty/members?phone=${phone}&franchiseId=${franchiseId}`)
             const result = await res.json()
 
             if (result.type === 'NOT_FOUND') {
@@ -107,7 +133,6 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
     }
 
     const handleEnroll = async () => {
-        const cleanPhone = phone.replace(/\D/g, '')
         setEnrolling(true)
         setError('')
         try {
@@ -115,7 +140,7 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    phone: cleanPhone,
+                    phone,
                     name: enrollName,
                     email: enrollEmail,
                     franchiseId
@@ -125,6 +150,7 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
             if (result.success) {
                 setMessage('Welcome to Rewards! 🎉')
                 setShowEnroll(false)
+                setShowNameInput(false)
                 handleLookup() // Refresh data
             } else {
                 setError(result.error || 'Failed to enroll')
@@ -159,7 +185,7 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    phone: phone.replace(/\D/g, ''),
+                    phone,
                     type: 'REDEEM',
                     points,
                     description: 'Redeemed at checkout',
@@ -196,7 +222,7 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    phone: phone.replace(/\D/g, ''),
+                    phone,
                     name: data.name,
                     email: data.email
                 })
@@ -234,7 +260,7 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
     }
 
     return (
-        <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 p-5 shadow-xl">
+        <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 p-5 shadow-xl w-full max-w-md">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
@@ -253,27 +279,15 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
                 )}
             </div>
 
-            {/* Phone Input */}
-            <div className="flex gap-2 mb-4">
-                <div className="relative flex-1">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input
-                        type="tel"
-                        placeholder="(555) 123-4567"
-                        value={phone}
-                        onChange={handlePhoneChange}
-                        onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
-                        className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-lg"
-                    />
+            {/* Phone Display */}
+            <div className="mb-4">
+                <div className="flex items-center bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-4">
+                    <Phone className="w-5 h-5 text-slate-500 mr-3" />
+                    <span className={`text-2xl font-bold tracking-wider flex-1 ${phone ? 'text-white' : 'text-slate-500'}`}>
+                        {phone ? formatPhoneDisplay(phone) : '(___) ___-____'}
+                    </span>
+                    {loading && <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />}
                 </div>
-                <button
-                    onClick={handleLookup}
-                    disabled={loading || phone.replace(/\D/g, '').length < 10}
-                    className="px-5 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white font-medium flex items-center gap-2 transition-all"
-                >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    Lookup
-                </button>
             </div>
 
             {/* Error/Message */}
@@ -289,6 +303,52 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
                 </div>
             )}
 
+            {/* ═══════════════════════════════════════════════════════════════
+                ON-SCREEN NUMPAD - Touch-first!
+            ═══════════════════════════════════════════════════════════════ */}
+            {!data && !showEnroll && (
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                        <button
+                            key={num}
+                            onClick={() => handleNumpadClick(num.toString())}
+                            className="h-16 bg-slate-800 hover:bg-slate-700 text-white text-2xl font-bold rounded-xl transition-all active:scale-95 border-b-4 border-slate-900 active:border-b-0"
+                        >
+                            {num}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => handleNumpadClick('CLEAR')}
+                        className="h-16 bg-red-900/30 hover:bg-red-900/50 text-red-400 text-sm font-bold rounded-xl transition-all"
+                    >
+                        Clear
+                    </button>
+                    <button
+                        onClick={() => handleNumpadClick('0')}
+                        className="h-16 bg-slate-800 hover:bg-slate-700 text-white text-2xl font-bold rounded-xl transition-all active:scale-95 border-b-4 border-slate-900 active:border-b-0"
+                    >
+                        0
+                    </button>
+                    <button
+                        onClick={() => handleNumpadClick('BACKSPACE')}
+                        className="h-16 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all flex items-center justify-center"
+                    >
+                        <Delete className="w-6 h-6" />
+                    </button>
+                </div>
+            )}
+
+            {/* Manual Lookup Button (if auto didn't trigger) */}
+            {phone.length >= 10 && !data && !showEnroll && !loading && (
+                <button
+                    onClick={handleLookup}
+                    className="w-full py-3 bg-amber-600 hover:bg-amber-500 rounded-xl text-white font-bold flex items-center justify-center gap-2 mb-4"
+                >
+                    <Search className="w-5 h-5" />
+                    Look Up Member
+                </button>
+            )}
+
             {/* Enroll Form */}
             {showEnroll && (
                 <div className="border border-slate-700 rounded-xl p-4 mb-4 bg-slate-800/30">
@@ -299,26 +359,37 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
                     <div className="space-y-3">
                         <input
                             type="text"
+                            inputMode="text"
                             placeholder="Customer Name"
                             value={enrollName}
                             onChange={(e) => setEnrollName(e.target.value)}
-                            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
+                            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-lg"
+                            autoFocus
                         />
                         <input
                             type="email"
+                            inputMode="email"
                             placeholder="Email (optional)"
                             value={enrollEmail}
                             onChange={(e) => setEnrollEmail(e.target.value)}
-                            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
+                            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
                         />
-                        <button
-                            onClick={handleEnroll}
-                            disabled={enrolling || !enrollName.trim()}
-                            className="w-full py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 disabled:opacity-50 rounded-xl text-white font-bold flex items-center justify-center gap-2"
-                        >
-                            {enrolling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                            Enroll & Earn Rewards
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => { setShowEnroll(false); setPhone(''); }}
+                                className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-white font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleEnroll}
+                                disabled={enrolling || !enrollName.trim()}
+                                className="flex-1 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 disabled:opacity-50 rounded-xl text-white font-bold flex items-center justify-center gap-2"
+                            >
+                                {enrolling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                Enroll
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -373,22 +444,23 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
                             <div className="flex gap-2">
                                 <input
                                     type="number"
+                                    inputMode="numeric"
                                     placeholder={`Max ${getMaxRedeemable()}`}
                                     value={redeemPoints}
                                     onChange={(e) => setRedeemPoints(e.target.value)}
                                     max={getMaxRedeemable()}
-                                    className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
+                                    className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 text-lg"
                                 />
                                 <button
                                     onClick={() => setRedeemPoints(String(getMaxRedeemable()))}
-                                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300"
+                                    className="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300 font-medium"
                                 >
                                     Max
                                 </button>
                                 <button
                                     onClick={handleRedeem}
                                     disabled={redeeming || !redeemPoints}
-                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg text-white font-medium flex items-center gap-2"
+                                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg text-white font-bold flex items-center gap-2"
                                 >
                                     {redeeming ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply'}
                                 </button>
@@ -400,9 +472,16 @@ export default function LoyaltyLookup({ franchiseId, onPointsApplied, onClose, o
                             )}
                         </div>
                     )}
+
+                    {/* New Lookup Button */}
+                    <button
+                        onClick={() => { setPhone(''); setData(null); setMessage(''); }}
+                        className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 font-medium"
+                    >
+                        Look Up Different Number
+                    </button>
                 </div>
             )}
         </div>
     )
 }
-
