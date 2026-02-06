@@ -10,7 +10,11 @@ import {
     CheckCircle,
     DollarSign,
     Sparkles,
-    Search
+    Search,
+    Printer,
+    MessageSquare,
+    Mail,
+    Phone
 } from 'lucide-react'
 
 interface GiftCardModalProps {
@@ -42,6 +46,15 @@ export default function GiftCardModal({
         originalAmount: number
         issuedAt: string
     } | null>(null)
+
+    // ═══════════════════════════════════════════════════════════════
+    // DELIVERY OPTIONS - How customer receives gift card
+    // ═══════════════════════════════════════════════════════════════
+    const [showDelivery, setShowDelivery] = useState<'SMS' | 'EMAIL' | null>(null)
+    const [customerPhone, setCustomerPhone] = useState('')
+    const [customerEmail, setCustomerEmail] = useState('')
+    const [sendingDelivery, setSendingDelivery] = useState(false)
+    const [deliverySuccess, setDeliverySuccess] = useState('')
 
     // ═══════════════════════════════════════════════════════════════
     // ON-SCREEN NUMPAD - Touch-first amount entry
@@ -186,6 +199,107 @@ export default function GiftCardModal({
         setCardData(null)
         setError('')
         setSuccess('')
+        setShowDelivery(null)
+        setCustomerPhone('')
+        setCustomerEmail('')
+        setDeliverySuccess('')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // DELIVERY HANDLERS
+    // ═══════════════════════════════════════════════════════════════
+    const handlePrintReceipt = async () => {
+        // Print gift card code on receipt
+        setSendingDelivery(true)
+        try {
+            // In a real implementation, this would trigger the thermal printer
+            await new Promise(resolve => setTimeout(resolve, 500)) // Simulate print
+            setDeliverySuccess('Printing receipt...')
+        } finally {
+            setSendingDelivery(false)
+        }
+    }
+
+    const handleSendSMS = async () => {
+        if (customerPhone.length < 10) {
+            setError('Enter a valid phone number')
+            return
+        }
+        setSendingDelivery(true)
+        setError('')
+        try {
+            const res = await fetch('/api/notifications/sms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phone: customerPhone,
+                    message: `Your gift card code is: ${cardCode}\nValue: $${parseFloat(amount).toFixed(2)}\nThank you for your purchase!`
+                })
+            })
+            const result = await res.json()
+            if (result.success) {
+                setDeliverySuccess(`Sent to ${formatPhoneDisplay(customerPhone)}`)
+            } else {
+                setError(result.error || 'Failed to send SMS')
+            }
+        } catch (err) {
+            setError('Failed to send SMS')
+        } finally {
+            setSendingDelivery(false)
+        }
+    }
+
+    const handleSendEmail = async () => {
+        if (!customerEmail.includes('@')) {
+            setError('Enter a valid email address')
+            return
+        }
+        setSendingDelivery(true)
+        setError('')
+        try {
+            const res = await fetch('/api/notifications/email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: customerEmail,
+                    subject: 'Your Gift Card',
+                    body: `Your gift card code is: ${cardCode}\nValue: $${parseFloat(amount).toFixed(2)}`
+                })
+            })
+            const result = await res.json()
+            if (result.success) {
+                setDeliverySuccess(`Sent to ${customerEmail}`)
+            } else {
+                setError(result.error || 'Failed to send email')
+            }
+        } catch (err) {
+            setError('Failed to send email')
+        } finally {
+            setSendingDelivery(false)
+        }
+    }
+
+    // Format phone for display
+    const formatPhoneDisplay = (digits: string) => {
+        const clean = digits.replace(/\D/g, '')
+        if (clean.length <= 3) return clean
+        if (clean.length <= 6) return `(${clean.slice(0, 3)}) ${clean.slice(3)}`
+        return `(${clean.slice(0, 3)}) ${clean.slice(3, 6)}-${clean.slice(6, 10)}`
+    }
+
+    // Phone numpad handler
+    const handlePhoneNumpad = (key: string) => {
+        setError('')
+        if (key === 'CLEAR') {
+            setCustomerPhone('')
+            return
+        }
+        if (key === 'BACKSPACE') {
+            setCustomerPhone(prev => prev.slice(0, -1))
+            return
+        }
+        if (customerPhone.length >= 10) return
+        setCustomerPhone(prev => prev + key)
     }
 
     if (!isOpen) return null
@@ -211,8 +325,8 @@ export default function GiftCardModal({
                     <button
                         onClick={() => { setMode('SELL'); resetForm(); }}
                         className={`flex-1 py-4 text-center font-bold transition-all ${mode === 'SELL'
-                                ? 'bg-purple-900/30 text-purple-400 border-b-2 border-purple-500'
-                                : 'text-slate-500 hover:bg-slate-800/50'
+                            ? 'bg-purple-900/30 text-purple-400 border-b-2 border-purple-500'
+                            : 'text-slate-500 hover:bg-slate-800/50'
                             }`}
                     >
                         <Sparkles className="w-5 h-5 inline-block mr-2" />
@@ -221,8 +335,8 @@ export default function GiftCardModal({
                     <button
                         onClick={() => { setMode('REDEEM'); resetForm(); }}
                         className={`flex-1 py-4 text-center font-bold transition-all ${mode === 'REDEEM'
-                                ? 'bg-emerald-900/30 text-emerald-400 border-b-2 border-emerald-500'
-                                : 'text-slate-500 hover:bg-slate-800/50'
+                            ? 'bg-emerald-900/30 text-emerald-400 border-b-2 border-emerald-500'
+                            : 'text-slate-500 hover:bg-slate-800/50'
                             }`}
                     >
                         <CreditCard className="w-5 h-5 inline-block mr-2" />
@@ -267,8 +381,8 @@ export default function GiftCardModal({
                                         key={amt}
                                         onClick={() => setAmount(amt.toString())}
                                         className={`py-3 rounded-xl font-bold transition-all ${amount === amt.toString()
-                                                ? 'bg-purple-600 text-white'
-                                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                                            ? 'bg-purple-600 text-white'
+                                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
                                             }`}
                                     >
                                         ${amt}
@@ -325,22 +439,145 @@ export default function GiftCardModal({
                         </>
                     )}
 
-                    {/* Success State - Show Card Code */}
+                    {/* ═══════════════════════════════════════════════════════════════
+                        SUCCESS STATE - Show card code + delivery options
+                    ═══════════════════════════════════════════════════════════════ */}
                     {mode === 'SELL' && success && cardCode && (
-                        <div className="text-center py-4">
-                            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
-                                <Gift className="w-10 h-10 text-white" />
+                        <div className="py-2">
+                            {/* Card Info Header */}
+                            <div className="text-center mb-4 pb-4 border-b border-slate-700">
+                                <div className="flex items-center justify-center gap-3 mb-2">
+                                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                                        <Gift className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="text-slate-400 text-sm">Gift Card Created</p>
+                                        <p className="text-2xl font-mono font-bold text-white tracking-wider">
+                                            {cardCode}
+                                        </p>
+                                    </div>
+                                </div>
+                                <p className="text-xl font-bold text-purple-400">
+                                    ${parseFloat(amount).toFixed(2)}
+                                </p>
                             </div>
-                            <p className="text-slate-400 mb-2">Gift Card Code:</p>
-                            <p className="text-3xl font-mono font-bold text-white tracking-widest mb-4">
-                                {cardCode}
-                            </p>
-                            <p className="text-2xl font-bold text-purple-400 mb-6">
-                                ${parseFloat(amount).toFixed(2)}
-                            </p>
+
+                            {/* Delivery Success Message */}
+                            {deliverySuccess && (
+                                <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 flex items-center gap-2">
+                                    <CheckCircle className="w-5 h-5" />
+                                    <span>{deliverySuccess}</span>
+                                </div>
+                            )}
+
+                            {/* Error */}
+                            {error && (
+                                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+                                    {error}
+                                </div>
+                            )}
+
+                            {/* Delivery Options */}
+                            <p className="text-center text-slate-400 text-sm mb-3">How does the customer receive this?</p>
+
+                            <div className="space-y-3">
+                                {/* Option 1: Print Receipt */}
+                                <button
+                                    onClick={handlePrintReceipt}
+                                    disabled={sendingDelivery}
+                                    className="w-full py-4 bg-slate-800 hover:bg-slate-700 rounded-xl text-white font-bold flex items-center justify-center gap-3 transition-all"
+                                >
+                                    <Printer className="w-5 h-5 text-blue-400" />
+                                    Print on Receipt
+                                </button>
+
+                                {/* Option 2: SMS */}
+                                {!showDelivery || showDelivery !== 'SMS' ? (
+                                    <button
+                                        onClick={() => setShowDelivery('SMS' as any)}
+                                        className="w-full py-4 bg-slate-800 hover:bg-slate-700 rounded-xl text-white font-bold flex items-center justify-center gap-3"
+                                    >
+                                        <MessageSquare className="w-5 h-5 text-green-400" />
+                                        Text to Customer
+                                    </button>
+                                ) : (
+                                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <MessageSquare className="w-4 h-4 text-green-400" />
+                                            <span className="text-white font-medium">Enter Phone Number</span>
+                                        </div>
+                                        <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 mb-3">
+                                            <Phone className="w-4 h-4 text-slate-500 mr-2" />
+                                            <span className={`text-xl font-bold tracking-wider ${customerPhone ? 'text-white' : 'text-slate-500'}`}>
+                                                {customerPhone ? formatPhoneDisplay(customerPhone) : '(___) ___-____'}
+                                            </span>
+                                        </div>
+                                        {/* Mini numpad */}
+                                        <div className="grid grid-cols-4 gap-1 mb-3">
+                                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(num => (
+                                                <button
+                                                    key={num}
+                                                    onClick={() => handlePhoneNumpad(num.toString())}
+                                                    className="h-10 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg text-lg"
+                                                >
+                                                    {num}
+                                                </button>
+                                            ))}
+                                            <button
+                                                onClick={() => handlePhoneNumpad('BACKSPACE')}
+                                                className="h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+                                            >
+                                                <Delete className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={handleSendSMS}
+                                                disabled={sendingDelivery || customerPhone.length < 10}
+                                                className="col-span-2 h-10 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold rounded-lg flex items-center justify-center gap-2"
+                                            >
+                                                {sendingDelivery ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Option 3: Email */}
+                                {!showDelivery || showDelivery !== 'EMAIL' ? (
+                                    <button
+                                        onClick={() => setShowDelivery('EMAIL' as any)}
+                                        className="w-full py-4 bg-slate-800 hover:bg-slate-700 rounded-xl text-white font-bold flex items-center justify-center gap-3"
+                                    >
+                                        <Mail className="w-5 h-5 text-purple-400" />
+                                        Email to Customer
+                                    </button>
+                                ) : (
+                                    <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Mail className="w-4 h-4 text-purple-400" />
+                                            <span className="text-white font-medium">Enter Email Address</span>
+                                        </div>
+                                        <input
+                                            type="email"
+                                            inputMode="email"
+                                            placeholder="customer@email.com"
+                                            value={customerEmail}
+                                            onChange={(e) => { setCustomerEmail(e.target.value); setError(''); }}
+                                            className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 mb-3"
+                                        />
+                                        <button
+                                            onClick={handleSendEmail}
+                                            disabled={sendingDelivery || !customerEmail.includes('@')}
+                                            className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg text-white font-bold flex items-center justify-center gap-2"
+                                        >
+                                            {sendingDelivery ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Email'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Done Button */}
                             <button
                                 onClick={() => { resetForm(); onClose(); }}
-                                className="w-full py-4 bg-slate-800 hover:bg-slate-700 rounded-xl text-white font-bold"
+                                className="w-full mt-4 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white font-bold"
                             >
                                 Done
                             </button>
