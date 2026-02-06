@@ -1014,6 +1014,10 @@ model Location {
   dealSuggestions  DealSuggestion[]   @relation("DealSuggestions")
   dealCampaigns    DealCampaign[]     @relation("DealCampaigns")
 
+  // ============ BRAND THEME CUSTOMIZATION ============
+  themeId      String  @default("classic_oro") // Preset theme: classic_oro, rose_gold, blush_pink, lavender_night, mint_clean, ocean_blue
+  highContrast Boolean @default(false) // Accessibility: increased text contrast
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
