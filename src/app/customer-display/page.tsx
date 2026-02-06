@@ -159,20 +159,20 @@ function CustomerDisplayContent() {
         const currentDeal = deals[currentDealIndex]
 
         return (
-            <div className="hidden lg:flex w-[20vw] min-w-[200px] max-w-[320px] bg-gradient-to-b from-purple-900/50 to-stone-900 border-l border-purple-500/30 flex-col">
+            <div className="hidden lg:flex w-[20vw] min-w-[200px] max-w-[320px] bg-gradient-to-b from-amber-900/30 to-[#0A1628] border-l border-amber-500/30 flex-col">
                 {/* Deals Header */}
-                <div className="p-[clamp(0.5rem,2vw,1rem)] bg-gradient-to-r from-purple-600 to-pink-600 flex items-center gap-2">
-                    <Zap className="w-[clamp(1rem,3vw,1.25rem)] h-[clamp(1rem,3vw,1.25rem)] text-white" />
-                    <h2 className="font-bold text-white text-[clamp(0.875rem,2.5vw,1.125rem)]">Today's Deals</h2>
+                <div className="p-[clamp(0.5rem,2vw,1rem)] bg-gradient-to-r from-amber-600 to-amber-500 flex items-center gap-2">
+                    <Zap className="w-[clamp(1rem,3vw,1.25rem)] h-[clamp(1rem,3vw,1.25rem)] text-black" />
+                    <h2 className="font-bold text-black text-[clamp(0.875rem,2.5vw,1.125rem)]">Today's Deals</h2>
                 </div>
 
                 {/* Current Deal */}
                 <div className="flex-1 p-[clamp(0.5rem,2vw,1rem)] flex flex-col">
                     {/* Deal Card */}
-                    <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/10 border border-green-500/40 rounded-2xl p-[clamp(0.75rem,2vw,1.25rem)] flex-1 flex flex-col justify-center animate-fade-in">
+                    <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/40 rounded-2xl p-[clamp(0.75rem,2vw,1.25rem)] flex-1 flex flex-col justify-center animate-fade-in">
                         <div className="text-center">
                             {/* Discount Badge */}
-                            <div className="inline-flex items-center gap-2 bg-green-500 text-white px-[clamp(0.5rem,2vw,1rem)] py-[clamp(0.25rem,1vw,0.5rem)] rounded-full text-[clamp(1rem,3vw,1.5rem)] font-bold mb-[clamp(0.5rem,2vw,1rem)]">
+                            <div className="inline-flex items-center gap-2 bg-emerald-500 text-white px-[clamp(0.5rem,2vw,1rem)] py-[clamp(0.25rem,1vw,0.5rem)] rounded-full text-[clamp(1rem,3vw,1.5rem)] font-bold mb-[clamp(0.5rem,2vw,1rem)]">
                                 <Percent className="w-[clamp(1rem,3vw,1.5rem)] h-[clamp(1rem,3vw,1.5rem)]" />
                                 {currentDeal.discountValue}% OFF
                             </div>
@@ -184,20 +184,20 @@ function CustomerDisplayContent() {
 
                             {/* Product Count or Sample Products */}
                             {currentDeal.productCount && (
-                                <p className="text-green-300 text-[clamp(0.625rem,1.5vw,0.875rem)] mb-[clamp(0.5rem,2vw,1rem)]">
+                                <p className="text-emerald-300 text-[clamp(0.625rem,1.5vw,0.875rem)] mb-[clamp(0.5rem,2vw,1rem)]">
                                     {currentDeal.productCount} items on sale!
                                 </p>
                             )}
 
                             {/* Sample Products */}
                             {currentDeal.products && currentDeal.products.slice(0, 3).map((product, idx) => (
-                                <div key={idx} className="flex justify-between items-center bg-stone-800/50 rounded-lg px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.25rem,1vw,0.5rem)] mb-2">
+                                <div key={idx} className="flex justify-between items-center bg-[#0A1628]/80 rounded-lg px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.25rem,1vw,0.5rem)] mb-2">
                                     <span className="text-white text-[clamp(0.625rem,1.5vw,0.875rem)] truncate">{product.name}</span>
                                     <div className="flex items-center gap-2">
                                         <span className="text-gray-500 line-through text-[clamp(0.5rem,1.25vw,0.75rem)]">
                                             {formatCurrency(product.originalPrice)}
                                         </span>
-                                        <span className="text-green-400 font-semibold text-[clamp(0.625rem,1.5vw,0.875rem)]">
+                                        <span className="text-emerald-400 font-semibold text-[clamp(0.625rem,1.5vw,0.875rem)]">
                                             {formatCurrency(product.originalPrice * (1 - currentDeal.discountValue / 100))}
                                         </span>
                                     </div>
@@ -213,7 +213,7 @@ function CustomerDisplayContent() {
                                 <div
                                     key={idx}
                                     className={`w-2 h-2 rounded-full transition-all ${idx === currentDealIndex
-                                        ? 'bg-green-400 w-6'
+                                        ? 'bg-amber-400 w-6'
                                         : 'bg-gray-600'
                                         }`}
                                 />
@@ -223,9 +223,9 @@ function CustomerDisplayContent() {
                 </div>
 
                 {/* App Promo */}
-                <div className="p-[clamp(0.5rem,2vw,1rem)] bg-stone-900/80 border-t border-stone-700">
+                <div className="p-[clamp(0.5rem,2vw,1rem)] bg-[#0A1628] border-t border-amber-500/20">
                     <div className="text-center">
-                        <p className="text-purple-300 text-[clamp(0.5rem,1.25vw,0.75rem)] font-medium">
+                        <p className="text-amber-300 text-[clamp(0.5rem,1.25vw,0.75rem)] font-medium">
                             📱 Download Oro Buddy App
                         </p>
                         <p className="text-gray-500 text-[clamp(0.5rem,1.25vw,0.75rem)]">
@@ -239,19 +239,22 @@ function CustomerDisplayContent() {
 
     if (error) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-stone-950 gap-[clamp(1rem,3vw,1.5rem)] p-[clamp(1rem,4vw,2rem)]">
+            <div className="min-h-screen flex flex-col items-center justify-center bg-[#0A1628] gap-[clamp(1rem,3vw,1.5rem)] p-[clamp(1rem,4vw,2rem)]">
                 <div className="text-[clamp(2rem,8vw,4rem)]">📟</div>
-                <h2 className="text-[clamp(1rem,4vw,1.5rem)] font-bold text-stone-100 text-center">Display Not Connected</h2>
-                <p className="text-stone-400 text-center max-w-md text-[clamp(0.75rem,2.5vw,1rem)]">{error}</p>
+                <h2 className="text-[clamp(1rem,4vw,1.5rem)] font-bold text-white text-center">Display Not Connected</h2>
+                <p className="text-gray-400 text-center max-w-md text-[clamp(0.75rem,2.5vw,1rem)]">{error}</p>
             </div>
         )
     }
 
     if (loading) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-stone-950 gap-[clamp(0.75rem,2vw,1rem)]">
-                <Loader2 className="h-[clamp(1.5rem,5vw,2.5rem)] w-[clamp(1.5rem,5vw,2.5rem)] animate-spin text-orange-600" />
-                <p className="text-stone-500 text-[clamp(0.75rem,2vw,1rem)]">Connecting to POS...</p>
+            <div className="min-h-screen flex flex-col items-center justify-center bg-[#0A1628] gap-[clamp(0.75rem,2vw,1rem)]">
+                <div className="relative">
+                    <div className="w-12 h-12 border-4 border-amber-500/30 rounded-full" />
+                    <div className="absolute inset-0 w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+                <p className="text-gray-500 text-[clamp(0.75rem,2vw,1rem)]">Connecting to POS...</p>
             </div>
         )
     }
@@ -259,7 +262,7 @@ function CustomerDisplayContent() {
     // Idle state - waiting for items (show deals prominently)
     if (!cart || !cart.items || cart.items.length === 0 || cart.status === 'IDLE') {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-stone-900 to-stone-950 flex">
+            <div className="min-h-screen bg-gradient-to-br from-[#0F172A] to-[#0A1628] flex">
                 {/* Main Welcome Area */}
                 <div className="flex-1 flex flex-col items-center justify-center p-[clamp(1rem,4vw,2rem)]">
                     <div className="text-center">
@@ -271,24 +274,20 @@ function CustomerDisplayContent() {
                             />
                         ) : (
                             <div
-                                className="w-[clamp(5rem,15vw,10rem)] h-[clamp(5rem,15vw,10rem)] mx-auto mb-[clamp(1rem,4vw,2rem)] rounded-full flex items-center justify-center"
-                                style={{ backgroundColor: branding?.primaryColor ? `${branding.primaryColor}20` : '#1c1917' }}
+                                className="w-[clamp(5rem,15vw,10rem)] h-[clamp(5rem,15vw,10rem)] mx-auto mb-[clamp(1rem,4vw,2rem)] rounded-full flex items-center justify-center bg-amber-500/10"
                             >
-                                <ShoppingCart
-                                    className="h-[clamp(2.5rem,8vw,5rem)] w-[clamp(2.5rem,8vw,5rem)]"
-                                    style={{ color: branding?.primaryColor || '#f97316', opacity: 0.7 }}
-                                />
+                                <ShoppingCart className="h-[clamp(2.5rem,8vw,5rem)] w-[clamp(2.5rem,8vw,5rem)] text-amber-500 opacity-70" />
                             </div>
                         )}
 
                         <h1 className="text-[clamp(1.5rem,6vw,3rem)] font-bold text-white mb-[clamp(0.5rem,2vw,1rem)]">
                             {branding?.storeDisplayName || 'Welcome!'}
                         </h1>
-                        <p className="text-[clamp(0.875rem,3vw,1.5rem)] text-stone-400">Your items will appear here</p>
+                        <p className="text-[clamp(0.875rem,3vw,1.5rem)] text-gray-400">Your items will appear here</p>
                     </div>
 
-                    <div className="absolute bottom-[clamp(1rem,3vw,2rem)] text-stone-600 text-[clamp(0.625rem,1.5vw,0.875rem)]">
-                        Powered by Oro 9
+                    <div className="absolute bottom-[clamp(1rem,3vw,2rem)] text-gray-600 text-[clamp(0.625rem,1.5vw,0.875rem)]">
+                        Powered by <span className="text-amber-500">ORO 9</span>
                     </div>
                 </div>
 
@@ -301,10 +300,13 @@ function CustomerDisplayContent() {
     // Processing state
     if (cart.status === 'PROCESSING') {
         return (
-            <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-[clamp(1rem,4vw,2rem)]">
-                <div className="animate-spin h-[clamp(3rem,10vw,5rem)] w-[clamp(3rem,10vw,5rem)] border-4 border-orange-500 border-t-transparent rounded-full mb-[clamp(1rem,3vw,1.5rem)]"></div>
+            <div className="min-h-screen bg-[#0A1628] flex flex-col items-center justify-center p-[clamp(1rem,4vw,2rem)]">
+                <div className="relative mb-[clamp(1rem,3vw,1.5rem)]">
+                    <div className="w-20 h-20 border-4 border-amber-500/30 rounded-full" />
+                    <div className="absolute inset-0 w-20 h-20 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                </div>
                 <h2 className="text-[clamp(1.25rem,5vw,2rem)] font-bold text-white mb-2 text-center">Processing Payment...</h2>
-                <p className="text-stone-400 text-[clamp(0.875rem,3vw,1.25rem)]">Please wait</p>
+                <p className="text-gray-400 text-[clamp(0.875rem,3vw,1.25rem)]">Please wait</p>
             </div>
         )
     }
@@ -312,31 +314,30 @@ function CustomerDisplayContent() {
     // Thank you state
     if (cart.status === 'COMPLETED') {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-green-900 to-stone-950 flex flex-col items-center justify-center p-[clamp(1rem,4vw,2rem)]">
+            <div className="min-h-screen bg-gradient-to-br from-emerald-900/50 to-[#0A1628] flex flex-col items-center justify-center p-[clamp(1rem,4vw,2rem)]">
                 <div className="text-center">
-                    <div className="w-[clamp(5rem,15vw,10rem)] h-[clamp(5rem,15vw,10rem)] mx-auto mb-[clamp(1rem,4vw,2rem)] rounded-full bg-green-500/20 flex items-center justify-center">
-                        <span className="text-[clamp(2rem,8vw,4rem)]">✓</span>
+                    <div className="w-[clamp(5rem,15vw,10rem)] h-[clamp(5rem,15vw,10rem)] mx-auto mb-[clamp(1rem,4vw,2rem)] rounded-full bg-emerald-500/20 flex items-center justify-center shadow-[0_0_40px_rgba(16,185,129,0.3)]">
+                        <span className="text-[clamp(2rem,8vw,4rem)] text-emerald-400">✓</span>
                     </div>
                     <h1 className="text-[clamp(1.5rem,6vw,3rem)] font-bold text-white mb-[clamp(0.5rem,2vw,1rem)]">Thank You!</h1>
-                    <p className="text-[clamp(1rem,4vw,1.5rem)] text-stone-300 mb-2">
-                        Your total was {formatCurrency(cart.total)}
+                    <p className="text-[clamp(1rem,4vw,1.5rem)] text-gray-300 mb-2">
+                        Your total was <span className="text-amber-400 font-bold">{formatCurrency(cart.total)}</span>
                     </p>
-                    <p className="text-[clamp(0.875rem,3vw,1.25rem)] text-stone-400">Have a great day!</p>
+                    <p className="text-[clamp(0.875rem,3vw,1.25rem)] text-gray-400">Have a great day!</p>
                 </div>
             </div>
         )
     }
 
     // Active cart display - CART IN CENTER, DEALS ON SIDEBAR
-    // Dynamically calculate visible items based on screen height
     const MAX_VISIBLE_ITEMS = 6
 
     return (
-        <div className="h-screen bg-gradient-to-br from-stone-900 to-stone-950 flex overflow-hidden">
+        <div className="h-screen bg-gradient-to-br from-[#0F172A] to-[#0A1628] flex overflow-hidden">
             {/* Main Cart Area - Center */}
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Header */}
-                <div className="text-center py-[clamp(0.5rem,2vw,1rem)] flex-shrink-0">
+                <div className="text-center py-[clamp(0.5rem,2vw,1rem)] flex-shrink-0 border-b border-amber-500/20">
                     <h1 className="text-[clamp(1rem,4vw,1.75rem)] font-bold text-white">Your Order</h1>
                 </div>
 
@@ -349,7 +350,7 @@ function CustomerDisplayContent() {
                             const olderTotal = olderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
                             const olderCount = olderItems.reduce((sum, item) => sum + item.quantity, 0)
                             return (
-                                <div className="flex items-center justify-between bg-stone-800/30 rounded px-[clamp(0.5rem,2vw,1rem)] py-[clamp(0.25rem,1vw,0.5rem)] mb-[clamp(0.25rem,1vw,0.5rem)] text-stone-400">
+                                <div className="flex items-center justify-between bg-amber-500/10 rounded px-[clamp(0.5rem,2vw,1rem)] py-[clamp(0.25rem,1vw,0.5rem)] mb-[clamp(0.25rem,1vw,0.5rem)] text-amber-300/70 border border-amber-500/20">
                                     <span className="text-[clamp(0.625rem,1.75vw,0.875rem)]">
                                         + {olderCount} more item{olderCount !== 1 ? 's' : ''}
                                     </span>
@@ -367,20 +368,20 @@ function CustomerDisplayContent() {
                                 return (
                                     <div
                                         key={idx}
-                                        className={`flex items-center justify-between rounded-lg px-[clamp(0.5rem,2vw,1rem)] py-[clamp(0.375rem,1.5vw,0.75rem)] transition-all ${isLatest
-                                            ? 'bg-orange-500/20 border border-orange-500/50'
-                                            : 'bg-stone-800/50'
+                                        className={`flex items-center justify-between rounded-xl px-[clamp(0.5rem,2vw,1rem)] py-[clamp(0.375rem,1.5vw,0.75rem)] transition-all ${isLatest
+                                            ? 'bg-gradient-to-r from-amber-500/20 to-amber-500/10 border border-amber-500/50 shadow-lg shadow-amber-500/10'
+                                            : 'bg-white/5 border border-white/10'
                                             }`}
                                     >
                                         <div className="flex items-center gap-[clamp(0.25rem,1vw,0.5rem)] min-w-0 flex-1">
-                                            <span className={`text-[clamp(0.875rem,3vw,1.25rem)] font-bold flex-shrink-0 ${isLatest ? 'text-orange-400' : 'text-orange-500'}`}>
+                                            <span className={`text-[clamp(0.875rem,3vw,1.25rem)] font-bold flex-shrink-0 ${isLatest ? 'text-amber-400' : 'text-amber-500'}`}>
                                                 {item.quantity}x
                                             </span>
-                                            <span className={`text-[clamp(0.75rem,2.5vw,1rem)] ${isLatest ? 'text-white font-medium' : 'text-white'} truncate`}>
+                                            <span className={`text-[clamp(0.75rem,2.5vw,1rem)] ${isLatest ? 'text-white font-medium' : 'text-gray-200'} truncate`}>
                                                 {item.name}
                                             </span>
                                         </div>
-                                        <span className={`text-[clamp(0.75rem,2.5vw,1rem)] font-bold flex-shrink-0 ml-2 ${isLatest ? 'text-orange-300' : 'text-orange-400'}`}>
+                                        <span className={`text-[clamp(0.75rem,2.5vw,1rem)] font-bold flex-shrink-0 ml-2 ${isLatest ? 'text-amber-300' : 'text-amber-400'}`}>
                                             {formatCurrency(item.price * item.quantity)}
                                         </span>
                                     </div>
@@ -391,25 +392,25 @@ function CustomerDisplayContent() {
                 </div>
 
                 {/* Totals - FIXED AT BOTTOM */}
-                <div className="flex-shrink-0 bg-stone-950 border-t border-stone-800 px-[clamp(0.5rem,2vw,1rem)] py-[clamp(0.5rem,2vw,1rem)]">
+                <div className="flex-shrink-0 bg-[#0A1628] border-t border-amber-500/20 px-[clamp(0.5rem,2vw,1rem)] py-[clamp(0.5rem,2vw,1rem)]">
                     <div className="max-w-2xl mx-auto">
-                        <div className="bg-stone-800 rounded-xl p-[clamp(0.5rem,2vw,1rem)]">
+                        <div className="bg-gradient-to-br from-white/10 to-white/5 rounded-2xl p-[clamp(0.5rem,2vw,1rem)] border border-white/10">
                             {/* Column headers for dual pricing */}
                             {cart.showDualPricing && (
-                                <div className="flex justify-between text-[clamp(0.5rem,1.5vw,0.75rem)] text-stone-500 font-bold uppercase border-b border-stone-700 pb-[clamp(0.25rem,1vw,0.5rem)] mb-[clamp(0.25rem,1vw,0.5rem)]">
+                                <div className="flex justify-between text-[clamp(0.5rem,1.5vw,0.75rem)] text-gray-500 font-bold uppercase border-b border-white/10 pb-[clamp(0.25rem,1vw,0.5rem)] mb-[clamp(0.25rem,1vw,0.5rem)]">
                                     <span></span>
                                     <div className="flex gap-[clamp(1rem,4vw,2rem)]">
-                                        <span className="text-green-500">CASH</span>
+                                        <span className="text-emerald-500">CASH</span>
                                         <span className="text-blue-400">CARD</span>
                                     </div>
                                 </div>
                             )}
                             {/* Subtotal row */}
-                            <div className="flex justify-between text-[clamp(0.75rem,2vw,1rem)] text-stone-400">
+                            <div className="flex justify-between text-[clamp(0.75rem,2vw,1rem)] text-gray-400">
                                 <span>Subtotal</span>
                                 {cart.showDualPricing ? (
                                     <div className="flex gap-[clamp(0.75rem,3vw,1.5rem)]">
-                                        <span className="text-green-400">{formatCurrency(cart.subtotalCash || cart.subtotal)}</span>
+                                        <span className="text-emerald-400">{formatCurrency(cart.subtotalCash || cart.subtotal)}</span>
                                         <span className="text-blue-400">{formatCurrency(cart.subtotalCard || cart.subtotal)}</span>
                                     </div>
                                 ) : (
@@ -417,18 +418,18 @@ function CustomerDisplayContent() {
                                 )}
                             </div>
                             {/* Tax row */}
-                            <div className="flex justify-between text-[clamp(0.75rem,2vw,1rem)] text-stone-400 mt-[clamp(0.125rem,0.5vw,0.25rem)]">
+                            <div className="flex justify-between text-[clamp(0.75rem,2vw,1rem)] text-gray-400 mt-[clamp(0.125rem,0.5vw,0.25rem)]">
                                 <span>Tax</span>
                                 {cart.showDualPricing ? (
                                     <div className="flex gap-[clamp(0.75rem,3vw,1.5rem)]">
-                                        <span className="text-green-400">{formatCurrency(cart.taxCash || cart.tax)}</span>
+                                        <span className="text-emerald-400">{formatCurrency(cart.taxCash || cart.tax)}</span>
                                         <span className="text-blue-400">{formatCurrency(cart.taxCard || cart.tax)}</span>
                                     </div>
                                 ) : (
                                     <span>{formatCurrency(cart.tax)}</span>
                                 )}
                             </div>
-                            <div className="border-t border-stone-700 mt-[clamp(0.5rem,2vw,1rem)] pt-[clamp(0.5rem,2vw,1rem)]">
+                            <div className="border-t border-white/10 mt-[clamp(0.5rem,2vw,1rem)] pt-[clamp(0.5rem,2vw,1rem)]">
                                 {cart.showDualPricing ? (
                                     <div className="flex flex-col sm:flex-row gap-[clamp(0.5rem,2vw,1rem)]">
                                         <div className="flex-1 flex justify-between text-[clamp(0.875rem,3vw,1.25rem)] font-bold">
@@ -436,14 +437,14 @@ function CustomerDisplayContent() {
                                             <span className="text-blue-400">{formatCurrency(cart.cardTotal || cart.total)}</span>
                                         </div>
                                         <div className="flex-1 flex justify-between text-[clamp(0.875rem,3vw,1.25rem)] font-bold">
-                                            <span className="text-green-400">💵 Cash</span>
-                                            <span className="text-green-400">{formatCurrency(cart.cashTotal || cart.total)}</span>
+                                            <span className="text-emerald-400">💵 Cash</span>
+                                            <span className="text-emerald-400">{formatCurrency(cart.cashTotal || cart.total)}</span>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="flex justify-between text-[clamp(1rem,4vw,1.5rem)] font-bold text-white">
                                         <span>TOTAL</span>
-                                        <span className="text-orange-500">{formatCurrency(cart.total)}</span>
+                                        <span className="text-amber-400">{formatCurrency(cart.total)}</span>
                                     </div>
                                 )}
                             </div>
@@ -461,8 +462,11 @@ function CustomerDisplayContent() {
 export default function RetailCustomerDisplayPage() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen flex items-center justify-center bg-stone-950">
-                <Loader2 className="h-[clamp(1.5rem,5vw,2.5rem)] w-[clamp(1.5rem,5vw,2.5rem)] animate-spin text-orange-600" />
+            <div className="min-h-screen flex items-center justify-center bg-[#0A1628]">
+                <div className="relative">
+                    <div className="w-12 h-12 border-4 border-amber-500/30 rounded-full" />
+                    <div className="absolute inset-0 w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                </div>
             </div>
         }>
             <CustomerDisplayContent />
