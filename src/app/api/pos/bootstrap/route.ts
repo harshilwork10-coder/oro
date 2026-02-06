@@ -298,7 +298,11 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
 
             // Offline
             offlineEnabled: true,
-            offlineCashOnly: true
+            offlineCashOnly: true,
+
+            // Brand Theme Pack - salon customization
+            themeId: location.themeId || 'classic_oro',
+            highContrast: location.highContrast || false
         }
 
         // ═══════════════════════════════════════════════════════════════════
