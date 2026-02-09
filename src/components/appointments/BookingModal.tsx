@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Calendar, Clock, User, Scissors, Search } from 'lucide-react'
+import { X, Calendar, Clock, User, Scissors, Search, Check } from 'lucide-react'
 
 type BookingModalProps = {
     isOpen: boolean
@@ -47,12 +47,36 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
 
     const [formData, setFormData] = useState({
         clientId: '',
-        serviceId: '',
+        serviceIds: [] as string[],
         employeeId: '',
         date: selectedDate.toISOString().split('T')[0],
         time: getInitialTime(),
         notes: ''
     })
+
+    // Toggle service selection (multi-select)
+    const toggleService = (serviceId: string) => {
+        setFormData(prev => {
+            const isSelected = prev.serviceIds.includes(serviceId)
+            return {
+                ...prev,
+                serviceIds: isSelected
+                    ? prev.serviceIds.filter(id => id !== serviceId)
+                    : [...prev.serviceIds, serviceId]
+            }
+        })
+    }
+
+    // Computed totals for selected services
+    const selectedServices = services.filter(s => formData.serviceIds.includes(s.id))
+    const totalDuration = selectedServices.reduce((sum, s) => {
+        const empPrice = employeePrices.get(s.id)
+        return sum + (empPrice?.duration ?? s.duration)
+    }, 0)
+    const totalPrice = selectedServices.reduce((sum, s) => {
+        const empPrice = employeePrices.get(s.id)
+        return sum + Number(empPrice?.price ?? s.price)
+    }, 0)
 
     // Phone lookup function
     const lookupByPhone = async (phone: string) => {
@@ -246,15 +270,16 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                 }
             }
 
-            const service = services.find(s => s.id === formData.serviceId)
             const startTime = new Date(`${formData.date}T${formData.time}`)
-            const endTime = new Date(startTime.getTime() + (service?.duration || 30) * 60000)
+            const endTime = new Date(startTime.getTime() + (totalDuration || 30) * 60000)
 
             const res = await fetch('/api/appointments', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...formData,
+                    serviceId: formData.serviceIds[0], // Primary service for backward compat
+                    serviceIds: formData.serviceIds,
                     clientId,
                     locationId: locations[0]?.id, // Use first location from user's franchise
                     startTime: startTime.toISOString(),
@@ -432,43 +457,46 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                                 {services
                                     .filter(s => serviceCategory === 'All' ? true : s.category === serviceCategory)
                                     .slice(0, 8)
-                                    .map(service => (
-                                        <button
-                                            key={service.id}
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, serviceId: service.id })}
-                                            className={`p-4 rounded-xl text-left transition-all border-2 min-h-[64px] active:scale-[0.98] ${formData.serviceId === service.id
-                                                ? 'bg-purple-600/30 border-purple-500 text-white shadow-lg shadow-purple-500/20'
-                                                : 'bg-stone-800 border-stone-700 hover:border-stone-500 text-stone-200'
-                                                }`}
-                                        >
-                                            {(() => {
-                                                const empPrice = employeePrices.get(service.id)
-                                                const displayPrice = empPrice?.price ?? service.price
-                                                const displayDuration = empPrice?.duration ?? service.duration
-                                                const hasCustomPrice = !!empPrice
-                                                return (
-                                                    <>
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="font-semibold text-base truncate">{service.name}</span>
-                                                            <span className={`font-bold text-base ${hasCustomPrice ? 'text-orange-400' : 'text-emerald-400'}`}>
-                                                                ${Number(displayPrice).toFixed(0)}
-                                                                {hasCustomPrice && <span className="text-xs ml-1">★</span>}
-                                                            </span>
-                                                        </div>
-                                                        <span className="text-sm text-stone-400">{displayDuration} mins</span>
-                                                    </>
-                                                )
-                                            })()}
-                                        </button>
-                                    ))}
+                                    .map(service => {
+                                        const isSelected = formData.serviceIds.includes(service.id)
+                                        const empPrice = employeePrices.get(service.id)
+                                        const displayPrice = empPrice?.price ?? service.price
+                                        const displayDuration = empPrice?.duration ?? service.duration
+                                        const hasCustomPrice = !!empPrice
+                                        return (
+                                            <button
+                                                key={service.id}
+                                                type="button"
+                                                onClick={() => toggleService(service.id)}
+                                                className={`p-4 rounded-xl text-left transition-all border-2 min-h-[64px] active:scale-[0.98] relative ${isSelected
+                                                    ? 'bg-purple-600/30 border-purple-500 text-white shadow-lg shadow-purple-500/20'
+                                                    : 'bg-stone-800 border-stone-700 hover:border-stone-500 text-stone-200'
+                                                    }`}
+                                            >
+                                                {/* Checkmark badge */}
+                                                {isSelected && (
+                                                    <div className="absolute -top-2 -right-2 h-6 w-6 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-2 ring-stone-900">
+                                                        <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
+                                                    </div>
+                                                )}
+                                                <div className="flex justify-between items-center">
+                                                    <span className="font-semibold text-base truncate pr-2">{service.name}</span>
+                                                    <span className={`font-bold text-base whitespace-nowrap ${hasCustomPrice ? 'text-orange-400' : 'text-emerald-400'}`}>
+                                                        ${Number(displayPrice).toFixed(0)}
+                                                        {hasCustomPrice && <span className="text-xs ml-1">★</span>}
+                                                    </span>
+                                                </div>
+                                                <span className="text-sm text-stone-400">{displayDuration} mins</span>
+                                            </button>
+                                        )
+                                    })}
                             </div>
                         )}
 
                         {/* Selected indicator */}
-                        {formData.serviceId && (
+                        {formData.serviceIds.length > 0 && (
                             <div className="mt-2 text-sm text-purple-300">
-                                ✓ {services.find(s => s.id === formData.serviceId)?.name} selected
+                                ✓ {formData.serviceIds.length} service{formData.serviceIds.length > 1 ? 's' : ''} selected
                             </div>
                         )}
                     </div>
@@ -594,6 +622,35 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                             className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500 h-16 resize-none text-sm"
                         />
                     </div>
+                    {/* Confirmation Summary Strip */}
+                    {formData.serviceIds.length > 0 && (
+                        <div className="mt-2 p-4 bg-gradient-to-r from-purple-900/40 to-pink-900/40 border border-purple-500/30 rounded-xl">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-1.5 text-purple-200">
+                                        <Scissors className="h-4 w-4" />
+                                        <span className="font-medium">{formData.serviceIds.length} service{formData.serviceIds.length > 1 ? 's' : ''}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-stone-300">
+                                        <Clock className="h-4 w-4" />
+                                        <span>{totalDuration} min</span>
+                                    </div>
+                                </div>
+                                <div className="text-lg font-bold text-emerald-400">
+                                    ${totalPrice.toFixed(2)}
+                                </div>
+                            </div>
+                            {formData.serviceIds.length > 1 && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {selectedServices.map(s => (
+                                        <span key={s.id} className="text-xs bg-purple-500/20 text-purple-200 px-2 py-0.5 rounded-full">
+                                            {s.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -606,7 +663,7 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={loading || !formData.serviceId || (searchStatus !== 'found' && (searchStatus !== 'not_found' || !newCustomer.firstName))}
+                        disabled={loading || formData.serviceIds.length === 0 || (searchStatus !== 'found' && (searchStatus !== 'not_found' || !newCustomer.firstName))}
                         className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:shadow-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                         {loading ? 'Booking...' : 'Confirm Booking'}
