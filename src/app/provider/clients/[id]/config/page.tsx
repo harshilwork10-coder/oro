@@ -1064,7 +1064,7 @@ export default function ProviderClientConfigPage() {
 
                                         {/* Employees Link */}
                                         <Link
-                                            href={`/provider/clients/${clientId}/employees`}
+                                            href={`/provider/clients/${clientId}/franchisees`}
                                             className="w-full p-4 bg-sky-500/20 border border-sky-500/50 rounded-lg flex items-center justify-between hover:bg-sky-500/30 transition-colors"
                                         >
                                             <div className="flex items-center gap-3">

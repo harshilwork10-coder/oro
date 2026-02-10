@@ -225,7 +225,7 @@ export default function OnboardingPage() {
                             New Shipment
                         </button>
                     ) : (
-                        <Link href="/provider/clients/new" className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium">
+                        <Link href="/provider/onboarding?action=new" className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium">
                             <Plus size={16} />
                             New Request
                         </Link>
@@ -305,7 +305,7 @@ export default function OnboardingPage() {
                             <FileText size={48} className="mx-auto text-stone-600 mb-4" />
                             <h2 className="text-lg font-semibold text-stone-100">No onboarding requests</h2>
                             <p className="text-stone-400 mt-2">Create a new client to start an onboarding request</p>
-                            <Link href="/provider/clients/new" className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors">
+                            <Link href="/provider/onboarding?action=new" className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors">
                                 <Plus size={16} />
                                 New Client
                             </Link>

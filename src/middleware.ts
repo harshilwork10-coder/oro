@@ -48,6 +48,35 @@ export async function middleware(req: NextRequest) {
         if (pathname === '/login') {
             return NextResponse.redirect(new URL('/dashboard', req.url))
         }
+
+        // ── Role-Based Route Protection ─────────────────────────────
+        const role = token.role as string | undefined
+
+        // Define which route prefixes each role is BLOCKED from accessing
+        const roleRestrictions: Record<string, string[]> = {
+            'OWNER': ['/provider', '/franchisor'],
+            'FRANCHISOR': ['/provider'],
+            // PROVIDER has full access – no restrictions
+            // EMPLOYEE/MANAGER inherit OWNER-level restrictions
+            'EMPLOYEE': ['/provider', '/franchisor', '/owner'],
+            'MANAGER': ['/provider', '/franchisor'],
+        }
+
+        const blocked = role ? (roleRestrictions[role] || []) : []
+        const isBlocked = blocked.some(prefix => pathname.startsWith(prefix))
+
+        if (isBlocked) {
+            // Redirect to the user's home page based on role
+            const roleHome: Record<string, string> = {
+                'PROVIDER': '/provider/home',
+                'FRANCHISOR': '/franchisor/home',
+                'OWNER': '/owner',
+                'EMPLOYEE': '/dashboard',
+                'MANAGER': '/owner',
+            }
+            const home = (role && roleHome[role]) || '/dashboard'
+            return NextResponse.redirect(new URL(home, req.url))
+        }
     }
 
     // Add security headers to all responses

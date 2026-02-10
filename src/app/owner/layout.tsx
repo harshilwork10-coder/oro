@@ -56,12 +56,14 @@ const LocationContext = createContext<LocationContextType>({
 
 export const useLocation = () => useContext(LocationContext);
 
-// Mock locations
-const MOCK_LOCATIONS = [
-    { id: 'loc_1', name: 'Downtown Store', type: 'retail' as const },
-    { id: 'loc_2', name: 'North Salon', type: 'salon' as const },
-    { id: 'loc_3', name: 'South Plaza', type: 'both' as const },
-];
+// Location type helper
+function deriveLocationType(businessType?: string): 'retail' | 'salon' | 'both' {
+    if (!businessType) return 'both';
+    const bt = businessType.toUpperCase();
+    if (bt.includes('RETAIL') || bt === 'CONVENIENCE' || bt === 'GROCERY') return 'retail';
+    if (bt.includes('SALON') || bt.includes('SPA') || bt === 'SERVICE') return 'salon';
+    return 'both';
+}
 
 // Sidebar nav items - conditional based on business type
 function getNavItems(businessType: 'retail' | 'salon' | 'both') {
@@ -101,13 +103,13 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
     const [businessDropdownOpen, setBusinessDropdownOpen] = useState(false);
-    const [locations] = useState(MOCK_LOCATIONS);
-    const [currentLocation, setCurrentLocation] = useState(MOCK_LOCATIONS[0]);
+    const [locations, setLocations] = useState<{ id: string; name: string; type: 'retail' | 'salon' | 'both' }[]>([]);
+    const [currentLocation, setCurrentLocation] = useState<{ id: string; name: string; type: 'retail' | 'salon' | 'both' } | null>(null);
     const [memberships, setMemberships] = useState<BusinessMembership[]>([]);
     const [currentBusiness, setCurrentBusiness] = useState<BusinessMembership | null>(null);
     const pathname = usePathname();
 
-    // Fetch business memberships on mount
+    // Fetch business memberships and locations on mount
     useEffect(() => {
         fetch('/api/auth/status')
             .then(res => res.ok ? res.json() : null)
@@ -117,6 +119,30 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
                     // Set first business as current (or primary)
                     const primary = data.memberships.find((m: BusinessMembership) => m.isPrimary) || data.memberships[0];
                     setCurrentBusiness(primary);
+
+                    // Extract real locations from memberships
+                    const locs: { id: string; name: string; type: 'retail' | 'salon' | 'both' }[] = [];
+                    for (const m of data.memberships) {
+                        const fr = m.franchisor;
+                        const locType = deriveLocationType(fr?.businessType);
+                        if (fr?.franchises) {
+                            for (const franchise of fr.franchises) {
+                                if (franchise.locations) {
+                                    for (const loc of franchise.locations) {
+                                        locs.push({ id: loc.id, name: loc.name || fr.name, type: locType });
+                                    }
+                                }
+                            }
+                        }
+                        // Fallback: if no nested locations, use franchisor itself as a "location"
+                        if (locs.length === 0 && fr) {
+                            locs.push({ id: fr.id, name: fr.name, type: locType });
+                        }
+                    }
+                    if (locs.length > 0) {
+                        setLocations(locs);
+                        setCurrentLocation(locs[0]);
+                    }
                 }
             })
             .catch(console.error);

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from './layout';
 import {
     DollarSign, TrendingUp, ShoppingCart, Users, Calendar, Clock,
-    Package, Scissors, BarChart3, ArrowUpRight, ArrowDownRight
+    Package, Scissors, BarChart3, ArrowUpRight, ArrowDownRight, Loader2
 } from 'lucide-react';
 
 // KPI Card Component
@@ -52,12 +52,92 @@ function QuickAction({ label, icon: Icon, href }: {
     );
 }
 
+// Types for API data
+interface TodayStats {
+    totalRevenueToday: number;
+    totalTipsToday: number;
+    totalServiceRevenue: number;
+    totalClients: number;
+    totalTransactions: number;
+    walkIns: number;
+    yesterdayRevenue: number;
+    changePercent: number;
+}
+
+interface RecentTransaction {
+    id: string;
+    total: number;
+    tip: number;
+    status: string;
+    createdAt: string;
+    client?: { firstName: string; lastName: string } | null;
+}
+
 export default function OwnerDashboard() {
     const { currentLocation } = useLocation();
     const [period, setPeriod] = useState<'today' | 'week' | 'month'>('today');
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState<TodayStats | null>(null);
+    const [recentTx, setRecentTx] = useState<RecentTransaction[]>([]);
 
     const isRetail = currentLocation?.type === 'retail' || currentLocation?.type === 'both';
     const isSalon = currentLocation?.type === 'salon' || currentLocation?.type === 'both';
+
+    // Fetch live stats from the API
+    useEffect(() => {
+        async function fetchStats() {
+            setLoading(true);
+            try {
+                // Fetch today's stats
+                const statsRes = await fetch('/api/owner/today-stats');
+                if (statsRes.ok) {
+                    const data = await statsRes.json();
+                    setStats(data);
+                }
+
+                // Fetch recent transactions
+                const txRes = await fetch('/api/transactions?limit=5&status=COMPLETED');
+                if (txRes.ok) {
+                    const txData = await txRes.json();
+                    setRecentTx(Array.isArray(txData) ? txData : txData.transactions || []);
+                }
+            } catch (error) {
+                console.error('Failed to load dashboard data:', error);
+            }
+            setLoading(false);
+        }
+        fetchStats();
+    }, [currentLocation?.id]);
+
+    // Format currency
+    const fmt = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    // Time ago helper
+    function timeAgo(dateStr: string) {
+        const diff = Date.now() - new Date(dateStr).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'just now';
+        if (mins < 60) return `${mins}m ago`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs}h ago`;
+        return `${Math.floor(hrs / 24)}d ago`;
+    }
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+            </div>
+        );
+    }
+
+    const avgTicket = stats && stats.totalTransactions > 0
+        ? stats.totalRevenueToday / stats.totalTransactions
+        : 0;
+
+    const changeLabel = stats
+        ? (stats.changePercent >= 0 ? `+${stats.changePercent.toFixed(1)}% vs yesterday` : `${stats.changePercent.toFixed(1)}% vs yesterday`)
+        : '';
 
     return (
         <div className="space-y-6">
@@ -87,28 +167,28 @@ export default function OwnerDashboard() {
             <div className="grid grid-cols-4 gap-4">
                 <KpiCard
                     title="Total Sales"
-                    value="$4,856"
-                    change="+12.5% vs yesterday"
-                    changeType="up"
+                    value={fmt(stats?.totalRevenueToday ?? 0)}
+                    change={changeLabel}
+                    changeType={stats && stats.changePercent >= 0 ? 'up' : 'down'}
                     icon={DollarSign}
                 />
                 <KpiCard
                     title="Transactions"
-                    value="47"
-                    change="+8 vs yesterday"
-                    changeType="up"
+                    value={String(stats?.totalTransactions ?? 0)}
+                    change={`${stats?.walkIns ?? 0} walk-ins`}
+                    changeType="neutral"
                     icon={ShoppingCart}
                 />
                 <KpiCard
                     title="Avg Ticket"
-                    value="$103.32"
-                    change="-$4.12"
-                    changeType="down"
+                    value={fmt(avgTicket)}
+                    change=""
+                    changeType="neutral"
                     icon={TrendingUp}
                 />
                 <KpiCard
-                    title="Staff On Duty"
-                    value="4"
+                    title="Unique Customers"
+                    value={String(stats?.totalClients ?? 0)}
                     change=""
                     changeType="neutral"
                     icon={Users}
@@ -120,17 +200,17 @@ export default function OwnerDashboard() {
                 {isRetail && (
                     <>
                         <KpiCard
-                            title="Low Stock Items"
-                            value="12"
-                            change="Need reorder"
-                            changeType="down"
-                            icon={Package}
+                            title="Tips Today"
+                            value={fmt(stats?.totalTipsToday ?? 0)}
+                            change=""
+                            changeType="neutral"
+                            icon={DollarSign}
                         />
                         <KpiCard
-                            title="Items Sold"
-                            value="156"
-                            change="+23 vs yesterday"
-                            changeType="up"
+                            title="Service Revenue"
+                            value={fmt(stats?.totalServiceRevenue ?? 0)}
+                            change=""
+                            changeType="neutral"
                             icon={ShoppingCart}
                         />
                     </>
@@ -138,33 +218,33 @@ export default function OwnerDashboard() {
                 {isSalon && (
                     <>
                         <KpiCard
-                            title="Appointments Today"
-                            value="18"
-                            change="3 remaining"
+                            title="Tips Today"
+                            value={fmt(stats?.totalTipsToday ?? 0)}
+                            change=""
                             changeType="neutral"
-                            icon={Calendar}
+                            icon={DollarSign}
                         />
                         <KpiCard
-                            title="Services Completed"
-                            value="15"
-                            change="+5 vs yesterday"
-                            changeType="up"
+                            title="Service Revenue"
+                            value={fmt(stats?.totalServiceRevenue ?? 0)}
+                            change=""
+                            changeType="neutral"
                             icon={Scissors}
                         />
                     </>
                 )}
                 <KpiCard
-                    title="Labor Hours"
-                    value="32.5h"
-                    change="On target"
+                    title="Yesterday Revenue"
+                    value={fmt(stats?.yesterdayRevenue ?? 0)}
+                    change="Baseline"
                     changeType="neutral"
                     icon={Clock}
                 />
                 <KpiCard
-                    title="Labor Cost %"
-                    value="18.2%"
-                    change="Under budget"
-                    changeType="up"
+                    title="Walk-Ins"
+                    value={String(stats?.walkIns ?? 0)}
+                    change=""
+                    changeType="neutral"
                     icon={BarChart3}
                 />
             </div>
@@ -184,84 +264,65 @@ export default function OwnerDashboard() {
 
             {/* Recent Activity */}
             <div className="grid grid-cols-2 gap-6">
-                {/* Recent Transactions */}
+                {/* Recent Transactions - Live Data */}
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
                     <div className="p-4 border-b border-[var(--border)]">
                         <h3 className="font-semibold text-[var(--text-primary)]">Recent Transactions</h3>
                     </div>
                     <div className="divide-y divide-[var(--border)]">
-                        {[
-                            { id: '#1234', amount: '$45.99', time: '2m ago', status: 'completed' },
-                            { id: '#1233', amount: '$128.50', time: '15m ago', status: 'completed' },
-                            { id: '#1232', amount: '$23.00', time: '32m ago', status: 'refunded' },
-                            { id: '#1231', amount: '$89.99', time: '1h ago', status: 'completed' },
-                        ].map((tx) => (
-                            <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-[var(--surface-hover)]">
-                                <div>
-                                    <span className="font-mono text-sm text-[var(--text-primary)]">{tx.id}</span>
-                                    <span className="text-xs text-[var(--text-muted)] ml-2">{tx.time}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className={`text-xs px-2 py-0.5 rounded ${tx.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                                        }`}>{tx.status}</span>
-                                    <span className="font-medium text-[var(--text-primary)]">{tx.amount}</span>
-                                </div>
+                        {recentTx.length === 0 ? (
+                            <div className="p-8 text-center">
+                                <ShoppingCart size={32} className="mx-auto text-[var(--text-muted)] mb-2" />
+                                <p className="text-sm text-[var(--text-secondary)]">No transactions yet today</p>
                             </div>
-                        ))}
+                        ) : (
+                            recentTx.slice(0, 5).map((tx) => (
+                                <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-[var(--surface-hover)]">
+                                    <div>
+                                        <span className="font-mono text-sm text-[var(--text-primary)]">
+                                            {tx.client ? `${tx.client.firstName} ${tx.client.lastName?.charAt(0)}.` : `#${tx.id.slice(-4)}`}
+                                        </span>
+                                        <span className="text-xs text-[var(--text-muted)] ml-2">{timeAgo(tx.createdAt)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className={`text-xs px-2 py-0.5 rounded ${tx.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' :
+                                            tx.status === 'REFUNDED' ? 'bg-amber-500/20 text-amber-400' : 'bg-stone-700 text-stone-300'
+                                            }`}>{tx.status.toLowerCase()}</span>
+                                        <span className="font-medium text-[var(--text-primary)]">{fmt(Number(tx.total))}</span>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
 
-                {/* Today's Schedule (Salon) or Low Stock (Retail) */}
-                {isSalon ? (
-                    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-                        <div className="p-4 border-b border-[var(--border)]">
-                            <h3 className="font-semibold text-[var(--text-primary)]">Upcoming Appointments</h3>
+                {/* Right Panel */}
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+                    <div className="p-4 border-b border-[var(--border)]">
+                        <h3 className="font-semibold text-[var(--text-primary)]">
+                            {isSalon ? 'Today at a Glance' : 'Revenue Breakdown'}
+                        </h3>
+                    </div>
+                    <div className="divide-y divide-[var(--border)]">
+                        <div className="flex items-center justify-between p-4">
+                            <span className="text-[var(--text-secondary)]">Gross Sales</span>
+                            <span className="font-medium text-[var(--text-primary)]">{fmt(stats?.totalRevenueToday ?? 0)}</span>
                         </div>
-                        <div className="divide-y divide-[var(--border)]">
-                            {[
-                                { time: '2:00 PM', client: 'Sarah M.', service: 'Haircut & Color', stylist: 'Emma' },
-                                { time: '2:30 PM', client: 'John D.', service: 'Men\'s Cut', stylist: 'Alex' },
-                                { time: '3:00 PM', client: 'Lisa K.', service: 'Manicure', stylist: 'Maria' },
-                                { time: '3:30 PM', client: 'Mike T.', service: 'Beard Trim', stylist: 'Emma' },
-                            ].map((apt, i) => (
-                                <div key={i} className="flex items-center justify-between p-4 hover:bg-[var(--surface-hover)]">
-                                    <div>
-                                        <span className="font-medium text-[var(--text-primary)]">{apt.client}</span>
-                                        <span className="text-xs text-[var(--text-muted)] ml-2">{apt.service}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-xs text-[var(--text-secondary)]">{apt.stylist}</span>
-                                        <span className="font-mono text-sm text-[var(--primary)]">{apt.time}</span>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="flex items-center justify-between p-4">
+                            <span className="text-[var(--text-secondary)]">Tips</span>
+                            <span className="font-medium text-emerald-400">{fmt(stats?.totalTipsToday ?? 0)}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-4">
+                            <span className="text-[var(--text-secondary)]">Service Revenue</span>
+                            <span className="font-medium text-[var(--text-primary)]">{fmt(stats?.totalServiceRevenue ?? 0)}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-4">
+                            <span className="text-[var(--text-secondary)]">Yesterday</span>
+                            <span className="font-medium text-[var(--text-muted)]">{fmt(stats?.yesterdayRevenue ?? 0)}</span>
                         </div>
                     </div>
-                ) : (
-                    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-                        <div className="p-4 border-b border-[var(--border)]">
-                            <h3 className="font-semibold text-[var(--text-primary)]">Low Stock Alert</h3>
-                        </div>
-                        <div className="divide-y divide-[var(--border)]">
-                            {[
-                                { name: 'Marlboro Gold', stock: 3, min: 10 },
-                                { name: 'Bud Light 12pk', stock: 5, min: 12 },
-                                { name: 'Red Bull 4pk', stock: 8, min: 15 },
-                                { name: 'Doritos Nacho', stock: 2, min: 8 },
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-center justify-between p-4 hover:bg-[var(--surface-hover)]">
-                                    <span className="font-medium text-[var(--text-primary)]">{item.name}</span>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-xs text-[var(--text-muted)]">Min: {item.min}</span>
-                                        <span className="font-mono text-sm text-red-400">{item.stock} left</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                </div>
             </div>
         </div>
     );
 }
-
