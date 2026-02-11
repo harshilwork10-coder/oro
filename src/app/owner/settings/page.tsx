@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Store, CreditCard, Bell, Users, Shield, Palette, Clock, MapPin, ChevronRight } from 'lucide-react';
 
 type SettingsSection = 'general' | 'payment' | 'notifications' | 'employees' | 'security' | 'appearance' | 'hours' | 'location';
@@ -18,6 +19,15 @@ const sections = [
 
 export default function SettingsPage() {
     const [activeSection, setActiveSection] = useState<SettingsSection>('general');
+    const router = useRouter();
+
+    const handleSectionClick = (sectionId: SettingsSection) => {
+        if (sectionId === 'appearance') {
+            router.push('/owner/settings/appearance');
+            return;
+        }
+        setActiveSection(sectionId);
+    };
 
     return (
         <div>
@@ -29,7 +39,7 @@ export default function SettingsPage() {
                     {sections.map((section) => (
                         <button
                             key={section.id}
-                            onClick={() => setActiveSection(section.id as SettingsSection)}
+                            onClick={() => handleSectionClick(section.id as SettingsSection)}
                             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeSection === section.id
                                 ? 'bg-[var(--primary)] text-white'
                                 : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'
