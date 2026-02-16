@@ -1,7 +1,7 @@
 /**
  * Provider: Update Location Settings
  * 
- * PATCH /api/admin/locations/[locationId]/settings
+ * PATCH /api/admin/locations/[id]/settings
  * 
  * Allows Provider to update location-level settings like googlePlaceId.
  * Protected: requires PROVIDER role
@@ -14,7 +14,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function PATCH(
     req: Request,
-    { params }: { params: { locationId: string } }
+    { params }: { params: { id: string } }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -37,7 +37,7 @@ export async function PATCH(
 
         // Validate the location exists
         const location = await prisma.location.findUnique({
-            where: { id: params.locationId },
+            where: { id: params.id },
             select: { id: true, name: true }
         })
 
@@ -47,7 +47,7 @@ export async function PATCH(
 
         // Update the location
         const updated = await prisma.location.update({
-            where: { id: params.locationId },
+            where: { id: params.id },
             data: {
                 googlePlaceId: googlePlaceId?.trim() || null
             },
@@ -70,7 +70,7 @@ export async function PATCH(
 
 export async function GET(
     req: Request,
-    { params }: { params: { locationId: string } }
+    { params }: { params: { id: string } }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -79,7 +79,7 @@ export async function GET(
         }
 
         const location = await prisma.location.findUnique({
-            where: { id: params.locationId },
+            where: { id: params.id },
             select: {
                 id: true,
                 name: true,
