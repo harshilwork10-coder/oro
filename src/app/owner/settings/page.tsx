@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Store, CreditCard, Bell, Users, Shield, Palette, Clock, MapPin, ChevronRight } from 'lucide-react';
+import { Store, CreditCard, Bell, Users, Shield, Palette, Clock, MapPin, ChevronRight, Star, Check, Loader2 } from 'lucide-react';
 
 type SettingsSection = 'general' | 'payment' | 'notifications' | 'employees' | 'security' | 'appearance' | 'hours' | 'location';
 
@@ -20,6 +20,41 @@ const sections = [
 export default function SettingsPage() {
     const [activeSection, setActiveSection] = useState<SettingsSection>('general');
     const router = useRouter();
+    const [googlePlaceId, setGooglePlaceId] = useState('');
+    const [placeIdSaving, setPlaceIdSaving] = useState(false);
+    const [placeIdSaved, setPlaceIdSaved] = useState(false);
+    const [placeIdError, setPlaceIdError] = useState<string | null>(null);
+
+    // Load existing Google Place ID
+    useEffect(() => {
+        fetch('/api/owner/location-settings')
+            .then(res => res.json())
+            .then(data => {
+                if (data.googlePlaceId) setGooglePlaceId(data.googlePlaceId);
+            })
+            .catch(() => { });
+    }, []);
+
+    const handleSaveGooglePlaceId = async () => {
+        setPlaceIdSaving(true);
+        setPlaceIdError(null);
+        try {
+            const res = await fetch('/api/owner/location-settings', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ googlePlaceId: googlePlaceId.trim() })
+            });
+            if (res.ok) {
+                setPlaceIdSaved(true);
+                setTimeout(() => setPlaceIdSaved(false), 3000);
+            } else {
+                setPlaceIdError('Failed to save. Please try again.');
+            }
+        } catch {
+            setPlaceIdError('Network error. Check your connection.');
+        }
+        setPlaceIdSaving(false);
+    };
 
     const handleSectionClick = (sectionId: SettingsSection) => {
         if (sectionId === 'appearance') {
@@ -83,6 +118,58 @@ export default function SettingsPage() {
                                         <option value="EST">Eastern Time (ET)</option>
                                         <option value="PST">Pacific Time (PT)</option>
                                     </select>
+                                </div>
+
+                                {/* Google Reviews Section */}
+                                <div className="pt-4 border-t border-[var(--border)]">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Star size={18} className="text-yellow-400" />
+                                        <h3 className="font-semibold text-[var(--text-primary)]">Google Reviews</h3>
+                                    </div>
+                                    <p className="text-sm text-[var(--text-muted)] mb-3">
+                                        Enter your Google Place ID to enable review prompts on POS after checkout.
+                                        Customers who rate 4-5 stars will be guided to leave a Google Review.
+                                    </p>
+                                    <div className="flex gap-2 items-start max-w-md">
+                                        <div className="flex-1">
+                                            <input
+                                                type="text"
+                                                value={googlePlaceId}
+                                                onChange={(e) => setGooglePlaceId(e.target.value)}
+                                                placeholder="e.g. ChIJN1t_tDeuEmsRUsoyG83frY4"
+                                                className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] text-sm"
+                                            />
+                                            {placeIdError && (
+                                                <p className="text-xs text-red-400 mt-1">{placeIdError}</p>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={handleSaveGooglePlaceId}
+                                            disabled={placeIdSaving}
+                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${placeIdSaved
+                                                ? 'bg-green-600 text-white'
+                                                : 'bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white'
+                                                }`}
+                                        >
+                                            {placeIdSaving ? (
+                                                <><Loader2 size={14} className="animate-spin" /> Saving</>
+                                            ) : placeIdSaved ? (
+                                                <><Check size={14} /> Saved!</>
+                                            ) : (
+                                                'Save'
+                                            )}
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-[var(--text-muted)] mt-2">
+                                        <a
+                                            href="https://developers.google.com/maps/documentation/places/web-service/place-id"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-[var(--primary)] hover:underline"
+                                        >
+                                            How to find your Google Place ID →
+                                        </a>
+                                    </p>
                                 </div>
                             </div>
                         )}

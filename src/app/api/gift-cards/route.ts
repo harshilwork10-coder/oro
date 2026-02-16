@@ -4,13 +4,34 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
+import { authenticatePOSRequest } from '@/lib/posAuth'
+
+/**
+ * Dual auth helper: tries station token first (for Android POS),
+ * falls back to NextAuth web session.
+ */
+async function resolveAuth(req: NextRequest): Promise<{ franchiseId: string; role?: string } | null> {
+    // Try POS station token first
+    const stationToken = req.headers.get('x-station-token')
+    if (stationToken) {
+        const result = await authenticatePOSRequest(req)
+        if ('ctx' in result) {
+            return { franchiseId: result.ctx.franchiseId, role: 'STATION' }
+        }
+        return null // Invalid token
+    }
+
+    // Fall back to NextAuth web session
+    const session = await getServerSession(authOptions)
+    const user = session?.user as { franchiseId?: string; role?: string }
+    if (!user?.franchiseId) return null
+    return { franchiseId: user.franchiseId, role: user.role }
+}
 
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as { franchiseId?: string; role?: string }
-
-        if (!user?.franchiseId) {
+        const auth = await resolveAuth(req)
+        if (!auth) {
             return ApiResponse.unauthorized()
         }
 
@@ -20,9 +41,9 @@ export async function GET(req: NextRequest) {
         const isActive = searchParams.get('isActive')
         const search = searchParams.get('search')
 
-        // Security: Use session franchiseId or verify ownership
-        const targetFranchiseId = franchiseId || user.franchiseId
-        if (targetFranchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
+        // Security: Use auth franchiseId or verify ownership
+        const targetFranchiseId = franchiseId || auth.franchiseId
+        if (targetFranchiseId !== auth.franchiseId && auth.role !== 'PROVIDER') {
             return ApiResponse.forbidden()
         }
 
@@ -72,19 +93,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as { franchiseId?: string; role?: string }
-
-        if (!user?.franchiseId) {
+        const auth = await resolveAuth(req)
+        if (!auth) {
             return ApiResponse.unauthorized()
         }
 
         const body = await req.json()
         const { franchiseId, initialAmount, recipientEmail, purchaserId } = body
 
-        // Security: Use session franchiseId or verify ownership
-        const targetFranchiseId = franchiseId || user.franchiseId
-        if (targetFranchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
+        // Security: Use auth franchiseId or verify ownership
+        const targetFranchiseId = franchiseId || auth.franchiseId
+        if (targetFranchiseId !== auth.franchiseId && auth.role !== 'PROVIDER') {
             return ApiResponse.forbidden()
         }
 
@@ -106,8 +125,6 @@ export async function POST(req: NextRequest) {
                 isActive: true
             }
         })
-
-        // Debug log removed
 
         return ApiResponse.created(giftCard)
     } catch (error) {

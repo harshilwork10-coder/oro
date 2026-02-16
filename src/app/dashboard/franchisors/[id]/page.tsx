@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react"
 import { redirect, useParams, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
-import { ArrowLeft, Building2, Mail, Calendar, MapPin, Users, DollarSign, TrendingUp, Edit, FileText, CheckCircle, Clock, XCircle, ExternalLink } from "lucide-react"
+import { ArrowLeft, Building2, Mail, Calendar, MapPin, Users, DollarSign, TrendingUp, Edit, FileText, CheckCircle, Clock, XCircle, ExternalLink, Star } from "lucide-react"
 import EditClientModal from "@/components/modals/EditClientModal"
 
 type ClientDetails = {
@@ -28,6 +28,11 @@ type ClientDetails = {
         _count: {
             users: number
         }
+        locations: Array<{
+            id: string
+            name: string
+            googlePlaceId: string | null
+        }>
     }>
     _count: {
         franchises: number
@@ -48,6 +53,48 @@ export default function ClientDetailsPage() {
     const [client, setClient] = useState<ClientDetails | null>(null)
     const [loading, setLoading] = useState(true)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+
+    // Google Place ID editing state: key = locationId, value = { value, status }
+    const [placeIdState, setPlaceIdState] = useState<Record<string, { value: string, status: 'idle' | 'saving' | 'saved' | 'error' }>>({})
+
+    // Initialize placeIdState when client data loads
+    useEffect(() => {
+        if (client) {
+            const initial: Record<string, { value: string, status: 'idle' | 'saving' | 'saved' | 'error' }> = {}
+            client.franchises.forEach(f => {
+                f.locations.forEach(loc => {
+                    initial[loc.id] = { value: loc.googlePlaceId || '', status: 'idle' }
+                })
+            })
+            setPlaceIdState(initial)
+        }
+    }, [client])
+
+    const handleSavePlaceId = async (locationId: string) => {
+        const current = placeIdState[locationId]
+        if (!current) return
+
+        setPlaceIdState(prev => ({ ...prev, [locationId]: { ...prev[locationId], status: 'saving' } }))
+
+        try {
+            const res = await fetch(`/api/admin/locations/${locationId}/settings`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ googlePlaceId: current.value.trim() })
+            })
+
+            if (res.ok) {
+                setPlaceIdState(prev => ({ ...prev, [locationId]: { ...prev[locationId], status: 'saved' } }))
+                setTimeout(() => {
+                    setPlaceIdState(prev => ({ ...prev, [locationId]: { ...prev[locationId], status: 'idle' } }))
+                }, 2000)
+            } else {
+                setPlaceIdState(prev => ({ ...prev, [locationId]: { ...prev[locationId], status: 'error' } }))
+            }
+        } catch {
+            setPlaceIdState(prev => ({ ...prev, [locationId]: { ...prev[locationId], status: 'error' } }))
+        }
+    }
 
     async function fetchClientDetails() {
         try {
@@ -430,6 +477,44 @@ export default function ClientDetailsPage() {
                                             Business Settings
                                         </a>
                                     </div>
+                                </div>
+
+                                {/* Google Reviews - Place ID per location */}
+                                <div>
+                                    <p className="text-xs text-stone-500 uppercase tracking-wider mb-2">⭐ Google Reviews</p>
+                                    {location.locations.map((loc) => (
+                                        <div key={loc.id} className="flex items-center gap-2 mb-2">
+                                            <Star className="h-4 w-4 text-amber-400 flex-shrink-0" />
+                                            <span className="text-xs text-stone-400 flex-shrink-0 w-28 truncate" title={loc.name}>{loc.name}</span>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. ChIJN1t_tDeuEmsR..."
+                                                value={placeIdState[loc.id]?.value || ''}
+                                                onChange={(e) => setPlaceIdState(prev => ({
+                                                    ...prev,
+                                                    [loc.id]: { value: e.target.value, status: 'idle' }
+                                                }))}
+                                                className="flex-1 bg-stone-900/50 border border-stone-700 rounded-lg py-1.5 px-2.5 text-xs text-stone-200 focus:outline-none focus:ring-1 focus:ring-amber-500/50 placeholder-stone-600"
+                                            />
+                                            <button
+                                                onClick={() => handleSavePlaceId(loc.id)}
+                                                disabled={placeIdState[loc.id]?.status === 'saving'}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex-shrink-0 ${placeIdState[loc.id]?.status === 'saved'
+                                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                                        : placeIdState[loc.id]?.status === 'error'
+                                                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                                            : placeIdState[loc.id]?.status === 'saving'
+                                                                ? 'bg-stone-700 text-stone-400 border border-stone-600'
+                                                                : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                                    }`}
+                                            >
+                                                {placeIdState[loc.id]?.status === 'saving' ? 'Saving...'
+                                                    : placeIdState[loc.id]?.status === 'saved' ? '✓ Saved'
+                                                        : placeIdState[loc.id]?.status === 'error' ? 'Error'
+                                                            : 'Save'}
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </div>

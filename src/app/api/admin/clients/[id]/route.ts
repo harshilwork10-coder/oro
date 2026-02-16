@@ -47,6 +47,13 @@ export async function GET(
                         name: true,
                         _count: {
                             select: { users: true }
+                        },
+                        locations: {
+                            select: {
+                                id: true,
+                                name: true,
+                                googlePlaceId: true
+                            }
                         }
                     }
                 },

@@ -513,7 +513,7 @@ export default function RetailPOSPage() {
                 const res = await fetch('/api/inventory/categories')
                 if (res.ok) {
                     const data = await res.json()
-                    setCategories(data.categories || data || [])
+                    setCategories(Array.isArray(data.categories) ? data.categories : Array.isArray(data) ? data : [])
                 }
             } catch (error) {
                 console.error('[POS] Failed to load categories:', error)
@@ -533,7 +533,7 @@ export default function RetailPOSPage() {
                 const res = await fetch(`/api/inventory/products?categoryId=${selectedCategory}&limit=100`)
                 if (res.ok) {
                     const data = await res.json()
-                    setCategoryProducts(data.products || data || [])
+                    setCategoryProducts(Array.isArray(data.products) ? data.products : Array.isArray(data) ? data : [])
                 }
             } catch (error) {
                 console.error('[POS] Failed to load category products:', error)
@@ -2584,7 +2584,7 @@ function SearchModal({ onSelect, onClose }: { onSelect: (product: any) => void; 
                 const res = await fetch(`/api/pos/retail/search?q=${encodeURIComponent(query)}`)
                 if (res.ok) {
                     const data = await res.json()
-                    setResults(data)
+                    setResults(Array.isArray(data) ? data : data.products || data.items || [])
                 }
             } catch (error) {
                 console.error('Search error:', error)
@@ -3168,8 +3168,8 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
                         <div className="flex justify-center py-8">
                             <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
                         </div>
-                    ) : transactions.length > 0 ? (
-                        transactions.map((tx) => (
+                    ) : (Array.isArray(transactions) ? transactions : []).length > 0 ? (
+                        (Array.isArray(transactions) ? transactions : []).map((tx) => (
                             <div
                                 key={tx.id}
                                 className={`p-3 rounded-xl transition-all cursor-pointer ${selectedTx?.id === tx.id

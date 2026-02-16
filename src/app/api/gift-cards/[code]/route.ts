@@ -2,6 +2,24 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { authenticatePOSRequest } from '@/lib/posAuth'
+
+/**
+ * Dual auth helper: tries station token first (for Android POS),
+ * falls back to NextAuth web session.
+ */
+async function resolveAuth(req: Request): Promise<boolean> {
+    // Try POS station token first
+    const stationToken = req.headers.get('x-station-token')
+    if (stationToken) {
+        const result = await authenticatePOSRequest(req)
+        return 'ctx' in result
+    }
+
+    // Fall back to NextAuth web session
+    const session = await getServerSession(authOptions)
+    return !!session
+}
 
 // Get gift card by code
 export async function GET(
@@ -10,8 +28,8 @@ export async function GET(
 ) {
     try {
         const { code } = await params
-        const session = await getServerSession(authOptions)
-        if (!session) {
+        const isAuthed = await resolveAuth(req)
+        if (!isAuthed) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -37,8 +55,8 @@ export async function POST(
 ) {
     try {
         const { code } = await params
-        const session = await getServerSession(authOptions)
-        if (!session) {
+        const isAuthed = await resolveAuth(req)
+        if (!isAuthed) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -69,8 +87,6 @@ export async function POST(
                 currentBalance: currentBalance - amount
             }
         })
-
-        // Debug log removed`)
 
         return NextResponse.json(updated)
     } catch (error) {

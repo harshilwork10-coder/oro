@@ -302,7 +302,10 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
 
             // Brand Theme Pack - salon customization
             themeId: location.themeId || 'classic_oro',
-            highContrast: location.highContrast || false
+            highContrast: location.highContrast || false,
+
+            // Google Reviews
+            googlePlaceId: location.googlePlaceId || null
         }
 
         // ═══════════════════════════════════════════════════════════════════
