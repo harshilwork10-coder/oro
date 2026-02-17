@@ -3,11 +3,8 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import { compareSync } from "bcryptjs"
 
-// SECURITY: Determine if running in production and if using HTTPS
+// SECURITY: Determine if running in production
 const isProduction = process.env.NODE_ENV === 'production'
-// Use HTTPS detection from NEXTAUTH_URL to set secure cookies
-// This prevents login loops when deployed without HTTPS or when NEXTAUTH_URL is still http://
-const useSecureCookies = (process.env.NEXTAUTH_URL || '').startsWith('https://')
 
 export const authOptions: NextAuthOptions = {
     session: {
@@ -16,34 +13,32 @@ export const authOptions: NextAuthOptions = {
         maxAge: 24 * 60 * 60, // 24 hours
     },
     // SECURITY: Secure cookie settings to prevent session hijacking
-    // NOTE: __Secure- prefix and secure:true REQUIRE HTTPS. 
-    // If NEXTAUTH_URL is http://, we use standard cookie names to prevent login loops.
     cookies: {
         sessionToken: {
-            name: useSecureCookies ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+            name: isProduction ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
             options: {
                 httpOnly: true,           // Cannot be accessed by JavaScript
                 sameSite: 'lax',          // CSRF protection
                 path: '/',
-                secure: useSecureCookies, // HTTPS only when URL is https
+                secure: isProduction,     // HTTPS only in production
             },
         },
         callbackUrl: {
-            name: useSecureCookies ? '__Secure-next-auth.callback-url' : 'next-auth.callback-url',
+            name: isProduction ? '__Secure-next-auth.callback-url' : 'next-auth.callback-url',
             options: {
                 httpOnly: true,
                 sameSite: 'lax',
                 path: '/',
-                secure: useSecureCookies,
+                secure: isProduction,
             },
         },
         csrfToken: {
-            name: useSecureCookies ? '__Host-next-auth.csrf-token' : 'next-auth.csrf-token',
+            name: isProduction ? '__Host-next-auth.csrf-token' : 'next-auth.csrf-token',
             options: {
                 httpOnly: true,
                 sameSite: 'lax',
                 path: '/',
-                secure: useSecureCookies,
+                secure: isProduction,
             },
         },
     },
