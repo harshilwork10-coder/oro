@@ -242,6 +242,7 @@ export default function SchedulePage() {
     }
 
     const canManageSchedule = ['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(session?.user?.role || '')
+    const todayMidnight = new Date(new Date().setHours(0, 0, 0, 0))
 
     if (status === 'loading' || loading) {
         return (
@@ -347,7 +348,7 @@ export default function SchedulePage() {
                                     ))}
 
                                     {/* Add shift button - only for today and future dates */}
-                                    {canManageSchedule && date >= new Date(new Date().setHours(0, 0, 0, 0)) && (
+                                    {canManageSchedule && date >= todayMidnight && (
                                         <button
                                             onClick={() => openAddModal(date)}
                                             className="w-full p-2 border border-dashed border-stone-700 rounded-lg text-stone-500 hover:border-orange-500/50 hover:text-orange-400 hover:bg-orange-500/5 transition-all flex items-center justify-center gap-1"
@@ -484,8 +485,8 @@ export default function SchedulePage() {
                                                 }))
                                             }}
                                             className={`p-2 rounded-lg text-sm font-medium transition-all ${isSelected
-                                                    ? 'bg-orange-500 text-white'
-                                                    : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                                ? 'bg-orange-500 text-white'
+                                                : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
                                                 }`}
                                         >
                                             {day}

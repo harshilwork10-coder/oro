@@ -202,7 +202,7 @@ class OfflineSyncService {
         const cardPending = await offlineDB.getCardPendingTransactions();
         if (cardPending.length === 0) return { processed: 0, failed: 0 };
 
-        let processed = 0;
+        const processed = 0;
         let failed = 0;
 
         for (const tx of cardPending) {

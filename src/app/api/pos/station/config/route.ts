@@ -108,7 +108,7 @@ export const GET = withPOSAuth(async (_req: Request, ctx: POSContext) => {
                 franchisorId: franchise?.franchisorId,
             })
         } catch (flagError) {
-            console.warn('[StationConfig] Feature flag resolution failed:', flagError)
+            console.error('[StationConfig] Feature flag resolution failed:', flagError)
         }
 
         // Dealer Co-Branding

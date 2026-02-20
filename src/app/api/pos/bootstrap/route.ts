@@ -75,7 +75,7 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
         }>(cacheKey)
 
         if (forceRefresh) {
-            console.log(`[Bootstrap] FORCE REFRESH requested for location ${locationId}`)
+            console.error(`[Bootstrap] FORCE REFRESH requested for location ${locationId}`)
         }
 
         if (cachedResponse) {
@@ -252,18 +252,18 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
         }
 
         // DUAL PRICING DEBUG - Log entire settings object
-        console.log('='.repeat(50))
-        console.log('[Bootstrap DUAL PRICING DEBUG]')
-        console.log('  settings object:', settings ? JSON.stringify({
+        console.error('='.repeat(50))
+        console.error('[Bootstrap DUAL PRICING DEBUG]')
+        console.error('  settings object:', settings ? JSON.stringify({
             id: settings.id,
             pricingModel: settings.pricingModel,
             cardSurcharge: settings.cardSurcharge,
             showDualPricing: settings.showDualPricing
         }) : 'NULL SETTINGS!')
-        console.log('  franchiseId:', franchiseId)
-        console.log('  locationId:', location.id)
-        console.log('  Computed dualPricingEnabled:', settings?.pricingModel === 'DUAL_PRICING')
-        console.log('='.repeat(50))
+        console.error('  franchiseId:', franchiseId)
+        console.error('  locationId:', location.id)
+        console.error('  Computed dualPricingEnabled:', settings?.pricingModel === 'DUAL_PRICING')
+        console.error('='.repeat(50))
 
         const stationConfig = {
             locationId: location.id,
@@ -321,7 +321,7 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             })
             featureFlags = flagsResult.featureFlags
         } catch (e) {
-            console.warn('[Bootstrap] Feature flags failed:', e)
+            console.error('[Bootstrap] Feature flags failed:', e)
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -430,7 +430,7 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
                 versions: { menu: menuVersion, staff: staffVersion, config: configVersion }
             }, CACHE_TTL.BOOTSTRAP)
         } catch (e) {
-            console.warn('[Bootstrap] Failed to store in cache:', e)
+            console.error('[Bootstrap] Failed to store in cache:', e)
         }
 
         return NextResponse.json(responseBody, {

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+// pdf-parse is a CJS-only module — ESM static import causes 'no default export' errors.
 
 // POST - Upload PDF and extract manufacturer deals
 export async function POST(request: NextRequest) {
@@ -24,10 +25,10 @@ export async function POST(request: NextRequest) {
         // Read PDF file
         const buffer = Buffer.from(await file.arrayBuffer())
 
-        // Use pdf-parse to extract text
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const pdfParse = require('pdf-parse')
-        const pdfData = await pdfParse(buffer)
+        // Use pdf-parse to extract text (CJS module — require() is the only option)
+        // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any
+        const pdfParseFn = (require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>)
+        const pdfData = await pdfParseFn(buffer)
         const text = pdfData.text
 
         // Extract deals using pattern matching

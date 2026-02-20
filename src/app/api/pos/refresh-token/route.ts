@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
                 const gracePeriodEnd = expiredAt + (REFRESH_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000)
 
                 if (Date.now() > gracePeriodEnd) {
-                    console.log(`[refresh-token] Token too old for refresh: ${decoded.stationId}`)
+                    console.error(`[refresh-token] Token too old for refresh: ${decoded.stationId}`)
                     return NextResponse.json({
                         success: false,
                         error: 'TOKEN_TOO_OLD',
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
         // Verify device fingerprint matches
         if (payload.deviceFingerprint !== deviceId) {
-            console.warn(`[refresh-token] Device fingerprint mismatch for station ${payload.stationId}`)
+            console.error(`[refresh-token] Device fingerprint mismatch for station ${payload.stationId}`)
             return NextResponse.json({
                 success: false,
                 error: 'DEVICE_MISMATCH',
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
             data: { lastHeartbeatAt: new Date() }
         })
 
-        console.log(`[refresh-token] Token refreshed for station ${station.name} (${station.id.slice(-8)})`)
+        console.error(`[refresh-token] Token refreshed for station ${station.name} (${station.id.slice(-8)})`)
 
         return NextResponse.json({
             success: true,

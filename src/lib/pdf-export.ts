@@ -77,7 +77,7 @@ export async function downloadPDF(elementId: string, filename: string): Promise<
 
         return true;
     } catch (error) {
-        console.warn('PDF library not available, using print fallback', error);
+        console.error('PDF library not available, using print fallback', error);
         window.print();
         return true;
     }

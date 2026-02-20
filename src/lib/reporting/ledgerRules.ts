@@ -153,7 +153,7 @@ export function calculateReconciliation(transactions: Array<{
     let grossSales = 0;
     let refunds = 0;
     let voids = 0;
-    let discounts = 0;
+    const discounts = 0;
     let tipsCash = 0;
     let tipsCard = 0;
     const tenders = { cash: 0, card: 0, giftCard: 0, other: 0, total: 0 };

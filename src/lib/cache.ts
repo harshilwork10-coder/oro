@@ -24,7 +24,7 @@ let redis: Redis | null = null
 function getRedis(): Redis | null {
     if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
         // Gracefully degrade if Redis not configured
-        console.warn('[Cache] Redis not configured - caching disabled')
+        console.error('[Cache] Redis not configured - caching disabled')
         return null
     }
 
@@ -65,10 +65,10 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
     try {
         const cached = await client.get(key)
         if (cached) {
-            console.log(`[Cache] HIT: ${key}`)
+            console.error(`[Cache] HIT: ${key}`)
             return cached as T
         }
-        console.log(`[Cache] MISS: ${key}`)
+        console.error(`[Cache] MISS: ${key}`)
         return null
     } catch (error) {
         console.error(`[Cache] Error getting ${key}:`, error)
@@ -85,7 +85,7 @@ export async function cacheSet(key: string, value: unknown, ttlSeconds: number):
 
     try {
         await client.set(key, JSON.stringify(value), { ex: ttlSeconds })
-        console.log(`[Cache] SET: ${key} (TTL: ${ttlSeconds}s)`)
+        console.error(`[Cache] SET: ${key} (TTL: ${ttlSeconds}s)`)
         return true
     } catch (error) {
         console.error(`[Cache] Error setting ${key}:`, error)
@@ -102,7 +102,7 @@ export async function cacheDelete(key: string): Promise<boolean> {
 
     try {
         await client.del(key)
-        console.log(`[Cache] DELETE: ${key}`)
+        console.error(`[Cache] DELETE: ${key}`)
         return true
     } catch (error) {
         console.error(`[Cache] Error deleting ${key}:`, error)
@@ -124,7 +124,7 @@ export async function cacheDeletePattern(pattern: string): Promise<number> {
         if (keys.length === 0) return 0
 
         await client.del(...keys)
-        console.log(`[Cache] DELETE PATTERN: ${pattern} (${keys.length} keys)`)
+        console.error(`[Cache] DELETE PATTERN: ${pattern} (${keys.length} keys)`)
         return keys.length
     } catch (error) {
         console.error(`[Cache] Error deleting pattern ${pattern}:`, error)
@@ -143,7 +143,7 @@ export async function invalidateLocationCache(locationId: string): Promise<void>
         cacheDelete(CACHE_KEYS.BOOTSTRAP(locationId)),
         cacheDelete(CACHE_KEYS.EMPLOYEES_LOGIN(locationId)),
     ])
-    console.log(`[Cache] Invalidated all caches for location: ${locationId}`)
+    console.error(`[Cache] Invalidated all caches for location: ${locationId}`)
 }
 
 /**

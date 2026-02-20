@@ -20,11 +20,6 @@ export default function AccountSelector() {
     const [loading, setLoading] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
 
-    // If no account context (not Provider/Support), don't show
-    if (!accountContext) return null
-
-    const { selectedAccount, setSelectedAccount, clearAccount } = accountContext
-
     // Load franchisors on first open
     useEffect(() => {
         if (isOpen && franchisors.length === 0) {
@@ -42,6 +37,12 @@ export default function AccountSelector() {
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
+
+    // If no account context (not Provider/Support), don't show
+    if (!accountContext) return null
+
+    const { selectedAccount, setSelectedAccount, clearAccount } = accountContext
+
 
     async function loadFranchisors() {
         setLoading(true)

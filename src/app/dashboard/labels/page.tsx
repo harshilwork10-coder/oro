@@ -55,12 +55,6 @@ export default function LabelPrintPage() {
     const [hasDualPricing, setHasDualPricing] = useState(false)
     const [printerStatus, setPrinterStatus] = useState<'checking' | 'online' | 'offline'>('checking')
 
-    // Check printer status on load
-    useEffect(() => {
-        checkPrinterStatus()
-        loadStoreSettings()
-    }, [])
-
     async function checkPrinterStatus() {
         try {
             const res = await fetch('http://localhost:9100/status', {
@@ -83,6 +77,12 @@ export default function LabelPrintPage() {
             // Default to no dual pricing
         }
     }
+
+    // Check printer status on load
+    useEffect(() => {
+        checkPrinterStatus()
+        loadStoreSettings()
+    }, [])
 
     // Search products
     async function searchProducts() {

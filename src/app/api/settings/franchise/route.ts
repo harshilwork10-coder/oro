@@ -132,7 +132,7 @@ export async function POST(request: Request) {
             where: { franchiseId: user.franchiseId },
             select: { id: true }
         })
-        console.log(`[FranchiseSettings] Pricing update - invalidating ${franchiseLocations.length} location caches`)
+        console.error(`[FranchiseSettings] Pricing update - invalidating ${franchiseLocations.length} location caches`)
         for (const loc of franchiseLocations) {
             await invalidateLocationCache(loc.id)
         }

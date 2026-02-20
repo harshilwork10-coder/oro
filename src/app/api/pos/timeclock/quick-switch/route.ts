@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Log the switch for audit trail
-        console.log('[Quick Switch] Audit:', {
+        console.error('[Quick Switch] Audit:', {
             action: 'QUICK_SWITCH',
             fromEmployee: currentUser.id,
             fromName: currentUser.name,

@@ -72,8 +72,8 @@ Thank you for your business!
 
         // TODO: Integrate with email service (SendGrid, SES, etc.)
         // For now, log and return success (mock)
-        console.log(`[Email Receipt] Sending to ${email}:`)
-        console.log(receiptContent)
+        console.error(`[Email Receipt] Sending to ${email}:`)
+        console.error(receiptContent)
 
         // In production, you would do something like:
         // await sendEmail({

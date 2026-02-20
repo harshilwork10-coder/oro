@@ -44,30 +44,6 @@ export default function StationsPage() {
     const user = session?.user as any
     const isProvider = user?.role === 'PROVIDER'
 
-    // Non-providers don't need to see this - stations are set up by Oro
-    if (status === 'authenticated' && !isProvider) {
-        return (
-            <div className="min-h-screen bg-stone-950 text-white flex items-center justify-center">
-                <div className="text-center max-w-md mx-4">
-                    <div className="h-20 w-20 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                        <ShieldCheck className="h-10 w-10 text-emerald-400" />
-                    </div>
-                    <h2 className="text-2xl font-bold mb-4">All Set Up!</h2>
-                    <p className="text-stone-400 mb-6">
-                        Your POS stations and terminals are managed by Oro Support.
-                        Just use the POS - everything is already configured for you.
-                    </p>
-                    <button
-                        onClick={() => router.push('/dashboard/pos')}
-                        className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-colors"
-                    >
-                        Go to POS
-                    </button>
-                </div>
-            </div>
-        )
-    }
-
     const [stations, setStations] = useState<Station[]>([])
     const [terminals, setTerminals] = useState<Terminal[]>([])
     const [employees, setEmployees] = useState<Employee[]>([])
@@ -141,6 +117,30 @@ export default function StationsPage() {
         } finally {
             setLoading(false)
         }
+    }
+
+    // Non-providers don't need to see this - stations are set up by Oro
+    if (status === 'authenticated' && !isProvider) {
+        return (
+            <div className="min-h-screen bg-stone-950 text-white flex items-center justify-center">
+                <div className="text-center max-w-md mx-4">
+                    <div className="h-20 w-20 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <ShieldCheck className="h-10 w-10 text-emerald-400" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-4">All Set Up!</h2>
+                    <p className="text-stone-400 mb-6">
+                        Your POS stations and terminals are managed by Oro Support.
+                        Just use the POS - everything is already configured for you.
+                    </p>
+                    <button
+                        onClick={() => router.push('/dashboard/pos')}
+                        className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-colors"
+                    >
+                        Go to POS
+                    </button>
+                </div>
+            </div>
+        )
     }
 
     const handleAddStation = async () => {

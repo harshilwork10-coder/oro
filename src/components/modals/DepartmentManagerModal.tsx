@@ -49,12 +49,6 @@ export default function DepartmentManagerModal({
     const [newCatName, setNewCatName] = useState('')
     const [newCatAgeRestricted, setNewCatAgeRestricted] = useState(false)
 
-    useEffect(() => {
-        if (isOpen) {
-            loadDepartments()
-        }
-    }, [isOpen])
-
     const loadDepartments = async () => {
         setLoading(true)
         try {
@@ -68,6 +62,12 @@ export default function DepartmentManagerModal({
         }
         setLoading(false)
     }
+
+    useEffect(() => {
+        if (isOpen) {
+            loadDepartments()
+        }
+    }, [isOpen])
 
     const handleAddDepartment = async () => {
         if (!newDeptName.trim()) return

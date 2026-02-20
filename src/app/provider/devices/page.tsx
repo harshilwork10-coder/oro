@@ -136,10 +136,10 @@ export default function DevicesPage() {
 
     const fetchStationsForLocation = async (locationId: string) => {
         try {
-            console.log('[Devices] Fetching stations for location:', locationId);
+            console.error('[Devices] Fetching stations for location:', locationId);
             const res = await fetch(`/api/settings/stations?locationId=${locationId}`);
             const data = await res.json();
-            console.log('[Devices] Stations API response for', locationId, ':', res.status, data);
+            console.error('[Devices] Stations API response for', locationId, ':', res.status, data);
             if (res.ok) {
                 setStationsByLocation(prev => ({ ...prev, [locationId]: data.stations || [] }));
             } else {

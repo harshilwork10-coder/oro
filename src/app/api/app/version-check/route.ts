@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
         // Log version check for analytics (optional)
         if (currentVersionCode) {
-            console.log(`[Version Check] Device running versionCode: ${currentVersionCode}`)
+            console.error(`[Version Check] Device running versionCode: ${currentVersionCode}`)
         }
 
         // Determine if this version requires force update

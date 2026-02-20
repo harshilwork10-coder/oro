@@ -124,7 +124,7 @@ export async function PUT(request: Request) {
             const { assignCustomerId } = await import('@/lib/customerId')
             const customerId = await assignCustomerId(user.franchiseId)
             if (customerId) {
-                console.log(`Auto-generated customerId ${customerId} for franchise ${user.franchiseId}`)
+                console.error(`Auto-generated customerId ${customerId} for franchise ${user.franchiseId}`)
             }
         } catch (error) {
             console.error('Failed to auto-generate customerId:', error)

@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
-        console.log('[CREATE_APPOINTMENT] Request body:', body)
+        console.error('[CREATE_APPOINTMENT] Request body:', body)
         const { customerName, customerPhone, serviceId, startTime, notes } = body
 
         if (!customerName || !customerPhone || !serviceId || !startTime) {
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
         // Try to get auth user (may be null for walk-in bookings)
         const user = await getAuthUser(req)
-        console.log('[CREATE_APPOINTMENT] Auth user:', user?.id || 'No auth')
+        console.error('[CREATE_APPOINTMENT] Auth user:', user?.id || 'No auth')
 
         // Use service's franchiseId as primary (guaranteed to exist)
         const franchiseId = service.franchiseId
@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
                     franchiseId: franchiseId
                 }
             })
-            console.log('[CREATE_APPOINTMENT] Created new client:', client.id)
+            console.error('[CREATE_APPOINTMENT] Created new client:', client.id)
         }
 
         // Get an employee ID - use auth user or find one from the franchise
@@ -212,7 +212,7 @@ export async function POST(req: NextRequest) {
             }
         })
 
-        console.log('[CREATE_APPOINTMENT] Created appointment:', appointment.id)
+        console.error('[CREATE_APPOINTMENT] Created appointment:', appointment.id)
 
         return NextResponse.json({
             success: true,

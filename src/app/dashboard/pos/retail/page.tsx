@@ -421,8 +421,7 @@ export default function RetailPOSPage() {
                         localStorage.removeItem('pairedStationId')
                         setShowStationPairing(true)
                     }
-                } else if (stationList.length === 1) {
-                    // Only one station and device not yet paired - auto-pair
+                    // Only one station - auto-pair device to it
                     localStorage.setItem('pairedStationId', stationList[0].id)
                     setSelectedStation(stationList[0])
                 } else {

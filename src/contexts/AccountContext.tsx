@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { useSession } from 'next-auth/react'
 
 interface SelectedAccount {
@@ -37,8 +37,8 @@ interface Props {
     children: ReactNode
 }
 
-export function AccountContextProvider({ children }: Props) {
-    const { data: session } = useSession()
+// Inner component: always rendered when account context IS needed — hooks are legal here
+function AccountContextInner({ children }: Props) {
     const [selectedAccount, setSelectedAccount] = useState<SelectedAccount | null>(null)
 
     // Load from localStorage on mount
@@ -62,19 +62,10 @@ export function AccountContextProvider({ children }: Props) {
         }
     }, [selectedAccount])
 
-    const clearAccount = () => {
+    const clearAccount = useCallback(() => {
         setSelectedAccount(null)
         localStorage.removeItem('selectedAccount')
-    }
-
-    // Only Provider and Support Staff need account context
-    const userRole = (session?.user as any)?.role
-    const needsAccountContext = userRole === 'PROVIDER' || userRole === 'SUPPORT_STAFF'
-
-    // If user doesn't need account context, just render children
-    if (!needsAccountContext) {
-        return <>{children}</>
-    }
+    }, [])
 
     return (
         <AccountContext.Provider value={{
@@ -86,5 +77,19 @@ export function AccountContextProvider({ children }: Props) {
             {children}
         </AccountContext.Provider>
     )
+}
+
+// Outer component: checks session (no state/effect hooks) then conditionally renders inner
+export function AccountContextProvider({ children }: Props) {
+    const { data: session } = useSession()
+    const userRole = (session?.user as { role?: string })?.role
+    const needsAccountContext = userRole === 'PROVIDER' || userRole === 'SUPPORT_STAFF'
+
+    // Only Provider and Support Staff need account context
+    if (!needsAccountContext) {
+        return <>{children}</>
+    }
+
+    return <AccountContextInner>{children}</AccountContextInner>
 }
 

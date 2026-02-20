@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import Papa from 'papaparse'
 
 // POST - Parse uploaded CSV file for owner import
 export async function POST(request: NextRequest) {
@@ -30,7 +31,6 @@ export async function POST(request: NextRequest) {
 
         // Only CSV supported
         if (fileName.endsWith('.csv')) {
-            const Papa = require('papaparse')
             const csvText = buffer.toString('utf-8')
             const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true })
             rows = parsed.data

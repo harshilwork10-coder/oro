@@ -145,7 +145,7 @@ export default function MultiStoreDashboard() {
                         <div className="bg-gradient-to-r from-yellow-600/20 to-amber-600/20 border border-yellow-500/30 rounded-xl p-4 mb-8 flex items-center gap-4">
                             <span className="text-3xl">🏆</span>
                             <div>
-                                <p className="text-sm text-stone-400">Today's Top Performer</p>
+                                <p className="text-sm text-stone-400">Today&apos;s Top Performer</p>
                                 <p className="text-xl font-bold text-yellow-400">{data.summary.topLocation}</p>
                             </div>
                         </div>

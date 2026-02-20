@@ -16,18 +16,18 @@ export async function GET(request: NextRequest) {
         if (mobileUser) {
             userId = mobileUser.id
             userEmail = mobileUser.email
-            console.log('[PAX Settings] Mobile auth:', mobileUser.email)
+            console.error('[PAX Settings] Mobile auth:', mobileUser.email)
         } else {
             // Fall back to web session auth
             const session = await getServerSession(authOptions)
             if (session?.user?.email) {
                 userEmail = session.user.email
-                console.log('[PAX Settings] Session auth:', session.user.email)
+                console.error('[PAX Settings] Session auth:', session.user.email)
             }
         }
 
         if (!userId && !userEmail) {
-            console.log('[PAX Settings] No auth found')
+            console.error('[PAX Settings] No auth found')
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
         })
 
         if (!user?.location) {
-            console.log('[PAX Settings] User has no location:', userEmail || userId)
+            console.error('[PAX Settings] User has no location:', userEmail || userId)
             return NextResponse.json({
                 error: 'No location assigned',
                 paxTerminalIP: null,
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
             })
         }
 
-        console.log('[PAX Settings] Location:', user.location.name, 'PAX IP:', user.location.paxTerminalIP)
+        console.error('[PAX Settings] Location:', user.location.name, 'PAX IP:', user.location.paxTerminalIP)
 
         return NextResponse.json({
             paxTerminalIP: user.location.paxTerminalIP,

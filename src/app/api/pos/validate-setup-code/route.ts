@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
             station.name
         )
 
-        console.log(`[PAIRING] Success: Station ${station.name} paired to device ${deviceId.slice(0, 8)}...`)
+        console.error(`[PAIRING] Success: Station ${station.name} paired to device ${deviceId.slice(0, 8)}...`)
 
         return NextResponse.json({
             success: true,

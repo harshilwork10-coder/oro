@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import Papa from 'papaparse'
 
 // POST - Parse uploaded CSV file
 // SECURITY: Only CSV supported (xlsx removed due to security vulnerability)
@@ -31,7 +32,6 @@ export async function POST(request: NextRequest) {
 
         // SECURITY: Only CSV supported (xlsx removed due to prototype pollution vulnerability)
         if (fileName.endsWith('.csv')) {
-            const Papa = require('papaparse')
             const csvText = buffer.toString('utf-8')
             const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true })
             rows = parsed.data
