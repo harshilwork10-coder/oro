@@ -525,6 +525,178 @@ function DefaultOwnerDashboard({ session }: { session: { user: { name?: string |
 
 // ─── Retail & Service Employee Dashboards (stateless, just UI) ─────────
 
+function RetailOwnerDashboard({ session }: { session: { user: { name?: string | null; role?: string | null } } }) {
+    const [isExpansionModalOpen, setIsExpansionModalOpen] = useState(false)
+    const [isConsultationModalOpen, setIsConsultationModalOpen] = useState(false)
+    const [isMerchantApplicationModalOpen, setIsMerchantApplicationModalOpen] = useState(false)
+    const [todayStats, setTodayStats] = useState({ visits: 0, revenue: 0, transactions: 0, itemsSold: 0 })
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const res = await fetch('/api/franchise/stats/today')
+                if (res.ok) {
+                    const data = await res.json()
+                    setTodayStats({
+                        visits: data.visits || 0,
+                        revenue: data.revenue || 0,
+                        transactions: data.transactions || data.services || 0,
+                        itemsSold: data.itemsSold || data.services || 0,
+                    })
+                }
+            } catch (error) {
+                console.error('Error fetching stats:', error)
+            }
+        }
+        fetchStats()
+    }, [])
+
+    return (
+        <div className="p-4 md:p-8 space-y-6 md:space-y-8">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-stone-100">
+                        Welcome back, {session?.user?.name}! 👋
+                    </h1>
+                    <p className="text-stone-400 mt-2">Here's your retail store today.</p>
+                </div>
+                {session?.user?.role !== 'EMPLOYEE' && (
+                    <div className="flex flex-wrap gap-3">
+                        <button
+                            onClick={() => setIsMerchantApplicationModalOpen(true)}
+                            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl shadow-lg shadow-blue-900/20 transition-all font-medium flex items-center gap-2"
+                        >
+                            <CreditCard className="h-5 w-5" />
+                            Apply for Processing
+                        </button>
+                        <button
+                            onClick={() => setIsConsultationModalOpen(true)}
+                            className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl shadow-lg shadow-purple-900/20 transition-all font-medium flex items-center gap-2"
+                        >
+                            <Phone className="h-5 w-5" />
+                            Request Consultation
+                        </button>
+                        <button
+                            onClick={() => setIsExpansionModalOpen(true)}
+                            className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl shadow-lg shadow-emerald-900/20 transition-all font-medium flex items-center gap-2"
+                        >
+                            <MapPin className="h-5 w-5" />
+                            Request Expansion
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            <RequestExpansionModal
+                isOpen={isExpansionModalOpen}
+                onClose={() => setIsExpansionModalOpen(false)}
+                onSuccess={() => { alert('Expansion request submitted successfully!') }}
+            />
+            <ConsultationRequestModal
+                isOpen={isConsultationModalOpen}
+                onClose={() => setIsConsultationModalOpen(false)}
+                onSuccess={() => { alert('Consultation request submitted successfully!') }}
+            />
+            <MerchantApplicationModal
+                isOpen={isMerchantApplicationModalOpen}
+                onClose={() => setIsMerchantApplicationModalOpen(false)}
+                onSuccess={() => { alert('Merchant application submitted successfully!') }}
+            />
+
+            {/* Today's Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-stone-400">Customer Visits</p>
+                            <p className="text-3xl font-bold text-stone-100 mt-2">{todayStats.visits}</p>
+                            <p className="text-sm text-emerald-500 mt-2 flex items-center">
+                                <TrendingUp className="h-4 w-4 mr-1" /> Live Today
+                            </p>
+                        </div>
+                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center">
+                            <Users className="h-6 w-6 text-stone-300" />
+                        </div>
+                    </div>
+                </div>
+                <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-stone-400">Transactions</p>
+                            <p className="text-3xl font-bold text-stone-100 mt-2">{todayStats.transactions}</p>
+                            <p className="text-sm text-emerald-500 mt-2 flex items-center">
+                                <TrendingUp className="h-4 w-4 mr-1" /> Live Today
+                            </p>
+                        </div>
+                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center">
+                            <CreditCard className="h-6 w-6 text-stone-300" />
+                        </div>
+                    </div>
+                </div>
+                <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-stone-400">Items Sold</p>
+                            <p className="text-3xl font-bold text-stone-100 mt-2">{todayStats.itemsSold}</p>
+                            <p className="text-sm text-stone-500 mt-2">Today</p>
+                        </div>
+                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center">
+                            <Building2 className="h-6 w-6 text-stone-300" />
+                        </div>
+                    </div>
+                </div>
+                <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-stone-400">Today's Revenue</p>
+                            <p className="text-3xl font-bold text-stone-100 mt-2">${todayStats.revenue.toFixed(2)}</p>
+                            <p className="text-sm text-stone-500 mt-2">Live</p>
+                        </div>
+                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center">
+                            <DollarSign className="h-6 w-6 text-stone-300" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="glass-panel p-6 rounded-2xl">
+                <h2 className="text-lg font-semibold text-stone-100 mb-4">Quick Actions</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Link href="/dashboard/pos/retail" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                        <CreditCard className="h-6 w-6 text-orange-400 mx-auto mb-2" />
+                        <p className="text-sm text-stone-300">Open POS</p>
+                    </Link>
+                    <Link href="/dashboard/inventory/retail" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                        <Building2 className="h-6 w-6 text-blue-400 mx-auto mb-2" />
+                        <p className="text-sm text-stone-300">Inventory</p>
+                    </Link>
+                    <Link href="/dashboard/reports" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                        <TrendingUp className="h-6 w-6 text-emerald-400 mx-auto mb-2" />
+                        <p className="text-sm text-stone-300">Reports</p>
+                    </Link>
+                    <Link href="/dashboard/lottery" className="p-4 bg-stone-800/50 rounded-xl hover:bg-stone-700/50 transition-all text-center">
+                        <Ticket className="h-6 w-6 text-purple-400 mx-auto mb-2" />
+                        <p className="text-sm text-stone-300">Lottery</p>
+                    </Link>
+                </div>
+            </div>
+
+            {/* Low Stock Alert section */}
+            <div className="glass-panel p-6 rounded-2xl">
+                <h2 className="text-lg font-semibold text-stone-100 mb-4 flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-amber-500" />
+                    Low Stock Alerts
+                </h2>
+                <div className="text-center py-8 text-stone-500">
+                    <p>No low stock alerts</p>
+                    <p className="text-sm mt-1">Products below reorder point will appear here</p>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 const currentHour = () => new Date().getHours()
 const todayDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
@@ -758,6 +930,9 @@ export default function DashboardPage() {
         return <ServiceEmployeeDashboard session={session!} />
     }
 
-    // Default: OWNER or any other role
+    // Default: OWNER/MANAGER or any other role — branch on industry
+    if (industryType === 'RETAIL') {
+        return <RetailOwnerDashboard session={session!} />
+    }
     return <DefaultOwnerDashboard session={session!} />
 }
