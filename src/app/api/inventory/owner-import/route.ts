@@ -13,9 +13,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        // Allow OWNER, MANAGER, PROVIDER (Provider can upload on behalf of client)
-        if (!['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR'].includes(user.role)) {
-            return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+        // PROVIDER ONLY — Customer retention strategy.
+        // Inventory import is managed exclusively by the provider.
+        // This prevents clients from self-migrating their product catalog
+        // to a competing POS system. Same principle as PAX device IP control.
+        if (user.role !== 'PROVIDER') {
+            return NextResponse.json({
+                error: 'Inventory import is managed by your Oronex support team. Please contact support to import or update your product catalog.'
+            }, { status: 403 })
         }
 
         const formData = await request.formData()
