@@ -415,17 +415,25 @@ export default function RetailPOSPage() {
                     // Device is paired - find the station
                     const paired = stationList.find((s: StationInfo) => s.id === pairedStationId)
                     if (paired) {
+                        // ✅ Use the correctly paired station (not stationList[0])
                         setSelectedStation(paired)
                     } else {
                         // Paired station no longer exists - clear and show pairing
                         localStorage.removeItem('pairedStationId')
-                        setShowStationPairing(true)
+                        if (stationList.length === 1) {
+                            // Auto-re-pair to the only available station
+                            localStorage.setItem('pairedStationId', stationList[0].id)
+                            setSelectedStation(stationList[0])
+                        } else {
+                            setShowStationPairing(true)
+                        }
                     }
-                    // Only one station - auto-pair device to it
+                } else if (stationList.length === 1) {
+                    // Only one station and device not paired - auto-pair
                     localStorage.setItem('pairedStationId', stationList[0].id)
                     setSelectedStation(stationList[0])
                 } else {
-                    // Multiple stations, device not paired - show pairing screen (Provider only)
+                    // Multiple stations, device not paired - show pairing screen
                     setShowStationPairing(true)
                 }
             } catch (error) {
@@ -817,7 +825,9 @@ export default function RetailPOSPage() {
         // Discount ratio for proportional tax reduction
         const discountRatio = subtotalCash > 0 ? transactionDiscountAmount / subtotalCash : 0
         const discountedSubtotalCash = round2(Math.max(0, subtotalCash - transactionDiscountAmount - promoDiscount))
-        const discountedSubtotalCard = round2(Math.max(0, subtotalCard - (transactionDiscountAmount + promoDiscount) * (subtotalCard / subtotalCash || 1)))
+        // Guard against divide-by-zero when cart is all-zero priced items
+        const cardRatio = subtotalCash > 0 ? subtotalCard / subtotalCash : 1
+        const discountedSubtotalCard = round2(Math.max(0, subtotalCard - (transactionDiscountAmount + promoDiscount) * cardRatio))
 
         // Reduce taxes proportionally by discount
         taxCash = round2(taxCash * (1 - discountRatio))
@@ -926,7 +936,11 @@ export default function RetailPOSPage() {
         if (confirm('Void entire transaction?')) {
             setCart([])
             setSelectedCustomer(null)
-            setIdVerifiedForTransaction(false) // Reset ID verification for next transaction
+            setIdVerifiedForTransaction(false)  // Reset ID verification
+            setTransactionDiscount(null)        // ✅ Clear manual discount (was leaking into next tx)
+            setAppliedPromotions([])            // ✅ Clear promo list
+            setPromoDiscount(0)                 // ✅ Clear promo discount amount
+            setLotteryPayout(0)                 // ✅ Clear lottery offset
             setToast({ message: 'Transaction voided', type: 'success' })
         }
     }
