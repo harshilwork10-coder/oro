@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma"
 // PUT /api/inventory/purchase-orders/[id] - Update purchase order
 export async function PUT(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -14,7 +14,7 @@ export async function PUT(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { id } = params
+        const { id } = await params
         const { status } = await request.json()
 
         // Verify the PO belongs to the user's franchise
@@ -84,7 +84,7 @@ export async function PUT(
 // DELETE /api/inventory/purchase-orders/[id]
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -92,7 +92,7 @@ export async function DELETE(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { id } = params
+        const { id } = await params
 
         // Verify the PO belongs to the user's franchise and is in DRAFT status
         const existingPO = await prisma.purchaseOrder.findFirst({

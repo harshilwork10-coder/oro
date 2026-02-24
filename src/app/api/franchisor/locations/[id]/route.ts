@@ -9,10 +9,10 @@ import { prisma } from '@/lib/prisma'
  */
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const session = await getServerSession(authOptions)
-    const locationId = params.id
+    const locationId = (await params).id
 
     if (!session?.user?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
