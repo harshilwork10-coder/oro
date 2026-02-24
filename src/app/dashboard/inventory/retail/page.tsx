@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
     Search, Plus, Save, Copy, Trash2, Package,
     ChevronLeft, ChevronRight, Barcode, DollarSign,
-    Percent, AlertTriangle, Check, X, ShoppingCart, ArrowLeft, Folder, Tag, Gift,
+    Percent, AlertTriangle, Check, X, ArrowLeft, Folder, Tag, Gift,
     Brain, Sparkles, Loader2, TrendingUp, Clock, ShoppingBag, Zap
 } from 'lucide-react'
 import Toast from '@/components/ui/Toast'
@@ -46,6 +46,21 @@ interface Category {
     minimumAge: number | null
 }
 
+// Minimum age to display for age-restricted categories when no override is set
+const FALLBACK_MIN_AGE = 18
+
+// How many digits of consecutive numbers = a barcode scan
+const BARCODE_MIN_LENGTH = 8
+
+// How long after last keystroke to auto-trigger barcode search (ms)
+const SCANNER_DEBOUNCE_MS = 300
+
+// Profit % thresholds for color coding
+const PROFIT_GOOD = 30
+const PROFIT_WARN = 15
+const MARGIN_GOOD = 25
+const MARGIN_WARN = 10
+
 export default function RetailInventoryPage() {
     const { data: session } = useSession()
     const router = useRouter()
@@ -62,6 +77,9 @@ export default function RetailInventoryPage() {
 
     // Current product being edited
     const [editProduct, setEditProduct] = useState<Product | null>(null)
+
+    // Inline delete confirmation (replaces browser confirm())
+    const [confirmDelete, setConfirmDelete] = useState(false)
 
     // AI SKU Lookup states
     const [lookingUpSKU, setLookingUpSKU] = useState(false)
@@ -80,11 +98,7 @@ export default function RetailInventoryPage() {
     const [loadingInsights, setLoadingInsights] = useState(false)
 
     // Load products and categories
-    useEffect(() => {
-        loadData()
-    }, [])
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             const [productsRes, categoriesRes] = await Promise.all([
                 fetch('/api/inventory/products'),
@@ -93,9 +107,11 @@ export default function RetailInventoryPage() {
 
             if (productsRes.ok) {
                 const data = await productsRes.json()
-                setProducts(data.products || data || [])
-                if (data.products?.length > 0 || data?.length > 0) {
-                    setEditProduct((data.products || data)[0])
+                const list: Product[] = data.products || data || []
+                setProducts(list)
+                if (list.length > 0) {
+                    setEditProduct(list[0])
+                    setCurrentIndex(0)
                 }
             }
 
@@ -105,26 +121,33 @@ export default function RetailInventoryPage() {
             }
         } catch (error) {
             console.error('Failed to load data:', error)
+            setToast({ message: 'Failed to load inventory data', type: 'error' })
         } finally {
             setLoading(false)
         }
-    }
+    }, [])
+
+    useEffect(() => {
+        loadData()
+    }, [loadData])
 
     // Navigate products
-    const goToProduct = (index: number) => {
-        if (index >= 0 && index < products.length) {
+    const goToProduct = useCallback((index: number, productList?: Product[]) => {
+        const list = productList ?? products
+        if (index >= 0 && index < list.length) {
             setCurrentIndex(index)
-            setEditProduct(products[index])
-            // Fetch insights for the product
-            if (products[index].id !== 'new') {
-                fetchProductInsights(products[index].id)
+            setEditProduct(list[index])
+            setConfirmDelete(false)
+            if (list[index].id !== 'new') {
+                fetchProductInsights(list[index].id)
             }
         }
-    }
+    }, [products])
 
     // Fetch product insights (order history, velocity, suggestions)
     const fetchProductInsights = async (productId: string) => {
         setLoadingInsights(true)
+        setInsights(null)
         try {
             const res = await fetch(`/api/inventory/product-insights?productId=${productId}`)
             if (res.ok) {
@@ -158,14 +181,14 @@ export default function RetailInventoryPage() {
             setToast({ message: `Found: ${found.name}`, type: 'success' })
         } else {
             // Not found - check if it's a barcode and offer AI lookup
-            if (searchCode.length >= 8 && /^\d+$/.test(searchCode)) {
+            if (searchCode.length >= BARCODE_MIN_LENGTH && /^\d+$/.test(searchCode)) {
                 // Looks like a barcode - trigger AI lookup
                 handleAISKULookup(searchCode)
             } else {
                 setToast({ message: 'Product not found. Click "Add New" to create.', type: 'error' })
             }
         }
-    }, [searchCode, products])
+    }, [searchCode, products, goToProduct])
 
     // AI SKU Lookup function
     const handleAISKULookup = async (barcode: string) => {
@@ -184,24 +207,16 @@ export default function RetailInventoryPage() {
 
                 // Category mapping rules - ORDER MATTERS! More specific first
                 const categoryMappings: { keywords: string[], categoryNames: string[] }[] = [
-                    // Wine first (more specific)
                     { keywords: ['wine', 'champagne', 'prosecco', 'merlot', 'cabernet', 'chardonnay', 'pinot', 'riesling', 'sauvignon'], categoryNames: ['wine', 'liquor', 'spirits'] },
-                    // Beer
                     { keywords: ['beer', 'ale', 'lager', 'ipa', 'stout', 'pilsner', 'malt'], categoryNames: ['beer'] },
-                    // Spirits/Liquor
                     { keywords: ['bourbon', 'whiskey', 'whisky', 'vodka', 'rum', 'tequila', 'gin', 'brandy', 'cognac', 'scotch', 'spirits', 'liqueur'], categoryNames: ['liquor', 'spirits'] },
-                    // Beverages
                     { keywords: ['soda', 'cola', 'pepsi', 'sprite', 'fanta', 'beverage', 'drink', 'juice', 'water', 'energy'], categoryNames: ['beverages', 'drinks', 'soda'] },
-                    // Snacks
                     { keywords: ['chips', 'snack', 'crackers', 'cookies', 'candy', 'chocolate'], categoryNames: ['snacks', 'candy', 'food'] },
-                    // Tobacco
                     { keywords: ['cigarette', 'cigar', 'tobacco', 'vape', 'nicotine'], categoryNames: ['tobacco', 'cigarettes'] },
                 ]
 
                 for (const mapping of categoryMappings) {
-                    // Check if any keyword matches the product
                     if (mapping.keywords.some(kw => searchTerms.includes(kw))) {
-                        // Find a matching category in user's categories
                         const matchedCat = categories.find(cat =>
                             mapping.categoryNames.some(name => cat.name.toLowerCase().includes(name))
                         )
@@ -209,7 +224,6 @@ export default function RetailInventoryPage() {
                     }
                 }
 
-                // Fallback to first category
                 return categories[0]?.id || null
             }
 
@@ -227,52 +241,33 @@ export default function RetailInventoryPage() {
                 if (searchTerms.includes('beer') || searchTerms.includes('lager') || searchTerms.includes('ale')) return 'Beer'
                 if (searchTerms.includes('energy')) return 'Energy Drink'
                 if (searchTerms.includes('soda') || searchTerms.includes('cola')) return 'Soda'
-
                 return null
             }
 
             // Build a proper product name: Brand + Product + Size
-            // e.g., "Jameson Irish Whiskey 750ml" instead of just "Whisky"
             const buildProductName = (apiName?: string, brand?: string, size?: string, productType?: string) => {
                 if (!apiName) return ''
-
                 let name = apiName
                 const nameLower = name.toLowerCase().trim()
 
-                // Check if brand is already in name (with fuzzy matching for typos)
                 const isBrandInName = (brandName: string, productName: string) => {
                     const brandLower = brandName.toLowerCase().trim()
                     const productLower = productName.toLowerCase().trim()
-
-                    // Exact match
                     if (productLower.includes(brandLower)) return true
-
-                    // Check if first word of product matches first N chars of brand (fuzzy)
                     const firstWord = productLower.split(' ')[0]
                     if (firstWord.length >= 4) {
-                        // Check if first 4+ chars match (handles Screwball vs Skrewball)
-                        const brandStart = brandLower.substring(0, 4)
-                        const wordStart = firstWord.substring(0, 4)
-                        if (brandStart === wordStart ||
-                            brandLower.substring(0, 3) === firstWord.substring(0, 3)) {
-                            return true
-                        }
+                        if (brandLower.substring(0, 4) === firstWord.substring(0, 4) ||
+                            brandLower.substring(0, 3) === firstWord.substring(0, 3)) return true
                     }
-
                     return false
                 }
 
-                // Only prepend brand if it's NOT already in the name
                 if (brand && !isBrandInName(brand, name)) {
-                    // Also check it's a generic name, not a full product name
                     const genericNames = ['whisky', 'whiskey', 'vodka', 'rum', 'gin', 'tequila', 'beer', 'wine', 'bourbon', 'soda', 'cola']
                     const isGeneric = genericNames.some(g => nameLower === g || (nameLower.endsWith(g) && nameLower.split(' ').length <= 2))
-                    if (isGeneric) {
-                        name = `${brand} ${name}`
-                    }
+                    if (isGeneric) name = `${brand} ${name}`
                 }
 
-                // Add size if not already in name
                 if (size && !name.toLowerCase().includes(size.toLowerCase())) {
                     name = `${name} ${size}`
                 }
@@ -294,8 +289,8 @@ export default function RetailInventoryPage() {
                 reorderPoint: null,
                 categoryId: data.found ? findBestCategory(data.category, data.name) : categories[0]?.id || null,
                 category: data.found ? data.category || null : null,
-                brand: data.found ? data.brand || null : null,  // AI fills this (who makes it)
-                vendor: null,  // User fills this (who you buy from)
+                brand: data.found ? data.brand || null : null,
+                vendor: null,
                 isActive: true,
                 size: data.found ? data.size || null : null,
                 productType: data.found ? detectedType : null
@@ -312,7 +307,6 @@ export default function RetailInventoryPage() {
         } catch (error) {
             console.error('AI lookup failed:', error)
             setToast({ message: 'AI lookup failed. Please enter details manually.', type: 'error' })
-            // Still create empty product with barcode
             handleAddNew()
         } finally {
             setLookingUpSKU(false)
@@ -320,9 +314,6 @@ export default function RetailInventoryPage() {
     }
 
     // Handle barcode scanner input (keyboard wedge)
-    // Auto-triggers search when:
-    // 1. Enter key pressed (scanner usually sends Enter after barcode)
-    // 2. Auto-detect: 8+ digits entered rapidly (within 300ms idle = scanner speed)
     const scannerTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
     useEffect(() => {
@@ -330,7 +321,6 @@ export default function RetailInventoryPage() {
             if (document.activeElement === searchRef.current) {
                 if (e.key === 'Enter') {
                     e.preventDefault()
-                    // Clear any pending auto-search
                     if (scannerTimeoutRef.current) {
                         clearTimeout(scannerTimeoutRef.current)
                         scannerTimeoutRef.current = null
@@ -345,24 +335,17 @@ export default function RetailInventoryPage() {
 
     // Auto-search after rapid input stops (barcode scanner detection)
     useEffect(() => {
-        // Only auto-search if it looks like a barcode (8+ digits)
-        if (searchCode.length >= 8 && /^\d+$/.test(searchCode)) {
-            // Clear previous timeout
-            if (scannerTimeoutRef.current) {
-                clearTimeout(scannerTimeoutRef.current)
-            }
-            // Set new timeout - scanners input rapidly, so short delay means scanning done
+        if (searchCode.length >= BARCODE_MIN_LENGTH && /^\d+$/.test(searchCode)) {
+            if (scannerTimeoutRef.current) clearTimeout(scannerTimeoutRef.current)
             scannerTimeoutRef.current = setTimeout(() => {
                 handleSearch()
-            }, 300) // 300ms after last character = barcode complete
+            }, SCANNER_DEBOUNCE_MS)
         }
 
         return () => {
-            if (scannerTimeoutRef.current) {
-                clearTimeout(scannerTimeoutRef.current)
-            }
+            if (scannerTimeoutRef.current) clearTimeout(scannerTimeoutRef.current)
         }
-    }, [searchCode])
+    }, [searchCode, handleSearch])
 
     // Calculate profit metrics
     const profitPercent = editProduct?.cost && editProduct.cost > 0
@@ -372,6 +355,10 @@ export default function RetailInventoryPage() {
     const grossMargin = editProduct?.price && Number(editProduct.price) > 0
         ? ((Number(editProduct.price) - (Number(editProduct.cost) || 0)) / Number(editProduct.price) * 100).toFixed(1)
         : '0.0'
+
+    // Get effective reorder point for display (null = user hasn't set one yet, don't fake a default)
+    const effectiveReorderPoint = editProduct?.reorderPoint ?? null
+    const isLowStock = effectiveReorderPoint !== null && editProduct !== null && editProduct.stock <= effectiveReorderPoint
 
     // Save product
     const handleSave = async () => {
@@ -385,7 +372,6 @@ export default function RetailInventoryPage() {
         try {
             const isNew = editProduct.id === 'new'
 
-            // Use POST for new products, PUT for updates
             const res = await fetch(
                 isNew ? '/api/inventory/products' : `/api/inventory/products/${editProduct.id}`,
                 {
@@ -400,23 +386,22 @@ export default function RetailInventoryPage() {
             if (res.ok) {
                 setToast({ message: isNew ? 'Product created!' : 'Saved!', type: 'success' })
                 if (isNew && data.product) {
-                    // Add new product to list with real ID from server
-                    const newProduct = { ...editProduct, id: data.product.id }
-                    setProducts(prev => [newProduct, ...prev])
-                    setEditProduct(newProduct)
+                    const savedProduct = { ...editProduct, id: data.product.id }
+                    const updatedList = [savedProduct, ...products]
+                    setProducts(updatedList)
+                    setEditProduct(savedProduct)
+                    setCurrentIndex(0)
                 } else {
-                    // Update existing product in list
                     setProducts(prev => prev.map(p =>
                         p.id === editProduct.id ? editProduct : p
                     ))
                 }
             } else {
-                // Show actual error message from API
                 setToast({ message: data.error || 'Failed to save', type: 'error' })
             }
         } catch (e) {
             console.error('Save error:', e)
-            setToast({ message: 'Error saving', type: 'error' })
+            setToast({ message: 'Error saving product', type: 'error' })
         } finally {
             setSaving(false)
         }
@@ -443,6 +428,8 @@ export default function RetailInventoryPage() {
         }
         setEditProduct(newProduct)
         setSearchCode('')
+        setConfirmDelete(false)
+        setInsights(null)
     }
 
     // Duplicate product
@@ -456,12 +443,13 @@ export default function RetailInventoryPage() {
             sku: null
         }
         setEditProduct(dup)
+        setInsights(null)
     }
 
-    // Delete product
-    const handleDelete = async () => {
+    // Delete product (with inline confirm)
+    const handleDeleteConfirm = async () => {
         if (!editProduct || editProduct.id === 'new') return
-        if (!confirm('Delete this product?')) return
+        setConfirmDelete(false)
 
         try {
             const res = await fetch(`/api/inventory/products/${editProduct.id}`, {
@@ -469,17 +457,21 @@ export default function RetailInventoryPage() {
             })
 
             if (res.ok) {
-                setToast({ message: 'Deleted', type: 'success' })
+                setToast({ message: 'Product deleted', type: 'success' })
                 const newProducts = products.filter(p => p.id !== editProduct.id)
                 setProducts(newProducts)
                 if (newProducts.length > 0) {
-                    goToProduct(0)
+                    const nextIdx = Math.min(currentIndex, newProducts.length - 1)
+                    goToProduct(nextIdx, newProducts)
                 } else {
                     handleAddNew()
                 }
+            } else {
+                const data = await res.json().catch(() => ({}))
+                setToast({ message: data.error || 'Failed to delete', type: 'error' })
             }
         } catch {
-            setToast({ message: 'Failed to delete', type: 'error' })
+            setToast({ message: 'Failed to delete product', type: 'error' })
         }
     }
 
@@ -488,6 +480,23 @@ export default function RetailInventoryPage() {
         if (!editProduct) return
         setEditProduct({ ...editProduct, [field]: value })
     }
+
+    // Age restriction info for current product
+    const ageRestricted =
+        editProduct?.productCategory?.ageRestricted ||
+        categories.find(c => c.id === editProduct?.categoryId)?.ageRestricted ||
+        false
+    const minimumAge =
+        editProduct?.productCategory?.minimumAge ||
+        categories.find(c => c.id === editProduct?.categoryId)?.minimumAge ||
+        FALLBACK_MIN_AGE
+
+    // Whether this is a new (unsaved) product
+    const isNewProduct = editProduct?.id === 'new'
+
+    // Display counter
+    const displayIndex = isNewProduct ? '★' : String(currentIndex + 1)
+    const displayTotal = isNewProduct ? `${products.length} + new` : String(products.length)
 
     if (loading) {
         return (
@@ -522,7 +531,7 @@ export default function RetailInventoryPage() {
                         type="text"
                         value={searchCode}
                         onChange={(e) => setSearchCode(e.target.value)}
-                        placeholder={lookingUpSKU ? "Looking up product..." : "Scan barcode or search..."}
+                        placeholder={lookingUpSKU ? "Looking up product..." : "Scan barcode or search by name..."}
                         className={`w-full pl-12 pr-4 py-4 bg-stone-900 border rounded-lg text-xl focus:ring-2 focus:border-transparent ${lookingUpSKU
                             ? 'border-purple-500 focus:ring-purple-500'
                             : 'border-stone-700 focus:ring-orange-500'
@@ -532,7 +541,7 @@ export default function RetailInventoryPage() {
                     />
                 </div>
 
-                {/* Search Button - with label */}
+                {/* Search Button */}
                 <button
                     onClick={handleSearch}
                     disabled={lookingUpSKU}
@@ -546,7 +555,7 @@ export default function RetailInventoryPage() {
                     <span>{lookingUpSKU ? 'Looking up...' : 'Search'}</span>
                 </button>
 
-                {/* Add Product Button - with label */}
+                {/* Add Product Button */}
                 <button
                     onClick={handleAddNew}
                     className="px-5 py-4 bg-green-600 hover:bg-green-500 rounded-lg flex items-center gap-2 font-medium"
@@ -555,28 +564,31 @@ export default function RetailInventoryPage() {
                     <span>Add New</span>
                 </button>
 
-                {/* Categories Button - for quick category access */}
+                {/* Categories Button */}
                 <button
                     onClick={() => setShowDeptModal(true)}
                     className="px-5 py-4 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center gap-2 font-medium"
+                    title="Manage Categories & Departments"
                 >
                     <Tag className="h-5 w-5" />
                     <span>Categories</span>
                 </button>
 
-                {/* Departments Button - for hierarchy management */}
+                {/* Deals / Promotions Button */}
                 <button
-                    onClick={() => setShowDeptModal(true)}
+                    onClick={() => setShowPromoModal(true)}
                     className="px-5 py-4 bg-purple-600 hover:bg-purple-500 rounded-lg flex items-center gap-2 font-medium"
+                    title="Manage Deals & Promotions"
                 >
-                    <Folder className="h-5 w-5" />
-                    <span>Departments</span>
+                    <Gift className="h-5 w-5" />
+                    <span>Deals</span>
                 </button>
 
                 {/* Slow Movers Alert Button */}
                 <button
                     onClick={() => router.push('/dashboard/inventory/alerts/slow-movers')}
                     className="px-5 py-4 bg-red-600/50 hover:bg-red-600 rounded-lg flex items-center gap-2 font-medium"
+                    title="View slow-moving inventory"
                 >
                     <AlertTriangle className="h-5 w-5" />
                     <span>Slow Movers</span>
@@ -598,14 +610,25 @@ export default function RetailInventoryPage() {
                                     placeholder="Enter product name..."
                                 />
                             </div>
-                            <div className="text-right">
-                                <span className={`px-3 py-1 text-sm rounded-full ${editProduct.productCategory?.ageRestricted || categories.find(c => c.id === editProduct.categoryId)?.ageRestricted
+                            <div className="flex items-center gap-3 text-right">
+                                {/* Active / Inactive toggle */}
+                                <button
+                                    onClick={() => updateField('isActive', !editProduct.isActive)}
+                                    className={`px-3 py-1 text-sm rounded-full border transition-colors ${editProduct.isActive
+                                        ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                                        : 'bg-stone-700 text-stone-400 border-stone-600'
+                                        }`}
+                                >
+                                    {editProduct.isActive ? '● Active' : '○ Inactive'}
+                                </button>
+                                {/* Age restriction badge */}
+                                <span className={`px-3 py-1 text-sm rounded-full ${ageRestricted
                                     ? 'bg-red-500/20 text-red-400'
                                     : 'bg-green-500/20 text-green-400'
                                     }`}>
-                                    {editProduct.productCategory?.ageRestricted || categories.find(c => c.id === editProduct.categoryId)?.ageRestricted
-                                        ? `🔞 ID Required (${editProduct.productCategory?.minimumAge || categories.find(c => c.id === editProduct.categoryId)?.minimumAge || 21}+)`
-                                        : '✓ No ID'}
+                                    {ageRestricted
+                                        ? `🔞 ID Required (${minimumAge}+)`
+                                        : '✓ No ID Required'}
                                 </span>
                             </div>
                         </div>
@@ -623,9 +646,9 @@ export default function RetailInventoryPage() {
                                     <input
                                         type="text"
                                         value={editProduct.barcode || ''}
-                                        onChange={(e) => updateField('barcode', e.target.value)}
+                                        onChange={(e) => updateField('barcode', e.target.value || null)}
                                         className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded text-lg font-mono"
-                                        placeholder="Scan barcode..."
+                                        placeholder="Scan or type barcode..."
                                     />
                                 </div>
                                 <div>
@@ -661,7 +684,7 @@ export default function RetailInventoryPage() {
                                     <label className="text-xs text-stone-500">Category / Department</label>
                                     <select
                                         value={editProduct.categoryId || ''}
-                                        onChange={(e) => updateField('categoryId', e.target.value)}
+                                        onChange={(e) => updateField('categoryId', e.target.value || null)}
                                         className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded"
                                     >
                                         <option value="">-- Select Category --</option>
@@ -683,41 +706,13 @@ export default function RetailInventoryPage() {
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="text-xs text-stone-500">Supplier / Distributor</label>
-                                        <select
-                                            value={editProduct.vendor || ''}
-                                            onChange={(e) => updateField('vendor', e.target.value)}
-                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded"
+                                        <label className="text-xs text-stone-500">Supplier / Distributor <span className="text-blue-400">(Tap)</span></label>
+                                        <div
+                                            onClick={() => { setKeyboardField('vendor'); setShowKeyboard(true); }}
+                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded cursor-pointer hover:border-orange-500 transition-colors min-h-[42px] flex items-center"
                                         >
-                                            <option value="">-- Select Supplier --</option>
-                                            <optgroup label="🥃 Major Liquor Distributors">
-                                                <option value="Southern Glazer's">Southern Glazer's Wine & Spirits</option>
-                                                <option value="RNDC">Republic National (RNDC)</option>
-                                                <option value="Breakthru Beverage">Breakthru Beverage Group</option>
-                                                <option value="Johnson Brothers">Johnson Brothers</option>
-                                                <option value="Young's Market">Young's Market Company</option>
-                                                <option value="Lipman Brothers">Lipman Brothers</option>
-                                                <option value="Fedway Associates">Fedway Associates</option>
-                                            </optgroup>
-                                            <optgroup label="🍺 Beer Distributors">
-                                                <option value="Reyes Beverage">Reyes Beverage Group</option>
-                                                <option value="Ben E. Keith">Ben E. Keith Beverages</option>
-                                                <option value="Silver Eagle">Silver Eagle Distributors</option>
-                                                <option value="Andrews Distributing">Andrews Distributing</option>
-                                            </optgroup>
-                                            <optgroup label="📦 General/Convenience">
-                                                <option value="McLane">McLane Company</option>
-                                                <option value="Core-Mark">Core-Mark International</option>
-                                                <option value="Eby-Brown">Eby-Brown Company</option>
-                                                <option value="H.T. Hackney">H.T. Hackney Company</option>
-                                                <option value="S. Abraham & Sons">S. Abraham & Sons</option>
-                                            </optgroup>
-                                            <optgroup label="🚬 Tobacco">
-                                                <option value="McLane Tobacco">McLane Tobacco</option>
-                                                <option value="Altria">Altria Distribution</option>
-                                            </optgroup>
-                                            <option value="Other">Other (specify in notes)</option>
-                                        </select>
+                                            {editProduct.vendor || <span className="text-stone-500">Enter supplier...</span>}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -729,7 +724,7 @@ export default function RetailInventoryPage() {
 
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-xs text-stone-500">Cost (You Pay) - Tap to enter</label>
+                                    <label className="text-xs text-stone-500">Cost (You Pay) — Tap to enter</label>
                                     <button
                                         onClick={() => { setNumpadField('cost'); setShowNumpad(true); }}
                                         className="w-full px-3 py-3 bg-stone-800 border border-stone-600 rounded text-left text-lg flex items-center gap-2 hover:border-green-500 transition-colors"
@@ -741,7 +736,7 @@ export default function RetailInventoryPage() {
                                     </button>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-stone-500">Price (Customer Pays) - Tap to enter</label>
+                                    <label className="text-xs text-stone-500">Price (Customer Pays) — Tap to enter</label>
                                     <button
                                         onClick={() => { setNumpadField('price'); setShowNumpad(true); }}
                                         className="w-full px-3 py-4 bg-stone-800 border border-orange-500 rounded text-left text-2xl font-bold flex items-center gap-2 hover:bg-stone-700 transition-colors"
@@ -757,21 +752,31 @@ export default function RetailInventoryPage() {
                                 <div className="bg-stone-800 rounded p-3 grid grid-cols-2 gap-3">
                                     <div className="text-center">
                                         <div className="text-xs text-stone-500">Profit %</div>
-                                        <div className={`text-xl font-bold ${Number(profitPercent) > 30 ? 'text-green-400' :
-                                            Number(profitPercent) > 15 ? 'text-yellow-400' : 'text-red-400'
+                                        <div className={`text-xl font-bold ${Number(profitPercent) > PROFIT_GOOD ? 'text-green-400' :
+                                            Number(profitPercent) > PROFIT_WARN ? 'text-yellow-400' : 'text-red-400'
                                             }`}>
                                             {profitPercent}%
                                         </div>
                                     </div>
                                     <div className="text-center">
                                         <div className="text-xs text-stone-500">Gross Margin</div>
-                                        <div className={`text-xl font-bold ${Number(grossMargin) > 25 ? 'text-green-400' :
-                                            Number(grossMargin) > 10 ? 'text-yellow-400' : 'text-red-400'
+                                        <div className={`text-xl font-bold ${Number(grossMargin) > MARGIN_GOOD ? 'text-green-400' :
+                                            Number(grossMargin) > MARGIN_WARN ? 'text-yellow-400' : 'text-red-400'
                                             }`}>
                                             {grossMargin}%
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Dollar profit */}
+                                {editProduct.cost && Number(editProduct.price) > 0 && (
+                                    <div className="text-center text-sm text-stone-400">
+                                        Profit per unit:{' '}
+                                        <span className="text-green-400 font-semibold">
+                                            ${(Number(editProduct.price) - Number(editProduct.cost)).toFixed(2)}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -781,10 +786,10 @@ export default function RetailInventoryPage() {
 
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-xs text-stone-500">Current Stock - Tap to enter exact</label>
+                                    <label className="text-xs text-stone-500">Current Stock — Tap to enter exact</label>
                                     <button
                                         onClick={() => { setNumpadField('stock'); setShowNumpad(true); }}
-                                        className={`w-full px-3 py-4 bg-stone-800 border rounded text-4xl font-bold text-center hover:bg-stone-700 transition-colors ${editProduct.stock <= (editProduct.reorderPoint || 5)
+                                        className={`w-full px-3 py-4 bg-stone-800 border rounded text-4xl font-bold text-center hover:bg-stone-700 transition-colors ${isLowStock
                                             ? 'border-red-500 text-red-400'
                                             : 'border-stone-600 text-white'
                                             }`}
@@ -796,22 +801,26 @@ export default function RetailInventoryPage() {
                                     <label className="text-xs text-stone-500">Reorder Point (Alert When Below)</label>
                                     <input
                                         type="number"
-                                        value={editProduct.reorderPoint || ''}
-                                        onChange={(e) => updateField('reorderPoint', parseInt(e.target.value) || null)}
+                                        value={editProduct.reorderPoint ?? ''}
+                                        onChange={(e) => updateField('reorderPoint', e.target.value !== '' ? parseInt(e.target.value) : null)}
                                         className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded"
-                                        placeholder="5"
+                                        placeholder="e.g. 5 (leave blank to disable alert)"
+                                        min={0}
                                     />
                                 </div>
 
-                                {editProduct.stock <= (editProduct.reorderPoint || 5) && (
+                                {/* Low stock alert — only shows when reorder point is set AND stock is at/below it */}
+                                {isLowStock && (
                                     <div className="bg-red-500/20 border border-red-500/50 rounded p-3 flex items-center gap-2">
-                                        <AlertTriangle className="h-5 w-5 text-red-400" />
-                                        <span className="text-red-400 text-sm">Low stock! Reorder needed.</span>
+                                        <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0" />
+                                        <span className="text-red-400 text-sm">
+                                            Low stock! Only {editProduct.stock} left — reorder point is {effectiveReorderPoint}.
+                                        </span>
                                     </div>
                                 )}
 
                                 {/* Product Insights Panel */}
-                                {editProduct.id !== 'new' && (
+                                {!isNewProduct && (
                                     <div className="mt-4 pt-4 border-t border-stone-700">
                                         <div className="flex items-center justify-between mb-3">
                                             <h4 className="text-sm font-semibold text-purple-400 flex items-center gap-2">
@@ -822,6 +831,9 @@ export default function RetailInventoryPage() {
                                                 <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
                                             )}
                                         </div>
+                                        {!loadingInsights && !insights && (
+                                            <div className="text-xs text-stone-500 text-center py-2">No data yet</div>
+                                        )}
                                         {insights && !loadingInsights && (
                                             <div className="space-y-2 text-sm">
                                                 {/* Last Order */}
@@ -830,9 +842,13 @@ export default function RetailInventoryPage() {
                                                         <div className="text-stone-500 text-xs">Last Order</div>
                                                         <div className="flex justify-between">
                                                             <span>{insights.lastOrder.daysAgo} days ago</span>
-                                                            <span className="text-green-400">{insights.lastOrder.quantity} @ ${insights.lastOrder.unitCost.toFixed(2)}</span>
+                                                            <span className="text-green-400">
+                                                                {insights.lastOrder.quantity} @ ${Number(insights.lastOrder.unitCost || 0).toFixed(2)}
+                                                            </span>
                                                         </div>
-                                                        <div className="text-stone-500 text-xs">{insights.lastOrder.supplier}</div>
+                                                        {insights.lastOrder.supplier && (
+                                                            <div className="text-stone-500 text-xs">{insights.lastOrder.supplier}</div>
+                                                        )}
                                                     </div>
                                                 ) : (
                                                     <div className="bg-stone-800 rounded p-2 text-stone-500 text-xs">
@@ -841,27 +857,34 @@ export default function RetailInventoryPage() {
                                                 )}
 
                                                 {/* Sales Since Order */}
-                                                <div className="bg-stone-800 rounded p-2">
-                                                    <div className="text-stone-500 text-xs">Sales (since last order)</div>
-                                                    <div className="flex justify-between">
-                                                        <span className="text-blue-400">{insights.salesSinceOrder.units} sold</span>
-                                                        <span className="text-green-400">${insights.salesSinceOrder.revenue.toFixed(2)}</span>
+                                                {insights.salesSinceOrder && (
+                                                    <div className="bg-stone-800 rounded p-2">
+                                                        <div className="text-stone-500 text-xs">Sales (since last order)</div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-blue-400">{insights.salesSinceOrder.units ?? 0} sold</span>
+                                                            <span className="text-green-400">${Number(insights.salesSinceOrder.revenue || 0).toFixed(2)}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                )}
 
                                                 {/* Velocity */}
-                                                <div className="bg-stone-800 rounded p-2">
-                                                    <div className="text-stone-500 text-xs">Velocity</div>
-                                                    <div className="flex justify-between">
-                                                        <span>{insights.velocity.unitsPerDay}/day</span>
-                                                        <span className={insights.velocity.daysOfStock < 7 ? 'text-red-400' : insights.velocity.daysOfStock < 14 ? 'text-yellow-400' : 'text-green-400'}>
-                                                            {insights.velocity.daysOfStock} days left
-                                                        </span>
+                                                {insights.velocity && (
+                                                    <div className="bg-stone-800 rounded p-2">
+                                                        <div className="text-stone-500 text-xs">Velocity</div>
+                                                        <div className="flex justify-between">
+                                                            <span>{insights.velocity.unitsPerDay ?? 0}/day</span>
+                                                            <span className={
+                                                                (insights.velocity.daysOfStock ?? 99) < 7 ? 'text-red-400' :
+                                                                    (insights.velocity.daysOfStock ?? 99) < 14 ? 'text-yellow-400' : 'text-green-400'
+                                                            }>
+                                                                {insights.velocity.daysOfStock ?? '—'} days left
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                )}
 
                                                 {/* AI Suggestion */}
-                                                {insights.suggestion.orderQty > 0 && (
+                                                {insights.suggestion?.orderQty > 0 && (
                                                     <div className="bg-purple-500/20 border border-purple-500/50 rounded p-2">
                                                         <div className="flex items-center gap-1 text-purple-400 text-xs">
                                                             <Sparkles className="h-3 w-3" />
@@ -871,9 +894,9 @@ export default function RetailInventoryPage() {
                                                             {insights.suggestion.orderQty} units
                                                         </div>
                                                         <div className="text-stone-500 text-xs">
-                                                            Covers {insights.suggestion.coversDays} days
-                                                            {insights.suggestion.estimatedCost && (
-                                                                <span> • ~${insights.suggestion.estimatedCost.toFixed(2)}</span>
+                                                            Covers {insights.suggestion.coversDays ?? '?'} days
+                                                            {insights.suggestion.estimatedCost > 0 && (
+                                                                <span> • ~${Number(insights.suggestion.estimatedCost).toFixed(2)}</span>
                                                             )}
                                                         </div>
                                                     </div>
@@ -893,17 +916,17 @@ export default function RetailInventoryPage() {
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => goToProduct(currentIndex - 1)}
-                                    disabled={currentIndex === 0}
+                                    disabled={isNewProduct || currentIndex === 0}
                                     className="p-3 bg-stone-800 hover:bg-stone-700 disabled:opacity-50 rounded-lg"
                                 >
                                     <ChevronLeft className="h-6 w-6" />
                                 </button>
-                                <span className="text-stone-500">
-                                    {currentIndex + 1} / {products.length}
+                                <span className="text-stone-500 min-w-[80px] text-center">
+                                    {displayIndex} / {displayTotal}
                                 </span>
                                 <button
                                     onClick={() => goToProduct(currentIndex + 1)}
-                                    disabled={currentIndex >= products.length - 1}
+                                    disabled={isNewProduct || currentIndex >= products.length - 1}
                                     className="p-3 bg-stone-800 hover:bg-stone-700 disabled:opacity-50 rounded-lg"
                                 >
                                     <ChevronRight className="h-6 w-6" />
@@ -914,18 +937,41 @@ export default function RetailInventoryPage() {
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={handleDuplicate}
-                                    className="px-4 py-3 bg-stone-700 hover:bg-stone-600 rounded-lg flex items-center gap-2"
+                                    disabled={isNewProduct}
+                                    className="px-4 py-3 bg-stone-700 hover:bg-stone-600 disabled:opacity-40 rounded-lg flex items-center gap-2"
                                 >
                                     <Copy className="h-5 w-5" />
                                     Duplicate
                                 </button>
-                                <button
-                                    onClick={handleDelete}
-                                    className="px-4 py-3 bg-red-600/30 hover:bg-red-600/50 rounded-lg flex items-center gap-2 text-red-400"
-                                >
-                                    <Trash2 className="h-5 w-5" />
-                                    Delete
-                                </button>
+
+                                {/* Inline delete confirmation */}
+                                {confirmDelete ? (
+                                    <div className="flex items-center gap-2 bg-red-600/20 border border-red-500/50 rounded-lg px-3 py-2">
+                                        <span className="text-red-400 text-sm">Delete permanently?</span>
+                                        <button
+                                            onClick={handleDeleteConfirm}
+                                            className="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm font-bold"
+                                        >
+                                            Yes, Delete
+                                        </button>
+                                        <button
+                                            onClick={() => setConfirmDelete(false)}
+                                            className="px-3 py-1 bg-stone-700 hover:bg-stone-600 rounded text-sm"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setConfirmDelete(true)}
+                                        disabled={isNewProduct}
+                                        className="px-4 py-3 bg-red-600/30 hover:bg-red-600/50 disabled:opacity-40 rounded-lg flex items-center gap-2 text-red-400"
+                                    >
+                                        <Trash2 className="h-5 w-5" />
+                                        Delete
+                                    </button>
+                                )}
+
                                 <button
                                     onClick={handleSave}
                                     disabled={saving}
@@ -936,12 +982,28 @@ export default function RetailInventoryPage() {
                                     ) : (
                                         <Save className="h-5 w-5" />
                                     )}
-                                    Save
+                                    {isNewProduct ? 'Create Product' : 'Save Changes'}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </>
+            )}
+
+            {/* Empty state when no products */}
+            {!editProduct && !loading && (
+                <div className="flex flex-col items-center justify-center py-24 text-center">
+                    <Package className="h-16 w-16 text-stone-600 mb-4" />
+                    <h2 className="text-xl font-semibold text-stone-400 mb-2">No Products Yet</h2>
+                    <p className="text-stone-500 mb-6">Scan a barcode or click "Add New" to add your first product.</p>
+                    <button
+                        onClick={handleAddNew}
+                        className="px-6 py-3 bg-green-600 hover:bg-green-500 rounded-lg flex items-center gap-2 font-medium"
+                    >
+                        <Plus className="h-5 w-5" />
+                        Add First Product
+                    </button>
+                </div>
             )}
 
             {/* Toast Component */}
@@ -953,7 +1015,7 @@ export default function RetailInventoryPage() {
                 />
             )}
 
-            {/* Department Manager Modal */}
+            {/* Department / Category Manager Modal */}
             <DepartmentManagerModal
                 isOpen={showDeptModal}
                 onClose={() => setShowDeptModal(false)}
@@ -1007,8 +1069,8 @@ export default function RetailInventoryPage() {
                     keyboardField === 'sku' ? 'Enter SKU' :
                         keyboardField === 'size' ? 'Enter Size (e.g., 750ml, 12 oz)' :
                             keyboardField === 'productType' ? 'Enter Product Type (e.g., Whiskey, Lager)' :
-                                keyboardField === 'brand' ? 'Enter Brand' :
-                                    keyboardField === 'vendor' ? 'Enter Vendor/Supplier' : 'Enter Value'
+                                keyboardField === 'brand' ? 'Enter Brand Name' :
+                                    keyboardField === 'vendor' ? 'Enter Supplier / Distributor Name' : 'Enter Value'
                 }
                 initialValue={
                     keyboardField === 'sku' ? editProduct?.sku || '' :
@@ -1029,4 +1091,3 @@ export default function RetailInventoryPage() {
         </div>
     )
 }
-
