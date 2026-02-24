@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSession } from 'next-auth/react'
 import {
     UserCog,
     ArrowLeft,
@@ -11,11 +12,60 @@ import {
     Search,
     Star,
     Wallet,
-    Activity
+    Activity,
+    Users,
+    TrendingUp
 } from 'lucide-react'
 import Link from 'next/link'
 
-const employeeReports = [
+// ─── Retail employee reports — no barber/stylist language ──────────────────
+const retailEmployeeReports = [
+    {
+        id: 'sales-by-employee',
+        name: 'Sales by Employee',
+        description: 'Revenue and transaction count per employee — who is your top performer?',
+        icon: TrendingUp,
+        href: '/dashboard/reports/employee/sales',
+        status: 'available',
+        priority: true
+    },
+    {
+        id: 'hours-wages',
+        name: 'Hours & Wages',
+        description: 'Employee time entries and calculated pay for the period',
+        icon: Clock,
+        href: '/dashboard/reports/employee/hours-wages',
+        status: 'available',
+        priority: true
+    },
+    {
+        id: 'shift-summary',
+        name: 'Shift Summary',
+        description: 'Daily shift details with drawer open/close amounts',
+        icon: FileText,
+        href: '/dashboard/reports/z-report',
+        status: 'available'
+    },
+    {
+        id: 'employee-performance',
+        name: 'Employee Performance',
+        description: 'Average transaction value, items per transaction, units sold by employee',
+        icon: Star,
+        href: '/dashboard/reports/employee/sales',
+        status: 'available'
+    },
+    {
+        id: 'drawer-activity',
+        name: 'Drawer Activity',
+        description: 'Cash drawer opens, overages, and shortages per employee',
+        icon: Wallet,
+        href: '/dashboard/reports/drawer-activity',
+        status: 'available'
+    },
+]
+
+// ─── Salon employee reports — barber/stylist specific ─────────────────────
+const salonEmployeeReports = [
     {
         id: 'earnings-statement',
         name: 'Barber Earnings Statement',
@@ -74,10 +124,15 @@ const employeeReports = [
         icon: FileText,
         href: '/dashboard/reports/z-report',
         status: 'available'
-    }
+    },
 ]
 
 export default function EmployeeReportsPage() {
+    const { data: session } = useSession()
+    const industryType = (session?.user as any)?.industryType || 'SERVICE'
+    const isRetail = industryType === 'RETAIL'
+
+    const employeeReports = isRetail ? retailEmployeeReports : salonEmployeeReports
     const [searchTerm, setSearchTerm] = useState('')
 
     const filteredReports = employeeReports.filter(report =>
@@ -102,8 +157,11 @@ export default function EmployeeReportsPage() {
                                 <UserCog className="w-6 h-6 text-white" />
                             </div>
                             Employee Reports
+                            <span className="text-xs font-normal bg-stone-700 text-stone-300 px-2 py-1 rounded-full">
+                                {isRetail ? 'Retail' : 'Salon'}
+                            </span>
                         </h1>
-                        <p className="text-gray-400 mt-1">7 reports available</p>
+                        <p className="text-gray-400 mt-1">{filteredReports.length} reports available</p>
                     </div>
                 </div>
 
@@ -129,18 +187,23 @@ export default function EmployeeReportsPage() {
                         <Link
                             key={report.id}
                             href={isAvailable ? report.href : '#'}
-                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isAvailable
-                                ? 'bg-gray-800/50 border-gray-700 hover:border-orange-500/50 hover:bg-gray-800'
-                                : 'bg-gray-800/30 border-gray-700/50 cursor-not-allowed opacity-60'
+                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${(report as any).priority
+                                ? 'bg-orange-900/10 border-orange-500/40 hover:border-orange-400'
+                                : isAvailable
+                                    ? 'bg-gray-800/50 border-gray-700 hover:border-orange-500/50 hover:bg-gray-800'
+                                    : 'bg-gray-800/30 border-gray-700/50 cursor-not-allowed opacity-60'
                                 }`}
                         >
                             <div className="flex items-center gap-4">
-                                <div className="p-2 rounded-lg bg-gray-700">
-                                    <Icon className="w-5 h-5 text-gray-400" />
+                                <div className={`p-2 rounded-lg ${(report as any).priority ? 'bg-orange-500/20' : 'bg-gray-700'}`}>
+                                    <Icon className={`w-5 h-5 ${(report as any).priority ? 'text-orange-400' : 'text-gray-400'}`} />
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-medium text-white">{report.name}</h3>
+                                        {(report as any).priority && (
+                                            <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded">PRIORITY</span>
+                                        )}
                                         {!isAvailable && (
                                             <span className="text-xs bg-gray-600 text-gray-300 px-2 py-0.5 rounded">Coming Soon</span>
                                         )}
@@ -158,4 +221,3 @@ export default function EmployeeReportsPage() {
         </div>
     )
 }
-

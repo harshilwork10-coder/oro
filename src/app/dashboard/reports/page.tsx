@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useSession } from 'next-auth/react'
 import {
     DollarSign,
     Package,
@@ -10,18 +10,79 @@ import {
     TrendingUp,
     CreditCard,
     FileText,
-    BarChart3
+    BarChart3,
+    Ticket,
+    Cigarette,
+    Calendar,
+    Star
 } from 'lucide-react'
 import Link from 'next/link'
 
-const reportCategories = [
+const retailReportCategories = [
+    {
+        id: 'sales',
+        name: 'Sales Reports',
+        description: 'Daily sales, cash vs card, product sales, tobacco scan, lottery, refunds',
+        icon: DollarSign,
+        color: 'from-green-500 to-emerald-600',
+        count: 10,
+        href: '/dashboard/reports/sales'
+    },
+    {
+        id: 'inventory',
+        name: 'Inventory Reports',
+        description: 'Stock levels, reorder alerts, top sellers, dead stock, item activity',
+        icon: Package,
+        color: 'from-blue-500 to-cyan-600',
+        count: 5,
+        href: '/dashboard/reports/inventory'
+    },
+    {
+        id: 'customer',
+        name: 'Customer Reports',
+        description: 'Customer list, loyalty points, top spenders, visit frequency',
+        icon: Users,
+        color: 'from-purple-500 to-violet-600',
+        count: 4,
+        href: '/dashboard/reports/customer'
+    },
+    {
+        id: 'employee',
+        name: 'Employee Reports',
+        description: 'Hours & wages, sales by employee, shift summaries',
+        icon: UserCog,
+        color: 'from-orange-500 to-amber-600',
+        count: 3,
+        href: '/dashboard/reports/employee'
+    },
+    {
+        id: 'tobacco',
+        name: 'Tobacco & Age-Restricted',
+        description: 'Tobacco scan compliance, age-verified sales, regulatory reporting',
+        icon: Cigarette,
+        color: 'from-stone-500 to-zinc-600',
+        count: 2,
+        href: '/dashboard/reports/tobacco-scan'
+    },
+    {
+        id: 'lottery',
+        name: 'Lottery Reports',
+        description: 'Lottery ticket sales, pack activity, payout tracking',
+        icon: Ticket,
+        color: 'from-yellow-500 to-amber-600',
+        count: 2,
+        href: '/dashboard/reports/lottery'
+    },
+]
+
+const salonReportCategories = [
     {
         id: 'sales',
         name: 'Sales Reports',
         description: 'Daily sales, service sales, stylist performance, commissions, tips',
         icon: DollarSign,
         color: 'from-green-500 to-emerald-600',
-        count: 12,
+        count: 13,
         href: '/dashboard/reports/sales'
     },
     {
@@ -45,15 +106,52 @@ const reportCategories = [
     {
         id: 'employee',
         name: 'Employee Reports',
-        description: 'Hours & wages, sales by employee, shift summary',
+        description: 'Barber earnings, utilization, payout history, hours & wages',
         icon: UserCog,
         color: 'from-orange-500 to-amber-600',
-        count: 3,
+        count: 7,
         href: '/dashboard/reports/employee'
-    }
+    },
+    {
+        id: 'appointments',
+        name: 'Appointment Reports',
+        description: 'Booking trends, no-shows, revenue by appointment type',
+        icon: Calendar,
+        color: 'from-pink-500 to-rose-600',
+        count: 3,
+        href: '/dashboard/reports/appointments'
+    },
+    {
+        id: 'nps',
+        name: 'NPS & Reviews',
+        description: 'Net Promoter Score trends, customer satisfaction, review activity',
+        icon: Star,
+        color: 'from-indigo-500 to-blue-600',
+        count: 2,
+        href: '/dashboard/reports/nps'
+    },
 ]
 
 export default function ReportsPage() {
+    const { data: session } = useSession()
+    const industryType = (session?.user as any)?.industryType || 'SERVICE'
+    const isRetail = industryType === 'RETAIL'
+
+    const reportCategories = isRetail ? retailReportCategories : salonReportCategories
+
+    // Quick access links differ by vertical
+    const quickLinks = isRetail ? [
+        { href: '/dashboard/reports/z-report', icon: FileText, color: 'text-green-400', borderColor: 'hover:border-green-500/50', label: 'Z-Report' },
+        { href: '/dashboard/reports/tobacco-scan', icon: Cigarette, color: 'text-stone-400', borderColor: 'hover:border-stone-500/50', label: 'Tobacco Scan' },
+        { href: '/dashboard/reports/daily', icon: TrendingUp, color: 'text-purple-400', borderColor: 'hover:border-purple-500/50', label: 'Daily Sales' },
+        { href: '/dashboard/reports/inventory/low-stock', icon: Package, color: 'text-orange-400', borderColor: 'hover:border-orange-500/50', label: 'Low Stock' },
+    ] : [
+        { href: '/dashboard/reports/z-report', icon: FileText, color: 'text-green-400', borderColor: 'hover:border-green-500/50', label: 'Z-Report' },
+        { href: '/dashboard/reports/sales/cc-batch', icon: CreditCard, color: 'text-blue-400', borderColor: 'hover:border-blue-500/50', label: 'CC Batch' },
+        { href: '/dashboard/reports/daily', icon: TrendingUp, color: 'text-purple-400', borderColor: 'hover:border-purple-500/50', label: 'Daily Sales' },
+        { href: '/dashboard/reports/tips', icon: DollarSign, color: 'text-orange-400', borderColor: 'hover:border-orange-500/50', label: 'Tips Report' },
+    ]
+
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
@@ -62,6 +160,9 @@ export default function ReportsPage() {
                     <h1 className="text-2xl font-bold text-white flex items-center gap-3">
                         <BarChart3 className="w-8 h-8 text-purple-400" />
                         Reports
+                        <span className="text-xs font-normal bg-stone-700 text-stone-300 px-2 py-1 rounded-full">
+                            {isRetail ? 'Retail' : 'Salon'}
+                        </span>
                     </h1>
                     <p className="text-gray-400 mt-1">Select a category to view reports</p>
                 </div>
@@ -108,37 +209,21 @@ export default function ReportsPage() {
             <div className="mt-8">
                 <h2 className="text-lg font-semibold text-white mb-4">Quick Access</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Link
-                        href="/dashboard/reports/z-report"
-                        className="flex items-center gap-3 bg-gray-800/50 border border-gray-700 rounded-lg p-4 hover:border-green-500/50 transition-colors"
-                    >
-                        <FileText className="w-5 h-5 text-green-400" />
-                        <span className="text-white text-sm">Z-Report</span>
-                    </Link>
-                    <Link
-                        href="/dashboard/reports/sales/cc-batch"
-                        className="flex items-center gap-3 bg-gray-800/50 border border-gray-700 rounded-lg p-4 hover:border-blue-500/50 transition-colors"
-                    >
-                        <CreditCard className="w-5 h-5 text-blue-400" />
-                        <span className="text-white text-sm">CC Batch</span>
-                    </Link>
-                    <Link
-                        href="/dashboard/reports/daily"
-                        className="flex items-center gap-3 bg-gray-800/50 border border-gray-700 rounded-lg p-4 hover:border-purple-500/50 transition-colors"
-                    >
-                        <TrendingUp className="w-5 h-5 text-purple-400" />
-                        <span className="text-white text-sm">Daily Sales</span>
-                    </Link>
-                    <Link
-                        href="/dashboard/reports/inventory/low-stock"
-                        className="flex items-center gap-3 bg-gray-800/50 border border-gray-700 rounded-lg p-4 hover:border-orange-500/50 transition-colors"
-                    >
-                        <Package className="w-5 h-5 text-orange-400" />
-                        <span className="text-white text-sm">Low Stock</span>
-                    </Link>
+                    {quickLinks.map((link) => {
+                        const Icon = link.icon
+                        return (
+                            <Link
+                                key={link.href}
+                                href={link.href}
+                                className={`flex items-center gap-3 bg-gray-800/50 border border-gray-700 rounded-lg p-4 ${link.borderColor} transition-colors`}
+                            >
+                                <Icon className={`w-5 h-5 ${link.color}`} />
+                                <span className="text-white text-sm">{link.label}</span>
+                            </Link>
+                        )
+                    })}
                 </div>
             </div>
         </div>
     )
 }
-

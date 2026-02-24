@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import {
     DollarSign,
@@ -20,11 +20,110 @@ import {
     Scissors,
     Users,
     Clock,
-    Star
+    Star,
+    Package,
+    Cigarette,
+    Ticket
 } from 'lucide-react'
 import Link from 'next/link'
 
-const salesReports = [
+// ─── Retail-specific sales reports ─────────────────────────────────────────
+const retailSalesReports = [
+    {
+        id: 'daily-sales',
+        name: 'Daily Sales / Z-Report',
+        description: 'End of day sales summary with all transactions',
+        icon: FileText,
+        href: '/dashboard/reports/z-report',
+        status: 'available',
+        priority: true
+    },
+    {
+        id: 'cash-card',
+        name: 'Cash vs Card Breakdown',
+        description: 'Revenue split by payment method',
+        icon: CreditCard,
+        href: '/dashboard/reports/sales/cash-card',
+        status: 'available',
+        priority: true
+    },
+    {
+        id: 'sales-by-employee',
+        name: 'Sales by Employee',
+        description: 'Revenue and transaction count per employee',
+        icon: Users,
+        href: '/dashboard/reports/employee/sales',
+        status: 'available',
+        priority: true
+    },
+    {
+        id: 'product-sales',
+        name: 'Product Sales Report',
+        description: 'Top-selling products, units sold, revenue by SKU',
+        icon: Package,
+        href: '/dashboard/reports/sales/products',
+        status: 'available'
+    },
+    {
+        id: 'tobacco-scan',
+        name: 'Tobacco Scan Report',
+        description: 'Age-verified tobacco & nicotine sales log',
+        icon: Cigarette,
+        href: '/dashboard/reports/tobacco-scan',
+        status: 'available'
+    },
+    {
+        id: 'lottery-sales',
+        name: 'Lottery Sales Report',
+        description: 'Ticket sales, pack activity, and lottery payouts',
+        icon: Ticket,
+        href: '/dashboard/reports/lottery',
+        status: 'available'
+    },
+    {
+        id: 'tax-summary',
+        name: 'Tax Summary',
+        description: 'Sales tax collected for filing',
+        icon: Percent,
+        href: '/dashboard/reports/tax',
+        status: 'available'
+    },
+    {
+        id: 'cc-batch',
+        name: 'Credit Card Batch Report',
+        description: 'Transaction time, auth code — for disputes',
+        icon: CreditCard,
+        href: '/dashboard/reports/sales/cc-batch',
+        status: 'coming-soon'
+    },
+    {
+        id: 'refunds-voids',
+        name: 'Refunds & Voids',
+        description: 'Voided transactions and refunds issued',
+        icon: RefreshCw,
+        href: '/dashboard/reports/transactions?filter=refunds',
+        status: 'available'
+    },
+    {
+        id: 'gift-cards',
+        name: 'Gift Card Report',
+        description: 'Sold, redeemed, outstanding balance',
+        icon: Gift,
+        href: '/dashboard/reports/sales/gift-cards',
+        status: 'coming-soon'
+    },
+    {
+        id: 'deals-promotions',
+        name: 'Deals & Promotions',
+        description: 'Active deals performance and savings applied',
+        icon: Tag,
+        href: '/dashboard/reports/deals',
+        status: 'available'
+    },
+]
+
+// ─── Salon-specific sales reports ──────────────────────────────────────────
+const salonSalesReports = [
     {
         id: 'daily-sales',
         name: 'Daily Sales / Z-Report',
@@ -87,7 +186,7 @@ const salesReports = [
     {
         id: 'cc-batch',
         name: 'Credit Card Batch Report',
-        description: 'Transaction time, auth code - for disputes',
+        description: 'Transaction time, auth code — for disputes',
         icon: CreditCard,
         href: '/dashboard/reports/sales/cc-batch',
         status: 'coming-soon'
@@ -109,14 +208,6 @@ const salesReports = [
         status: 'coming-soon'
     },
     {
-        id: 'product-sales',
-        name: 'Product Sales Report',
-        description: 'Retail product sales and top sellers',
-        icon: Receipt,
-        href: '/dashboard/reports/sales/products',
-        status: 'coming-soon'
-    },
-    {
         id: 'tips-report',
         name: 'Tips Report',
         description: 'Tips collected by stylist/employee',
@@ -131,11 +222,23 @@ const salesReports = [
         icon: Tag,
         href: '/dashboard/reports/deals',
         status: 'available'
-    }
+    },
+    {
+        id: 'product-sales',
+        name: 'Product Sales Report',
+        description: 'Retail product sales and top sellers',
+        icon: Receipt,
+        href: '/dashboard/reports/sales/products',
+        status: 'coming-soon'
+    },
 ]
 
 export default function SalesReportsPage() {
     const { data: session } = useSession()
+    const industryType = (session?.user as any)?.industryType || 'SERVICE'
+    const isRetail = industryType === 'RETAIL'
+
+    const salesReports = isRetail ? retailSalesReports : salonSalesReports
     const [searchTerm, setSearchTerm] = useState('')
 
     const filteredReports = salesReports.filter(report =>
@@ -160,8 +263,11 @@ export default function SalesReportsPage() {
                                 <DollarSign className="w-6 h-6 text-white" />
                             </div>
                             Sales Reports
+                            <span className="text-xs font-normal bg-stone-700 text-stone-300 px-2 py-1 rounded-full">
+                                {isRetail ? 'Retail' : 'Salon'}
+                            </span>
                         </h1>
-                        <p className="text-gray-400 mt-1">13 reports available</p>
+                        <p className="text-gray-400 mt-1">{filteredReports.length} reports</p>
                     </div>
                 </div>
 
@@ -188,7 +294,7 @@ export default function SalesReportsPage() {
                         <Link
                             key={report.id}
                             href={isAvailable ? report.href : '#'}
-                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${report.priority
+                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${(report as any).priority
                                 ? 'bg-blue-900/20 border-blue-500/50 hover:border-blue-400'
                                 : isAvailable
                                     ? 'bg-gray-800/50 border-gray-700 hover:border-purple-500/50 hover:bg-gray-800'
@@ -196,13 +302,13 @@ export default function SalesReportsPage() {
                                 }`}
                         >
                             <div className="flex items-center gap-4">
-                                <div className={`p-2 rounded-lg ${report.priority ? 'bg-blue-500/20' : 'bg-gray-700'}`}>
-                                    <Icon className={`w-5 h-5 ${report.priority ? 'text-blue-400' : 'text-gray-400'}`} />
+                                <div className={`p-2 rounded-lg ${(report as any).priority ? 'bg-blue-500/20' : 'bg-gray-700'}`}>
+                                    <Icon className={`w-5 h-5 ${(report as any).priority ? 'text-blue-400' : 'text-gray-400'}`} />
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-medium text-white">{report.name}</h3>
-                                        {report.priority && (
+                                        {(report as any).priority && (
                                             <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">PRIORITY</span>
                                         )}
                                         {!isAvailable && (
@@ -222,4 +328,3 @@ export default function SalesReportsPage() {
         </div>
     )
 }
-
