@@ -302,6 +302,20 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         return user?.[link.permission] === true
     }).map(({ always, permission, industry, compensationFlag, ...link }) => link)
 
+    // OWNER: Retail/Salon store owner - full management access
+    const ownerLinks = [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'POS', href: industryType === 'RETAIL' ? '/dashboard/pos/retail' : '/dashboard/pos/salon', icon: CreditCard },
+        { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag },
+        { name: 'Deals', href: '/dashboard/deals', icon: Tag },
+        { name: 'Employees', href: '/dashboard/employees', icon: Users },
+        { name: 'Customers', href: '/dashboard/customers', icon: UserCircle },
+        { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt },
+        { name: 'Reports', href: '/dashboard/reports', icon: FileText },
+        { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+        { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones },
+    ]
+
     // SUPPORT_STAFF: Support team members - only see support inbox
     const supportStaffLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -316,8 +330,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             ) :
                 session?.user?.role === Role.FRANCHISEE ? franchiseeLinks :
                     session?.user?.role === Role.MANAGER ? managerLinks :
-                        session?.user?.role === 'SUPPORT_STAFF' ? supportStaffLinks :
-                            employeeLinks
+                        session?.user?.role === 'OWNER' ? ownerLinks :
+                            session?.user?.role === 'SUPPORT_STAFF' ? supportStaffLinks :
+                                employeeLinks
 
     return (
         <>

@@ -5348,3 +5348,63 @@ model ApiUsageDaily {
   @@index([date])
 }
 
+// ============ PROMOTIONS & DEALS ============
+
+model Promotion {
+  id          String   @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  
+  name        String
+  description String?
+  type        String   // MIX_MATCH, BOGO, TIERED, PERCENTAGE, FIXED, THRESHOLD
+  discountType String  // PERCENT, FIXED
+  discountValue Float  @default(0)
+  
+  // BOGO / MIX_MATCH fields
+  requiredQty Int?
+  getQty      Int?
+  
+  // Threshold fields
+  minSpend    Float?
+  
+  // Tiered pricing (stored as JSON)
+  priceTiers  Json?
+  
+  // Scheduling
+  startDate   DateTime?
+  endDate     DateTime?
+  timeStart   String?
+  timeEnd     String?
+  daysOfWeek  String?   // JSON array of day strings
+  
+  // Application scope
+  appliesTo   String   @default("ALL")  // ALL, CATEGORY, PRODUCT
+  stackable   Boolean  @default(false)
+  priority    Int      @default(0)
+  maxUsesPerTransaction Int?
+  promoCode   String?
+  
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  qualifyingItems PromotionItem[]
+  
+  @@index([franchiseId])
+  @@index([franchiseId, isActive])
+}
+
+model PromotionItem {
+  id          String   @id @default(cuid())
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  
+  categoryId  String?
+  productId   String?
+  isExcluded  Boolean  @default(false)
+  
+  @@index([promotionId])
+}
+
