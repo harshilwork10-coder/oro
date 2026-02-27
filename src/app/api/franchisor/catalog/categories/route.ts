@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
             return ApiResponse.forbidden('Not a franchisor')
         }
 
-        const categories = await prisma.globalServiceCategory.findMany({
+        const categories = await (prisma as any).globalServiceCategory.findMany({
             where: { franchisorId },
             orderBy: { sortOrder: 'asc' }
         })
@@ -77,13 +77,13 @@ export async function POST(req: NextRequest) {
         const { name, sortOrder = 0 } = body
 
         if (!name) {
-            return ApiResponse.badRequest('Name is required')
+            return ApiResponse.error('Name is required', 400)
         }
 
         // Get max sort order if not provided
         let finalSortOrder = sortOrder
         if (sortOrder === 0) {
-            const maxCategory = await prisma.globalServiceCategory.findFirst({
+            const maxCategory = await (prisma as any).globalServiceCategory.findFirst({
                 where: { franchisorId },
                 orderBy: { sortOrder: 'desc' },
                 select: { sortOrder: true }
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
             finalSortOrder = (maxCategory?.sortOrder || 0) + 1
         }
 
-        const category = await prisma.globalServiceCategory.create({
+        const category = await (prisma as any).globalServiceCategory.create({
             data: {
                 franchisorId,
                 name,

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-// GET: Get owner details with their LLCs
+// GET: Get owner details with their LLCs (Franchisors)
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ ownerId: string }> }
@@ -25,7 +25,6 @@ export async function GET(
                 name: true,
                 email: true,
                 image: true,
-                phone: true,
                 createdAt: true,
             }
         })
@@ -34,41 +33,28 @@ export async function GET(
             return NextResponse.json({ error: 'Owner not found' }, { status: 404 })
         }
 
-        // Get their business memberships separately
-        const memberships = await prisma.franchisorMembership.findMany({
-            where: { userId: ownerId },
+        // Get their businesses (Franchisors) where ownerId matches
+        // FranchisorMembership model doesn't exist in schema — query Franchisor directly
+        const franchisors = await prisma.franchisor.findMany({
+            where: { ownerId },
             include: {
-                franchisor: {
+                franchises: {
                     include: {
-                        config: {
+                        locations: {
                             select: {
-                                subscriptionTier: true,
-                                usesMobileApp: true,
-                                usesOroPulse: true
-                            }
-                        },
-                        franchises: {
-                            include: {
-                                locations: {
-                                    select: {
-                                        id: true,
-                                        _count: {
-                                            select: { users: true }
-                                        }
-                                    }
-                                },
+                                id: true,
                                 _count: {
-                                    select: { locations: true }
+                                    select: { users: true }
                                 }
                             }
+                        },
+                        _count: {
+                            select: { locations: true }
                         }
                     }
                 }
             },
-            orderBy: [
-                { isPrimary: 'desc' },
-                { createdAt: 'asc' }
-            ]
+            orderBy: { createdAt: 'asc' }
         })
 
         // Transform data
@@ -77,40 +63,37 @@ export async function GET(
             name: owner.name,
             email: owner.email,
             image: owner.image,
-            phone: owner.phone,
             createdAt: owner.createdAt,
-            businesses: memberships.map(m => {
-                // Count locations across all franchises
-                const storeCount = m.franchisor.franchises?.reduce(
-                    (sum: number, f: any) => sum + (f._count?.locations || 0), 0
+            businesses: franchisors.map(f => {
+                const storeCount = f.franchises?.reduce(
+                    (sum: number, fr: any) => sum + (fr._count?.locations || 0), 0
                 ) || 0
 
-                // Count employees across all locations in all franchises
-                const employeeCount = m.franchisor.franchises?.reduce(
-                    (sum: number, f: any) => sum + (f.locations?.reduce(
+                const employeeCount = f.franchises?.reduce(
+                    (sum: number, fr: any) => sum + (fr.locations?.reduce(
                         (locSum: number, loc: any) => locSum + (loc._count?.users || 0), 0
                     ) || 0), 0
                 ) || 0
 
                 return {
-                    membershipId: m.id,
-                    role: m.role,
-                    isPrimary: m.isPrimary,
-                    joinedAt: m.createdAt,
+                    membershipId: f.id,
+                    role: 'OWNER',
+                    isPrimary: true,
+                    joinedAt: f.createdAt,
                     llc: {
-                        id: m.franchisor.id,
-                        name: m.franchisor.name,
-                        businessName: m.franchisor.businessName,
-                        businessType: m.franchisor.businessType,
-                        approvalStatus: m.franchisor.approvalStatus,
-                        accountStatus: m.franchisor.accountStatus,
-                        createdAt: m.franchisor.createdAt,
-                        subscriptionTier: m.franchisor.config?.subscriptionTier || 'STARTER',
-                        usesMobileApp: m.franchisor.config?.usesMobileApp || false,
-                        usesOroPulse: m.franchisor.config?.usesOroPulse || false
+                        id: f.id,
+                        name: f.name,
+                        businessName: f.name,
+                        businessType: f.businessType,
+                        approvalStatus: f.approvalStatus,
+                        accountStatus: f.accountStatus,
+                        createdAt: f.createdAt,
+                        subscriptionTier: 'STARTER',
+                        usesMobileApp: false,
+                        usesOroPulse: false
                     },
                     storeCount,
-                    activeStores: storeCount, // All stores considered active
+                    activeStores: storeCount,
                     employeeCount
                 }
             })
@@ -119,7 +102,6 @@ export async function GET(
         return NextResponse.json(result)
     } catch (error) {
         console.error('Error fetching owner:', error)
-        // Return detailed error in development
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         return NextResponse.json({
             error: 'Failed to fetch owner',
@@ -127,4 +109,3 @@ export async function GET(
         }, { status: 500 })
     }
 }
-

@@ -101,29 +101,24 @@ async function buildAudience(locationId: string, audienceType: string): Promise<
     // Filter based on audience type
     switch (audienceType) {
         case 'INACTIVE_35':
-            // Customers inactive 35+ days
             whereClause.lastVisit = { lt: thirtyFiveDaysAgo }
             break
         case 'NEW_14':
-            // New customers in last 14 days
             whereClause.createdAt = { gte: fourteenDaysAgo }
             break
         case 'VIP':
-            // Top spenders (top 20%)
-            whereClause.lifetimeValue = { gte: 500 } // Example threshold
+            whereClause.lifetimeValue = { gte: 500 }
             break
         case 'REBOOK':
-            // Visited in last 7 days (for rebook incentive)
             whereClause.lastVisit = { gte: sevenDaysAgo }
             break
         case 'ALL':
         case 'CUSTOM':
         default:
-            // All active customers with phone
             break
     }
 
-    const clients = await prisma.client.findMany({
+    const clients = await (prisma as any).client.findMany({
         where: whereClause,
         select: {
             id: true,
@@ -134,17 +129,17 @@ async function buildAudience(locationId: string, audienceType: string): Promise<
             marketingConsent: true,
             consentTimestamp: true
         },
-        take: 5000 // Safety limit
+        take: 5000
     })
 
     // Get opted out phones
-    const optOuts = await prisma.smsOptOut.findMany({
+    const optOuts = await (prisma as any).smsOptOut.findMany({
         select: { phone: true }
     })
-    const optOutSet = new Set(optOuts.map(o => o.phone))
+    const optOutSet = new Set(optOuts.map((o: any) => o.phone))
 
     // Get recent sends for frequency check
-    const recentSends = await prisma.smsUsageLedger.findMany({
+    const recentSends = await (prisma as any).smsUsageLedger.findMany({
         where: {
             locationId,
             messageType: 'PROMO',
@@ -153,11 +148,11 @@ async function buildAudience(locationId: string, audienceType: string): Promise<
         },
         select: { phone: true }
     })
-    const recentSendSet = new Set(recentSends.map(s => s.phone))
+    const recentSendSet = new Set(recentSends.map((s: any) => s.phone))
 
     // Get delivery failures
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    const failures = await prisma.smsUsageLedger.groupBy({
+    const failures = await (prisma as any).smsUsageLedger.groupBy({
         by: ['phone'],
         where: {
             locationId,
@@ -166,9 +161,9 @@ async function buildAudience(locationId: string, audienceType: string): Promise<
         },
         _count: { id: true }
     })
-    const failureMap = new Map(failures.map(f => [f.phone, f._count.id]))
+    const failureMap = new Map(failures.map((f: any) => [f.phone, f._count.id]))
 
-    return clients.map(client => ({
+    return clients.map((client: any) => ({
         customerId: client.id,
         phone: client.phone!,
         name: `${client.firstName || ''} ${client.lastName || ''}`.trim(),

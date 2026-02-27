@@ -54,7 +54,7 @@ export async function PUT(request: NextRequest) {
 
         // Validation: Brand Code (simple check)
         if (data.brandCode && data.brandCode.length < 3) {
-            return ApiResponse.badRequest("Brand code must be at least 3 characters")
+            return ApiResponse.error('Brand code must be at least 3 characters', 400)
         }
 
         // Get franchisor details
@@ -76,7 +76,7 @@ export async function PUT(request: NextRequest) {
                 where: { brandCode: data.brandCode }
             })
             if (existing) {
-                return ApiResponse.badRequest("Brand code is already taken")
+                return ApiResponse.error('Brand code is already taken', 400)
             }
         }
 

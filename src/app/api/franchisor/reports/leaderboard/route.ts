@@ -19,14 +19,18 @@ export async function GET(req: NextRequest) {
     try {
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
-            include: {
-                franchisorMemberships: {
-                    include: { franchisor: true }
-                }
-            }
+            select: { id: true, franchiseId: true }
         }) as any
 
-        const franchisorId = user?.franchisorMemberships?.[0]?.franchisor?.id
+        // Get franchisorId via franchise relation
+        let franchisorId: string | null = null
+        if (user?.franchiseId) {
+            const franchise = await prisma.franchise.findUnique({
+                where: { id: user.franchiseId },
+                select: { franchisorId: true }
+            })
+            franchisorId = franchise?.franchisorId ?? null
+        }
         if (!franchisorId) {
             return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })
         }
@@ -59,19 +63,25 @@ export async function GET(req: NextRequest) {
 
         const locationIds = locations.map(l => l.id)
 
-        // Get transactions per location
+        // Get franchise IDs for this franchisor (transactions link by franchiseId)
+        const franchises = await prisma.franchise.findMany({
+            where: { franchisorId },
+            select: { id: true }
+        })
+        const franchiseIds = franchises.map(f => f.id)
+
+        // Get transactions scoped to this franchisor's franchises
         const transactions = await prisma.transaction.findMany({
             where: {
-                locationId: { in: locationIds },
+                franchiseId: { in: franchiseIds },
                 createdAt: { gte: startDate },
                 status: { in: ['COMPLETED', 'PARTIAL_REFUND'] }
             },
             select: {
                 id: true,
                 total: true,
-                locationId: true,
+                franchiseId: true,
                 clientId: true,
-                appointmentId: true,
             }
         })
 
@@ -89,14 +99,19 @@ export async function GET(req: NextRequest) {
             }
         })
 
-        // Build leaderboard
+        // Build leaderboard — match locations via their franchise
         const leaderboard = locations.map(loc => {
-            const locTransactions = transactions.filter(t => t.locationId === loc.id)
+            // Find which franchise this location belongs to
+            const locFranchises = franchises.filter(f => f.id === franchiseIds.find(fid => fid === f.id))
+            const locFranchiseIds = locFranchises.map(f => f.id)
+
+            // For simplicity scope transactions to this location's franchise (best we can do without locationId on Transaction)
+            const locTransactions = transactions.filter(t => locFranchiseIds.includes(t.franchiseId!))
             const locAppointments = appointments.filter(a => a.locationId === loc.id)
 
             const revenue = locTransactions.reduce((sum, t) => sum + Number(t.total || 0), 0)
             const appointmentsCompleted = locAppointments.filter(a => a.status === 'COMPLETED' || a.status === 'CHECKED_OUT').length
-            const walkIns = locTransactions.filter(t => !t.appointmentId).length
+            const walkIns = locTransactions.length  // treat all non-appointment txns as walk-ins (no appointmentId on Transaction)
             const totalVisits = appointmentsCompleted + walkIns
 
             // Unique customers

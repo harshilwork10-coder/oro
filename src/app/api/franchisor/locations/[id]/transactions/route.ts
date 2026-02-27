@@ -41,8 +41,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '50'), 200);
         const format = searchParams.get('format'); // json, csv
 
+        // Get location's franchiseId (transactions linked by franchise)
+        const location = await prisma.location.findUnique({
+            where: { id: locationId },
+            select: { franchiseId: true, name: true }
+        });
+        if (!location) {
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 });
+        }
+
         const where: Record<string, unknown> = {
-            storeId: locationId,
+            franchiseId: location.franchiseId,
             ...(from && to && { createdAt: { gte: new Date(from), lte: new Date(to) } }),
             ...(type && { type: { in: type.split(',') } }),
             ...(paymentMethod && { paymentMethod: { in: paymentMethod.split(',') } }),
@@ -53,10 +62,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             prisma.transaction.findMany({
                 where,
                 include: {
-                    employee: { select: { id: true, name: true } },
-                    customer: { select: { id: true, firstName: true, lastName: true } },
                     lineItems: {
-                        select: { id: true, name: true, quantity: true, price: true, total: true }
+                        select: { id: true, quantity: true, price: true, total: true }
                     }
                 },
                 orderBy: { createdAt: 'desc' },
@@ -81,10 +88,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                 tx.type || 'SALE',
                 tx.status || '',
                 Number(tx.total).toFixed(2),
-                Number(tx.tipAmount || 0).toFixed(2),
+                Number(tx.tip || 0).toFixed(2),
                 tx.paymentMethod || '',
-                tx.employee?.name || '',
-                tx.customer ? `${tx.customer.firstName} ${tx.customer.lastName}` : '',
+                tx.employeeId || '',
+                tx.clientId || '',
                 tx.originalTransactionId || ''
             ].join(','));
 
@@ -112,10 +119,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                 total: Number(tx.total),
                 subtotal: Number(tx.subtotal || 0),
                 tax: Number(tx.tax || 0),
-                tipAmount: Number(tx.tipAmount || 0),
+                tip: Number(tx.tip || 0),
                 paymentMethod: tx.paymentMethod,
-                employee: tx.employee,
-                customer: tx.customer,
+                employeeId: tx.employeeId,
+                clientId: tx.clientId,
                 lineItems: tx.lineItems,
                 originalTransactionId: tx.originalTransactionId
             })),

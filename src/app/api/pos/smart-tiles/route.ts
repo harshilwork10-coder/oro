@@ -99,20 +99,26 @@ export async function GET(req: NextRequest) {
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
         const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000)
 
-        // 1. Get NOW/NEXT appointments
+        // 1. Get NOW/NEXT appointments - need to find locationIds for this franchise
+        const franchiseLocations = await prisma.location.findMany({
+            where: { franchise: { franchisorId: franchiseId } },
+            select: { id: true }
+        })
+        const locationIds = franchiseLocations.map(l => l.id)
+
         const upcomingAppointments = await prisma.appointment.findMany({
             where: {
-                franchiseId,
+                locationId: { in: locationIds },
                 startTime: {
-                    gte: new Date(now.getTime() - 30 * 60 * 1000), // 30 min ago (for late)
+                    gte: new Date(now.getTime() - 30 * 60 * 1000),
                     lte: twoHoursLater
                 },
-                status: { in: ['PENDING', 'CONFIRMED'] }
+                status: { in: ['PENDING', 'CONFIRMED', 'SCHEDULED'] }
             },
             include: {
                 client: { select: { firstName: true, lastName: true, phone: true } },
-                staff: { select: { name: true } },
-                services: { include: { service: { select: { name: true } } } }
+                employee: { select: { name: true } },
+                service: { select: { name: true } }
             },
             orderBy: { startTime: 'asc' },
             take: 5
@@ -135,8 +141,8 @@ export async function GET(req: NextRequest) {
                 customer: nextApt.client
                     ? `${nextApt.client.firstName} ${nextApt.client.lastName || ''}`.trim()
                     : 'Walk-in',
-                services: nextApt.services.map(s => s.service.name),
-                stylist: nextApt.staff?.name,
+                services: [nextApt.service.name],
+                stylist: nextApt.employee?.name || undefined,
                 isLate
             }
 
@@ -292,8 +298,8 @@ export async function GET(req: NextRequest) {
             customer: apt.client
                 ? `${apt.client.firstName} ${apt.client.lastName || ''}`.trim()
                 : 'Walk-in',
-            services: apt.services.map(s => s.service.name),
-            stylist: apt.staff?.name,
+            services: [apt.service.name],
+            stylist: apt.employee?.name,
             status: apt.status,
             isLate: new Date(apt.startTime) < now
         }))

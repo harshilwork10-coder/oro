@@ -89,14 +89,14 @@ export async function POST(req: NextRequest) {
 
         for (const tx of transactions) {
             try {
-                // IDEMPOTENCY: Use a receipt number based on offlineId to prevent duplicates
-                const receiptNumber = `OFF-${tx.offlineId.substring(0, 12)}`
+                // IDEMPOTENCY: Use an invoice number based on offlineId to prevent duplicates
+                const invoiceNum = `OFF-${tx.offlineId.substring(0, 12)}`
 
                 // Check if already exists
                 const existing = await prisma.transaction.findFirst({
                     where: {
                         franchiseId,
-                        receiptNumber
+                        invoiceNumber: invoiceNum
                     }
                 })
 
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
                         offlineId: tx.offlineId,
                         status: 'skipped',
                         serverId: existing.id,
-                        receiptNumber: existing.receiptNumber || undefined
+                        receiptNumber: existing.invoiceNumber || undefined
                     })
                     skipped++
                     continue
@@ -116,14 +116,13 @@ export async function POST(req: NextRequest) {
                 const created = await prisma.transaction.create({
                     data: {
                         franchiseId,
-                        locationId: locationId || undefined,
                         subtotal: tx.subtotal,
-                        taxAmount: tx.tax,
+                        tax: tx.tax,
                         total: tx.total,
                         tip: tx.tip || 0,
                         paymentMethod: tx.paymentMethod,
                         status: 'COMPLETED',
-                        receiptNumber,
+                        invoiceNumber: invoiceNum,
                         clientId: tx.customerId || undefined,
                         cashDrawerSessionId: tx.shiftId || undefined,
                         createdAt: new Date(tx.createdAt),
@@ -150,7 +149,7 @@ export async function POST(req: NextRequest) {
                     offlineId: tx.offlineId,
                     status: 'synced',
                     serverId: created.id,
-                    receiptNumber: created.receiptNumber || undefined
+                    receiptNumber: created.invoiceNumber || undefined
                 })
                 synced++
 
@@ -204,14 +203,14 @@ export async function GET(req: NextRequest) {
         const recentTransactions = await prisma.transaction.findMany({
             where: {
                 franchiseId,
-                receiptNumber: { startsWith: 'OFF-' },
+                invoiceNumber: { startsWith: 'OFF-' },
                 createdAt: {
                     gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
                 }
             },
             select: {
                 id: true,
-                receiptNumber: true,
+                invoiceNumber: true,
                 total: true,
                 status: true,
                 createdAt: true

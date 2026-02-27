@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
+import { classifyItem } from '@/lib/itemClassifier'
 import { useRouter } from 'next/navigation'
 import {
     Search, Plus, Save, Copy, Trash2, Package,
@@ -201,48 +202,8 @@ export default function RetailInventoryPage() {
 
             setSKULookupResult(data)
 
-            // Intelligent category matching based on product name and category from API
-            const findBestCategory = (apiCategory?: string, productName?: string) => {
-                const searchTerms = [apiCategory, productName].filter(Boolean).join(' ').toLowerCase()
-
-                // Category mapping rules - ORDER MATTERS! More specific first
-                const categoryMappings: { keywords: string[], categoryNames: string[] }[] = [
-                    { keywords: ['wine', 'champagne', 'prosecco', 'merlot', 'cabernet', 'chardonnay', 'pinot', 'riesling', 'sauvignon'], categoryNames: ['wine', 'liquor', 'spirits'] },
-                    { keywords: ['beer', 'ale', 'lager', 'ipa', 'stout', 'pilsner', 'malt'], categoryNames: ['beer'] },
-                    { keywords: ['bourbon', 'whiskey', 'whisky', 'vodka', 'rum', 'tequila', 'gin', 'brandy', 'cognac', 'scotch', 'spirits', 'liqueur'], categoryNames: ['liquor', 'spirits'] },
-                    { keywords: ['soda', 'cola', 'pepsi', 'sprite', 'fanta', 'beverage', 'drink', 'juice', 'water', 'energy'], categoryNames: ['beverages', 'drinks', 'soda'] },
-                    { keywords: ['chips', 'snack', 'crackers', 'cookies', 'candy', 'chocolate'], categoryNames: ['snacks', 'candy', 'food'] },
-                    { keywords: ['cigarette', 'cigar', 'tobacco', 'vape', 'nicotine'], categoryNames: ['tobacco', 'cigarettes'] },
-                ]
-
-                for (const mapping of categoryMappings) {
-                    if (mapping.keywords.some(kw => searchTerms.includes(kw))) {
-                        const matchedCat = categories.find(cat =>
-                            mapping.categoryNames.some(name => cat.name.toLowerCase().includes(name))
-                        )
-                        if (matchedCat) return matchedCat.id
-                    }
-                }
-
-                return categories[0]?.id || null
-            }
-
-            // Detect product type from name/category
-            const detectProductType = (apiCategory?: string, productName?: string) => {
-                const searchTerms = [apiCategory, productName].filter(Boolean).join(' ').toLowerCase()
-
-                if (searchTerms.includes('bourbon')) return 'Bourbon'
-                if (searchTerms.includes('whiskey') || searchTerms.includes('whisky')) return 'Whiskey'
-                if (searchTerms.includes('vodka')) return 'Vodka'
-                if (searchTerms.includes('rum')) return 'Rum'
-                if (searchTerms.includes('tequila')) return 'Tequila'
-                if (searchTerms.includes('gin')) return 'Gin'
-                if (searchTerms.includes('wine')) return 'Wine'
-                if (searchTerms.includes('beer') || searchTerms.includes('lager') || searchTerms.includes('ale')) return 'Beer'
-                if (searchTerms.includes('energy')) return 'Energy Drink'
-                if (searchTerms.includes('soda') || searchTerms.includes('cola')) return 'Soda'
-                return null
-            }
+            // Intelligent category + type detection via shared classifier
+            const { categoryId: autoCategory, productType: detectedType } = classifyItem(data.name, data.category, categories)
 
             // Build a proper product name: Brand + Product + Size
             const buildProductName = (apiName?: string, brand?: string, size?: string, productType?: string) => {
@@ -275,8 +236,6 @@ export default function RetailInventoryPage() {
                 return name.trim()
             }
 
-            const detectedType = detectProductType(data.category, data.name)
-
             // Create new product with AI-filled data
             const newProduct: Product = {
                 id: 'new',
@@ -287,7 +246,7 @@ export default function RetailInventoryPage() {
                 cost: null,
                 stock: 0,
                 reorderPoint: null,
-                categoryId: data.found ? findBestCategory(data.category, data.name) : categories[0]?.id || null,
+                categoryId: data.found ? autoCategory : categories[0]?.id || null,
                 category: data.found ? data.category || null : null,
                 brand: data.found ? data.brand || null : null,
                 vendor: null,

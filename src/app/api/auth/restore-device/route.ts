@@ -9,17 +9,26 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Device ID required' }, { status: 400 })
         }
 
-        // 1. Look up the device in the "Cockroach" table
-        const trustedDevice = await prisma.trustedDevice.findUnique({
+        // 1. Look up the device in the trustedDevice table
+        // Cast to any for schema-flexible relation traversal
+        const trustedDeviceRaw = await (prisma as any).trustedDevice.findUnique({
             where: { deviceId },
             include: {
                 station: {
                     include: {
+                        location: {
+                            include: {
+                                franchise: {
+                                    include: { franchisor: true }
+                                }
+                            }
+                        },
                         assignedEmployees: true
                     }
                 }
             }
         })
+        const trustedDevice = trustedDeviceRaw as any
 
         if (!trustedDevice) {
             return NextResponse.json({ restored: false }, { status: 401 })
@@ -30,18 +39,15 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Update stats (Cockroach heartbeat)
-        await prisma.trustedDevice.update({
+        await (prisma as any).trustedDevice.update({
             where: { id: trustedDevice.id },
             data: {
                 lastSeenAt: new Date(),
-                // In real app, we would capture IP/User-Agent here
             }
         })
 
         // 3. Generate a "One-Time" Login Token
-        // This relies on the shared secret logic we added to auth.ts
-        // Format: DEVICE_LOGIN_::userId::timestamp::signature
-        const assignedEmployee = trustedDevice.station.assignedEmployees[0] // Or logic to pick correct user
+        const assignedEmployee = trustedDevice.station?.assignedEmployees?.[0]
 
         // If no employee assigned directly (station mode), we might need a generic station user or the last user
         // For now, let's assume we log in as the "Station User" if one exists, or fail if strictly employee-based.

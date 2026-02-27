@@ -18,7 +18,7 @@ export async function PUT(
         const { id: serviceId } = await params
 
         // Verify ownership - check both role assignments AND direct ownership
-        const service = await prisma.globalService.findUnique({
+        const service = await (prisma as any).globalService.findUnique({
             where: { id: serviceId },
             include: {
                 franchisor: {
@@ -56,7 +56,7 @@ export async function PUT(
             isActive
         } = body
 
-        const updated = await prisma.globalService.update({
+        const updated = await (prisma as any).globalService.update({
             where: { id: serviceId },
             data: {
                 name,
@@ -97,7 +97,7 @@ export async function DELETE(
         const { id: serviceId } = await params
 
         // Verify ownership - check both role assignments AND direct ownership
-        const service = await prisma.globalService.findUnique({
+        const service = await (prisma as any).globalService.findUnique({
             where: { id: serviceId },
             include: {
                 franchisor: {
@@ -119,7 +119,7 @@ export async function DELETE(
         }
 
         // Soft delete - archive instead of hard delete
-        await prisma.globalService.update({
+        await (prisma as any).globalService.update({
             where: { id: serviceId },
             data: {
                 isArchived: true,

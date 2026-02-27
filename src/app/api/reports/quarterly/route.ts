@@ -49,12 +49,9 @@ export async function GET(request: NextRequest) {
                 total: true,
                 subtotal: true,
                 tax: true,
-                tipAmount: true,
+                tip: true,
                 paymentMethod: true,
-                createdAt: true,
-                employee: {
-                    select: { name: true }
-                }
+                createdAt: true
             }
         })
 
@@ -86,7 +83,7 @@ export async function GET(request: NextRequest) {
         transactions.forEach(tx => {
             const total = Number(tx.total) || 0
             totalSales += total
-            tips += Number(tx.tipAmount) || 0
+            tips += Number(tx.tip) || 0
             taxCollected += Number(tx.tax) || 0
 
             if (tx.paymentMethod === 'CASH') {

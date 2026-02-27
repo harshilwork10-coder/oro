@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
@@ -37,7 +37,11 @@ import {
     Maximize,
     Lock,
     Eye,
-    EyeOff
+    EyeOff,
+    ChevronLeft,
+    ChevronRight,
+    Grid3X3,
+    MoreHorizontal
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useBusinessConfig } from '@/hooks/useBusinessConfig'
@@ -192,6 +196,43 @@ export default function RetailPOSPage() {
     const [selectedCategory, setSelectedCategory] = useState<string>('')
     const [categoryProducts, setCategoryProducts] = useState<any[]>([])
 
+    // ========== CRE-STYLE LAYOUT STATE ==========
+    const [layoutConfig, setLayoutConfig] = useState<any>(null)
+    const [productCache, setProductCache] = useState<Map<string, any[]>>(new Map())
+    const [productPage, setProductPage] = useState(1)
+    const [productTotal, setProductTotal] = useState(0)
+    const [showMoreDepts, setShowMoreDepts] = useState(false)
+    const [deptSearch, setDeptSearch] = useState('')
+    const [activeQuickFilter, setActiveQuickFilter] = useState<string>('ALL')
+    const [loadingProducts, setLoadingProducts] = useState(false)
+    const PRODUCTS_PER_PAGE = 20
+
+    // Pinned category IDs from layout config (or fallback first 10)
+    const pinnedCategories = useMemo(() => {
+        if (layoutConfig?.pinnedCategoryIds?.length > 0) {
+            return layoutConfig.pinnedCategoryIds
+                .map((id: string) => categories.find(c => c.id === id))
+                .filter(Boolean)
+        }
+        // Fallback: first 10 categories
+        return categories.slice(0, 10)
+    }, [layoutConfig, categories])
+
+    // Quick filters for current category
+    const currentQuickFilters = useMemo(() => {
+        if (!selectedCategory || !layoutConfig?.quickFilters) return []
+        return layoutConfig.quickFilters[selectedCategory] || []
+    }, [selectedCategory, layoutConfig])
+
+    // Category overrides (colors/icons)
+    const getCategoryStyle = useCallback((catId: string) => {
+        const overrides = layoutConfig?.categoryOverrides?.[catId]
+        return {
+            color: overrides?.color || '#57534e', // stone-600 default
+            icon: overrides?.icon || '📦'
+        }
+    }, [layoutConfig])
+
     // SMS Receipt Modal
     const [showReceiptModal, setShowReceiptModal] = useState(false)
     const [pendingReceiptData, setPendingReceiptData] = useState<any>(null)
@@ -236,6 +277,130 @@ export default function RetailPOSPage() {
         document.addEventListener('keydown', handleKeyDown)
         return () => document.removeEventListener('keydown', handleKeyDown)
     }, [])
+
+    // ========== CRE DATA FETCHING ==========
+
+    // Fetch categories on mount
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const res = await fetch('/api/inventory/categories?take=200')
+                if (res.ok) {
+                    const data = await res.json()
+                    const items = data?.data || data?.categories || data || []
+                    setCategories(Array.isArray(items) ? items : [])
+                }
+            } catch (e) { console.error('[CRE] Failed to fetch categories:', e) }
+        }
+        fetchCategories()
+    }, [])
+
+    // Fetch layout config on mount
+    useEffect(() => {
+        const fetchLayout = async () => {
+            try {
+                const res = await fetch('/api/pos/retail/layout')
+                if (res.ok) {
+                    const data = await res.json()
+                    setLayoutConfig(data?.data?.config || null)
+                }
+            } catch (e) { console.error('[CRE] Failed to fetch layout:', e) }
+        }
+        fetchLayout()
+    }, [])
+
+    // Fetch top sellers on mount (for ALL tab)
+    useEffect(() => {
+        const fetchTopSellers = async () => {
+            try {
+                const res = await fetch('/api/pos/retail/top-sellers')
+                if (res.ok) {
+                    const data = await res.json()
+                    const items = data?.data || data?.products || data || []
+                    setFavorites(Array.isArray(items) ? items.slice(0, 20) : [])
+                }
+            } catch (e) { console.error('[CRE] Failed to fetch top sellers:', e) }
+        }
+        fetchTopSellers()
+    }, [])
+
+    // Fetch products when category or page changes
+    useEffect(() => {
+        if (!selectedCategory) {
+            setCategoryProducts([])
+            return
+        }
+
+        // Check cache first (page 1 only)
+        const cacheKey = `${selectedCategory}:${activeQuickFilter}`
+        if (productPage === 1 && productCache.has(cacheKey)) {
+            setCategoryProducts(productCache.get(cacheKey) || [])
+            return
+        }
+
+        const controller = new AbortController()
+        const fetchProducts = async () => {
+            setLoadingProducts(true)
+            try {
+                const skip = (productPage - 1) * PRODUCTS_PER_PAGE
+                let url = `/api/inventory/products?categoryId=${selectedCategory}&take=${PRODUCTS_PER_PAGE}&skip=${skip}`
+
+                // Apply keyword filter if active
+                if (activeQuickFilter !== 'ALL' && currentQuickFilters.length > 0) {
+                    const filter = currentQuickFilters.find((f: any) => f.label === activeQuickFilter)
+                    if (filter?.keywords?.length > 0) {
+                        url += `&search=${encodeURIComponent(filter.keywords.join(' '))}`
+                    }
+                }
+
+                const res = await fetch(url, { signal: controller.signal })
+                if (res.ok) {
+                    const data = await res.json()
+                    const items = data?.data || data?.products || data || []
+                    const products = Array.isArray(items) ? items : []
+                    setCategoryProducts(products)
+                    setProductTotal(data?.total || data?.pagination?.total || products.length)
+
+                    // Cache page 1
+                    if (productPage === 1) {
+                        setProductCache(prev => new Map(prev).set(cacheKey, products))
+                    }
+                }
+            } catch (e: any) {
+                if (e.name !== 'AbortError') console.error('[CRE] Failed to fetch products:', e)
+            } finally {
+                setLoadingProducts(false)
+            }
+        }
+        fetchProducts()
+        return () => controller.abort()
+    }, [selectedCategory, productPage, activeQuickFilter])
+
+    // Handle department selection
+    const selectDepartment = useCallback((catId: string) => {
+        setSelectedCategory(catId)
+        setProductPage(1)
+        setActiveQuickFilter('ALL')
+    }, [])
+
+    // Handle product tap → add to cart
+    const handleProductTap = useCallback((product: any) => {
+        addToCart({
+            id: product.id,
+            name: product.name,
+            price: Number(product.price || product.cashPrice || 0),
+            barcode: product.barcode,
+            sku: product.sku,
+            cashPrice: product.cashPrice ? Number(product.cashPrice) : undefined,
+            cardPrice: product.cardPrice ? Number(product.cardPrice) : undefined,
+            ageRestricted: product.ageRestricted || product.productCategory?.ageRestricted || false,
+            minimumAge: product.minimumAge || product.productCategory?.minimumAge || null,
+            isEbtEligible: product.isEbtEligible || product.productCategory?.isEbtEligible || false,
+        })
+        setToast({ message: `Added: ${product.name}`, type: 'success' })
+    }, [])
+
+    const totalPages = Math.max(1, Math.ceil(productTotal / PRODUCTS_PER_PAGE))
 
     // ===== KIOSK MODE FEATURES =====
     const [isFullscreen, setIsFullscreen] = useState(false)
@@ -1424,20 +1589,6 @@ export default function RetailPOSPage() {
                         />
                     </div>
 
-                    {/* Category Filter Dropdown */}
-                    <select
-                        value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
-                        className={`bg-stone-800 border border-stone-700 rounded-lg text-sm focus:outline-none focus:border-orange-500 ${compactMode ? 'py-2 px-2' : 'py-3 px-3'} ${selectedCategory ? 'text-orange-400' : 'text-stone-400'}`}
-                    >
-                        <option value="">All Depts</option>
-                        {categories.map((cat) => (
-                            <option key={cat.id} value={cat.id}>
-                                {cat.name}
-                            </option>
-                        ))}
-                    </select>
-
                     {/* Quantity Input */}
                     <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 rounded-lg px-3 py-2">
                         <span className="text-stone-400 text-sm">Qty:</span>
@@ -1534,196 +1685,187 @@ export default function RetailPOSPage() {
                 />
             </div>
 
-            {/* Tag-Along Suggestions Bar (Cross-sell) */}
-            {tagAlongItems.length > 0 && (
-                <div className="px-4 py-2 bg-gradient-to-r from-amber-900/30 to-orange-900/30 border-b border-amber-700/50">
-                    <div className="flex items-center gap-3">
-                        <span className="text-amber-400 text-sm font-medium whitespace-nowrap">
-                            💡 Customers also buy:
-                        </span>
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+
+            {/* ========== CRE-STYLE DEPARTMENT TABS + PRODUCT GRID ========== */}
+
+            {/* Main Content - 2 Column: Product Grid (left) + Cart (right) */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* LEFT SIDE - Department Tabs + Product Grid */}
+                <div className="flex-1 flex flex-col border-r border-stone-800 min-w-0">
+
+                    {/* Department Tab Bar */}
+                    <div className="flex items-center gap-1 px-2 py-1.5 bg-stone-900/80 border-b border-stone-800 overflow-x-auto flex-shrink-0">
+                        {/* ALL (Top Sellers) */}
+                        <button
+                            onClick={() => selectDepartment('')}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${!selectedCategory
+                                ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/30'
+                                : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+                                }`}
+                        >
+                            <span>⭐</span>
+                            <span>ALL</span>
+                        </button>
+
+                        {/* Pinned Department Tabs */}
+                        {pinnedCategories.map((cat: any) => {
+                            const style = getCategoryStyle(cat.id)
+                            const isActive = selectedCategory === cat.id
+                            return (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => selectDepartment(cat.id)}
+                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${isActive
+                                        ? 'text-white shadow-lg'
+                                        : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+                                        }`}
+                                    style={isActive ? { backgroundColor: style.color, boxShadow: `0 4px 14px ${style.color}40` } : {}}
+                                >
+                                    <span className="text-base">{style.icon}</span>
+                                    <span className="hidden sm:inline">{cat.name}</span>
+                                    <span className="sm:hidden">{cat.name.slice(0, 6)}</span>
+                                </button>
+                            )
+                        })}
+
+                        {/* MORE Button */}
+                        {categories.length > pinnedCategories.length && (
+                            <button
+                                onClick={() => { setShowMoreDepts(true); setDeptSearch('') }}
+                                className="flex items-center gap-1 px-3 py-2 bg-stone-800 hover:bg-stone-700 rounded-lg text-sm font-medium text-stone-400 whitespace-nowrap transition-colors flex-shrink-0"
+                            >
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span>MORE</span>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Quick Filter Row (shown when category has filters configured) */}
+                    {selectedCategory && currentQuickFilters.length > 0 && (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-stone-900/50 border-b border-stone-800 overflow-x-auto flex-shrink-0">
+                            <button
+                                onClick={() => { setActiveQuickFilter('ALL'); setProductPage(1) }}
+                                className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all ${activeQuickFilter === 'ALL'
+                                    ? 'bg-orange-500 text-white'
+                                    : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                    }`}
+                            >
+                                ALL
+                            </button>
+                            {currentQuickFilters.map((filter: any, idx: number) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => { setActiveQuickFilter(filter.label); setProductPage(1) }}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all ${activeQuickFilter === filter.label
+                                        ? 'bg-orange-500 text-white'
+                                        : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                        }`}
+                                >
+                                    {filter.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Tag-Along Suggestions Bar (inline) */}
+                    {tagAlongItems.length > 0 && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-900/20 to-orange-900/20 border-b border-amber-700/30 overflow-x-auto flex-shrink-0">
+                            <span className="text-amber-400 text-xs font-medium whitespace-nowrap">💡 Also buy:</span>
                             {tagAlongItems.map((item) => (
                                 <button
                                     key={item.id}
                                     onClick={() => {
-                                        addToCart({
-                                            id: item.id,
-                                            name: item.name,
-                                            price: item.price,
-                                            barcode: item.barcode,
-                                            sku: item.sku
-                                        })
+                                        addToCart({ id: item.id, name: item.name, price: item.price, barcode: item.barcode, sku: item.sku })
                                         setToast({ message: `Added: ${item.name}`, type: 'success' })
                                     }}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-600/50 rounded-full text-sm whitespace-nowrap transition-colors"
+                                    className="flex items-center gap-1 px-2 py-1 bg-amber-600/20 hover:bg-amber-600/40 border border-amber-600/30 rounded text-xs whitespace-nowrap transition-colors"
                                 >
                                     <span>{item.name}</span>
-                                    <span className="text-amber-300 font-medium">
-                                        {formatCurrency(Number(item.price))}
-                                    </span>
-                                    <span className="text-xs bg-amber-500/50 px-1.5 py-0.5 rounded">+ADD</span>
+                                    <span className="text-amber-300 font-medium">{formatCurrency(Number(item.price))}</span>
                                 </button>
                             ))}
-                        </div>
-                        <button
-                            onClick={() => setTagAlongItems([])}
-                            className="text-stone-500 hover:text-stone-300 ml-auto"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Favorites Bar (Top Sellers Quick Buttons) */}
-            {favorites.length > 0 && !selectedCategory && (
-                <div className="px-4 py-2 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-b border-purple-700/50">
-                    <div className="flex items-center gap-3">
-                        <span className="text-purple-400 text-sm font-medium whitespace-nowrap">
-                            ⭐ Quick:
-                        </span>
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                            {favorites.map((item) => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => {
-                                        addToCart({
-                                            id: item.id,
-                                            name: item.name,
-                                            price: item.price,
-                                            barcode: item.barcode
-                                        })
-                                        setToast({ message: `Added: ${item.name}`, type: 'success' })
-                                    }}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-600/50 rounded-lg text-sm whitespace-nowrap transition-colors"
-                                >
-                                    <span className="font-medium">{item.name}</span>
-                                    <span className="text-purple-300 font-medium">
-                                        {formatCurrency(Number(item.price))}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Category Products Grid - Shows when category is selected */}
-            {selectedCategory && categoryProducts.length > 0 && (
-                <div className="bg-gradient-to-r from-orange-900/20 to-amber-900/20 border-b border-orange-700/50 max-h-48 overflow-y-auto">
-                    <div className="px-4 py-2">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-orange-400 text-sm font-medium">
-                                📦 {categories.find(c => c.id === selectedCategory)?.name} ({categoryProducts.length} items)
-                            </span>
-                            <button
-                                onClick={() => setSelectedCategory('')}
-                                className="text-xs text-stone-400 hover:text-white px-2 py-1 bg-stone-800 rounded"
-                            >
-                                Clear Filter
+                            <button onClick={() => setTagAlongItems([])} className="text-stone-500 hover:text-stone-300 ml-auto flex-shrink-0">
+                                <X className="h-3 w-3" />
                             </button>
                         </div>
-                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-                            {categoryProducts.map((product: any) => (
-                                <button
-                                    key={product.id}
-                                    onClick={() => {
-                                        addToCart({
-                                            id: product.id,
-                                            name: product.name,
-                                            price: Number(product.price),
-                                            barcode: product.barcode
-                                        })
-                                        setToast({ message: `Added: ${product.name}`, type: 'success' })
-                                    }}
-                                    className="flex flex-col items-center p-2 bg-orange-600/20 hover:bg-orange-600/40 border border-orange-600/30 rounded-lg text-xs transition-colors"
-                                >
-                                    <span className="font-medium text-white truncate w-full text-center">{product.name}</span>
-                                    <span className="text-orange-300 font-bold">{formatCurrency(Number(product.price))}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
+                    )}
 
-            {/* Main Content */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Left Side - Item List */}
-                <div className="flex-1 flex flex-col border-r border-stone-800">
-                    {/* Table Header */}
-                    <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-stone-900 border-b border-stone-800 text-sm font-medium text-stone-400">
-                        <div className="col-span-1">#</div>
-                        <div className="col-span-6">Item Info</div>
-                        <div className="col-span-2 text-center">Quantity</div>
-                        <div className="col-span-2 text-right">Price</div>
-                        <div className="col-span-1"></div>
-                    </div>
-
-                    {/* Item List */}
-                    <div className="flex-1 overflow-y-auto">
-                        {cart.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-stone-500">
-                                <ShoppingCart className="h-16 w-16 mb-4 opacity-20" />
-                                <p className="text-lg">Scan items to begin</p>
-                            </div>
-                        ) : (
-                            cart.map((item, idx) => (
-                                <div
-                                    key={idx}
-                                    onClick={() => setSelectedItemIndex(idx)}
-                                    className={`grid grid-cols-12 gap-2 px-4 py-3 border-b border-stone-800 cursor-pointer transition-colors ${selectedItemIndex === idx
-                                        ? 'bg-orange-500/20 border-l-4 border-l-orange-500'
-                                        : 'hover:bg-stone-900'
-                                        }`}
-                                >
-                                    <div className="col-span-1 text-stone-500 font-mono">{idx + 1}</div>
-                                    <div className="col-span-6">
-                                        <p className="font-medium">{item.name}</p>
-                                        <div className="flex items-center gap-2 text-xs text-stone-500">
-                                            {item.barcode && <span>BC: {item.barcode}</span>}
-                                            {item.sku && <span>SKU: {item.sku}</span>}
-                                            {item.isEbtEligible && (
-                                                <span className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium">EBT</span>
-                                            )}
-                                            {item.ageRestricted && (
-                                                <span className="text-amber-500">21+</span>
-                                            )}
-                                        </div>
-                                        {item.discount && item.discount > 0 && (
-                                            <span className="text-xs text-orange-400">-{item.discount}% OFF</span>
-                                        )}
-                                    </div>
-                                    <div className="col-span-2 flex items-center justify-center gap-2">
+                    {/* Product Button Grid */}
+                    <div className="flex-1 overflow-y-auto p-2">
+                        {!selectedCategory ? (
+                            /* ALL Tab — Top Sellers / Favorites */
+                            favorites.length > 0 ? (
+                                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                                    {favorites.map((item: any) => (
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); updateQuantity(idx, item.quantity - 1) }}
-                                            className="w-8 h-8 rounded bg-stone-800 hover:bg-stone-700 flex items-center justify-center"
+                                            key={item.id}
+                                            onClick={() => handleProductTap(item)}
+                                            className="flex flex-col items-center justify-center p-2 bg-gradient-to-b from-stone-800 to-stone-850 hover:from-amber-600/30 hover:to-amber-700/20 border border-stone-700 hover:border-amber-500/50 rounded-xl transition-all active:scale-95 min-h-[80px]"
                                         >
-                                            -
+                                            <span className="text-xs font-semibold text-white text-center leading-tight line-clamp-2 mb-1">{item.name}</span>
+                                            <span className="text-sm font-bold text-emerald-400">{formatCurrency(Number(item.price))}</span>
                                         </button>
-                                        <span className="w-10 text-center font-bold">{item.quantity}</span>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); updateQuantity(idx, item.quantity + 1) }}
-                                            className="w-8 h-8 rounded bg-stone-800 hover:bg-stone-700 flex items-center justify-center"
-                                        >
-                                            +
-                                        </button>
-                                    </div>
-                                    <div className="col-span-2 text-right font-medium">
-                                        {formatCurrency(item.price * item.quantity)}
-                                    </div>
-                                    <div className="col-span-1 flex justify-end">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); removeItem(idx) }}
-                                            className="w-8 h-8 rounded bg-red-500/20 hover:bg-red-500/40 text-red-400 flex items-center justify-center transition-colors"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </button>
-                                    </div>
+                                    ))}
                                 </div>
-                            ))
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-stone-500">
+                                    <Grid3X3 className="h-16 w-16 mb-4 opacity-20" />
+                                    <p className="text-lg font-medium">Quick Access Buttons</p>
+                                    <p className="text-sm text-stone-600 mt-1">Select a department above or scan a barcode</p>
+                                </div>
+                            )
+                        ) : (
+                            /* Department Products Grid */
+                            loadingProducts ? (
+                                <div className="flex flex-col items-center justify-center h-full text-stone-500">
+                                    <Loader2 className="h-10 w-10 animate-spin mb-3 text-orange-500" />
+                                    <p className="text-sm">Loading products...</p>
+                                </div>
+                            ) : categoryProducts.length > 0 ? (
+                                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                                    {categoryProducts.map((product: any) => (
+                                        <button
+                                            key={product.id}
+                                            onClick={() => handleProductTap(product)}
+                                            className="flex flex-col items-center justify-center p-2 bg-gradient-to-b from-stone-800 to-stone-850 hover:from-orange-600/30 hover:to-orange-700/20 border border-stone-700 hover:border-orange-500/50 rounded-xl transition-all active:scale-95 min-h-[80px]"
+                                        >
+                                            <span className="text-xs font-semibold text-white text-center leading-tight line-clamp-2 mb-1">{product.name}</span>
+                                            <span className="text-sm font-bold text-emerald-400">{formatCurrency(Number(product.price || product.cashPrice || 0))}</span>
+                                            {product.ageRestricted && <span className="text-[9px] text-amber-400 mt-0.5">21+</span>}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-stone-500">
+                                    <Package className="h-12 w-12 mb-3 opacity-20" />
+                                    <p className="text-sm">No products in this category</p>
+                                </div>
+                            )
                         )}
                     </div>
+
+                    {/* Pagination Bar (only when in a category with products) */}
+                    {selectedCategory && categoryProducts.length > 0 && (
+                        <div className="flex items-center justify-between px-3 py-1.5 bg-stone-900 border-t border-stone-800 flex-shrink-0">
+                            <button
+                                onClick={() => setProductPage(p => Math.max(1, p - 1))}
+                                disabled={productPage <= 1}
+                                className="flex items-center gap-1 px-3 py-1 bg-stone-800 hover:bg-stone-700 disabled:opacity-30 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
+                            >
+                                <ChevronLeft className="h-3 w-3" /> PREV
+                            </button>
+                            <span className="text-xs text-stone-500 font-medium">
+                                Page {productPage} / {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setProductPage(p => Math.min(totalPages, p + 1))}
+                                disabled={productPage >= totalPages}
+                                className="flex items-center gap-1 px-3 py-1 bg-stone-800 hover:bg-stone-700 disabled:opacity-30 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
+                            >
+                                NEXT <ChevronRight className="h-3 w-3" />
+                            </button>
+                        </div>
+                    )}
 
                     {/* Bottom Action Bar - Compact for 15.5" POS */}
                     <div className="flex flex-col gap-1 p-2 bg-stone-900 border-t border-stone-800">
@@ -1886,10 +2028,73 @@ export default function RetailPOSPage() {
                     </div>
                 </div>
 
-                {/* Right Side - Totals & Payment - Narrower on compact */}
-                <div className={`flex flex-col bg-stone-950 ${compactMode ? 'w-64' : 'w-80'}`}>
+                {/* RIGHT SIDE - Cart + Totals + Payment */}
+                <div className={`flex flex-col bg-stone-950 ${compactMode ? 'w-72' : 'w-96'}`}>
+                    {/* Cart Header */}
+                    <div className="flex items-center justify-between px-3 py-2 bg-stone-900 border-b border-stone-800">
+                        <span className="text-sm font-semibold text-stone-400">Cart ({itemCount} items)</span>
+                        {cart.length > 0 && (
+                            <button onClick={voidTransaction} className="text-xs text-red-400 hover:text-red-300 transition-colors">
+                                Clear All
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Cart Items List */}
+                    <div className="flex-1 overflow-y-auto">
+                        {cart.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-stone-600 py-8">
+                                <ShoppingCart className="h-10 w-10 mb-2 opacity-30" />
+                                <p className="text-xs">Scan or tap items</p>
+                            </div>
+                        ) : (
+                            cart.map((item, idx) => (
+                                <div
+                                    key={idx}
+                                    onClick={() => setSelectedItemIndex(idx)}
+                                    className={`flex items-center gap-2 px-3 py-2 border-b border-stone-800/50 cursor-pointer transition-colors ${selectedItemIndex === idx
+                                        ? 'bg-orange-500/15 border-l-2 border-l-orange-500'
+                                        : 'hover:bg-stone-900/50'
+                                        }`}
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">{item.name}</p>
+                                        <div className="flex items-center gap-1 text-[10px] text-stone-500">
+                                            {item.barcode && <span>{item.barcode}</span>}
+                                            {item.isEbtEligible && <span className="text-green-400">EBT</span>}
+                                            {item.ageRestricted && <span className="text-amber-400">21+</span>}
+                                            {item.discount && item.discount > 0 && (
+                                                <span className="text-orange-400">-{item.discount}%</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); updateQuantity(idx, item.quantity - 1) }}
+                                            className="w-6 h-6 rounded bg-stone-800 hover:bg-stone-700 flex items-center justify-center text-xs"
+                                        >-</button>
+                                        <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); updateQuantity(idx, item.quantity + 1) }}
+                                            className="w-6 h-6 rounded bg-stone-800 hover:bg-stone-700 flex items-center justify-center text-xs"
+                                        >+</button>
+                                    </div>
+                                    <span className="text-sm font-medium w-16 text-right flex-shrink-0">
+                                        {formatCurrency(item.price * item.quantity)}
+                                    </span>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); removeItem(idx) }}
+                                        className="w-5 h-5 rounded bg-red-500/20 hover:bg-red-500/40 text-red-400 flex items-center justify-center flex-shrink-0 transition-colors"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
                     {/* Totals */}
-                    <div className={`space-y-2 bg-stone-900 border-b border-stone-800 ${compactMode ? 'p-2' : 'p-4 space-y-3'}`}>
+                    <div className={`space-y-2 bg-stone-900 border-t border-stone-800 ${compactMode ? 'p-2' : 'p-3 space-y-2'}`}>
                         <div className={`flex justify-between ${compactMode ? 'text-base' : 'text-lg'}`}>
                             <span className="text-emerald-400">Sub Total</span>
                             <span className="font-bold">{formatCurrency(subtotal)}</span>
@@ -2243,6 +2448,71 @@ export default function RetailPOSPage() {
                     setShowUniversalSearch(false)
                 }}
             />
+
+            {/* MORE Departments Picker Modal */}
+            {showMoreDepts && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-stone-900 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col border border-stone-700">
+                        <div className="flex items-center justify-between p-4 border-b border-stone-800">
+                            <h2 className="text-lg font-bold">All Departments</h2>
+                            <button onClick={() => setShowMoreDepts(false)} className="p-2 hover:bg-stone-800 rounded-lg">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="px-4 pt-3 pb-2">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
+                                <input
+                                    type="text"
+                                    value={deptSearch}
+                                    onChange={(e) => setDeptSearch(e.target.value)}
+                                    placeholder="Search departments..."
+                                    className="w-full pl-10 pr-4 py-2.5 bg-stone-800 border border-stone-700 rounded-lg focus:outline-none focus:border-orange-500 text-sm"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto px-2 pb-3">
+                            <div className="grid grid-cols-2 gap-2">
+                                {categories
+                                    .filter(cat => !deptSearch || cat.name.toLowerCase().includes(deptSearch.toLowerCase()))
+                                    .map(cat => {
+                                        const style = getCategoryStyle(cat.id)
+                                        const isPinned = pinnedCategories.some((p: any) => p.id === cat.id)
+                                        return (
+                                            <button
+                                                key={cat.id}
+                                                onClick={() => {
+                                                    selectDepartment(cat.id)
+                                                    setShowMoreDepts(false)
+                                                }}
+                                                className={`flex items-center gap-2 p-3 rounded-xl text-left transition-all ${selectedCategory === cat.id
+                                                    ? 'bg-orange-500/20 border-2 border-orange-500'
+                                                    : 'bg-stone-800 hover:bg-stone-700 border-2 border-transparent'
+                                                    }`}
+                                            >
+                                                <span className="text-lg">{style.icon}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium truncate">{cat.name}</p>
+                                                    {cat.itemCount !== undefined && (
+                                                        <p className="text-[10px] text-stone-500">{cat.itemCount} items</p>
+                                                    )}
+                                                </div>
+                                                {isPinned && (
+                                                    <span className="text-[10px] text-amber-400">⭐</span>
+                                                )}
+                                            </button>
+                                        )
+                                    })
+                                }
+                            </div>
+                            {categories.filter(cat => !deptSearch || cat.name.toLowerCase().includes(deptSearch.toLowerCase())).length === 0 && (
+                                <p className="text-center text-stone-500 py-8 text-sm">No departments match "{deptSearch}"</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Price Check Input Modal */}
             {showPriceCheckInputModal && (

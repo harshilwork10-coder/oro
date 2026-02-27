@@ -24,7 +24,7 @@ function generatePairingCode(length: number = 8): string {
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { stationId: string } }
+    { params }: { params: Promise<{ stationId: string }> }
 ) {
     const session = await getServerSession(authOptions)
 
@@ -33,7 +33,7 @@ export async function POST(
         return NextResponse.json({ error: 'Provider access required' }, { status: 403 })
     }
 
-    const { stationId } = params
+    const { stationId } = await params
     const body = await request.json()
     const { action } = body as { action: 'regenerate_code' | 'untrust' | 'transfer' }
 

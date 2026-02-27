@@ -21,13 +21,13 @@ export async function GET() {
             return NextResponse.json({ error: 'No franchise' }, { status: 400 })
         }
 
-        let settings = await prisma.reminderSettings.findUnique({
+        let settings = await (prisma as any).reminderSettings.findUnique({
             where: { franchiseId: user.franchiseId }
         })
 
         // Create default settings if none exist
         if (!settings) {
-            settings = await prisma.reminderSettings.create({
+            settings = await (prisma as any).reminderSettings.create({
                 data: { franchiseId: user.franchiseId }
             })
         }
@@ -84,7 +84,7 @@ export async function PUT(request: NextRequest) {
             body.twilioAuthToken = encryptField(body.twilioAuthToken)
         }
 
-        const settings = await prisma.reminderSettings.upsert({
+        const settings = await (prisma as any).reminderSettings.upsert({
             where: { franchiseId: user.franchiseId },
             update: body,
             create: { franchiseId: user.franchiseId, ...body }
@@ -105,13 +105,13 @@ export async function PUT(request: NextRequest) {
  * Helper function to get decrypted Twilio credentials for sending SMS
  * Use this in SMS sending code, NOT in the API responses
  */
-export async function getTwilioCredentials(franchiseId: string): Promise<{
+async function getTwilioCredentials(franchiseId: string): Promise<{
     accountSid: string | null
     authToken: string | null
     phoneNumber: string | null
 } | null> {
     try {
-        const settings = await prisma.reminderSettings.findUnique({
+        const settings = await (prisma as any).reminderSettings.findUnique({
             where: { franchiseId },
             select: {
                 twilioAccountSid: true,

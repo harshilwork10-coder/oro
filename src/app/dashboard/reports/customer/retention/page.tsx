@@ -160,15 +160,15 @@ export default function RetentionReportPage() {
         const csvContent = [
             'SUMMARY',
             summaryHeader.join(','),
-            ...summaryRows.map(r => r.join(',')),
+            ...summaryRows.map((r: (string | number)[]) => r.join(',')),
             '',
             'RETENTION BY BARBER',
             barberHeader.join(','),
-            ...barberRows.map(r => r.join(',')),
+            ...barberRows.map((r: (string | number)[]) => r.join(',')),
             '',
             'TOP RETURNING CLIENTS',
             clientHeader.join(','),
-            ...clientRows.map(r => r.join(','))
+            ...clientRows.map((r: (string | number)[]) => r.join(','))
         ].join('\n')
 
         const blob = new Blob([csvContent], { type: 'text/csv' })

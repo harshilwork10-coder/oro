@@ -19,14 +19,18 @@ export async function GET(req: NextRequest) {
     try {
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
-            include: {
-                franchisorMemberships: {
-                    include: { franchisor: true }
-                }
-            }
+            select: { id: true, franchiseId: true }
         }) as any
 
-        const franchisorId = user?.franchisorMemberships?.[0]?.franchisor?.id
+        // Get franchisorId via franchise relation
+        let franchisorId: string | null = null
+        if (user?.franchiseId) {
+            const franchise = await prisma.franchise.findUnique({
+                where: { id: user.franchiseId },
+                select: { franchisorId: true }
+            })
+            franchisorId = franchise?.franchisorId ?? null
+        }
         if (!franchisorId) {
             return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })
         }
@@ -45,25 +49,24 @@ export async function GET(req: NextRequest) {
         const now = new Date()
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-        // Get employees (stylists) from these locations via franchise
-        const franchises = await prisma.franchise.findMany({
-            where: { franchisorId },
-            include: {
-                employees: {
-                    where: {
-                        role: { in: ['EMPLOYEE', 'MANAGER'] },
-                        status: 'ACTIVE'
-                    },
-                    select: {
-                        id: true,
-                        name: true,
-                        locationId: true,
-                    }
-                }
+        // Get employees (stylists) from franchises under this franchisor
+        const employees = await prisma.user.findMany({
+            where: {
+                franchiseId: {
+                    in: (await prisma.franchise.findMany({
+                        where: { franchisorId },
+                        select: { id: true }
+                    })).map(f => f.id)
+                },
+                role: { in: ['EMPLOYEE', 'MANAGER'] }
+            },
+            select: {
+                id: true,
+                name: true,
+                locationId: true,
             }
         })
 
-        const employees = franchises.flatMap(f => f.employees)
         const employeeIds = employees.map(e => e.id)
 
         // Get appointments by employee
@@ -77,7 +80,6 @@ export async function GET(req: NextRequest) {
                 employeeId: true,
                 status: true,
                 clientId: true,
-                duration: true,
             }
         })
 
@@ -113,8 +115,8 @@ export async function GET(req: NextRequest) {
             // Revenue
             const revenue = empTransactions.reduce((sum, t) => sum + Number(t.total || 0), 0)
 
-            // Booked minutes (using duration field or default 60 min)
-            const bookedMinutes = empAppointments.reduce((sum, a) => sum + (a.duration || 60), 0)
+            // Booked minutes (default 60 min per appointment - duration not in schema)
+            const bookedMinutes = empAppointments.length * 60
 
             // Available minutes (8 hours * working days in month - simplified)
             const workingDays = 22 // Approximate

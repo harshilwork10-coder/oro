@@ -28,32 +28,35 @@ export async function POST(req: NextRequest) {
         }
 
         // Get transaction with line items
-        const transaction = await prisma.transaction.findUnique({
+        const txRaw = await prisma.transaction.findUnique({
             where: { id: transactionId },
-            include: {
-                lineItems: true,
-                client: true,
-                employee: true,
-                location: true
-            }
+            include: { lineItems: true }
         })
 
-        if (!transaction) {
+        if (!txRaw) {
             return ApiResponse.notFound('Transaction not found')
         }
 
+        // Cast to any to access fields without strict schema validation
+        // (receipt building only - not used for financial logic)
+        const transaction = txRaw as unknown as Record<string, any>
+
+        // Fetch employee name if available
+        const employeeUser = transaction.employeeId
+            ? await prisma.user.findUnique({ where: { id: transaction.employeeId as string }, select: { name: true } })
+            : null
+
         // Build receipt content
-        const receiptLines = transaction.lineItems.map(item =>
-            `${item.name} x${item.quantity} - $${Number(item.total).toFixed(2)}`
+        const receiptLines = (transaction.lineItems as any[]).map((item: any) =>
+            `${item.name || item.type || 'Item'} x${item.quantity} - $${Number(item.total).toFixed(2)}`
         ).join('\n')
 
         const receiptContent = `
 ORO 9 - Receipt
-${transaction.location?.name || 'Location'}
 =====================================
 Invoice: #${transaction.invoiceNumber || transaction.id.slice(-8)}
 Date: ${new Date(transaction.createdAt).toLocaleString()}
-${transaction.employee?.name ? `Served by: ${transaction.employee.name}` : ''}
+${employeeUser?.name ? `Served by: ${employeeUser.name}` : ''}
 
 ITEMS:
 ${receiptLines}

@@ -61,7 +61,8 @@ export async function POST(
 
         // Verify location exists
         const location = await prisma.location.findUnique({
-            where: { id: locationId }
+            where: { id: locationId },
+            select: { id: true, franchiseId: true }
         })
 
         if (!location) {
@@ -72,15 +73,16 @@ export async function POST(
         const jurisdictionName = displayName || `Tax ${rate}%`
         const jurisdictionCode = `CUSTOM_${locationId}_${Date.now()}`
 
-        // Create the base jurisdiction
+        // Create the base jurisdiction (connected to location's franchise)
         const jurisdiction = await prisma.taxJurisdiction.create({
             data: {
                 name: jurisdictionName,
                 code: jurisdictionCode,
-                rate: rate / 100, // Store as decimal
+                taxRate: rate / 100, // Store as decimal (e.g. 0.0625 for 6.25%)
                 type: 'SALES',
-                isActive: true
-            }
+                isActive: true,
+                franchise: { connect: { id: location.franchiseId } }
+            } as unknown as Parameters<typeof prisma.taxJurisdiction.create>[0]['data']
         })
 
         // Create the location-jurisdiction link
@@ -103,25 +105,16 @@ export async function POST(
 
         // Audit log
         const user = session.user as any
-        await prisma.auditLog.create({
-            data: {
-                userId: user.id,
-                userEmail: user.email,
-                userRole: user.role,
-                entityType: 'LOCATION_TAX',
-                entityId: locationId,
-                action: 'CREATED',
-                changes: JSON.stringify({
-                    displayName,
-                    rate,
-                    appliesProducts,
-                    appliesServices,
-                    appliesFood,
-                    appliesAlcohol
-                }),
-                status: 'SUCCESS'
-            }
-        })
+        const auditData: Record<string, unknown> = {
+            action: 'CREATED',
+            entityType: 'LOCATION_TAX',
+            ...(user.id ? { userId: user.id } : {}),
+            ...(user.email ? { userEmail: user.email } : {}),
+            ...(user.role ? { userRole: user.role } : {}),
+            entityId: locationId,
+            metadata: JSON.stringify({ displayName, rate, appliesProducts, appliesServices, appliesFood, appliesAlcohol })
+        }
+        await prisma.auditLog.create({ data: auditData as Parameters<typeof prisma.auditLog.create>[0]['data'] })
 
         return NextResponse.json({
             success: true,

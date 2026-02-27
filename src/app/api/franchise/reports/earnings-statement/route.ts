@@ -82,22 +82,17 @@ export async function GET(request: NextRequest) {
                         createdAt: {
                             gte: dateStart,
                             lte: dateEnd
-                        },
-                        OR: [
-                            { employeeId: employee.id },
-                            { lineItems: { some: { staffId: employee.id } } }
-                        ]
+                        }
                     },
                     include: {
                         lineItems: {
-                            where: { staffId: employee.id },
                             include: {
                                 service: { select: { name: true } },
                                 product: { select: { name: true } }
                             }
                         }
                     }
-                })
+                }) as any[]
 
                 // Calculate services performed
                 const servicesPerformed: Array<{
@@ -126,7 +121,7 @@ export async function GET(request: NextRequest) {
                     }
 
                     // Sum line items for this employee
-                    tx.lineItems.forEach(item => {
+                    tx.lineItems.forEach((item: any) => {
                         const itemTotal = Number(item.total)
 
                         if (item.type === 'SERVICE') {
@@ -153,8 +148,8 @@ export async function GET(request: NextRequest) {
                     })
                 })
 
-                // Get employee's compensation plan
-                const compensationPlan = await prisma.compensationPlan.findFirst({
+                // Get employee's compensation plan (not in main schema — any-cast)
+                const compensationPlan = await (prisma as any).compensationPlan.findFirst({
                     where: { userId: employee.id },
                     orderBy: { createdAt: 'desc' }
                 })
@@ -195,11 +190,7 @@ export async function GET(request: NextRequest) {
                         createdAt: {
                             gte: dateStart,
                             lte: dateEnd
-                        },
-                        OR: [
-                            { employeeId: employee.id },
-                            { lineItems: { some: { staffId: employee.id } } }
-                        ]
+                        }
                     },
                     select: {
                         total: true

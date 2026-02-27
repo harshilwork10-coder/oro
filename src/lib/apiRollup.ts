@@ -54,6 +54,7 @@ export async function runDailyApiRollup(): Promise<{
         // Step 2: Upsert into ApiUsageDaily
         let rolledUp = 0
         for (const stat of stats) {
+            if (!stat.locationId) continue  // locationId required for unique key
             await prisma.apiUsageDaily.upsert({
                 where: {
                     date_locationId_route: {

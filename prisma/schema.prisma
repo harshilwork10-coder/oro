@@ -91,6 +91,10 @@ enum AccountStatus {
   ACTIVE
   SUSPENDED
   ARCHIVED
+  PENDING_DELETION
+  DELETED
+  PAYMENT_DUE
+  TERMINATED
 }
 
 // ============ STATION & DEVICE ENUMS ============
@@ -416,6 +420,7 @@ model User {
   commissionRule     CommissionRule?     @relation(fields: [commissionRuleId], references: [id])
   cashDrawerSessions CashDrawerSession[]
   drawerActivities   DrawerActivity[] // Fraud prevention - all drawer opens logged
+  suspendedTransactions SuspendedTransaction[] @relation("SuspendedTransactions")
   paymentLogs        PaymentLog[] @relation("PaymentLogs") // Payment attempt logs
 
   // Sub-Franchisee Link (Phase 2)
@@ -688,6 +693,14 @@ model FranchiseSettings {
   // Visibility
   enableBarberProfiles  Boolean @default(true) // Public barber profiles
   enableIndividualLinks Boolean @default(true) // Barber-specific booking links
+
+  // ========== VOID / REFUND LIMITS ==========
+  voidLimitPerDay       Decimal? @db.Decimal(12, 2) // Max $ void per cashier per day (null = unlimited)
+  refundLimitPerDay     Decimal? @db.Decimal(12, 2) // Max $ refund per cashier per day (null = unlimited)
+  requireManagerPinAbove Decimal? @db.Decimal(12, 2) // Require manager PIN for void/refund above this $
+
+  // ========== TAX RECEIPT DISPLAY ==========
+  taxReceiptMode String @default("SINGLE_LINE") // SINGLE_LINE or BREAKDOWN
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -963,6 +976,21 @@ model Location {
   // Category-specific tax rules (Beer/Wine/Food exempt, etc.)
   taxCategoryRules LocationTaxCategoryRule[]
 
+  // Tax Groups (bundles of tax components per location)
+  taxGroups            TaxGroup[]             @relation("LocationTaxGroups")
+  departmentTaxDefaults DepartmentTaxDefault[] @relation("LocationDeptTaxDefaults")
+
+  // Pricing Rules (auto-pricing per department)
+  pricingRules          PricingRule[]
+  categoryPricingRules  CategoryPricingRule[]  @relation("LocationCatPricingRules")
+
+  // Suspended Transactions
+  suspendedTransactions SuspendedTransaction[]
+
+  // Bottle Deposit (only in bottle-bill states: CA, CT, HI, IA, MA, ME, MI, NY, OR, VT)
+  bottleDepositEnabled Boolean  @default(false)
+  bottleDepositAmount  Decimal? @db.Decimal(6, 2) // e.g., 0.05 for $0.05 per container
+
   // Pulse Quick Login Store Code (e.g., "DOWNTOWN", "MAIN")
   pulseStoreCode String? @unique
 
@@ -1018,8 +1046,21 @@ model Location {
   themeId      String  @default("classic_oro") // Preset theme: classic_oro, rose_gold, blush_pink, lavender_night, mint_clean, ocean_blue
   highContrast Boolean @default(false) // Accessibility: increased text contrast
 
+  // ============ POS REGISTER LAYOUT ============
+  posRegisterLayout PosRegisterLayout?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ============ POS REGISTER LAYOUT (CRE-Style Buttons) ============
+
+model PosRegisterLayout {
+  id         String   @id @default(cuid())
+  locationId String   @unique
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  config     Json     // { pinnedCategoryIds, categoryOverrides, quickFilters }
+  updatedAt  DateTime @updatedAt
 }
 
 // ============ PULSE DEVICE AUTHENTICATION ============
@@ -1348,6 +1389,9 @@ model UnifiedCategory {
   // Items in this category
   items Item[]
 
+  // Pricing rules for this category
+  categoryPricingRules CategoryPricingRule[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1407,8 +1451,28 @@ model Item {
   isAlcohol     Boolean @default(false) // Alcohol product
 
   // === TAX CONFIGURATION ===
-  taxExempt Boolean  @default(false)
-  taxRate   Decimal? @db.Decimal(7, 4) // Override tax rate (null = use default)
+  taxExempt          Boolean  @default(false)
+  taxRate            Decimal? @db.Decimal(7, 4) // Override tax rate (null = use default)
+  taxGroupOverrideId String?  // Override tax group (null = use department default)
+
+  // === PRICING CONFIGURATION ===
+  priceLocked     Boolean  @default(false) // If true, auto-pricing won't update this item
+  msrp            Decimal? @db.Decimal(12, 2) // Manufacturer suggested retail price
+  overrideMarkup  Decimal? @db.Decimal(7, 4) // Per-item markup override (null = use dept rule)
+  minSellPrice    Decimal? @db.Decimal(12, 2) // HQ-enforced minimum sell price (null = no floor)
+
+  // === WEIGHTED / SCALE ITEMS ===
+  isWeighted    Boolean  @default(false) // Sold by weight (deli, produce)
+  pricePerUnit  Decimal? @db.Decimal(12, 4) // Price per unit of measure
+  unitOfMeasure String?  // "lb", "oz", "kg", "g"
+
+  // === AUTO-REORDER (PAR LEVELS) ===
+  parLevel          Int?     // Target stock level
+  autoReorderQty    Int?     // Quantity to order when below par
+  preferredSupplierId String? // Default supplier for auto-reorder
+
+  // === AUDIT ===
+  priceChangeLogs PriceChangeLog[]
 
   // === TRACKING ===
   createdAt DateTime @default(now())
@@ -1721,6 +1785,9 @@ model ProductCategory {
 
   // Location-specific tax rules for this category
   taxCategoryRules LocationTaxCategoryRule[]
+
+  // Department → Tax Group defaults
+  departmentTaxDefaults DepartmentTaxDefault[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2316,6 +2383,34 @@ model CashDrop {
   droppedBy String // Employee ID
 
   createdAt DateTime @default(now())
+}
+
+// ============ SUSPENDED TRANSACTIONS ============
+
+model SuspendedTransaction {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   User     @relation("SuspendedTransactions", fields: [employeeId], references: [id])
+
+  // Cart snapshot (JSON: items[], subtotal, tax, discounts, customer info)
+  cartData Json
+
+  // Optional label for quick identification
+  label    String?  // "John - forgot wallet", "Table 5"
+  
+  // Auto-expire after 24h
+  expiresAt DateTime
+  status    String   @default("ACTIVE") // ACTIVE, RECALLED, EXPIRED, VOIDED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([locationId])
+  @@index([employeeId])
+  @@index([status])
+  @@index([expiresAt])
 }
 
 // ============ PROMOTIONS & DISCOUNTS ============
@@ -3787,6 +3882,9 @@ model TaxJurisdiction {
   // Sales Tax (percentage-based)
   salesTaxRate Decimal @default(0) @db.Decimal(7, 4) // e.g., 6.25 for 6.25%
 
+  // Effective date for rate changes (pre-schedule future rates)
+  effectiveFrom DateTime @default(now())
+
   // Description for display
   description String?
 
@@ -3800,6 +3898,9 @@ model TaxJurisdiction {
 
   // Locations that apply this jurisdiction
   locations LocationTaxJurisdiction[]
+
+  // Tax Groups that include this component
+  taxGroupComponents TaxGroupComponent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3890,6 +3991,139 @@ model LocationTaxCategoryRule {
   @@unique([locationId, categoryId])
   @@index([locationId])
   @@index([categoryId])
+}
+
+// ============ TAX GROUPS ============
+// Tax Group = named bundle of tax components per location
+// E.g., ALCOHOL = State Sales + County + City + Liquor Surcharge
+
+model TaxGroup {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation("LocationTaxGroups", fields: [locationId], references: [id], onDelete: Cascade)
+
+  name      String   // "GENERAL", "ALCOHOL", "TOBACCO", "GROCERY", "PREPARED_FOOD"
+  isDefault Boolean  @default(false) // One default per location (fallback)
+
+  // Components in this group
+  components TaxGroupComponent[]
+
+  // Departments using this group as default
+  departmentDefaults DepartmentTaxDefault[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([locationId, name])
+  @@index([locationId])
+}
+
+// Join table: Tax Group → Tax Components (jurisdictions)
+model TaxGroupComponent {
+  id             String          @id @default(cuid())
+  taxGroupId     String
+  taxGroup       TaxGroup        @relation(fields: [taxGroupId], references: [id], onDelete: Cascade)
+  jurisdictionId String
+  jurisdiction   TaxJurisdiction @relation(fields: [jurisdictionId], references: [id], onDelete: Cascade)
+
+  // 0 = non-compound (parallel with others), 1+ = compound order
+  compoundOrder Int @default(0)
+
+  @@unique([taxGroupId, jurisdictionId])
+  @@index([taxGroupId])
+  @@index([jurisdictionId])
+}
+
+// Department → Tax Group default mapping per location
+// All products in a department inherit this Tax Group automatically
+model DepartmentTaxDefault {
+  id         String          @id @default(cuid())
+  locationId String
+  location   Location        @relation("LocationDeptTaxDefaults", fields: [locationId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  taxGroupId String
+  taxGroup   TaxGroup        @relation(fields: [taxGroupId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([locationId, categoryId])
+  @@index([locationId])
+  @@index([categoryId])
+  @@index([taxGroupId])
+}
+
+// ============ PRICE CHANGE AUDIT LOG ============
+
+model PriceChangeLog {
+  id     String @id @default(cuid())
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  oldPrice  Decimal @db.Decimal(12, 2)
+  newPrice  Decimal @db.Decimal(12, 2)
+  oldCost   Decimal? @db.Decimal(12, 2)
+  newCost   Decimal? @db.Decimal(12, 2)
+
+  reason    String? // "Cost update", "Manual override", "Import", "Auto-reprice"
+  source    String  @default("MANUAL") // MANUAL, AUTO_REPRICE, IMPORT, PROMO, VENDOR_UPDATE
+  changedBy String  // User ID
+  changedByName String? // User name for display
+
+  createdAt DateTime @default(now())
+
+  @@index([itemId])
+  @@index([changedBy])
+  @@index([createdAt])
+}
+
+// ============ PRICING RULES ============
+// Department-level auto-pricing: cost → sell price calculation
+
+model PricingRule {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  name   String // "BEER_PACKS", "SPIRITS", "TOBACCO_CIG", etc.
+  label  String // "Beer Packs (6/12/24)", human-friendly
+
+  // Method: MARKUP or TARGET_MARGIN
+  method String @default("MARKUP")
+
+  // JSON config: { tiers, rounding, caps, lockIfMsrpPresent, managerOverrideOnly }
+  config Json
+
+  isActive Boolean @default(true)
+
+  // Categories using this rule
+  categoryRules CategoryPricingRule[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([locationId, name])
+  @@index([locationId])
+}
+
+// Category → Pricing Rule mapping per location
+model CategoryPricingRule {
+  id            String         @id @default(cuid())
+  locationId    String
+  location      Location       @relation("LocationCatPricingRules", fields: [locationId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      UnifiedCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  pricingRuleId String
+  pricingRule   PricingRule    @relation(fields: [pricingRuleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([locationId, categoryId])
+  @@index([locationId])
+  @@index([categoryId])
+  @@index([pricingRuleId])
 }
 
 // ============ STORE ACCOUNT (A/R) TRACKING ============

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Get user's franchisor (via role, franchise ownership, or direct franchisor ownership)
-        const user = await prisma.user.findUnique({
+        const user = await (prisma as any).user.findUnique({
             where: { id: session.user.id },
             include: {
                 franchises: {
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Fetch services for this franchise with their categories
-        const services = await prisma.service.findMany({
+        const services = await (prisma as any).service.findMany({
             where: {
                 franchiseId,
                 isActive: true
@@ -46,10 +46,10 @@ export async function GET(req: NextRequest) {
                 }
             },
             orderBy: { name: 'asc' }
-        })
+        }) as any[]
 
         // Fetch categories for this franchise
-        const categories = await prisma.serviceCategory.findMany({
+        const categories = await (prisma as any).serviceCategory.findMany({
             where: { franchiseId },
             include: {
                 services: {
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
                 }
             },
             orderBy: { name: 'asc' }
-        })
+        }) as any[]
 
         // Get uncategorized services
         const uncategorizedServices = services.filter(s => !s.serviceCategoryId)
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Get user's franchise
-        const user = await prisma.user.findUnique({
+        const user = await (prisma as any).user.findUnique({
             where: { id: session.user.id },
             include: {
                 franchises: {
@@ -122,10 +122,10 @@ export async function POST(req: NextRequest) {
         } = body
 
         if (!name || !duration || basePrice === undefined) {
-            return ApiResponse.badRequest('Name, duration, and basePrice are required')
+            return ApiResponse.error('Name, duration, and basePrice are required', 400)
         }
 
-        const service = await prisma.service.create({
+        const service = await (prisma as any).service.create({
             data: {
                 franchiseId,
                 name,

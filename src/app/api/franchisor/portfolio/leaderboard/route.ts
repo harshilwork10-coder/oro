@@ -33,17 +33,17 @@ export async function GET(request: NextRequest) {
         }
 
         // Get locations for this franchise
-        const locations = await prisma.location.findMany({
+        const locations = await (prisma as any).location.findMany({
             where: { franchiseId, provisioningStatus: 'ACTIVE' },
             select: { id: true, name: true, address: true }
-        });
+        }) as Array<{ id: string; name: string; address: string }>;
 
         // Calculate metrics per location based on appointments and time entries
         const leaderboard = await Promise.all(
             locations.map(async (loc) => {
                 const [apptStats, staffCount] = await Promise.all([
                     // Appointments
-                    prisma.appointment.groupBy({
+                    (prisma.appointment as any).groupBy({
                         by: ['status'],
                         where: {
                             locationId: loc.id,

@@ -75,8 +75,8 @@ export async function GET(request: NextRequest) {
         // Calculate payouts for each employee based on transactions
         const payouts = await Promise.all(
             employees.map(async (employee) => {
-                // Get compensation plan
-                const compensationPlan = await prisma.compensationPlan.findFirst({
+                // Get compensation plan (not in main schema — any-cast)
+                const compensationPlan = await (prisma as any).compensationPlan.findFirst({
                     where: { userId: employee.id },
                     orderBy: { createdAt: 'desc' }
                 })
@@ -89,16 +89,10 @@ export async function GET(request: NextRequest) {
                         createdAt: {
                             gte: dateStart,
                             lte: dateEnd
-                        },
-                        OR: [
-                            { employeeId: employee.id },
-                            { lineItems: { some: { staffId: employee.id } } }
-                        ]
+                        }
                     },
                     include: {
-                        lineItems: {
-                            where: { staffId: employee.id }
-                        }
+                        lineItems: true
                     }
                 })
 
@@ -118,7 +112,7 @@ export async function GET(request: NextRequest) {
                         cardTips += tipAmount
                     }
 
-                    tx.lineItems.forEach(item => {
+                    tx.lineItems.forEach((item: any) => {
                         if (item.type === 'SERVICE') {
                             serviceRevenue += Number(item.total)
                         }

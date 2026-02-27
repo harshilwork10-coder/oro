@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         const updated = await prisma.franchisor.update({
             where: { id: franchisorId },
             data: {
-                accountStatus: newStatus,
+                accountStatus: newStatus as 'ACTIVE' | 'SUSPENDED' | 'TERMINATED',
                 suspendedAt,
                 suspendedReason
             },
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
 
         const franchisors = await prisma.franchisor.findMany({
             where: {
-                accountStatus: { in: ['SUSPENDED', 'TERMINATED'] }
+                accountStatus: { in: ['SUSPENDED', 'TERMINATED'] as ('SUSPENDED' | 'TERMINATED')[] }
             },
             include: {
                 owner: { select: { name: true, email: true } },

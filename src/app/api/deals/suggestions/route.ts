@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         weekStart.setHours(0, 0, 0, 0)
 
         // Find existing suggestions for this week
-        let suggestions = await prisma.dealSuggestion.findMany({
+        let suggestions = await (prisma as any).dealSuggestion.findMany({
             where: {
                 locationId,
                 weekOf: { gte: weekStart }
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
         weekStart.setHours(0, 0, 0, 0)
 
         // Delete old pending suggestions for this week
-        await prisma.dealSuggestion.deleteMany({
+        await (prisma as any).dealSuggestion.deleteMany({
             where: {
                 locationId,
                 weekOf: { gte: weekStart },
@@ -161,7 +161,7 @@ async function generateSuggestions(locationId: string, weekOf: Date) {
 
     // Count inactive customers (35+ days)
     const thirtyFiveDaysAgo = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000)
-    const inactiveCount = await prisma.client.count({
+    const inactiveCount = await (prisma as any).client.count({
         where: {
             franchiseId: location.franchiseId,
             lastVisit: { lt: thirtyFiveDaysAgo },
@@ -170,9 +170,9 @@ async function generateSuggestions(locationId: string, weekOf: Date) {
     })
 
     // Create 3 suggestions
-    const suggestions = await prisma.$transaction([
+    const suggestions = await (prisma as any).$transaction([
         // 1. Slow Day Deal
-        prisma.dealSuggestion.create({
+        (prisma as any).dealSuggestion.create({
             data: {
                 locationId,
                 weekOf,
@@ -186,12 +186,12 @@ async function generateSuggestions(locationId: string, weekOf: Date) {
                 targetDays: slowDays,
                 targetTimeStart: '10:00',
                 targetTimeEnd: '14:00',
-                audienceCount: 0, // Will be calculated at preview
+                audienceCount: 0,
                 status: 'PENDING'
             }
         }),
         // 2. Win-Back Deal
-        prisma.dealSuggestion.create({
+        (prisma as any).dealSuggestion.create({
             data: {
                 locationId,
                 weekOf,
@@ -207,7 +207,7 @@ async function generateSuggestions(locationId: string, weekOf: Date) {
             }
         }),
         // 3. Rebook Deal
-        prisma.dealSuggestion.create({
+        (prisma as any).dealSuggestion.create({
             data: {
                 locationId,
                 weekOf,
