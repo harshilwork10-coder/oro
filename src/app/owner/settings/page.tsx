@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Store, CreditCard, Bell, Users, Shield, Palette, Clock, MapPin, ChevronRight, Star, Check, Loader2, Globe, RefreshCw, Package } from 'lucide-react';
+import { Store, CreditCard, Bell, Users, Shield, Palette, Clock, MapPin, ChevronRight, Star, Check, Loader2, Globe, RefreshCw, Package, Truck } from 'lucide-react';
 
-type SettingsSection = 'general' | 'payment' | 'notifications' | 'employees' | 'security' | 'appearance' | 'hours' | 'location' | 'integrations';
+type SettingsSection = 'general' | 'payment' | 'notifications' | 'employees' | 'security' | 'appearance' | 'hours' | 'location' | 'integrations' | 'delivery';
 
 const sections = [
     { id: 'general', label: 'General', icon: Store },
@@ -16,6 +16,7 @@ const sections = [
     { id: 'hours', label: 'Business Hours', icon: Clock },
     { id: 'location', label: 'Location Info', icon: MapPin },
     { id: 'integrations', label: 'Google Pointy', icon: Globe },
+    { id: 'delivery', label: 'Delivery Platforms', icon: Truck },
 ];
 
 export default function SettingsPage() {
@@ -34,6 +35,16 @@ export default function SettingsPage() {
     const [pointySyncing, setPointySyncing] = useState(false);
     const [pointySyncResult, setPointySyncResult] = useState<any>(null);
 
+    // Delivery platform state
+    const [ddStoreId, setDdStoreId] = useState('');
+    const [ddApiKey, setDdApiKey] = useState('');
+    const [ueStoreId, setUeStoreId] = useState('');
+    const [ueClientId, setUeClientId] = useState('');
+    const [ueClientSecret, setUeClientSecret] = useState('');
+    const [deliveryStats, setDeliveryStats] = useState<any>(null);
+    const [menuSyncing, setMenuSyncing] = useState<string | null>(null);
+    const [menuSyncResult, setMenuSyncResult] = useState<any>(null);
+
     // Load existing Google Place ID
     useEffect(() => {
         fetch('/api/owner/location-settings')
@@ -48,7 +59,31 @@ export default function SettingsPage() {
             .then(res => res.json())
             .then(data => setPointyStats(data))
             .catch(() => { });
+
+        // Load delivery platform stats
+        fetch('/api/integrations/delivery')
+            .then(res => res.json())
+            .then(data => setDeliveryStats(data))
+            .catch(() => { });
     }, []);
+
+    const handleMenuSync = async (platform: string) => {
+        const storeId = platform === 'doordash' ? ddStoreId : ueStoreId;
+        if (!storeId) return;
+        setMenuSyncing(platform);
+        try {
+            const res = await fetch('/api/integrations/delivery', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'sync_menu', platform, storeId })
+            });
+            const data = await res.json();
+            setMenuSyncResult({ ...data, platform });
+        } catch {
+            setMenuSyncResult({ error: 'Sync failed', platform });
+        }
+        setMenuSyncing(null);
+    };
 
     const handlePointyPreview = async () => {
         const res = await fetch('/api/integrations/google-pointy', {
@@ -332,8 +367,8 @@ export default function SettingsPage() {
                                         onClick={handlePointySync}
                                         disabled={!merchantId || !storeCode || pointySyncing}
                                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${!merchantId || !storeCode
-                                                ? 'bg-stone-600 text-stone-400 cursor-not-allowed'
-                                                : 'bg-blue-600 hover:bg-blue-500 text-white'
+                                            ? 'bg-stone-600 text-stone-400 cursor-not-allowed'
+                                            : 'bg-blue-600 hover:bg-blue-500 text-white'
                                             }`}
                                     >
                                         {pointySyncing ? (
@@ -347,8 +382,8 @@ export default function SettingsPage() {
                                 {/* Sync Result */}
                                 {pointySyncResult && (
                                     <div className={`p-4 rounded-lg border ${pointySyncResult.success
-                                            ? 'bg-green-500/10 border-green-500/30'
-                                            : 'bg-red-500/10 border-red-500/30'
+                                        ? 'bg-green-500/10 border-green-500/30'
+                                        : 'bg-red-500/10 border-red-500/30'
                                         }`}>
                                         <p className={`text-sm font-medium ${pointySyncResult.success ? 'text-green-400' : 'text-red-400'}`}>
                                             {pointySyncResult.success
@@ -396,6 +431,155 @@ export default function SettingsPage() {
                                 <p className="text-xs text-[var(--text-muted)]">
                                     Products need a UPC/EAN barcode to sync. Add barcodes in Inventory → Products.
                                     Google matches barcodes to its product catalog for images and descriptions.
+                                </p>
+                            </div>
+                        )}
+                        {activeSection === 'delivery' && (
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Truck size={22} className="text-orange-400" />
+                                    <div>
+                                        <h3 className="font-semibold text-[var(--text-primary)]">DoorDash & Uber Eats</h3>
+                                        <p className="text-sm text-[var(--text-muted)]">
+                                            Push your menu to delivery platforms. Orders flow directly into POS.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Menu Stats */}
+                                {deliveryStats?.menuStats && (
+                                    <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--border)] flex items-center gap-6">
+                                        <div>
+                                            <p className="text-2xl font-bold text-[var(--text-primary)]">{deliveryStats.menuStats.totalProducts}</p>
+                                            <p className="text-xs text-[var(--text-muted)]">Menu Items Ready</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-2xl font-bold text-blue-400">{deliveryStats.menuStats.categories?.length || 0}</p>
+                                            <p className="text-xs text-[var(--text-muted)]">Categories</p>
+                                        </div>
+                                        <div className="ml-auto text-xs text-[var(--text-muted)] font-mono bg-stone-900 px-3 py-1 rounded">
+                                            Webhook: /api/integrations/delivery/webhook
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* DoorDash */}
+                                <div className="p-5 rounded-lg border border-[var(--border)] space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">DD</div>
+                                        <div>
+                                            <h4 className="font-medium text-[var(--text-primary)]">DoorDash</h4>
+                                            <p className="text-xs text-[var(--text-muted)]">Marketplace + Drive API</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-[var(--text-secondary)] mb-1">Store ID</label>
+                                            <input
+                                                type="text"
+                                                value={ddStoreId}
+                                                onChange={(e) => setDdStoreId(e.target.value)}
+                                                placeholder="From DoorDash Merchant Portal"
+                                                className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-[var(--text-secondary)] mb-1">API Key</label>
+                                            <input
+                                                type="password"
+                                                value={ddApiKey}
+                                                onChange={(e) => setDdApiKey(e.target.value)}
+                                                placeholder="Developer Key Secret"
+                                                className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => handleMenuSync('doordash')}
+                                        disabled={!ddStoreId || menuSyncing === 'doordash'}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${!ddStoreId ? 'bg-stone-600 text-stone-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white'
+                                            }`}
+                                    >
+                                        {menuSyncing === 'doordash' ? (
+                                            <><RefreshCw size={14} className="animate-spin" /> Syncing...</>
+                                        ) : (
+                                            <><RefreshCw size={14} /> Push Menu to DoorDash</>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* Uber Eats */}
+                                <div className="p-5 rounded-lg border border-[var(--border)] space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">UE</div>
+                                        <div>
+                                            <h4 className="font-medium text-[var(--text-primary)]">Uber Eats</h4>
+                                            <p className="text-xs text-[var(--text-muted)]">Marketplace API</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-[var(--text-secondary)] mb-1">Store ID</label>
+                                            <input
+                                                type="text"
+                                                value={ueStoreId}
+                                                onChange={(e) => setUeStoreId(e.target.value)}
+                                                placeholder="Uber Eats Store ID"
+                                                className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-[var(--text-secondary)] mb-1">Client ID</label>
+                                            <input
+                                                type="text"
+                                                value={ueClientId}
+                                                onChange={(e) => setUeClientId(e.target.value)}
+                                                placeholder="OAuth Client ID"
+                                                className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-[var(--text-secondary)] mb-1">Client Secret</label>
+                                            <input
+                                                type="password"
+                                                value={ueClientSecret}
+                                                onChange={(e) => setUeClientSecret(e.target.value)}
+                                                placeholder="OAuth Secret"
+                                                className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => handleMenuSync('ubereats')}
+                                        disabled={!ueStoreId || menuSyncing === 'ubereats'}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${!ueStoreId ? 'bg-stone-600 text-stone-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'
+                                            }`}
+                                    >
+                                        {menuSyncing === 'ubereats' ? (
+                                            <><RefreshCw size={14} className="animate-spin" /> Syncing...</>
+                                        ) : (
+                                            <><RefreshCw size={14} /> Push Menu to Uber Eats</>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* Sync Result */}
+                                {menuSyncResult && (
+                                    <div className={`p-4 rounded-lg border ${menuSyncResult.success ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'
+                                        }`}>
+                                        <p className={`text-sm font-medium ${menuSyncResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                                            {menuSyncResult.success
+                                                ? `✅ ${menuSyncResult.message}`
+                                                : `❌ ${menuSyncResult.error}`
+                                            }
+                                        </p>
+                                    </div>
+                                )}
+
+                                <p className="text-xs text-[var(--text-muted)]">
+                                    Need help? Apply for DoorDash access at <a href="https://developers.doordash.com" target="_blank" className="text-red-400 hover:underline">developers.doordash.com</a> or
+                                    Uber Eats at <a href="https://merchants.ubereats.com" target="_blank" className="text-green-400 hover:underline">merchants.ubereats.com</a>.
+                                    Orders will auto-flow into your POS once connected.
                                 </p>
                             </div>
                         )}
