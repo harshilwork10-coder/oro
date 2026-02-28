@@ -991,6 +991,10 @@ model Location {
   bottleDepositEnabled Boolean  @default(false)
   bottleDepositAmount  Decimal? @db.Decimal(6, 2) // e.g., 0.05 for $0.05 per container
 
+  // Store Hours & Holidays
+  storeHours String? // JSON: { monday: { open: "06:00", close: "22:00" }, ... }
+  holidays   String? // JSON: [{ date: "2026-12-25", name: "Christmas", closed: true }]
+
   // Pulse Quick Login Store Code (e.g., "DOWNTOWN", "MAIN")
   pulseStoreCode String? @unique
 
@@ -1105,6 +1109,7 @@ model Station {
 
   name     String // "Register 1", "Register 2", etc.
   isActive Boolean @default(true)
+  trainingMode Boolean @default(false) // When true, transactions don't affect real data
 
   // Payment capability: DEDICATED (has terminal) or CASH_ONLY
   paymentMode StationPaymentMode @default(CASH_ONLY)
@@ -1933,6 +1938,7 @@ model Transaction {
   total    Decimal @db.Decimal(12, 2)
 
   paymentMethod  String // CASH, DEBIT_CARD, CREDIT_CARD, SPLIT
+  splitTenders   String? // JSON array of tender breakdowns [{method, amount, reference}]
   processingPlan String? // STANDARD, SURCHARGE, DUAL_PRICE (from merchant config)
 
   // Dual Pricing Totals (compliant dual price system)
