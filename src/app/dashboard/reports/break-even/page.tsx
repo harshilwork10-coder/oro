@@ -1,24 +1,49 @@
 'use client'
 
-import ReportPageLayout from "@/components/reports/ReportPageLayout"
-import { TrendingUp } from "lucide-react"
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { ArrowLeft, TrendingUp, RefreshCw } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 
 export default function BreakEvenReportPage() {
+    const [data, setData] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        fetch('/api/reports/eod-summary')
+            .then(r => r.json()).then(d => { setData(d.data); setLoading(false) })
+            .catch(() => setLoading(false))
+    }, [])
+
+    const revenue = data?.revenue || 0
+    const fixedCosts = revenue * 0.25
+    const variableCosts = revenue * 0.35
+    const contributionMargin = revenue > 0 ? ((revenue - variableCosts) / revenue * 100).toFixed(1) : '0.0'
+    const breakEvenPoint = Number(contributionMargin) > 0 ? fixedCosts / (Number(contributionMargin) / 100) : 0
+
     return (
-        <ReportPageLayout
-            title="Break-Even Analysis"
-            description="Track locations against their break-even points to ensure financial sustainability."
-        >
-            <div className="glass-panel rounded-xl p-12">
-                <div className="text-center">
-                    <TrendingUp className="w-16 h-16 text-stone-600 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-stone-300 mb-2">No Break-Even Data Available</h3>
-                    <p className="text-stone-500 max-w-md mx-auto">
-                        Break-even analysis will appear here once revenue and cost data is recorded for your locations.
-                    </p>
-                </div>
+        <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white p-6">
+            <div className="flex items-center gap-4 mb-8">
+                <Link href="/dashboard/reports" className="p-2 hover:bg-stone-800 rounded-lg"><ArrowLeft className="h-6 w-6" /></Link>
+                <div><h1 className="text-3xl font-bold flex items-center gap-2"><TrendingUp className="h-8 w-8 text-cyan-500" /> Break-Even Analysis</h1>
+                    <p className="text-stone-400">Revenue needed to cover costs</p></div>
             </div>
-        </ReportPageLayout>
+            {loading ? <div className="text-center py-20"><RefreshCw className="h-8 w-8 animate-spin mx-auto" /></div> : data ? (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[
+                        { label: 'Today Revenue', val: formatCurrency(revenue), color: 'text-emerald-400' },
+                        { label: 'Est. Fixed Costs', val: formatCurrency(fixedCosts), color: 'text-orange-400' },
+                        { label: 'Contribution Margin', val: `${contributionMargin}%`, color: 'text-cyan-400' },
+                        { label: 'Break-Even Point', val: formatCurrency(isFinite(breakEvenPoint) ? breakEvenPoint : 0), color: revenue >= breakEvenPoint ? 'text-emerald-400' : 'text-red-400' },
+                    ].map(s => (
+                        <div key={s.label} className="bg-stone-900/80 border border-stone-700 rounded-2xl p-5">
+                            <p className="text-sm text-stone-400">{s.label}</p>
+                            <p className={`text-3xl font-bold mt-1 ${s.color}`}>{s.val}</p>
+                        </div>
+                    ))}
+                    <p className="col-span-full text-xs text-stone-600">* Costs estimated. Connect accounting for exact figures.</p>
+                </div>
+            ) : <p className="text-center text-stone-500 py-20">No data yet.</p>}
+        </div>
     )
 }
-

@@ -12,6 +12,44 @@ import {
     AlertCircle
 } from 'lucide-react'
 
+function RecentShifts() {
+    const [shifts, setShifts] = useState<any[]>([])
+    useEffect(() => {
+        fetch('/api/pos/timeclock/history')
+            .then(r => r.json()).then(d => setShifts(d.data || []))
+            .catch(() => { })
+    }, [])
+
+    if (shifts.length === 0) return <p className="p-4 text-stone-500 text-sm">No recent shifts found.</p>
+
+    return (
+        <div className="divide-y divide-stone-800">
+            {shifts.slice(0, 5).map((shift: any, i: number) => {
+                const start = shift.clockIn ? new Date(shift.clockIn) : null
+                const end = shift.clockOut ? new Date(shift.clockOut) : null
+                const durationMs = start && end ? end.getTime() - start.getTime() : 0
+                const hours = Math.floor(durationMs / (1000 * 60 * 60))
+                const mins = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60))
+                return (
+                    <div key={i} className="p-4 flex items-center justify-between hover:bg-stone-800/30">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-stone-800 rounded-lg text-stone-400"><Calendar className="h-5 w-5" /></div>
+                            <div>
+                                <p className="font-medium text-stone-200">{start ? start.toLocaleDateString() : 'Unknown'}</p>
+                                <p className="text-xs text-stone-500">{shift.employeeName || 'Shift'}</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="font-mono text-stone-200">{end ? `${hours}h ${mins}m` : 'Active'}</p>
+                            <p className={`text-xs ${end ? 'text-emerald-400' : 'text-amber-400'}`}>{end ? 'Completed' : 'In Progress'}</p>
+                        </div>
+                    </div>
+                )
+            })}
+        </div>
+    )
+}
+
 export default function TimeClockPage() {
     const [currentTime, setCurrentTime] = useState(new Date())
     const [status, setStatus] = useState<'CLOCKED_OUT' | 'CLOCKED_IN' | 'ON_BREAK'>('CLOCKED_OUT')
@@ -74,8 +112,8 @@ export default function TimeClockPage() {
                 {/* Status Indicator */}
                 <div className="flex justify-center">
                     <div className={`px-6 py-2 rounded-full text-sm font-bold tracking-wide uppercase border ${status === 'CLOCKED_IN' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-                            status === 'ON_BREAK' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
-                                'bg-stone-800 text-stone-400 border-stone-700'
+                        status === 'ON_BREAK' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
+                            'bg-stone-800 text-stone-400 border-stone-700'
                         }`}>
                         Current Status: {status.replace('_', ' ')}
                     </div>
@@ -136,38 +174,7 @@ export default function TimeClockPage() {
                     <History className="h-5 w-5 text-stone-400" />
                     <h3 className="font-semibold text-stone-200">Recent Activity</h3>
                 </div>
-                <div className="divide-y divide-stone-800">
-                    <div className="p-4 flex items-center justify-between hover:bg-stone-800/30 transition-colors">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-stone-800 rounded-lg text-stone-400">
-                                <Calendar className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <p className="font-medium text-stone-200">Yesterday</p>
-                                <p className="text-xs text-stone-500">Regular Shift</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <p className="font-mono text-stone-200">8h 15m</p>
-                            <p className="text-xs text-emerald-400">Completed</p>
-                        </div>
-                    </div>
-                    <div className="p-4 flex items-center justify-between hover:bg-stone-800/30 transition-colors">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-stone-800 rounded-lg text-stone-400">
-                                <Calendar className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <p className="font-medium text-stone-200">Nov 21, 2023</p>
-                                <p className="text-xs text-stone-500">Regular Shift</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <p className="font-mono text-stone-200">7h 45m</p>
-                            <p className="text-xs text-emerald-400">Completed</p>
-                        </div>
-                    </div>
-                </div>
+                <RecentShifts />
             </div>
         </div>
     )
