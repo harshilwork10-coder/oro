@@ -10,7 +10,7 @@ export default function SalesVelocityPage() {
     const [loading, setLoading] = useState(true)
     const [days, setDays] = useState(30)
 
-    useEffect(() => { setLoading(true); fetch(`/api/reports/sales-velocity?days=${days}`).then(r => r.json()).then(d => { setData(d.data?.items || []); setLoading(false) }) }, [days])
+    useEffect(() => { setLoading(true); fetch(`/api/reports/sales-velocity?days=${days}`).then(r => r.json()).then(d => { setData(d.data?.items || []); setLoading(false) }).catch(() => setLoading(false)) }, [days])
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white p-6">

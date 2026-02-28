@@ -12,7 +12,7 @@ export default function HourlyHeatmapPage() {
     const [data, setData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
-    useEffect(() => { fetch('/api/reports/hourly-heatmap').then(r => r.json()).then(d => { setData(d.data); setLoading(false) }) }, [])
+    useEffect(() => { fetch('/api/reports/hourly-heatmap').then(r => r.json()).then(d => { setData(d.data); setLoading(false) }).catch(() => setLoading(false)) }, [])
 
     const getColor = (val: number, max: number) => {
         if (!max || !val) return 'bg-stone-800'

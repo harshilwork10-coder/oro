@@ -9,7 +9,7 @@ export default function LossPreventionPage() {
     const [loading, setLoading] = useState(true)
     const [days, setDays] = useState(7)
 
-    useEffect(() => { setLoading(true); fetch(`/api/reports/loss-prevention?days=${days}`).then(r => r.json()).then(d => { setData(d.data?.dashboard); setLoading(false) }) }, [days])
+    useEffect(() => { setLoading(true); fetch(`/api/reports/loss-prevention?days=${days}`).then(r => r.json()).then(d => { setData(d.data?.dashboard); setLoading(false) }).catch(() => setLoading(false)) }, [days])
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white p-6">

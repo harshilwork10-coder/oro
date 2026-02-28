@@ -9,7 +9,7 @@ export default function FlashReportPage() {
     const [data, setData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
-    useEffect(() => { fetch('/api/reports/flash-report').then(r => r.json()).then(d => { setData(d.data); setLoading(false) }) }, [])
+    useEffect(() => { fetch('/api/reports/flash-report').then(r => r.json()).then(d => { setData(d.data); setLoading(false) }).catch(() => setLoading(false)) }, [])
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white p-6">
@@ -27,7 +27,7 @@ export default function FlashReportPage() {
                             { label: 'Today Revenue', val: formatCurrency(data.todayRevenue || 0), color: 'text-emerald-400' },
                             { label: 'Transactions', val: data.todayTransactions || 0, color: 'text-blue-400' },
                             { label: 'Avg Ticket', val: formatCurrency(data.avgTicket || 0), color: 'text-purple-400' },
-                            { label: 'vs Yesterday', val: `${data.vsYesterday > 0 ? '+' : ''}${data.vsYesterday?.toFixed(1) || 0}%`, color: (data.vsYesterday || 0) >= 0 ? 'text-emerald-400' : 'text-red-400' },
+                            { label: 'vs Yesterday', val: `${(data.vsYesterday || 0) > 0 ? '+' : ''}${isFinite(data.vsYesterday) ? Number(data.vsYesterday).toFixed(1) : '0.0'}%`, color: (data.vsYesterday || 0) >= 0 ? 'text-emerald-400' : 'text-red-400' },
                         ].map(s => (
                             <div key={s.label} className="bg-stone-900/80 border border-stone-700 rounded-2xl p-5">
                                 <p className="text-sm text-stone-400">{s.label}</p>

@@ -10,7 +10,7 @@ export default function YearOverYearPage() {
     const [loading, setLoading] = useState(true)
     const [period, setPeriod] = useState('month')
 
-    useEffect(() => { setLoading(true); fetch(`/api/reports/year-over-year?period=${period}`).then(r => r.json()).then(d => { setData(d.data); setLoading(false) }) }, [period])
+    useEffect(() => { setLoading(true); fetch(`/api/reports/year-over-year?period=${period}`).then(r => r.json()).then(d => { setData(d.data); setLoading(false) }).catch(() => setLoading(false)) }, [period])
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white p-6">

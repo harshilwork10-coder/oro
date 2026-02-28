@@ -9,7 +9,7 @@ export default function RealtimeSalesPage() {
     const [data, setData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
-    const refresh = useCallback(() => { fetch('/api/reports/realtime-sales').then(r => r.json()).then(d => { setData(d.data?.live); setLoading(false) }) }, [])
+    const refresh = useCallback(() => { fetch('/api/reports/realtime-sales').then(r => r.json()).then(d => { setData(d.data?.live); setLoading(false) }).catch(() => setLoading(false)) }, [])
 
     useEffect(() => { refresh(); const iv = setInterval(refresh, 60000); return () => clearInterval(iv) }, [refresh])
 

@@ -9,7 +9,7 @@ export default function AnomalyDetectionPage() {
     const [loading, setLoading] = useState(true)
     const [days, setDays] = useState(7)
 
-    useEffect(() => { setLoading(true); fetch(`/api/reports/anomaly-detection?days=${days}`).then(r => r.json()).then(d => { setData(d.data?.anomalies || []); setLoading(false) }) }, [days])
+    useEffect(() => { setLoading(true); fetch(`/api/reports/anomaly-detection?days=${days}`).then(r => r.json()).then(d => { setData(d.data?.anomalies || []); setLoading(false) }).catch(() => setLoading(false)) }, [days])
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white p-6">

@@ -9,7 +9,7 @@ export default function AbcAnalysisPage() {
     const [data, setData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
-    useEffect(() => { fetch('/api/reports/abc-analysis').then(r => r.json()).then(d => { setData(d.data); setLoading(false) }) }, [])
+    useEffect(() => { fetch('/api/reports/abc-analysis').then(r => r.json()).then(d => { setData(d.data); setLoading(false) }).catch(() => setLoading(false)) }, [])
 
     const tiers = [
         { key: 'A', color: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400', desc: 'Top 80% of revenue — always in stock' },
@@ -51,7 +51,7 @@ export default function AbcAnalysisPage() {
                                         <td className="py-3 px-4 text-center"><span className={`px-2 py-1 rounded text-xs font-bold ${item.tier === 'A' ? 'bg-emerald-500/20 text-emerald-400' : item.tier === 'B' ? 'bg-blue-500/20 text-blue-400' : 'bg-stone-500/20 text-stone-400'}`}>{item.tier}</span></td>
                                         <td className="py-3 px-4 text-right font-mono text-emerald-400">{formatCurrency(item.revenue)}</td>
                                         <td className="py-3 px-4 text-right">{item.units}</td>
-                                        <td className="py-3 px-4 text-right">{item.percentOfTotal?.toFixed(1)}%</td>
+                                        <td className="py-3 px-4 text-right">{isFinite(item.percentOfTotal) ? Number(item.percentOfTotal).toFixed(1) : '0.0'}%</td>
                                     </tr>
                                 ))}
                             </tbody>

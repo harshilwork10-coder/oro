@@ -20,17 +20,21 @@ export default function BlindCloseModal({ open, onClose, cashDrawerId }: Props) 
     const [result, setResult] = useState<any>(null)
     const [loading, setLoading] = useState(false)
 
-    const total = DENOMS.reduce((s, d) => s + (counts[d.key] || 0) * d.val, 0)
+    const total = Math.round(DENOMS.reduce((s, d) => s + (counts[d.key] || 0) * d.val, 0) * 100) / 100
 
     const submit = async () => {
         setLoading(true)
-        const res = await fetch('/api/pos/blind-close', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cashDrawerId, denominations: counts, countedTotal: total })
-        })
-        const data = await res.json()
-        setResult(data.data)
-        setSubmitted(true)
+        try {
+            const res = await fetch('/api/pos/blind-close', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cashDrawerId, denominations: counts, countedTotal: total })
+            })
+            const data = await res.json()
+            setResult(data.data)
+            setSubmitted(true)
+        } catch (e) {
+            console.error('Blind close submit failed:', e)
+        }
         setLoading(false)
     }
 
