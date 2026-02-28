@@ -281,6 +281,153 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // ─── Tobacco Deal Auto-Apply ──────────────────────────────────────
+        // Owner sets up deals once. When cashier scans a tobacco item,
+        // matching deals apply automatically. No manual code needed for
+        // BUYDOWN, MULTI_BUY, PENNY_DEAL, SCAN_REBATE, PROMO types.
+        // COUPON_CODE type only applies if promoCode matches.
+        try {
+            const tobaccoDeals = await prisma.tobaccoDeal.findMany({
+                where: {
+                    franchiseId: user.franchiseId,
+                    isActive: true,
+                    startDate: { lte: now },
+                    OR: [
+                        { endDate: null },
+                        { endDate: { gte: now } }
+                    ]
+                }
+            })
+
+            if (tobaccoDeals.length > 0) {
+                // Get product details for UPC matching
+                const productIds = items.map(i => i.id)
+                const products = await prisma.product.findMany({
+                    where: { id: { in: productIds }, isTobacco: true },
+                    select: { id: true, name: true, barcode: true, sku: true }
+                })
+
+                const tobaccoItems = items.filter(item =>
+                    products.some(p => p.id === item.id)
+                )
+
+                for (const deal of tobaccoDeals) {
+                    // COUPON_CODE deals require matching code — skip if not entered
+                    if (deal.dealType === 'COUPON_CODE') {
+                        if (!promoCode) continue
+                        if ((deal as any).couponCode && (deal as any).couponCode !== promoCode) continue
+                    }
+
+                    // Find matching tobacco items for this deal
+                    let matchingItems: CartItem[] = []
+
+                    if (deal.applicableUpcs) {
+                        // Deal applies to specific UPCs only
+                        const dealUpcs = deal.applicableUpcs.split(',').map(u => u.trim())
+                        matchingItems = tobaccoItems.filter(item => {
+                            const product = products.find(p => p.id === item.id)
+                            return product && (
+                                dealUpcs.includes(product.barcode || '') ||
+                                dealUpcs.includes(product.sku || '')
+                            )
+                        })
+                    } else if (deal.manufacturer !== 'ALL') {
+                        // Deal applies to all items from this manufacturer
+                        const mfgKeywords: Record<string, string[]> = {
+                            ALTRIA: ['marlboro', 'virginia slims', 'parliament', 'basic', 'l&m', 'copenhagen', 'skoal', 'on!', 'iqos'],
+                            RJR: ['camel', 'newport', 'pall mall', 'natural american', 'grizzly', 'vuse', 'kodiak'],
+                            ITG: ['kool', 'winston', 'maverick', 'salem', 'usa gold', 'dutch masters']
+                        }
+                        const keywords = mfgKeywords[deal.manufacturer] || []
+                        matchingItems = tobaccoItems.filter(item => {
+                            const product = products.find(p => p.id === item.id)
+                            const name = (product?.name || '').toLowerCase()
+                            return keywords.some(kw => name.includes(kw))
+                        })
+                    } else {
+                        // Deal applies to ALL tobacco items
+                        matchingItems = tobaccoItems
+                    }
+
+                    if (matchingItems.length === 0) continue
+                    // Skip items already used by a non-stackable promo
+                    matchingItems = matchingItems.filter(item => !usedItemIds.has(item.id))
+                    if (matchingItems.length === 0) continue
+
+                    const totalQty = matchingItems.reduce((s, i) => s + i.quantity, 0)
+                    let discountAmount = 0
+                    const affectedItemIds: string[] = matchingItems.map(i => i.id)
+
+                    switch (deal.dealType) {
+                        case 'BUYDOWN': {
+                            // Manufacturer pays discount per unit — auto-applies on scan
+                            const perUnit = Number(deal.discountAmount) || 0
+                            discountAmount = perUnit * totalQty
+                            break
+                        }
+                        case 'MULTI_BUY': {
+                            // Buy X, get $Y off total — auto-triggers when qty met
+                            const buyQty = deal.buyQuantity || 2
+                            if (totalQty >= buyQty) {
+                                const sets = Math.floor(totalQty / buyQty)
+                                discountAmount = (Number(deal.discountAmount) || 0) * sets
+                            }
+                            break
+                        }
+                        case 'PENNY_DEAL': {
+                            // Buy X get Y for $0.01 — auto-triggers
+                            const buyQty = deal.buyQuantity || 2
+                            const freeQty = deal.getFreeQuantity || 1
+                            const totalNeeded = buyQty + freeQty
+                            if (totalQty >= totalNeeded) {
+                                const sets = Math.floor(totalQty / totalNeeded)
+                                // Cheapest items become $0.01
+                                const sorted = [...matchingItems].sort((a, b) => a.price - b.price)
+                                let pennyCount = freeQty * sets
+                                for (const item of sorted) {
+                                    const qty = Math.min(item.quantity, pennyCount)
+                                    discountAmount += (item.price - 0.01) * qty
+                                    pennyCount -= qty
+                                    if (pennyCount <= 0) break
+                                }
+                            }
+                            break
+                        }
+                        case 'COUPON_CODE': {
+                            // Already validated code above
+                            discountAmount = (Number(deal.discountAmount) || 0) * totalQty
+                            break
+                        }
+                        case 'SCAN_REBATE': {
+                            // Per-scan rebate — auto-applies
+                            discountAmount = (Number(deal.discountAmount) || 0) * totalQty
+                            break
+                        }
+                        case 'PROMO': {
+                            // Promotional — flat discount per qualifying item
+                            discountAmount = (Number(deal.discountAmount) || 0) * totalQty
+                            break
+                        }
+                    }
+
+                    if (discountAmount > 0) {
+                        appliedPromotions.push({
+                            promotionId: `tobacco-${deal.id}`,
+                            promotionName: `🚬 ${deal.dealName}`,
+                            type: deal.dealType,
+                            discountAmount: Math.round(discountAmount * 100) / 100,
+                            affectedItems: [...new Set(affectedItemIds)]
+                        })
+                        totalDiscount += discountAmount
+                        affectedItemIds.forEach(id => usedItemIds.add(id))
+                    }
+                }
+            }
+        } catch (tobaccoError) {
+            // Don't break checkout if tobacco deals fail
+            console.error('[TOBACCO_DEALS_CHECK]', tobaccoError)
+        }
+
         return NextResponse.json({
             appliedPromotions,
             totalDiscount: Math.round(totalDiscount * 100) / 100

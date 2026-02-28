@@ -76,9 +76,10 @@ export default function TobaccoDealsPage() {
         dealName: '',
         dealType: 'MULTI_BUY',
         buyQuantity: 2,
-        getFreeQuantity: 1,  // For penny deals
+        getFreeQuantity: 1,
         discountType: 'FIXED',
         discountAmount: '0.50',
+        couponCode: '',
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
         applyToAll: true
@@ -98,8 +99,10 @@ export default function TobaccoDealsPage() {
 
     const manufacturers = ['ALTRIA', 'RJR', 'ITG']
     const dealTypes = [
-        { value: 'MULTI_BUY', label: 'Multi-Buy (Buy X Get Off)' },
+        { value: 'BUYDOWN', label: 'Buydown (Mfg pays discount, you keep full price)' },
+        { value: 'MULTI_BUY', label: 'Multi-Buy (Buy X Get $ Off)' },
         { value: 'PENNY_DEAL', label: 'Penny Deal (Buy X Get Y for $0.01)' },
+        { value: 'COUPON_CODE', label: 'Coupon Code (cashier enters at POS)' },
         { value: 'LOYALTY', label: 'Loyalty Bonus' },
         { value: 'SCAN_REBATE', label: 'Scan Rebate' },
         { value: 'PROMO', label: 'Promotional Offer' }
@@ -144,6 +147,7 @@ export default function TobaccoDealsPage() {
             getFreeQuantity: 1,
             discountType: 'FIXED',
             discountAmount: '0.50',
+            couponCode: '',
             startDate: new Date().toISOString().split('T')[0],
             endDate: '',
             applyToAll: true
@@ -181,6 +185,7 @@ export default function TobaccoDealsPage() {
                 body: JSON.stringify({
                     ...newDeal,
                     discountAmount: parseFloat(newDeal.discountAmount),
+                    couponCode: newDeal.couponCode || null,
                     applicableUpcs
                 })
             })
@@ -196,6 +201,7 @@ export default function TobaccoDealsPage() {
                     getFreeQuantity: 1,
                     discountType: 'FIXED',
                     discountAmount: '0.50',
+                    couponCode: '',
                     startDate: new Date().toISOString().split('T')[0],
                     endDate: '',
                     applyToAll: true
@@ -373,8 +379,10 @@ export default function TobaccoDealsPage() {
                                         <div>
                                             <h4 className="font-medium text-stone-200">{deal.dealName}</h4>
                                             <p className="text-sm text-stone-500">
+                                                {deal.dealType === 'BUYDOWN' && `Buydown: ${formatCurrency(deal.discountAmount)} off (mfg-funded)`}
                                                 {deal.dealType === 'MULTI_BUY' && `Buy ${deal.buyQuantity}, Save ${formatCurrency(deal.discountAmount)}`}
                                                 {deal.dealType === 'PENNY_DEAL' && `Buy ${deal.buyQuantity}, Get ${deal.getFreeQuantity || 1} for $0.01`}
+                                                {deal.dealType === 'COUPON_CODE' && `Coupon: ${formatCurrency(deal.discountAmount)} off`}
                                                 {deal.dealType === 'LOYALTY' && `Loyalty: ${formatCurrency(deal.discountAmount)}/month`}
                                                 {deal.dealType === 'SCAN_REBATE' && `${formatCurrency(deal.discountAmount)} per scan`}
                                                 {deal.dealType === 'PROMO' && `Promo: ${formatCurrency(deal.discountAmount)} off`}
@@ -483,6 +491,38 @@ export default function TobaccoDealsPage() {
                                         onChange={(e) => setNewDeal({ ...newDeal, discountAmount: e.target.value })}
                                         className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100"
                                     />
+                                </div>
+                            )}
+
+                            {/* Coupon Code - for COUPON_CODE and BUYDOWN types */}
+                            {(newDeal.dealType === 'COUPON_CODE' || newDeal.dealType === 'BUYDOWN') && (
+                                <div>
+                                    <label className="block text-sm text-stone-400 mb-1">
+                                        {newDeal.dealType === 'COUPON_CODE' ? 'Coupon Code (cashier enters this)' : 'Manufacturer Coupon Code (optional)'}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={newDeal.couponCode}
+                                        onChange={(e) => setNewDeal({ ...newDeal, couponCode: e.target.value.toUpperCase() })}
+                                        placeholder="e.g., MARLBORO50 or ALT-2024-Q1"
+                                        className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 font-mono uppercase"
+                                    />
+                                    <p className="text-xs text-stone-500 mt-1">
+                                        {newDeal.dealType === 'COUPON_CODE'
+                                            ? 'Cashier will type this code at checkout to apply the discount'
+                                            : 'From your Altria/RJR rep deal sheet — used for tracking'
+                                        }
+                                    </p>
+                                </div>
+                            )}
+
+                            {newDeal.dealType === 'BUYDOWN' && (
+                                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                                    <p className="text-sm text-emerald-300 font-medium">💡 How Buydowns Work:</p>
+                                    <p className="text-xs text-stone-400 mt-1">
+                                        Customer sees the lower price. You keep YOUR full shelf price.
+                                        The manufacturer reimburses you the difference via your scan data rebate.
+                                    </p>
                                 </div>
                             )}
 
