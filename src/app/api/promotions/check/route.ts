@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const { items, promoCode } = await request.json() as { items: CartItem[], promoCode?: string }
+        const { items, promoCode, loyaltyId } = await request.json() as { items: CartItem[], promoCode?: string, loyaltyId?: string }
 
         if (!items || items.length === 0) {
             return NextResponse.json({ appliedPromotions: [], totalDiscount: 0 })
@@ -360,9 +360,18 @@ export async function POST(request: NextRequest) {
 
                     switch (deal.dealType) {
                         case 'BUYDOWN': {
-                            // Manufacturer pays discount per unit — auto-applies on scan
-                            const perUnit = Number(deal.discountAmount) || 0
-                            discountAmount = perUnit * totalQty
+                            // Tiered buydown: base discount for everyone,
+                            // extra discount when customer enters phone # (loyalty ID)
+                            const basePerUnit = Number(deal.discountAmount) || 0
+                            const loyaltyExtra = Number((deal as any).loyaltyExtraDiscount) || 0
+
+                            // Base discount always applies (auto on scan)
+                            discountAmount = basePerUnit * totalQty
+
+                            // Loyalty extra: only if customer entered phone number
+                            if (loyaltyId && loyaltyExtra > 0) {
+                                discountAmount += loyaltyExtra * totalQty
+                            }
                             break
                         }
                         case 'MULTI_BUY': {

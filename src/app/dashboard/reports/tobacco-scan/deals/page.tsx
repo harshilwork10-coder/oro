@@ -79,6 +79,7 @@ export default function TobaccoDealsPage() {
         getFreeQuantity: 1,
         discountType: 'FIXED',
         discountAmount: '0.50',
+        loyaltyExtraDiscount: '0.00',
         couponCode: '',
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
@@ -147,6 +148,7 @@ export default function TobaccoDealsPage() {
             getFreeQuantity: 1,
             discountType: 'FIXED',
             discountAmount: '0.50',
+            loyaltyExtraDiscount: '0.00',
             couponCode: '',
             startDate: new Date().toISOString().split('T')[0],
             endDate: '',
@@ -185,6 +187,7 @@ export default function TobaccoDealsPage() {
                 body: JSON.stringify({
                     ...newDeal,
                     discountAmount: parseFloat(newDeal.discountAmount),
+                    loyaltyExtraDiscount: parseFloat(newDeal.loyaltyExtraDiscount || '0'),
                     couponCode: newDeal.couponCode || null,
                     applicableUpcs
                 })
@@ -201,6 +204,7 @@ export default function TobaccoDealsPage() {
                     getFreeQuantity: 1,
                     discountType: 'FIXED',
                     discountAmount: '0.50',
+                    loyaltyExtraDiscount: '0.00',
                     couponCode: '',
                     startDate: new Date().toISOString().split('T')[0],
                     endDate: '',
@@ -517,12 +521,46 @@ export default function TobaccoDealsPage() {
                             )}
 
                             {newDeal.dealType === 'BUYDOWN' && (
-                                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                                    <p className="text-sm text-emerald-300 font-medium">💡 How Buydowns Work:</p>
-                                    <p className="text-xs text-stone-400 mt-1">
-                                        Customer sees the lower price. You keep YOUR full shelf price.
-                                        The manufacturer reimburses you the difference via your scan data rebate.
-                                    </p>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-stone-400 mb-1">
+                                                💲 Base Discount (everyone)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={newDeal.discountAmount}
+                                                onChange={(e) => setNewDeal({ ...newDeal, discountAmount: e.target.value })}
+                                                placeholder="1.00"
+                                                className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100"
+                                            />
+                                            <p className="text-xs text-stone-500 mt-1">Applied when item is scanned</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-stone-400 mb-1">
+                                                📱 Loyalty Extra (phone # entered)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={newDeal.loyaltyExtraDiscount}
+                                                onChange={(e) => setNewDeal({ ...newDeal, loyaltyExtraDiscount: e.target.value })}
+                                                placeholder="0.70"
+                                                className="w-full p-3 bg-stone-800 border border-stone-700 rounded-lg text-stone-100"
+                                            />
+                                            <p className="text-xs text-stone-500 mt-1">Extra off when customer gives phone #</p>
+                                        </div>
+                                    </div>
+                                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                                        <p className="text-sm text-emerald-300 font-medium">💡 How Tiered Buydowns Work:</p>
+                                        <div className="text-xs text-stone-400 mt-1 space-y-1">
+                                            <p>• <span className="text-stone-200">Without loyalty:</span> Customer gets ${newDeal.discountAmount || '0.00'} off (mfg pays)</p>
+                                            <p>• <span className="text-stone-200">With loyalty (phone #):</span> Customer gets ${(parseFloat(newDeal.discountAmount || '0') + parseFloat(newDeal.loyaltyExtraDiscount || '0')).toFixed(2)} off total (mfg pays both)</p>
+                                            <p>• <span className="text-emerald-400">You keep your full shelf price either way!</span></p>
+                                            <p>• Scan data reports the loyalty ID → manufacturer reimburses you for BOTH discounts</p>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
