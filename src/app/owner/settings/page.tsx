@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Store, CreditCard, Bell, Users, Shield, Palette, Clock, MapPin, ChevronRight, Star, Check, Loader2 } from 'lucide-react';
+import { Store, CreditCard, Bell, Users, Shield, Palette, Clock, MapPin, ChevronRight, Star, Check, Loader2, Globe, RefreshCw, Package } from 'lucide-react';
 
-type SettingsSection = 'general' | 'payment' | 'notifications' | 'employees' | 'security' | 'appearance' | 'hours' | 'location';
+type SettingsSection = 'general' | 'payment' | 'notifications' | 'employees' | 'security' | 'appearance' | 'hours' | 'location' | 'integrations';
 
 const sections = [
     { id: 'general', label: 'General', icon: Store },
@@ -15,6 +15,7 @@ const sections = [
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'hours', label: 'Business Hours', icon: Clock },
     { id: 'location', label: 'Location Info', icon: MapPin },
+    { id: 'integrations', label: 'Google Pointy', icon: Globe },
 ];
 
 export default function SettingsPage() {
@@ -25,6 +26,14 @@ export default function SettingsPage() {
     const [placeIdSaved, setPlaceIdSaved] = useState(false);
     const [placeIdError, setPlaceIdError] = useState<string | null>(null);
 
+    // Google Pointy state
+    const [merchantId, setMerchantId] = useState('');
+    const [storeCode, setStoreCode] = useState('');
+    const [pointyStats, setPointyStats] = useState<any>(null);
+    const [pointyPreview, setPointyPreview] = useState<any[]>([]);
+    const [pointySyncing, setPointySyncing] = useState(false);
+    const [pointySyncResult, setPointySyncResult] = useState<any>(null);
+
     // Load existing Google Place ID
     useEffect(() => {
         fetch('/api/owner/location-settings')
@@ -33,7 +42,40 @@ export default function SettingsPage() {
                 if (data.googlePlaceId) setGooglePlaceId(data.googlePlaceId);
             })
             .catch(() => { });
+
+        // Load Google Pointy stats
+        fetch('/api/integrations/google-pointy')
+            .then(res => res.json())
+            .then(data => setPointyStats(data))
+            .catch(() => { });
     }, []);
+
+    const handlePointyPreview = async () => {
+        const res = await fetch('/api/integrations/google-pointy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'preview' })
+        });
+        const data = await res.json();
+        setPointyPreview(data.products || []);
+    };
+
+    const handlePointySync = async () => {
+        if (!merchantId || !storeCode) return;
+        setPointySyncing(true);
+        try {
+            const res = await fetch('/api/integrations/google-pointy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'sync', merchantId, storeCode })
+            });
+            const data = await res.json();
+            setPointySyncResult(data);
+        } catch {
+            setPointySyncResult({ error: 'Sync failed' });
+        }
+        setPointySyncing(false);
+    };
 
     const handleSaveGooglePlaceId = async () => {
         setPlaceIdSaving(true);
@@ -205,9 +247,156 @@ export default function SettingsPage() {
                             </div>
                         )}
 
-                        {activeSection !== 'general' && activeSection !== 'payment' && (
+                        {activeSection !== 'general' && activeSection !== 'payment' && activeSection !== 'integrations' && (
                             <div className="text-center py-8">
                                 <p className="text-[var(--text-muted)]">Settings for this section coming soon</p>
+                            </div>
+                        )}
+
+                        {activeSection === 'integrations' && (
+                            <div className="space-y-6">
+                                {/* Pointy Header */}
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Globe size={22} className="text-blue-400" />
+                                    <div>
+                                        <h3 className="font-semibold text-[var(--text-primary)]">Google Pointy — "See What's In Store"</h3>
+                                        <p className="text-sm text-[var(--text-muted)]">
+                                            Show your products on Google Search, Maps & Shopping when customers search nearby.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Coverage Stats */}
+                                {pointyStats?.inventory && (
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
+                                            <p className="text-2xl font-bold text-[var(--text-primary)]">{pointyStats.inventory.totalProducts}</p>
+                                            <p className="text-xs text-[var(--text-muted)]">Total Products</p>
+                                        </div>
+                                        <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
+                                            <p className="text-2xl font-bold text-green-400">{pointyStats.inventory.productsWithBarcode}</p>
+                                            <p className="text-xs text-[var(--text-muted)]">With Barcodes (Syncable)</p>
+                                        </div>
+                                        <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
+                                            <p className="text-2xl font-bold text-blue-400">{pointyStats.inventory.coveragePercent}%</p>
+                                            <p className="text-xs text-[var(--text-muted)]">Coverage</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Merchant Center Settings */}
+                                <div className="p-4 rounded-lg border border-[var(--border)] space-y-4">
+                                    <h4 className="font-medium text-[var(--text-primary)] flex items-center gap-2">
+                                        <Package size={16} />
+                                        Google Merchant Center
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-[var(--text-secondary)] mb-1">Merchant Center ID</label>
+                                            <input
+                                                type="text"
+                                                value={merchantId}
+                                                onChange={(e) => setMerchantId(e.target.value)}
+                                                placeholder="e.g. 12345678"
+                                                className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                            />
+                                            <p className="text-xs text-[var(--text-muted)] mt-1">
+                                                <a href="https://merchants.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                                                    Get from Google Merchant Center →
+                                                </a>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-[var(--text-secondary)] mb-1">Store Code</label>
+                                            <input
+                                                type="text"
+                                                value={storeCode}
+                                                onChange={(e) => setStoreCode(e.target.value)}
+                                                placeholder="e.g. STORE001"
+                                                className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                            />
+                                            <p className="text-xs text-[var(--text-muted)] mt-1">Must match store code in Merchant Center</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={handlePointyPreview}
+                                        className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        👀 Preview Syncable Products
+                                    </button>
+                                    <button
+                                        onClick={handlePointySync}
+                                        disabled={!merchantId || !storeCode || pointySyncing}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${!merchantId || !storeCode
+                                                ? 'bg-stone-600 text-stone-400 cursor-not-allowed'
+                                                : 'bg-blue-600 hover:bg-blue-500 text-white'
+                                            }`}
+                                    >
+                                        {pointySyncing ? (
+                                            <><RefreshCw size={14} className="animate-spin" /> Syncing...</>
+                                        ) : (
+                                            <><RefreshCw size={14} /> Sync to Google Now</>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* Sync Result */}
+                                {pointySyncResult && (
+                                    <div className={`p-4 rounded-lg border ${pointySyncResult.success
+                                            ? 'bg-green-500/10 border-green-500/30'
+                                            : 'bg-red-500/10 border-red-500/30'
+                                        }`}>
+                                        <p className={`text-sm font-medium ${pointySyncResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                                            {pointySyncResult.success
+                                                ? `✅ ${pointySyncResult.synced} products prepared for Google Pointy`
+                                                : `❌ ${pointySyncResult.error}`
+                                            }
+                                        </p>
+                                        {pointySyncResult.syncedAt && (
+                                            <p className="text-xs text-[var(--text-muted)] mt-1">
+                                                Synced at {new Date(pointySyncResult.syncedAt).toLocaleString()}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Preview Table */}
+                                {pointyPreview.length > 0 && (
+                                    <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-[var(--surface)]">
+                                                <tr>
+                                                    <th className="text-left px-4 py-2 text-[var(--text-secondary)]">Product</th>
+                                                    <th className="text-left px-4 py-2 text-[var(--text-secondary)]">Barcode</th>
+                                                    <th className="text-left px-4 py-2 text-[var(--text-secondary)]">Price</th>
+                                                    <th className="text-left px-4 py-2 text-[var(--text-secondary)]">Category</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {pointyPreview.slice(0, 20).map((p: any) => (
+                                                    <tr key={p.id} className="border-t border-[var(--border)]">
+                                                        <td className="px-4 py-2 text-[var(--text-primary)]">{p.name}</td>
+                                                        <td className="px-4 py-2 text-[var(--text-muted)] font-mono text-xs">{p.barcode}</td>
+                                                        <td className="px-4 py-2 text-green-400">${p.price.toFixed(2)}</td>
+                                                        <td className="px-4 py-2 text-[var(--text-muted)]">{p.category}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                        {pointyPreview.length > 20 && (
+                                            <p className="text-xs text-[var(--text-muted)] px-4 py-2 bg-[var(--surface)]">Showing 20 of {pointyPreview.length}</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <p className="text-xs text-[var(--text-muted)]">
+                                    Products need a UPC/EAN barcode to sync. Add barcodes in Inventory → Products.
+                                    Google matches barcodes to its product catalog for images and descriptions.
+                                </p>
                             </div>
                         )}
 
