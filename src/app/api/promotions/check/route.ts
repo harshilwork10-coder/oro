@@ -32,7 +32,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const { items, promoCode, loyaltyId } = await request.json() as { items: CartItem[], promoCode?: string, loyaltyId?: string }
+        const { items, promoCode, loyaltyId, customerTag } = await request.json() as {
+            items: CartItem[],
+            promoCode?: string,
+            loyaltyId?: string,
+            customerTag?: string  // EMPLOYEE, SENIOR, MILITARY, VIP
+        }
 
         if (!items || items.length === 0) {
             return NextResponse.json({ appliedPromotions: [], totalDiscount: 0 })
@@ -79,6 +84,12 @@ export async function POST(request: NextRequest) {
 
             // Check promo code requirement
             if (promo.promoCode && promo.promoCode !== promoCode) continue
+
+            // Check loyalty-only gate: skip if deal requires loyalty but no loyaltyId
+            if ((promo as any).loyaltyOnly && !loyaltyId) continue
+
+            // Check customer tag gate: skip if deal requires specific tag
+            if ((promo as any).customerTag && (promo as any).customerTag !== customerTag) continue
 
             // Find qualifying items based on appliesTo
             let qualifyingCartItems: CartItem[] = []
@@ -260,6 +271,84 @@ export async function POST(request: NextRequest) {
                     }
 
                     discountAmount = normalPrice - tierPrice
+                    break
+                }
+
+                case 'HAPPY_HOUR': {
+                    // Time-based auto-pricing — same as PERCENTAGE but visually distinct
+                    // Time gating already handled above (timeStart/timeEnd/daysOfWeek)
+                    for (const item of qualifyingCartItems) {
+                        discountAmount += item.price * item.quantity * (Number(promo.discountValue) / 100)
+                        affectedItemIds.push(item.id)
+                    }
+                    break
+                }
+
+                case 'EMPLOYEE_DISCOUNT': {
+                    // Flat % off for tagged customers (employee, senior, military)
+                    // customerTag gate already handled above
+                    for (const item of qualifyingCartItems) {
+                        discountAmount += item.price * item.quantity * (Number(promo.discountValue) / 100)
+                        affectedItemIds.push(item.id)
+                    }
+                    break
+                }
+
+                case 'COMBO': {
+                    // Combo builder — all specified items present = combo price
+                    // Same logic as BUNDLE but shown as "Combo" in POS
+                    const comboProductIds = promo.qualifyingItems
+                        .filter(qi => qi.productId && !qi.isExcluded)
+                        .map(qi => qi.productId)
+
+                    const comboPresent = items.map(i => i.id)
+                    const allComboPresent = comboProductIds.every(id => comboPresent.includes(id!))
+                    if (!allComboPresent) continue
+
+                    const comboItems = items.filter(i => comboProductIds.includes(i.id))
+                    const normalComboPrice = comboItems.reduce((sum, i) => sum + i.price, 0)
+                    discountAmount = normalComboPrice - Number(promo.discountValue)
+                    comboItems.forEach(item => affectedItemIds.push(item.id))
+                    break
+                }
+
+                case 'LOYALTY_EXCLUSIVE': {
+                    // Members-only pricing — loyaltyId gate handled above
+                    if (promo.discountType === 'PERCENT') {
+                        for (const item of qualifyingCartItems) {
+                            discountAmount += item.price * item.quantity * (Number(promo.discountValue) / 100)
+                            affectedItemIds.push(item.id)
+                        }
+                    } else {
+                        // Fixed price or fixed amount off
+                        for (const item of qualifyingCartItems) {
+                            discountAmount += Math.min(item.price, Number(promo.discountValue)) * item.quantity
+                            affectedItemIds.push(item.id)
+                        }
+                    }
+                    break
+                }
+
+                case 'GIFT_WITH_PURCHASE': {
+                    // When qualifying items met, a free item is auto-added
+                    // The gift item price becomes $0.00
+                    // discountValue = the product ID of the gift, OR the $ value to discount
+                    if (promo.getQty) {
+                        // Cheapest qualifying item(s) become free
+                        const sorted = [...qualifyingCartItems].sort((a, b) => a.price - b.price)
+                        let freeCount = promo.getQty
+                        for (const item of sorted) {
+                            const qty = Math.min(item.quantity, freeCount)
+                            discountAmount += item.price * qty
+                            affectedItemIds.push(item.id)
+                            freeCount -= qty
+                            if (freeCount <= 0) break
+                        }
+                    } else {
+                        // Flat gift value
+                        discountAmount = Number(promo.discountValue)
+                        qualifyingCartItems.forEach(item => affectedItemIds.push(item.id))
+                    }
                     break
                 }
             }

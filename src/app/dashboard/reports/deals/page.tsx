@@ -83,7 +83,12 @@ export default function DealsReportPage() {
             'PERCENTAGE': 'Percentage Off',
             'FIXED': 'Fixed Amount',
             'THRESHOLD': 'Spend Threshold',
-            'BUNDLE': 'Bundle'
+            'BUNDLE': 'Bundle',
+            'HAPPY_HOUR': '⏰ Happy Hour',
+            'EMPLOYEE_DISCOUNT': '👨‍✈️ Employee/Senior/Military',
+            'COMBO': '🍕 Combo Deal',
+            'LOYALTY_EXCLUSIVE': '🎯 Members Only',
+            'GIFT_WITH_PURCHASE': '🎁 Gift w/ Purchase'
         }
         return labels[type] || type
     }
@@ -96,7 +101,12 @@ export default function DealsReportPage() {
             'PERCENTAGE': 'bg-green-500',
             'FIXED': 'bg-orange-500',
             'THRESHOLD': 'bg-yellow-500',
-            'BUNDLE': 'bg-cyan-500'
+            'BUNDLE': 'bg-cyan-500',
+            'HAPPY_HOUR': 'bg-amber-500',
+            'EMPLOYEE_DISCOUNT': 'bg-indigo-500',
+            'COMBO': 'bg-rose-500',
+            'LOYALTY_EXCLUSIVE': 'bg-violet-500',
+            'GIFT_WITH_PURCHASE': 'bg-emerald-500'
         }
         return colors[type] || 'bg-stone-500'
     }

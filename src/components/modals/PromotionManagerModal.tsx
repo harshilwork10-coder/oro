@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import {
     X, Plus, Trash2, Tag, Percent, DollarSign,
     Calendar, Clock, Gift, ShoppingBag, ChevronDown,
-    ChevronUp, Zap, Layers
+    ChevronUp, Zap, Layers, Coffee, Users, Star, Heart
 } from 'lucide-react'
 
 interface Promotion {
@@ -55,6 +55,18 @@ const DEAL_TYPES = [
     { value: 'PERCENTAGE', label: 'Percentage Off', icon: Percent, description: 'X% off qualifying items' },
     { value: 'FIXED', label: 'Fixed Amount Off', icon: DollarSign, description: '$X off per item' },
     { value: 'THRESHOLD', label: 'Spend Threshold', icon: Zap, description: 'Spend $X get discount' },
+    { value: 'HAPPY_HOUR', label: '⏰ Happy Hour', icon: Coffee, description: 'Time-based auto-pricing' },
+    { value: 'EMPLOYEE_DISCOUNT', label: '👨‍✈️ Employee/Senior/Military', icon: Users, description: 'Tag-based flat discount' },
+    { value: 'COMBO', label: '🍕 Combo Deal', icon: ShoppingBag, description: 'Combo items = combo price' },
+    { value: 'LOYALTY_EXCLUSIVE', label: '🎯 Members Only', icon: Star, description: 'Loyalty members only pricing' },
+    { value: 'GIFT_WITH_PURCHASE', label: '🎁 Gift w/ Purchase', icon: Heart, description: 'Buy X, get free gift item' },
+]
+
+const CUSTOMER_TAGS = [
+    { value: 'EMPLOYEE', label: 'Employee' },
+    { value: 'SENIOR', label: 'Senior (65+)' },
+    { value: 'MILITARY', label: 'Military/Veteran' },
+    { value: 'VIP', label: 'VIP Customer' },
 ]
 
 const DAYS_OF_WEEK = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
@@ -94,7 +106,9 @@ export default function PromotionManagerModal({
         promoCode: '',
         categoryIds: [] as string[],
         productIds: [] as string[],
-        priceTiers: [{ qty: 2, price: 15 }, { qty: 3, price: 20 }] as { qty: number, price: number }[]
+        priceTiers: [{ qty: 2, price: 15 }, { qty: 3, price: 20 }] as { qty: number, price: number }[],
+        customerTag: '',       // EMPLOYEE, SENIOR, MILITARY, VIP
+        loyaltyOnly: false,    // Members-only pricing
     })
 
     useEffect(() => {
@@ -154,7 +168,9 @@ export default function PromotionManagerModal({
             promoCode: '',
             categoryIds: [],
             productIds: [],
-            priceTiers: [{ qty: 2, price: 15 }, { qty: 3, price: 20 }]
+            priceTiers: [{ qty: 2, price: 15 }, { qty: 3, price: 20 }],
+            customerTag: '',
+            loyaltyOnly: false,
         })
     }
 
@@ -165,14 +181,16 @@ export default function PromotionManagerModal({
         try {
             // Set discountType based on type
             let discountType = 'PERCENT'
-            if (formData.type === 'MIX_MATCH' || formData.type === 'BUNDLE') {
+            if (formData.type === 'MIX_MATCH' || formData.type === 'BUNDLE' || formData.type === 'COMBO') {
                 discountType = 'FIXED_PRICE'
-            } else if (formData.type === 'BOGO') {
+            } else if (formData.type === 'BOGO' || formData.type === 'GIFT_WITH_PURCHASE') {
                 discountType = 'FREE_ITEM'
             } else if (formData.type === 'FIXED') {
                 discountType = 'FIXED_AMOUNT'
             } else if (formData.type === 'TIERED') {
                 discountType = 'TIERED'
+            } else if (['HAPPY_HOUR', 'EMPLOYEE_DISCOUNT', 'LOYALTY_EXCLUSIVE', 'PERCENTAGE', 'THRESHOLD'].includes(formData.type)) {
+                discountType = 'PERCENT'
             }
 
             const res = await fetch('/api/promotions', {
@@ -442,20 +460,88 @@ export default function PromotionManagerModal({
                                         <div>
                                             <label className="text-sm text-stone-400">
                                                 {formData.type === 'MIX_MATCH' ? 'Deal Price ($)' :
-                                                    formData.type === 'PERCENTAGE' ? 'Discount (%)' :
+                                                    formData.type === 'PERCENTAGE' || formData.type === 'HAPPY_HOUR' || formData.type === 'EMPLOYEE_DISCOUNT' || formData.type === 'LOYALTY_EXCLUSIVE' ? 'Discount (%)' :
                                                         formData.type === 'FIXED' ? 'Amount Off ($)' :
                                                             formData.type === 'THRESHOLD' ? 'Discount (%)' :
-                                                                'Value'}
+                                                                formData.type === 'COMBO' ? 'Combo Price ($)' :
+                                                                    formData.type === 'GIFT_WITH_PURCHASE' ? 'Gift Item Qty (free)' :
+                                                                        'Value'}
                                             </label>
                                             <input
                                                 type="number"
                                                 value={formData.discountValue}
                                                 onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })}
                                                 min="0"
-                                                step={formData.type === 'PERCENTAGE' ? '1' : '0.01'}
+                                                step={['PERCENTAGE', 'HAPPY_HOUR', 'EMPLOYEE_DISCOUNT', 'LOYALTY_EXCLUSIVE'].includes(formData.type) ? '1' : '0.01'}
                                                 className="w-full mt-1 px-3 py-2 bg-stone-900 border border-stone-600 rounded-lg"
                                             />
                                         </div>
+
+                                        {/* Employee/Senior/Military Tag Selector */}
+                                        {formData.type === 'EMPLOYEE_DISCOUNT' && (
+                                            <div>
+                                                <label className="text-sm text-stone-400">Customer Tag Required</label>
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                                                    {CUSTOMER_TAGS.map(tag => (
+                                                        <button
+                                                            key={tag.value}
+                                                            onClick={() => setFormData({ ...formData, customerTag: tag.value })}
+                                                            className={`px-3 py-2 rounded-lg text-sm font-medium ${formData.customerTag === tag.value
+                                                                ? 'bg-indigo-500 text-white'
+                                                                : 'bg-stone-700 text-stone-300 hover:bg-stone-600'
+                                                                }`}
+                                                        >
+                                                            {tag.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <p className="text-xs text-stone-500 mt-1">Cashier tags customer at POS → discount auto-applies</p>
+                                            </div>
+                                        )}
+
+                                        {/* Loyalty-Only Toggle */}
+                                        {formData.type === 'LOYALTY_EXCLUSIVE' && (
+                                            <div className="p-3 bg-violet-500/10 border border-violet-500/30 rounded-lg">
+                                                <p className="text-sm text-violet-300 font-medium">🎯 Members-Only Pricing</p>
+                                                <p className="text-xs text-stone-400 mt-1">
+                                                    This deal ONLY applies when customer enters their phone # (loyalty ID).
+                                                    Non-members pay full price. Great for driving loyalty enrollments!
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Happy Hour Helper */}
+                                        {formData.type === 'HAPPY_HOUR' && (
+                                            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                                                <p className="text-sm text-amber-300 font-medium">⏰ Set Time Window Below</p>
+                                                <p className="text-xs text-stone-400 mt-1">
+                                                    Set start/end time + active days below. Discount auto-applies
+                                                    ONLY during that window. No cashier action needed.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Combo Helper */}
+                                        {formData.type === 'COMBO' && (
+                                            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg">
+                                                <p className="text-sm text-rose-300 font-medium">🍕 Select combo items below in "Specific Products"</p>
+                                                <p className="text-xs text-stone-400 mt-1">
+                                                    Pick the items that make up the combo. When ALL are scanned,
+                                                    the total becomes the Combo Price above. Example: Hot Dog + Chips + Drink = $4.99
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Gift with Purchase Helper */}
+                                        {formData.type === 'GIFT_WITH_PURCHASE' && (
+                                            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                                                <p className="text-sm text-emerald-300 font-medium">🎁 Buy qualifying items → cheapest item becomes FREE</p>
+                                                <p className="text-xs text-stone-400 mt-1">
+                                                    Set the qualifying items and quantity below. The cheapest item(s)
+                                                    in the qualifying set become free. Example: Buy any 3 energy drinks, cheapest is free.
+                                                </p>
+                                            </div>
+                                        )}
 
                                         {/* Applies To */}
                                         <div>
