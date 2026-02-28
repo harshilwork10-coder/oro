@@ -665,6 +665,9 @@ model FranchiseSettings {
   receiptPrintMode String  @default("ALL") // ALL, CARD_ONLY, EBT_ONLY, CARD_AND_EBT, NONE
   openDrawerOnCash Boolean @default(true) // Open cash drawer on cash transactions
 
+  // Receipt Template (advanced customization)
+  receiptTemplate String? // JSON: full template config (header, body, footer sections)
+
   // ========== SALON FEATURE TOGGLES (Squire-level) ==========
 
   // Booking Features
@@ -1428,6 +1431,15 @@ model Item {
   // MENU_ITEM = Restaurant food/drinks
   // PACKAGE = Bundle of items/services
   type String @default("PRODUCT") // SERVICE, PRODUCT, MENU_ITEM, PACKAGE
+
+  // Bundle / Kit Items (sell as 1 SKU, deducts component items from stock)
+  isBundle         Boolean @default(false)
+  bundleComponents String? // JSON: [{ itemId, quantity }]
+
+  // Matrix Items (parent + variants like Size/Color)
+  isMatrix          Boolean @default(false)
+  parentItemId      String? // If variant, references parent matrix item
+  variantAttributes String? // JSON: { size: "Large", color: "Red" }
 
   // Category (unified)
   categoryId String?
