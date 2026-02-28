@@ -17,6 +17,7 @@ interface AppliedPromotion {
     type: string
     discountAmount: number
     affectedItems: string[] // Item IDs
+    receiptDisplay?: string // INLINE | SEPARATE
 }
 
 // POST - Check cart items for applicable promotions
@@ -66,6 +67,8 @@ export async function POST(request: NextRequest) {
         const appliedPromotions: AppliedPromotion[] = []
         let totalDiscount = 0
         const usedItemIds = new Set<string>() // Track items already in a deal (for non-stackable)
+        const usedExclusionGroups = new Set<string>() // Mutual exclusion groups
+        const cartTotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
 
         for (const promo of promotions) {
             // Check end date
@@ -90,6 +93,10 @@ export async function POST(request: NextRequest) {
 
             // Check customer tag gate: skip if deal requires specific tag
             if ((promo as any).customerTag && (promo as any).customerTag !== customerTag) continue
+
+            // Check mutual exclusion group: skip if another promo in same group already applied
+            const exclusionGroup = (promo as any).exclusionGroup as string | undefined
+            if (exclusionGroup && usedExclusionGroups.has(exclusionGroup)) continue
 
             // Find qualifying items based on appliesTo
             let qualifyingCartItems: CartItem[] = []
@@ -163,10 +170,18 @@ export async function POST(request: NextRequest) {
                     const sets = Math.floor(totalQualifyingQty / (buyQty + getQty))
                     if (sets === 0) continue
 
-                    // Free items are the cheapest
-                    const sortedItems = [...qualifyingCartItems].sort((a, b) => a.price - b.price)
+                    // Evaluation method: which items get discounted
+                    const evalMethod = (promo as any).evaluationMethod || 'LOWEST_PRICE'
+                    let sortedForDiscount: CartItem[]
+                    if (evalMethod === 'HIGHEST_PRICE') {
+                        sortedForDiscount = [...qualifyingCartItems].sort((a, b) => b.price - a.price)
+                    } else {
+                        // LOWEST_PRICE (default) — cheapest items get the deal
+                        sortedForDiscount = [...qualifyingCartItems].sort((a, b) => a.price - b.price)
+                    }
+
                     let freeItems = getQty * sets
-                    for (const item of sortedItems) {
+                    for (const item of sortedForDiscount) {
                         const qtyToFree = Math.min(item.quantity, freeItems)
                         if (promo.discountType === 'FREE_ITEM') {
                             discountAmount += item.price * qtyToFree
@@ -351,6 +366,80 @@ export async function POST(request: NextRequest) {
                     }
                     break
                 }
+
+                case 'BXGY': {
+                    // Buy X items from group A, get Y items from group B free/discounted
+                    // Buy group = qualifyingItems where isExcluded=false
+                    // Get group = qualifyingItems where isExcluded=true (repurposed flag)
+                    const buyGroupIds = promo.qualifyingItems
+                        .filter(qi => qi.productId && !qi.isExcluded)
+                        .map(qi => qi.productId)
+                    const getGroupIds = promo.qualifyingItems
+                        .filter(qi => qi.productId && qi.isExcluded)
+                        .map(qi => qi.productId)
+
+                    // Also support category-level buy/get groups
+                    const buyCatIds = promo.qualifyingItems
+                        .filter(qi => qi.categoryId && !qi.isExcluded)
+                        .map(qi => qi.categoryId)
+                    const getCatIds = promo.qualifyingItems
+                        .filter(qi => qi.categoryId && qi.isExcluded)
+                        .map(qi => qi.categoryId)
+
+                    const buyItems = items.filter(i =>
+                        buyGroupIds.includes(i.id) ||
+                        buyCatIds.includes(i.categoryId || '')
+                    )
+                    const getItems = items.filter(i =>
+                        getGroupIds.includes(i.id) ||
+                        getCatIds.includes(i.categoryId || '')
+                    )
+
+                    const bxgyBuyQty = promo.requiredQty || 2
+                    const bxgyGetQty = promo.getQty || 1
+                    const buyTotalQty = buyItems.reduce((s, i) => s + i.quantity, 0)
+
+                    if (buyTotalQty < bxgyBuyQty) continue
+                    if (getItems.length === 0) continue
+
+                    const bxgySets = Math.floor(buyTotalQty / bxgyBuyQty)
+                    const evalMethod = (promo as any).evaluationMethod || 'LOWEST_PRICE'
+
+                    let sortedGetItems: CartItem[]
+                    if (evalMethod === 'HIGHEST_PRICE') {
+                        sortedGetItems = [...getItems].sort((a, b) => b.price - a.price)
+                    } else {
+                        sortedGetItems = [...getItems].sort((a, b) => a.price - b.price)
+                    }
+
+                    let freeGetCount = bxgyGetQty * bxgySets
+                    for (const item of sortedGetItems) {
+                        const qty = Math.min(item.quantity, freeGetCount)
+                        if (promo.discountType === 'FREE_ITEM') {
+                            discountAmount += item.price * qty
+                        } else if (promo.discountType === 'PERCENT') {
+                            discountAmount += item.price * qty * (Number(promo.discountValue) / 100)
+                        } else {
+                            discountAmount += Math.min(item.price, Number(promo.discountValue)) * qty
+                        }
+                        affectedItemIds.push(item.id)
+                        freeGetCount -= qty
+                        if (freeGetCount <= 0) break
+                    }
+                    buyItems.forEach(item => affectedItemIds.push(item.id))
+                    break
+                }
+
+                case 'CART_DISCOUNT': {
+                    // Manager promo: % or $ off entire transaction
+                    if (promo.discountType === 'PERCENT') {
+                        discountAmount = cartTotal * (Number(promo.discountValue) / 100)
+                    } else {
+                        discountAmount = Math.min(cartTotal, Number(promo.discountValue))
+                    }
+                    items.forEach(item => affectedItemIds.push(item.id))
+                    break
+                }
             }
 
             if (discountAmount > 0) {
@@ -359,13 +448,19 @@ export async function POST(request: NextRequest) {
                     promotionName: promo.name,
                     type: promo.type,
                     discountAmount: Math.round(discountAmount * 100) / 100,
-                    affectedItems: [...new Set(affectedItemIds)]
+                    affectedItems: [...new Set(affectedItemIds)],
+                    receiptDisplay: (promo as any).receiptDisplay || 'INLINE'
                 })
                 totalDiscount += discountAmount
 
                 // Mark items as used (for non-stackable)
                 if (!promo.stackable) {
                     affectedItemIds.forEach(id => usedItemIds.add(id))
+                }
+
+                // Mark exclusion group as used
+                if (exclusionGroup) {
+                    usedExclusionGroups.add(exclusionGroup)
                 }
             }
         }

@@ -327,6 +327,67 @@ export async function POST(request: NextRequest) {
             })
         }
 
+        if (action === 'punch') {
+            // ─── Punch Card / Loyalty Club ───
+            // "Buy 10 coffees, get 1 free" across visits
+            // Tracks punches per member + auto-rewards when threshold hit
+            const { punchThreshold, rewardDescription } = body
+            if (!phone) {
+                return NextResponse.json({ error: 'Phone required' }, { status: 400 })
+            }
+
+            const member = await prisma.loyaltyMember.findUnique({
+                where: { programId_phone: { programId: program.id, phone } }
+            })
+
+            if (!member) {
+                return NextResponse.json({ error: 'Member not found. Enroll first.' }, { status: 404 })
+            }
+
+            // Count existing punches (PUNCH type transactions)
+            const punchCount = await prisma.pointsTransaction.count({
+                where: {
+                    memberId: member.id,
+                    type: 'EARN',
+                    description: { startsWith: 'Punch:' }
+                }
+            })
+
+            const threshold = punchThreshold || 10
+            const currentPunches = (punchCount % threshold) + 1
+            const isReward = currentPunches >= threshold
+
+            // Log the punch
+            await prisma.pointsTransaction.create({
+                data: {
+                    programId: program.id,
+                    memberId: member.id,
+                    type: 'EARN',
+                    points: isReward ? 0 : 0, // Punch cards don't earn points
+                    transactionId,
+                    locationId,
+                    description: isReward
+                        ? `Punch: ${currentPunches}/${threshold} — 🎉 REWARD! ${rewardDescription || 'Free item earned!'}`
+                        : `Punch: ${currentPunches}/${threshold}`
+                }
+            })
+
+            // Update last activity
+            await prisma.loyaltyMember.update({
+                where: { id: member.id },
+                data: { lastActivity: new Date() }
+            })
+
+            return NextResponse.json({
+                success: true,
+                currentPunches: isReward ? 0 : currentPunches,
+                threshold,
+                isReward,
+                rewardDescription: isReward ? (rewardDescription || 'Free item earned!') : null,
+                totalPunches: punchCount + 1
+            })
+        }
+
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 
     } catch (error) {

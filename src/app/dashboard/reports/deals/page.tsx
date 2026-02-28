@@ -88,7 +88,9 @@ export default function DealsReportPage() {
             'EMPLOYEE_DISCOUNT': '👨‍✈️ Employee/Senior/Military',
             'COMBO': '🍕 Combo Deal',
             'LOYALTY_EXCLUSIVE': '🎯 Members Only',
-            'GIFT_WITH_PURCHASE': '🎁 Gift w/ Purchase'
+            'GIFT_WITH_PURCHASE': '🎁 Gift w/ Purchase',
+            'BXGY': '🔄 Buy X Get Y',
+            'CART_DISCOUNT': '🛍️ Cart Discount'
         }
         return labels[type] || type
     }
@@ -106,7 +108,9 @@ export default function DealsReportPage() {
             'EMPLOYEE_DISCOUNT': 'bg-indigo-500',
             'COMBO': 'bg-rose-500',
             'LOYALTY_EXCLUSIVE': 'bg-violet-500',
-            'GIFT_WITH_PURCHASE': 'bg-emerald-500'
+            'GIFT_WITH_PURCHASE': 'bg-emerald-500',
+            'BXGY': 'bg-sky-500',
+            'CART_DISCOUNT': 'bg-yellow-500'
         }
         return colors[type] || 'bg-stone-500'
     }
