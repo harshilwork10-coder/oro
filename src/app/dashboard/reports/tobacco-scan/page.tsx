@@ -107,16 +107,21 @@ export default function TobaccoScanPage() {
         }
     }
 
-    const downloadCSV = async (submissionId: string) => {
+    const downloadExportFile = async (manufacturer: string) => {
         try {
-            const res = await fetch(`/api/tobacco-scan/submissions/${submissionId}/download`)
+            const res = await fetch(`/api/tobacco-scan/export?manufacturer=${manufacturer}`)
             if (res.ok) {
                 const blob = await res.blob()
                 const url = window.URL.createObjectURL(blob)
                 const a = document.createElement('a')
                 a.href = url
-                a.download = `tobacco-scan-${submissionId}.csv`
+                const disposition = res.headers.get('Content-Disposition')
+                const filename = disposition?.match(/filename="(.+)"/)?.[1] || `${manufacturer}_SCAN_DATA.txt`
+                a.download = filename
                 a.click()
+                window.URL.revokeObjectURL(url)
+            } else {
+                alert('Failed to generate export file')
             }
         } catch (error) {
             console.error('Failed to download:', error)
@@ -353,11 +358,11 @@ export default function TobaccoScanPage() {
                                         <td className="px-4 py-3">
                                             <div className="flex gap-2">
                                                 <button
-                                                    onClick={() => downloadCSV(sub.id)}
+                                                    onClick={() => downloadExportFile(sub.manufacturer)}
                                                     className="px-2 py-1 bg-stone-700 hover:bg-stone-600 text-stone-300 rounded text-xs flex items-center gap-1"
                                                 >
                                                     <Download className="h-3 w-3" />
-                                                    CSV
+                                                    TXT File
                                                 </button>
                                                 {sub.status === 'PENDING' && (
                                                     <button
