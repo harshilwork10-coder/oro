@@ -368,6 +368,10 @@ model User {
   canManageEmployees Boolean @default(false) // Can add/edit employees
   canSetOwnPrices    Boolean @default(false) // Chair rental/booth renter can set their own service prices
   canApplyDiscounts  Boolean @default(false) // Can apply manual discounts
+
+  // Employee Discount (auto-applied when employee is the customer)
+  employeeDiscountEnabled Boolean  @default(false)
+  employeeDiscountPct     Decimal? @db.Decimal(5, 2) // e.g., 15.00 = 15% off
   maxDiscountPercent Int     @default(0) // Max discount percentage allowed (e.g., 20)
   maxDiscountAmount  Decimal @default(0) @db.Decimal(12, 2) // Max discount flat amount allowed (e.g., 10.00)
 
@@ -1452,6 +1456,7 @@ model Item {
   ageRestricted Boolean @default(false) // Requires ID check
   minimumAge    Int? // 18, 21, etc.
   isEbtEligible Boolean @default(false) // SNAP/EBT eligible
+  isWicEligible Boolean @default(false) // WIC program eligible
   isTobacco     Boolean @default(false) // Tobacco product
   isAlcohol     Boolean @default(false) // Alcohol product
 
