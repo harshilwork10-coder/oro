@@ -1855,7 +1855,12 @@ model Product {
 
   // Compliance & Tracking
   isEbtEligible Boolean @default(false) // Can be purchased with EBT/SNAP
+  wicEligible   Boolean @default(false) // WIC-approved item (milk, bread, formula, etc.)
   isTobacco     Boolean @default(false) // Tobacco product (for scan data reporting)
+
+  // PLU & Weight (for deli/produce scanner-scale combos)
+  plu          String?  // PLU number (4-5 digit produce code, e.g. 4011 = Banana)
+  soldByWeight Boolean  @default(false) // If true, trigger scale at POS checkout
 
   // Alcohol Attributes (for excise tax calculation)
   alcoholType String? // NONE, BEER, WINE_LIGHT, WINE_HEAVY, SPIRITS
