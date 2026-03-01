@@ -11,6 +11,35 @@ export interface ScanResult {
     barcode: string
     type: 'UPC-A' | 'UPC-E' | 'EAN-13' | 'EAN-8' | 'CODE-128' | 'CODE-39' | 'QR' | 'UNKNOWN'
     timestamp: Date
+    /** If this is a price-embedded barcode (prefix 2), contains extracted data */
+    embedded?: EmbeddedBarcodeData | null
+}
+
+/**
+ * Price/Weight Embedded Barcode Data
+ * 
+ * Used by scanner-scale combo units (NCR 7878, Datalogic Magellan, Honeywell Stratos).
+ * Deli/produce items get weighed and labeled with a barcode that contains the price/weight.
+ * 
+ * UPC-A Format: 2 PPPPP VVVVV C
+ *   Prefix "2" = in-store price/weight embedded
+ *   PPPPP = PLU number (internal product lookup)
+ *   VVVVV = embedded value (price in cents OR weight × 100)
+ *   C = check digit
+ */
+export interface EmbeddedBarcodeData {
+    /** True if this barcode has embedded price/weight */
+    isPriceEmbedded: boolean
+    /** PLU number (5-digit internal product code) */
+    plu: string
+    /** Embedded price in dollars (e.g. 3.78) — if price-embedded */
+    embeddedPrice: number | null
+    /** Embedded weight in lbs (e.g. 0.42) — if weight-embedded */
+    embeddedWeight: number | null
+    /** Whether this is a price barcode or weight barcode */
+    embedType: 'PRICE' | 'WEIGHT' | 'NONE'
+    /** Raw 5-digit value field from barcode */
+    rawValue: string
 }
 
 export interface ScannerConfig {
@@ -26,6 +55,14 @@ export interface ScannerConfig {
     prefixToStrip: string[]
     /** Suffix characters to strip */
     suffixToStrip: string[]
+    /**
+     * How to interpret prefix-2 barcodes.
+     * 'PRICE' = value field is price in cents ($3.78 → 00378)
+     * 'WEIGHT' = value field is weight × 100 (0.42 lb → 00042)
+     * 'AUTO' = try to detect based on value range
+     * Default: 'PRICE' (most common in c-stores)
+     */
+    embeddedBarcodeMode: 'PRICE' | 'WEIGHT' | 'AUTO'
 }
 
 const DEFAULT_SCANNER_CONFIG: ScannerConfig = {
@@ -35,6 +72,7 @@ const DEFAULT_SCANNER_CONFIG: ScannerConfig = {
     terminatorKey: 'Enter',
     prefixToStrip: [],
     suffixToStrip: [],
+    embeddedBarcodeMode: 'PRICE',
 }
 
 export class BarcodeScanner {
@@ -74,9 +112,10 @@ export class BarcodeScanner {
 
                     const barcode = this.cleanBarcode(this.buffer)
                     const type = this.detectBarcodeType(barcode)
+                    const embedded = this.parsePriceEmbeddedBarcode(barcode)
 
                     if (this.onScan) {
-                        this.onScan({ barcode, type, timestamp: new Date() })
+                        this.onScan({ barcode, type, timestamp: new Date(), embedded })
                     }
                 }
                 this.buffer = ''
@@ -116,6 +155,65 @@ export class BarcodeScanner {
             if (cleaned.endsWith(suffix)) cleaned = cleaned.slice(0, -suffix.length)
         }
         return cleaned
+    }
+
+    /**
+     * Parse price/weight-embedded barcodes (prefix "2")
+     * 
+     * Used by scanner-scale combo units for deli/produce items.
+     * Format: 2 PPPPP VVVVV C
+     *   2     = in-store prefix (price or weight embedded)
+     *   PPPPP = 5-digit PLU (internal product lookup number)
+     *   VVVVV = 5-digit value (price in cents or weight × 100)
+     *   C     = check digit
+     * 
+     * Examples:
+     *   "212345003789" → PLU 12345, Price $3.78
+     *   "212345000425" → PLU 12345, Weight 0.42 lb (if weight mode)
+     *   "200401006495" → PLU 00401, Price $64.95 (if lobster!)
+     */
+    parsePriceEmbeddedBarcode(barcode: string): EmbeddedBarcodeData | null {
+        // Must be 12-digit UPC-A starting with "2"
+        if (barcode.length !== 12 || !/^\d+$/.test(barcode) || barcode[0] !== '2') {
+            return null
+        }
+
+        const plu = barcode.substring(1, 6)      // digits 2-6: PLU number
+        const rawValue = barcode.substring(6, 11) // digits 7-11: price or weight
+        const valueNum = parseInt(rawValue, 10)
+
+        let embedType: 'PRICE' | 'WEIGHT' | 'NONE' = 'NONE'
+        let embeddedPrice: number | null = null
+        let embeddedWeight: number | null = null
+
+        if (this.config.embeddedBarcodeMode === 'PRICE') {
+            embedType = 'PRICE'
+            embeddedPrice = valueNum / 100  // cents → dollars
+        } else if (this.config.embeddedBarcodeMode === 'WEIGHT') {
+            embedType = 'WEIGHT'
+            embeddedWeight = valueNum / 100 // hundredths of lb → lbs
+        } else {
+            // AUTO mode: if value > 10000 ($100+), likely price; 
+            // if value < 5000 (50 lbs), could be weight
+            // Most deli items are under $50 and under 5 lbs
+            // Heuristic: values under 1000 (10 lbs) are likely weight
+            if (valueNum <= 1000) {
+                embedType = 'WEIGHT'
+                embeddedWeight = valueNum / 100
+            } else {
+                embedType = 'PRICE'
+                embeddedPrice = valueNum / 100
+            }
+        }
+
+        return {
+            isPriceEmbedded: true,
+            plu,
+            embeddedPrice,
+            embeddedWeight,
+            embedType,
+            rawValue,
+        }
     }
 
     /** Detect barcode format based on length and content */
