@@ -1591,13 +1591,17 @@ export default function RetailPOSPage() {
                         />
                     </div>
 
-                    {/* Quantity Input — tap to open numpad */}
-                    <div
-                        className="flex items-center gap-2 bg-stone-800 border border-stone-700 hover:border-orange-500 rounded-lg px-3 py-2 cursor-pointer transition-colors"
-                        onClick={() => setShowQtyNumpad(true)}
-                    >
+                    {/* Quantity Input — keyboard + tap numpad */}
+                    <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 hover:border-orange-500 rounded-lg px-3 py-2 cursor-pointer transition-colors">
                         <span className="text-stone-400 text-sm">Qty:</span>
-                        <span className="w-16 text-center text-lg font-bold">{quantityInput || '1'}</span>
+                        <input
+                            type="number"
+                            value={quantityInput}
+                            onChange={(e) => setQuantityInput(e.target.value)}
+                            onClick={() => setShowQtyNumpad(true)}
+                            className="w-16 bg-transparent text-center text-lg font-bold focus:outline-none cursor-pointer [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            min="1"
+                        />
                     </div>
 
                     {/* Item Count */}
@@ -3041,9 +3045,10 @@ function CustomerLookupModal({ onClose, onSelectCustomer }: {
                     <input
                         type="tel"
                         value={phone}
-                        readOnly
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                         placeholder="Enter phone number..."
-                        className="flex-1 px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-lg text-center font-mono tracking-widest"
+                        className="flex-1 px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-lg text-center font-mono tracking-widest focus:outline-none focus:border-blue-500"
+                        autoFocus
                     />
                     <button
                         onClick={handleSearch}
@@ -3064,8 +3069,8 @@ function CustomerLookupModal({ onClose, onSelectCustomer }: {
                                 else if (phone.length < 10) setPhone(p => p + key)
                             }}
                             className={`py-4 rounded-xl text-xl font-bold transition-all active:scale-95 ${key === 'C' ? 'bg-red-900/20 text-red-400 hover:bg-red-900/40 border border-red-500/30'
-                                    : key === '⌫' ? 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
-                                        : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
+                                : key === '⌫' ? 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                    : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
                                 }`}
                         >
                             {key}
@@ -3158,10 +3163,20 @@ function CashDropModal({ onClose, onSuccess }: {
                     </button>
                 </div>
                 <p className="text-stone-400 mb-2">Enter amount to drop to safe:</p>
-                {/* Amount Display */}
-                <div className="w-full px-4 py-4 bg-stone-800 border border-stone-700 rounded-lg text-center text-3xl font-bold mb-3 font-mono">
-                    ${amount || '0.00'}
-                </div>
+                {/* Amount Input — keyboard + numpad */}
+                <input
+                    type="text"
+                    inputMode="decimal"
+                    value={amount ? `$${amount}` : ''}
+                    onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9.]/g, '')
+                        if (raw.split('.').length > 2) return
+                        if (raw.includes('.') && raw.split('.')[1]?.length > 2) return
+                        setAmount(raw)
+                    }}
+                    placeholder="$0.00"
+                    className="w-full px-4 py-4 bg-stone-800 border border-stone-700 rounded-lg text-center text-3xl font-bold mb-3 font-mono focus:outline-none focus:border-green-500"
+                />
                 {/* Numpad */}
                 <div className="grid grid-cols-3 gap-2 mb-3">
                     {['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0', '⌫'].map(key => (
@@ -3174,7 +3189,7 @@ function CashDropModal({ onClose, onSuccess }: {
                                 else setAmount(p => p + key)
                             }}
                             className={`py-4 rounded-xl text-xl font-bold transition-all active:scale-95 ${key === '⌫' ? 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
-                                    : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
+                                : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
                                 }`}
                         >
                             {key}
@@ -3277,9 +3292,12 @@ function ReceiveStockModal({ onClose, onSuccess }: {
                 )}
                 <div className="mb-3">
                     <span className="text-stone-400 text-sm">Quantity:</span>
-                    <div className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-center text-2xl font-bold font-mono mt-1">
-                        {quantity || '0'}
-                    </div>
+                    <input
+                        type="number"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value.replace(/\D/g, '') || '1')}
+                        className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-center text-2xl font-bold font-mono mt-1 focus:outline-none focus:border-orange-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
                 </div>
                 {/* Qty Numpad */}
                 <div className="grid grid-cols-3 gap-2 mb-3">
@@ -3293,8 +3311,8 @@ function ReceiveStockModal({ onClose, onSuccess }: {
                                 else setQuantity(p => p + key)
                             }}
                             className={`py-3 rounded-xl text-lg font-bold transition-all active:scale-95 ${key === 'C' ? 'bg-red-900/20 text-red-400 hover:bg-red-900/40 border border-red-500/30'
-                                    : key === '⌫' ? 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
-                                        : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
+                                : key === '⌫' ? 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                    : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
                                 }`}
                         >
                             {key}
