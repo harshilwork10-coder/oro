@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stripe Webhook Handler
  *

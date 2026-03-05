@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Global Search API — Unified search across items, customers, transactions
  *

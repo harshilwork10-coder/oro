@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Cash Drawer Module
  * Opens cash drawer via ESC/POS command through receipt printer

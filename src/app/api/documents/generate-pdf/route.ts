@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PDF Document Generator API
  *

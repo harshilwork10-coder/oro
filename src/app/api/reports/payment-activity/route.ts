@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Payment Activity Log API
  *

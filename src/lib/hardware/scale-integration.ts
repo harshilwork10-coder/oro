@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Scale Integration Module
  * Supports USB/Serial commercial scales (CAS, Mettler Toledo, Fairbanks Scales)

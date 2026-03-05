@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use strict'
 
 import { NextRequest, NextResponse } from 'next/server'

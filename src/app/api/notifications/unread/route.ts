@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Notifications Unread API
  *

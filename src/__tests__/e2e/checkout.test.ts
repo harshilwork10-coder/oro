@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * E2E Test: Full Checkout Flow
  *

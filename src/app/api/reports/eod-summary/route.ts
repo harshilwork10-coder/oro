@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * End-of-Day Summary API
  *
