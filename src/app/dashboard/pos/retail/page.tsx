@@ -57,6 +57,7 @@ import LotteryModal from '@/components/pos/LotteryModal'
 import LotteryPayoutModal from '@/components/pos/LotteryPayoutModal'
 import ReceiptModal from '@/components/pos/ReceiptModal'
 import UniversalSearch from '@/components/pos/UniversalSearch'
+import NumpadModal from '@/components/modals/NumpadModal'
 import {
     printReceipt,
     openCashDrawer,
@@ -135,6 +136,7 @@ export default function RetailPOSPage() {
     const [showDiscountModal, setShowDiscountModal] = useState(false)
     const [showQuantityModal, setShowQuantityModal] = useState(false)
     const [showPriceModal, setShowPriceModal] = useState(false)
+    const [showQtyNumpad, setShowQtyNumpad] = useState(false)
     const [showUniversalSearch, setShowUniversalSearch] = useState(false)
     const [showAgeVerification, setShowAgeVerification] = useState(false)
     const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -1589,16 +1591,13 @@ export default function RetailPOSPage() {
                         />
                     </div>
 
-                    {/* Quantity Input */}
-                    <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 rounded-lg px-3 py-2">
+                    {/* Quantity Input — tap to open numpad */}
+                    <div
+                        className="flex items-center gap-2 bg-stone-800 border border-stone-700 hover:border-orange-500 rounded-lg px-3 py-2 cursor-pointer transition-colors"
+                        onClick={() => setShowQtyNumpad(true)}
+                    >
                         <span className="text-stone-400 text-sm">Qty:</span>
-                        <input
-                            type="number"
-                            value={quantityInput}
-                            onChange={(e) => setQuantityInput(e.target.value)}
-                            className="w-16 bg-transparent text-center text-lg font-bold focus:outline-none"
-                            min="1"
-                        />
+                        <span className="w-16 text-center text-lg font-bold">{quantityInput || '1'}</span>
                     </div>
 
                     {/* Item Count */}
@@ -2409,35 +2408,53 @@ export default function RetailPOSPage() {
                 </div>
             )}
 
-            {/* Discount Modal */}
-            {showDiscountModal && selectedItemIndex !== null && (
-                <DiscountModal
-                    item={cart[selectedItemIndex]}
-                    onApply={applyDiscount}
-                    onClose={() => setShowDiscountModal(false)}
-                />
-            )}
+            {/* Discount Numpad Modal */}
+            <NumpadModal
+                isOpen={showDiscountModal && selectedItemIndex !== null}
+                onClose={() => setShowDiscountModal(false)}
+                onSubmit={(value) => { applyDiscount(value); setShowDiscountModal(false) }}
+                title={`Discount % — ${selectedItemIndex !== null ? cart[selectedItemIndex]?.name : ''}`}
+                prefix=""
+                allowDecimal={false}
+                maxValue={100}
+                initialValue={selectedItemIndex !== null ? (cart[selectedItemIndex]?.discount || 0) : 0}
+            />
 
-            {/* Quantity Modal */}
-            {showQuantityModal && selectedItemIndex !== null && (
-                <QuantityModal
-                    item={cart[selectedItemIndex]}
-                    onApply={(qty) => {
-                        updateQuantity(selectedItemIndex, qty)
-                        setShowQuantityModal(false)
-                    }}
-                    onClose={() => setShowQuantityModal(false)}
-                />
-            )}
+            {/* Quantity Numpad Modal */}
+            <NumpadModal
+                isOpen={showQuantityModal && selectedItemIndex !== null}
+                onClose={() => setShowQuantityModal(false)}
+                onSubmit={(value) => { if (selectedItemIndex !== null) { updateQuantity(selectedItemIndex, value); } setShowQuantityModal(false) }}
+                title={`Quantity — ${selectedItemIndex !== null ? cart[selectedItemIndex]?.name : ''}`}
+                prefix=""
+                allowDecimal={false}
+                maxValue={9999}
+                initialValue={selectedItemIndex !== null ? cart[selectedItemIndex]?.quantity || 1 : 1}
+            />
 
-            {/* Price Modal */}
-            {showPriceModal && selectedItemIndex !== null && (
-                <PriceModal
-                    item={cart[selectedItemIndex]}
-                    onApply={changePrice}
-                    onClose={() => setShowPriceModal(false)}
-                />
-            )}
+            {/* Price Override Numpad Modal */}
+            <NumpadModal
+                isOpen={showPriceModal && selectedItemIndex !== null}
+                onClose={() => setShowPriceModal(false)}
+                onSubmit={(value) => { changePrice(value); setShowPriceModal(false) }}
+                title={`Change Price — ${selectedItemIndex !== null ? cart[selectedItemIndex]?.name : ''}`}
+                prefix="$"
+                allowDecimal={true}
+                maxValue={99999.99}
+                initialValue={selectedItemIndex !== null ? cart[selectedItemIndex]?.price || 0 : 0}
+            />
+
+            {/* Top-bar Qty Numpad */}
+            <NumpadModal
+                isOpen={showQtyNumpad}
+                onClose={() => setShowQtyNumpad(false)}
+                onSubmit={(value) => { setQuantityInput(Math.max(1, Math.round(value)).toString()); setShowQtyNumpad(false) }}
+                title="Scan Quantity"
+                prefix=""
+                allowDecimal={false}
+                maxValue={9999}
+                initialValue={parseInt(quantityInput) || 1}
+            />
 
             {/* Universal Search Modal (F3 or Search button) */}
             <UniversalSearch
@@ -3024,10 +3041,9 @@ function CustomerLookupModal({ onClose, onSelectCustomer }: {
                     <input
                         type="tel"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                        readOnly
                         placeholder="Enter phone number..."
-                        className="flex-1 px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-lg"
-                        autoFocus
+                        className="flex-1 px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-lg text-center font-mono tracking-widest"
                     />
                     <button
                         onClick={handleSearch}
@@ -3036,6 +3052,25 @@ function CustomerLookupModal({ onClose, onSelectCustomer }: {
                     >
                         {loading ? '...' : 'Search'}
                     </button>
+                </div>
+                {/* Phone Numpad */}
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map(key => (
+                        <button
+                            key={key}
+                            onClick={() => {
+                                if (key === 'C') setPhone('')
+                                else if (key === '⌫') setPhone(p => p.slice(0, -1))
+                                else if (phone.length < 10) setPhone(p => p + key)
+                            }}
+                            className={`py-4 rounded-xl text-xl font-bold transition-all active:scale-95 ${key === 'C' ? 'bg-red-900/20 text-red-400 hover:bg-red-900/40 border border-red-500/30'
+                                    : key === '⌫' ? 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                        : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
+                                }`}
+                        >
+                            {key}
+                        </button>
+                    ))}
                 </div>
                 {result && (
                     result.found ? (
@@ -3122,20 +3157,37 @@ function CashDropModal({ onClose, onSuccess }: {
                         <X className="h-5 w-5" />
                     </button>
                 </div>
-                <p className="text-stone-400 mb-4">Enter amount to drop to safe:</p>
-                <input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full px-4 py-4 bg-stone-800 border border-stone-700 rounded-lg text-center text-3xl font-bold mb-4"
-                    autoFocus
-                />
-                <div className="grid grid-cols-4 gap-2 mb-4">
-                    {[20, 50, 100, 200].map(val => (
+                <p className="text-stone-400 mb-2">Enter amount to drop to safe:</p>
+                {/* Amount Display */}
+                <div className="w-full px-4 py-4 bg-stone-800 border border-stone-700 rounded-lg text-center text-3xl font-bold mb-3 font-mono">
+                    ${amount || '0.00'}
+                </div>
+                {/* Numpad */}
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                    {['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0', '⌫'].map(key => (
+                        <button
+                            key={key}
+                            onClick={() => {
+                                if (key === '⌫') setAmount(p => p.slice(0, -1))
+                                else if (key === '.' && amount.includes('.')) return
+                                else if (amount.includes('.') && amount.split('.')[1]?.length >= 2) return
+                                else setAmount(p => p + key)
+                            }}
+                            className={`py-4 rounded-xl text-xl font-bold transition-all active:scale-95 ${key === '⌫' ? 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                    : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
+                                }`}
+                        >
+                            {key}
+                        </button>
+                    ))}
+                </div>
+                {/* Quick amounts */}
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                    <button onClick={() => setAmount('')} className="py-2 bg-red-900/20 text-red-400 hover:bg-red-900/40 rounded-lg text-sm font-bold border border-red-500/30">Clear</button>
+                    {[50, 100, 200].map(val => (
                         <button
                             key={val}
-                            onClick={() => setAmount(val.toString())}
+                            onClick={() => setAmount(val.toFixed(2))}
                             className="py-2 bg-stone-800 hover:bg-stone-700 rounded-lg font-medium"
                         >
                             ${val}
@@ -3223,14 +3275,31 @@ function ReceiveStockModal({ onClose, onSuccess }: {
                         <p className="text-sm text-stone-400">Current stock: {product.stock || 0}</p>
                     </div>
                 )}
-                <div className="flex items-center gap-3 mb-4">
-                    <span className="text-stone-400">Quantity:</span>
-                    <input
-                        type="number"
-                        value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
-                        className="flex-1 px-4 py-2 bg-stone-800 border border-stone-700 rounded-lg text-center text-xl"
-                    />
+                <div className="mb-3">
+                    <span className="text-stone-400 text-sm">Quantity:</span>
+                    <div className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-center text-2xl font-bold font-mono mt-1">
+                        {quantity || '0'}
+                    </div>
+                </div>
+                {/* Qty Numpad */}
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map(key => (
+                        <button
+                            key={key}
+                            onClick={() => {
+                                if (key === 'C') setQuantity('1')
+                                else if (key === '⌫') setQuantity(p => p.length > 1 ? p.slice(0, -1) : '1')
+                                else if (quantity === '0' || quantity === '1') setQuantity(key)
+                                else setQuantity(p => p + key)
+                            }}
+                            className={`py-3 rounded-xl text-lg font-bold transition-all active:scale-95 ${key === 'C' ? 'bg-red-900/20 text-red-400 hover:bg-red-900/40 border border-red-500/30'
+                                    : key === '⌫' ? 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                        : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
+                                }`}
+                        >
+                            {key}
+                        </button>
+                    ))}
                 </div>
                 <button
                     onClick={handleReceive}
