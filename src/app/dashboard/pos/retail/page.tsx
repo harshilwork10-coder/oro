@@ -172,6 +172,12 @@ export default function RetailPOSPage() {
     const [appliedPromotions, setAppliedPromotions] = useState<AppliedPromotion[]>([])
     const [promoDiscount, setPromoDiscount] = useState(0)
 
+    // Promo Code & Loyalty
+    const [promoCode, setPromoCode] = useState('')
+    const [appliedPromoCode, setAppliedPromoCode] = useState('')
+    const [loyaltyDiscount, setLoyaltyDiscount] = useState(0)
+    const [showLoyaltyRedeem, setShowLoyaltyRedeem] = useState(false)
+
     // Today's Stats (live sales header)
     const [todayStats, setTodayStats] = useState<{ sales: number; transactions: number; avgTicket: number } | null>(null)
 
@@ -782,7 +788,9 @@ export default function RetailPOSPage() {
                             name: item.name,
                             price: item.price,
                             quantity: item.quantity
-                        }))
+                        })),
+                        promoCode: appliedPromoCode || undefined,
+                        loyaltyId: selectedCustomer?.id || undefined
                     })
                 })
 
@@ -797,7 +805,7 @@ export default function RetailPOSPage() {
         }
 
         checkPromotions()
-    }, [cart])
+    }, [cart, appliedPromoCode, selectedCustomer])
 
 
     // Handle barcode scan (Enter key from scanner)
@@ -991,10 +999,10 @@ export default function RetailPOSPage() {
 
         // Discount ratio for proportional tax reduction
         const discountRatio = subtotalCash > 0 ? transactionDiscountAmount / subtotalCash : 0
-        const discountedSubtotalCash = round2(Math.max(0, subtotalCash - transactionDiscountAmount - promoDiscount))
+        const discountedSubtotalCash = round2(Math.max(0, subtotalCash - transactionDiscountAmount - promoDiscount - loyaltyDiscount))
         // Guard against divide-by-zero when cart is all-zero priced items
         const cardRatio = subtotalCash > 0 ? subtotalCard / subtotalCash : 1
-        const discountedSubtotalCard = round2(Math.max(0, subtotalCard - (transactionDiscountAmount + promoDiscount) * cardRatio))
+        const discountedSubtotalCard = round2(Math.max(0, subtotalCard - (transactionDiscountAmount + promoDiscount + loyaltyDiscount) * cardRatio))
 
         // Reduce taxes proportionally by discount
         taxCash = round2(taxCash * (1 - discountRatio))
@@ -2096,6 +2104,83 @@ export default function RetailPOSPage() {
                         )}
                     </div>
 
+                    {/* Promo Code + Loyalty Section */}
+                    <div className="bg-stone-900/50 border-t border-stone-800 px-3 py-2 space-y-2">
+                        {/* Promo Code Input */}
+                        <div className="flex gap-1">
+                            <input
+                                type="text"
+                                value={promoCode}
+                                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && promoCode.trim()) {
+                                        setAppliedPromoCode(promoCode.trim())
+                                    }
+                                }}
+                                placeholder="Promo code..."
+                                className="flex-1 px-2 py-1.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-center font-mono tracking-wider focus:outline-none focus:border-amber-500 placeholder:text-stone-600 placeholder:font-sans placeholder:tracking-normal"
+                            />
+                            {appliedPromoCode ? (
+                                <button
+                                    onClick={() => { setAppliedPromoCode(''); setPromoCode('') }}
+                                    className="px-3 py-1.5 bg-red-900/30 text-red-400 rounded-lg text-xs font-bold hover:bg-red-900/50 border border-red-500/30"
+                                >
+                                    ✕
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => promoCode.trim() && setAppliedPromoCode(promoCode.trim())}
+                                    disabled={!promoCode.trim()}
+                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-xs font-bold text-white"
+                                >
+                                    Apply
+                                </button>
+                            )}
+                        </div>
+                        {appliedPromoCode && (
+                            <p className="text-[10px] text-amber-400 text-center">Code <span className="font-mono font-bold">{appliedPromoCode}</span> applied</p>
+                        )}
+
+                        {/* Loyalty Points Display */}
+                        {selectedCustomer && (
+                            <div className="bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">⭐</span>
+                                        <div>
+                                            <p className="text-xs text-amber-400 font-bold">{selectedCustomer.name}</p>
+                                            <p className="text-[10px] text-stone-400">{selectedCustomer.loyaltyPoints ?? 0} pts available</p>
+                                        </div>
+                                    </div>
+                                    {(selectedCustomer.loyaltyPoints ?? 0) > 0 && loyaltyDiscount === 0 && (
+                                        <button
+                                            onClick={() => {
+                                                // 100 points = $1.00 (standard ratio)
+                                                const pointValue = (selectedCustomer.loyaltyPoints ?? 0) * 0.01
+                                                const maxRedeem = Math.min(pointValue, subtotal)
+                                                setLoyaltyDiscount(Math.round(maxRedeem * 100) / 100)
+                                            }}
+                                            className="px-2 py-1 bg-amber-600 hover:bg-amber-500 rounded text-[10px] font-bold text-white"
+                                        >
+                                            Redeem
+                                        </button>
+                                    )}
+                                    {loyaltyDiscount > 0 && (
+                                        <button
+                                            onClick={() => setLoyaltyDiscount(0)}
+                                            className="px-2 py-1 bg-red-900/30 text-red-400 rounded text-[10px] font-bold hover:bg-red-900/50 border border-red-500/30"
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
+                                {loyaltyDiscount > 0 && (
+                                    <p className="text-xs text-emerald-400 mt-1 font-bold">✓ {formatCurrency(loyaltyDiscount)} loyalty discount applied</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
                     {/* Totals */}
                     <div className={`space-y-2 bg-stone-900 border-t border-stone-800 ${compactMode ? 'p-2' : 'p-3 space-y-2'}`}>
                         <div className={`flex justify-between ${compactMode ? 'text-base' : 'text-lg'}`}>
@@ -2123,6 +2208,21 @@ export default function RetailPOSPage() {
                                         <span className="text-pink-400">-{formatCurrency(promo.discountAmount)}</span>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {/* Loyalty Discount Line */}
+                        {loyaltyDiscount > 0 && (
+                            <div className="flex justify-between text-sm">
+                                <span className="text-amber-400 flex items-center gap-1">⭐ Loyalty</span>
+                                <span className="font-bold text-amber-400">-{formatCurrency(loyaltyDiscount)}</span>
+                            </div>
+                        )}
+
+                        {/* Total Savings Banner */}
+                        {(promoDiscount + loyaltyDiscount) > 0 && (
+                            <div className="bg-emerald-500/10 rounded-lg px-3 py-2 border border-emerald-500/20 text-center">
+                                <p className="text-emerald-400 font-bold text-sm">🎉 You saved {formatCurrency(promoDiscount + loyaltyDiscount)}!</p>
                             </div>
                         )}
 
