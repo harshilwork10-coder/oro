@@ -192,6 +192,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         // SERVICE only - resources (chairs, rooms)
         { name: 'Resources', href: '/dashboard/resources', icon: Armchair, feature: 'enableResources' as const, industry: ['SERVICE'] as const },
         { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones, always: true },
+        { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Sparkles, always: true },
         { name: 'Security', href: '/dashboard/settings/security', icon: Shield, always: true },
     ]
 
@@ -219,6 +220,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
         { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
         { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones },
+        { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Sparkles },
         { name: 'Security', href: '/dashboard/settings/security', icon: Shield },
     ]
 
@@ -313,6 +315,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText },
         { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+        { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Sparkles },
         { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones },
     ]
 
