@@ -88,11 +88,11 @@ export default function LotteryPage() {
 
             if (gamesRes.ok) {
                 const data = await gamesRes.json()
-                setGames(data.games || [])
+                setGames(data.data || data.games || [])
             }
             if (packsRes.ok) {
                 const data = await packsRes.json()
-                setPacks(data.packs || [])
+                setPacks(data.data || data.packs || [])
             }
         } catch (error) {
             console.error('Failed to fetch lottery data:', error)
@@ -281,8 +281,8 @@ export default function LotteryPage() {
             {/* Scan Toast Notification */}
             {scanToast && (
                 <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-xl shadow-2xl border ${scanToast.type === 'success'
-                        ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-100'
-                        : 'bg-red-900/90 border-red-500/50 text-red-100'
+                    ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-100'
+                    : 'bg-red-900/90 border-red-500/50 text-red-100'
                     } animate-in slide-in-from-top-5 backdrop-blur-sm`}>
                     <p className="font-medium">{scanToast.message}</p>
                 </div>
