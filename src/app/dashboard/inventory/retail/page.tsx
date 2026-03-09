@@ -108,7 +108,7 @@ export default function RetailInventoryPage() {
 
             if (productsRes.ok) {
                 const data = await productsRes.json()
-                const list: Product[] = data.products || data || []
+                const list: Product[] = data.data || data.products || []
                 setProducts(list)
                 if (list.length > 0) {
                     setEditProduct(list[0])
@@ -118,7 +118,7 @@ export default function RetailInventoryPage() {
 
             if (categoriesRes.ok) {
                 const catData = await categoriesRes.json()
-                setCategories(catData.categories || catData || [])
+                setCategories(catData.data || catData.categories || [])
             }
         } catch (error) {
             console.error('Failed to load data:', error)

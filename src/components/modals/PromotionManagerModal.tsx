@@ -136,17 +136,17 @@ export default function PromotionManagerModal({
 
             if (promoRes.ok) {
                 const data = await promoRes.json()
-                setPromotions(data.promotions || [])
+                setPromotions(data.data || data.promotions || [])
             }
 
             if (catRes.ok) {
                 const data = await catRes.json()
-                setCategories(data.categories || [])
+                setCategories(data.data || data.categories || [])
             }
 
             if (prodRes.ok) {
                 const data = await prodRes.json()
-                setProducts(data.products || data || [])
+                setProducts(data.data || data.products || [])
             }
         } catch (error) {
             console.error('Failed to load data:', error)
