@@ -1,5 +1,8 @@
-// @ts-nocheck
-'use strict'
+/**
+ * Year-over-Year Comparison Report API
+ *
+ * GET — Compare current period vs same period last year
+ */
 
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -7,18 +10,19 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
 
-// GET — Year-over-year comparison
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) return ApiResponse.unauthorized()
 
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { franchiseId: true }
+        })
+        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
 
         const { searchParams } = new URL(request.url)
-        const period = searchParams.get('period') || 'MONTH' // WEEK, MONTH, QUARTER
+        const period = searchParams.get('period') || 'MONTH'
 
         const now = new Date()
         let currentStart: Date, currentEnd: Date, priorStart: Date, priorEnd: Date
@@ -40,13 +44,15 @@ export async function GET(request: NextRequest) {
             priorEnd = new Date(currentEnd); priorEnd.setFullYear(priorEnd.getFullYear() - 1)
         }
 
+        const franchiseId = user.franchiseId
+
         const [currentTx, priorTx] = await Promise.all([
             prisma.transaction.findMany({
-                where: { locationId, status: 'COMPLETED', createdAt: { gte: currentStart, lte: currentEnd } },
+                where: { franchiseId, status: 'COMPLETED', createdAt: { gte: currentStart, lte: currentEnd } },
                 select: { total: true, subtotal: true }
             }),
             prisma.transaction.findMany({
-                where: { locationId, status: 'COMPLETED', createdAt: { gte: priorStart, lte: priorEnd } },
+                where: { franchiseId, status: 'COMPLETED', createdAt: { gte: priorStart, lte: priorEnd } },
                 select: { total: true, subtotal: true }
             })
         ])
@@ -82,6 +88,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[YOY_GET]', error)
-        return ApiResponse.error('Failed to generate YoY comparison')
+        return ApiResponse.error('Failed to generate YoY comparison', 500)
     }
 }

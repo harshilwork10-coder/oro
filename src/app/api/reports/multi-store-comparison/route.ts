@@ -1,74 +1,90 @@
-// @ts-nocheck
 /**
  * Multi-Store Comparison API
  *
- * GET — Compare performance across locations (for franchisors/owners with multiple stores)
- * Returns side-by-side revenue, transactions, avg ticket for each location.
+ * GET — Compare performance across locations (for owners with multiple stores)
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { ApiResponse } from '@/lib/api-response'
 
 export async function GET(request: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    try {
+        const session = await getServerSession(authOptions)
+        if (!session?.user) return ApiResponse.unauthorized()
 
-    const { searchParams } = new URL(request.url)
-    const days = parseInt(searchParams.get('days') || '7')
-    const since = new Date()
-    since.setDate(since.getDate() - days)
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true, franchiseId: true }
+        })
 
-    // Get all locations the user has access to
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { role: true, locationId: true },
-    })
+        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
 
-    let locations: any[]
-    if (['PROVIDER', 'ADMIN'].includes(user?.role || '')) {
-        locations = await prisma.location.findMany({ select: { id: true, name: true, address: true } })
-    } else {
-        locations = user?.locationId
-            ? await prisma.location.findMany({ where: { id: user.locationId }, select: { id: true, name: true, address: true } })
-            : []
-    }
+        const { searchParams } = new URL(request.url)
+        const days = parseInt(searchParams.get('days') || '7')
+        const since = new Date(); since.setDate(since.getDate() - days)
 
-    // Get transactions for all locations in one query
-    const allTransactions = await prisma.transaction.findMany({
-        where: {
-            locationId: { in: locations.map(l => l.id) },
-            createdAt: { gte: since },
-            status: 'COMPLETED',
-        },
-        select: { locationId: true, total: true, createdAt: true },
-    })
+        // Get all locations for this franchise
+        const franchise = await prisma.franchise.findUnique({
+            where: { id: user.franchiseId },
+            select: { locations: { select: { id: true, name: true, address: true } } }
+        })
 
-    // Aggregate per location
-    const comparison = locations.map(loc => {
-        const txns = allTransactions.filter(t => t.locationId === loc.id)
-        const revenue = txns.reduce((s, t) => s + Number(t.total || 0), 0)
+        const locations = franchise?.locations || []
 
-        return {
-            locationId: loc.id,
-            name: loc.name,
-            address: loc.address,
-            revenue: Math.round(revenue * 100) / 100,
-            transactions: txns.length,
-            avgTicket: txns.length > 0 ? Math.round((revenue / txns.length) * 100) / 100 : 0,
-            dailyAvgRevenue: Math.round((revenue / days) * 100) / 100,
+        if (locations.length === 0) {
+            return ApiResponse.success({ period: `Last ${days} days`, totalRevenue: 0, locationCount: 0, comparison: [] })
         }
-    }).sort((a, b) => b.revenue - a.revenue)
 
-    const totalRevenue = comparison.reduce((s, l) => s + l.revenue, 0)
+        // Get all completed transactions for this franchise
+        const transactions = await prisma.transaction.findMany({
+            where: {
+                franchiseId: user.franchiseId,
+                status: 'COMPLETED',
+                createdAt: { gte: since }
+            },
+            select: { total: true, createdAt: true, cashDrawerSessionId: true }
+        })
 
-    return NextResponse.json({
-        data: {
+        // Get drawer sessions to map transactions to locations
+        const sessionIds = [...new Set(transactions.map(t => t.cashDrawerSessionId).filter(Boolean))] as string[]
+        const drawerSessions = sessionIds.length > 0 ? await prisma.cashDrawerSession.findMany({
+            where: { id: { in: sessionIds } },
+            select: { id: true, locationId: true }
+        }) : []
+        const sessionLocationMap = new Map(drawerSessions.map(ds => [ds.id, ds.locationId]))
+
+        // Group transactions by location
+        const comparison = locations.map(loc => {
+            const locTxns = transactions.filter(t => {
+                if (!t.cashDrawerSessionId) return false
+                return sessionLocationMap.get(t.cashDrawerSessionId) === loc.id
+            })
+            const revenue = locTxns.reduce((s, t) => s + Number(t.total || 0), 0)
+
+            return {
+                locationId: loc.id,
+                name: loc.name,
+                address: loc.address,
+                revenue: Math.round(revenue * 100) / 100,
+                transactions: locTxns.length,
+                avgTicket: locTxns.length > 0 ? Math.round((revenue / locTxns.length) * 100) / 100 : 0,
+                dailyAvgRevenue: Math.round((revenue / days) * 100) / 100
+            }
+        }).sort((a, b) => b.revenue - a.revenue)
+
+        const totalRevenue = comparison.reduce((s, l) => s + l.revenue, 0)
+
+        return ApiResponse.success({
             period: `Last ${days} days`,
             totalRevenue: Math.round(totalRevenue * 100) / 100,
             locationCount: comparison.length,
-            comparison,
-        },
-    })
+            comparison
+        })
+    } catch (error) {
+        console.error('[MULTI_STORE_GET]', error)
+        return ApiResponse.error('Failed to generate comparison', 500)
+    }
 }

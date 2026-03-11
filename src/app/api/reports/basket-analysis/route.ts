@@ -1,5 +1,8 @@
-// @ts-nocheck
-'use strict'
+/**
+ * Basket Analysis API
+ *
+ * GET — Identify frequently co-purchased items, average basket size, and metrics
+ */
 
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -7,78 +10,109 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
 
-// GET — Basket analysis: "frequently bought together"
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) return ApiResponse.unauthorized()
 
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { franchiseId: true }
+        })
+        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
 
         const { searchParams } = new URL(request.url)
         const days = parseInt(searchParams.get('days') || '30')
-        const minSupport = parseInt(searchParams.get('minSupport') || '3') // Min co-occurrences
+        const minSupport = parseInt(searchParams.get('minSupport') || '3') // min co-occurrences
+        const since = new Date(); since.setDate(since.getDate() - days)
 
-        const since = new Date()
-        since.setDate(since.getDate() - days)
-
-        // Get all transactions with their items
+        // Get transactions with their product line items
         const transactions = await prisma.transaction.findMany({
-            where: { locationId, status: 'COMPLETED', createdAt: { gte: since } },
+            where: { franchiseId: user.franchiseId, status: 'COMPLETED', createdAt: { gte: since } },
             select: {
                 id: true,
-                items: { select: { itemId: true, name: true } }
+                total: true,
+                lineItems: {
+                    where: { type: 'PRODUCT', productId: { not: null } },
+                    select: { productId: true, quantity: true }
+                }
             }
         })
 
-        // Count co-occurrences (item pairs appearing in same basket)
-        const pairs: Record<string, { items: [string, string]; names: [string, string]; count: number }> = {}
+        // Only multi-item baskets
+        const multiItem = transactions.filter(t => t.lineItems.length >= 2)
 
-        for (const tx of transactions) {
-            const items = tx.items.filter(i => i.itemId)
-            for (let i = 0; i < items.length; i++) {
-                for (let j = i + 1; j < items.length; j++) {
-                    const ids = [items[i].itemId!, items[j].itemId!].sort()
-                    const key = ids.join('|')
-                    if (!pairs[key]) {
-                        pairs[key] = {
-                            items: ids as [string, string],
-                            names: [items[i].name, items[j].name] as [string, string],
-                            count: 0
-                        }
-                    }
-                    pairs[key].count++
+        // Count co-occurrences
+        const pairCounts: Record<string, number> = {}
+        const itemCounts: Record<string, number> = {}
+
+        for (const tx of multiItem) {
+            const productIds = [...new Set(tx.lineItems.map(li => li.productId!).filter(Boolean))]
+            for (const pid of productIds) {
+                itemCounts[pid] = (itemCounts[pid] || 0) + 1
+            }
+            for (let i = 0; i < productIds.length; i++) {
+                for (let j = i + 1; j < productIds.length; j++) {
+                    const key = [productIds[i], productIds[j]].sort().join('|')
+                    pairCounts[key] = (pairCounts[key] || 0) + 1
                 }
             }
         }
 
-        // Filter and sort by frequency
-        const results = Object.values(pairs)
-            .filter(p => p.count >= minSupport)
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 50)
-            .map(p => ({
-                pair: p.names,
-                itemIds: p.items,
-                coOccurrences: p.count,
-                confidence: Math.round((p.count / transactions.length) * 10000) / 100
-            }))
+        // Get product names for top pairs
+        const allIds = new Set<string>()
+        Object.keys(pairCounts).forEach(key => {
+            const [a, b] = key.split('|')
+            allIds.add(a); allIds.add(b)
+        })
 
-        // Avg basket size
-        const avgBasketSize = transactions.length > 0
-            ? Math.round((transactions.reduce((s, t) => s + t.items.length, 0) / transactions.length) * 10) / 10
+        const products = await prisma.product.findMany({
+            where: { id: { in: Array.from(allIds) } },
+            select: { id: true, name: true, barcode: true }
+        })
+        const nameMap = new Map(products.map(p => [p.id, p.name]))
+
+        // Build pair results, filtered by support
+        const pairs = Object.entries(pairCounts)
+            .filter(([, count]) => count >= minSupport)
+            .map(([key, count]) => {
+                const [a, b] = key.split('|')
+                const confidence = (itemCounts[a] || 1) > 0 ? (count / (itemCounts[a] || 1)) : 0
+                return {
+                    itemA: nameMap.get(a) || a,
+                    itemB: nameMap.get(b) || b,
+                    coOccurrences: count,
+                    confidence: Math.round(confidence * 1000) / 10
+                }
+            })
+            .sort((a, b) => b.coOccurrences - a.coOccurrences)
+            .slice(0, 20)
+
+        // Basket size stats
+        const basketSizes = transactions.map(t => t.lineItems.length)
+        const avgBasketSize = basketSizes.length > 0
+            ? Math.round((basketSizes.reduce((s, b) => s + b, 0) / basketSizes.length) * 10) / 10
+            : 0
+
+        const avgBasketValue = transactions.length > 0
+            ? Math.round((transactions.reduce((s, t) => s + Number(t.total || 0), 0) / transactions.length) * 100) / 100
             : 0
 
         return ApiResponse.success({
-            pairs: results,
-            totalTransactions: transactions.length,
-            avgBasketSize,
+            pairs,
+            metrics: {
+                totalTransactions: transactions.length,
+                multiItemTransactions: multiItem.length,
+                multiItemPct: transactions.length > 0
+                    ? Math.round((multiItem.length / transactions.length) * 1000) / 10
+                    : 0,
+                avgBasketSize,
+                avgBasketValue
+            },
             periodDays: days
         })
     } catch (error) {
-        console.error('[BASKET_ANALYSIS_GET]', error)
-        return ApiResponse.error('Failed to generate basket analysis')
+        console.error('[BASKET_GET]', error)
+        return ApiResponse.error('Failed to generate basket analysis', 500)
     }
 }

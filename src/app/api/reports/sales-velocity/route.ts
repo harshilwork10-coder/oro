@@ -1,5 +1,8 @@
-// @ts-nocheck
-'use strict'
+/**
+ * Sales Velocity Report API
+ *
+ * GET — Items ranked by sell-through speed: units/day, days-of-stock remaining
+ */
 
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -7,15 +10,17 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
 
-// GET — Sales velocity: items ranked by sell-through speed
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) return ApiResponse.unauthorized()
 
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { franchiseId: true }
+        })
+
+        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
 
         const { searchParams } = new URL(request.url)
         const days = parseInt(searchParams.get('days') || '30')
@@ -24,46 +29,51 @@ export async function GET(request: NextRequest) {
         const since = new Date()
         since.setDate(since.getDate() - days)
 
-        // Get all sales grouped by item
-        const where: any = {
-            transaction: { locationId, status: 'COMPLETED', createdAt: { gte: since } }
-        }
-
+        // Get sales grouped by product
         const salesData = await prisma.transactionLineItem.groupBy({
-            by: ['itemId'],
-            where,
+            by: ['productId'],
+            where: {
+                type: 'PRODUCT',
+                productId: { not: null },
+                transaction: {
+                    franchiseId: user.franchiseId,
+                    status: 'COMPLETED',
+                    createdAt: { gte: since }
+                }
+            },
             _sum: { quantity: true, total: true },
             _count: { id: true }
         })
 
-        const itemIds = salesData.map(s => s.itemId).filter(Boolean) as string[]
-        const itemWhere: any = { id: { in: itemIds } }
-        if (categoryId) itemWhere.categoryId = categoryId
+        // Get product details
+        const productIds = salesData.map(s => s.productId).filter(Boolean) as string[]
+        const productWhere: Record<string, unknown> = { id: { in: productIds } }
+        if (categoryId) productWhere.categoryId = categoryId
 
-        const items = await prisma.item.findMany({
-            where: itemWhere,
+        const products = await prisma.product.findMany({
+            where: productWhere,
             select: {
                 id: true, name: true, barcode: true, stock: true, cost: true, price: true,
-                category: { select: { name: true } }
+                productCategory: { select: { name: true } }
             }
         })
 
-        const itemMap = new Map(items.map(i => [i.id, i]))
+        const productMap = new Map(products.map(p => [p.id, p]))
 
         const velocity = salesData
-            .filter(s => s.itemId && itemMap.has(s.itemId!))
+            .filter(s => s.productId && productMap.has(s.productId!))
             .map(s => {
-                const item = itemMap.get(s.itemId!)!
+                const product = productMap.get(s.productId!)!
                 const unitsSold = s._sum.quantity || 0
                 const unitsPerDay = unitsSold / days
-                const currentStock = item.stock || 0
+                const currentStock = product.stock || 0
                 const daysOfStock = unitsPerDay > 0 ? Math.round(currentStock / unitsPerDay) : 999
 
                 return {
-                    itemId: item.id,
-                    name: item.name,
-                    barcode: item.barcode,
-                    category: item.category?.name || 'Uncategorized',
+                    productId: product.id,
+                    name: product.name,
+                    barcode: product.barcode,
+                    category: product.productCategory?.name || 'Uncategorized',
                     unitsSold,
                     revenue: Math.round(Number(s._sum.total || 0) * 100) / 100,
                     unitsPerDay: Math.round(unitsPerDay * 10) / 10,
@@ -86,6 +96,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[VELOCITY_GET]', error)
-        return ApiResponse.error('Failed to generate velocity report')
+        return ApiResponse.error('Failed to generate velocity report', 500)
     }
 }

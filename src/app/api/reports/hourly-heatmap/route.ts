@@ -1,5 +1,8 @@
-// @ts-nocheck
-'use strict'
+/**
+ * Hourly Sales Heatmap API
+ *
+ * GET — Revenue and transaction count bucketed by hour-of-day and day-of-week
+ */
 
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -7,15 +10,17 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
 
-// GET — Hourly sales heatmap (which hours are busiest)
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) return ApiResponse.unauthorized()
 
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { franchiseId: true }
+        })
+
+        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
 
         const { searchParams } = new URL(request.url)
         const days = parseInt(searchParams.get('days') || '7')
@@ -25,7 +30,7 @@ export async function GET(request: NextRequest) {
 
         const transactions = await prisma.transaction.findMany({
             where: {
-                locationId,
+                franchiseId: user.franchiseId,
                 status: 'COMPLETED',
                 createdAt: { gte: since }
             },
@@ -66,6 +71,6 @@ export async function GET(request: NextRequest) {
         return ApiResponse.success({ heatmap, hourlyTotals, peakHours: peak, periodDays: days })
     } catch (error) {
         console.error('[HEATMAP_GET]', error)
-        return ApiResponse.error('Failed to generate heatmap')
+        return ApiResponse.error('Failed to generate heatmap', 500)
     }
 }

@@ -1,5 +1,8 @@
-// @ts-nocheck
-'use strict'
+/**
+ * Employee Sales Ranking (Leaderboard) API
+ *
+ * GET — Rank employees by total sales revenue, transaction count, and avg ticket
+ */
 
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -7,15 +10,17 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
 
-// GET — Employee sales ranking (leaderboard)
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) return ApiResponse.unauthorized()
 
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { franchiseId: true }
+        })
+
+        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
 
         const { searchParams } = new URL(request.url)
         const days = parseInt(searchParams.get('days') || '7')
@@ -27,7 +32,7 @@ export async function GET(request: NextRequest) {
         const salesData = await prisma.transaction.groupBy({
             by: ['employeeId'],
             where: {
-                locationId,
+                franchiseId: user.franchiseId,
                 status: 'COMPLETED',
                 createdAt: { gte: since }
             },
@@ -39,15 +44,15 @@ export async function GET(request: NextRequest) {
         const empIds = salesData.map(s => s.employeeId).filter(Boolean) as string[]
         const employees = await prisma.user.findMany({
             where: { id: { in: empIds } },
-            select: { id: true, name: true }
+            select: { id: true, firstName: true, lastName: true }
         })
 
-        const empMap = new Map(employees.map(e => [e.id, e.name || 'Unknown']))
+        const empMap = new Map(employees.map(e => [e.id, `${e.firstName || ''} ${e.lastName || ''}`.trim() || 'Unknown']))
 
         const rankings = salesData
             .filter(s => s.employeeId)
-            .map((s, idx) => ({
-                rank: idx + 1,
+            .map(s => ({
+                rank: 0,
                 employeeId: s.employeeId!,
                 name: empMap.get(s.employeeId!) || 'Unknown',
                 transactionCount: s._count.id,
@@ -62,6 +67,6 @@ export async function GET(request: NextRequest) {
         return ApiResponse.success({ rankings, periodDays: days })
     } catch (error) {
         console.error('[EMPLOYEE_RANKING_GET]', error)
-        return ApiResponse.error('Failed to generate employee rankings')
+        return ApiResponse.error('Failed to generate employee rankings', 500)
     }
 }

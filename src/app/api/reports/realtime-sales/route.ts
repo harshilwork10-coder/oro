@@ -1,5 +1,8 @@
-// @ts-nocheck
-'use strict'
+/**
+ * Realtime Sales Ticker API
+ *
+ * GET — Live KPI snapshot: today's revenue, last hour, vs yesterday, projected total
+ */
 
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -7,35 +10,36 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
 
-// GET — Realtime sales ticker (live KPI snapshot)
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user) return ApiResponse.unauthorized()
 
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId && !user.franchiseId) return ApiResponse.badRequest('No location or franchise')
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { franchiseId: true }
+        })
 
-        const where: any = { status: 'COMPLETED' }
-        if (locationId) where.locationId = locationId
-        else where.location = { franchiseId: user.franchiseId }
+        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
 
-        // Today's data
+        const franchiseId = user.franchiseId
+        const baseWhere = { franchiseId, status: 'COMPLETED' as const }
+
+        // Today's start
         const today = new Date(); today.setHours(0, 0, 0, 0)
 
         const [todayTx, lastHourTx, yesterdayTx] = await Promise.all([
             prisma.transaction.findMany({
-                where: { ...where, createdAt: { gte: today } },
+                where: { ...baseWhere, createdAt: { gte: today } },
                 select: { total: true, createdAt: true }
             }),
             prisma.transaction.findMany({
-                where: { ...where, createdAt: { gte: new Date(Date.now() - 3600000) } },
+                where: { ...baseWhere, createdAt: { gte: new Date(Date.now() - 3600000) } },
                 select: { total: true }
             }),
             prisma.transaction.findMany({
                 where: {
-                    ...where,
+                    ...baseWhere,
                     createdAt: { gte: new Date(today.getTime() - 86400000), lt: today }
                 },
                 select: { total: true }
@@ -85,6 +89,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[REALTIME_GET]', error)
-        return ApiResponse.error('Failed to fetch realtime data')
+        return ApiResponse.error('Failed to fetch realtime data', 500)
     }
 }
