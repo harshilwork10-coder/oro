@@ -9,7 +9,7 @@ export default function ComplianceReportPage() {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        fetch('/api/reports/loss-prevention?days=30')
+        fetch('/api/reports/compliance?days=30')
             .then(r => r.json()).then(d => { setData(d.data?.dashboard); setLoading(false) })
             .catch(() => setLoading(false))
     }, [])

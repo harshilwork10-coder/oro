@@ -44,11 +44,9 @@ export default function DrawerActivityPage() {
     const fetchActivities = async () => {
         setLoading(true)
         try {
-            // Real API integration pending
-            // const res = await fetch(`/api/reports/drawer-activity?date=${selectedDate}`)
-            // const data = await res.json()
-            // setActivities(data.activities)
-            setActivities([])
+            const res = await fetch(`/api/drawer-activity?date=${selectedDate}${filterType !== 'all' ? `&type=${filterType}` : ''}`)
+            const data = await res.json()
+            setActivities(data.activities || [])
         } catch (error) {
             console.error('Failed to fetch activities:', error)
         } finally {

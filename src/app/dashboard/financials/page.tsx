@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import {
@@ -9,9 +10,12 @@ import {
     TrendingUp,
     ArrowRightLeft,
     Users,
-    ArrowRight
+    ArrowRight,
+    RefreshCw
 } from 'lucide-react'
 import Link from 'next/link'
+
+function fmtCurrency(n: number) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 export default function FinancialsPage() {
     const { data: session, status } = useSession({
@@ -20,6 +24,17 @@ export default function FinancialsPage() {
             redirect('/login')
         },
     })
+    const [data, setData] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        if (status === 'authenticated') {
+            fetch('/api/reports/eod-summary')
+                .then(r => r.json())
+                .then(d => { setData(d.data); setLoading(false) })
+                .catch(() => setLoading(false))
+        }
+    }, [status])
 
     if (status === 'loading') {
         return (
@@ -29,6 +44,11 @@ export default function FinancialsPage() {
         )
     }
 
+    const revenue = data?.revenue?.total || 0
+    const refunds = data?.refunds?.total || 0
+    const voids = data?.voids?.count || 0
+    const netSales = revenue - refunds
+
     return (
         <div className="p-4 md:p-8 space-y-8">
             <div>
@@ -36,42 +56,56 @@ export default function FinancialsPage() {
                 <p className="text-stone-400 mt-2">Track revenue, fees, and financial analytics</p>
             </div>
 
+            {/* Today's KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="glass-panel p-5 rounded-2xl">
+                    <p className="text-sm text-stone-400">Today&apos;s Revenue</p>
+                    <p className="text-2xl font-bold text-emerald-400 mt-1">{loading ? '...' : fmtCurrency(revenue)}</p>
+                </div>
+                <div className="glass-panel p-5 rounded-2xl">
+                    <p className="text-sm text-stone-400">Net Sales</p>
+                    <p className="text-2xl font-bold text-blue-400 mt-1">{loading ? '...' : fmtCurrency(netSales)}</p>
+                </div>
+                <div className="glass-panel p-5 rounded-2xl">
+                    <p className="text-sm text-stone-400">Refunds</p>
+                    <p className="text-2xl font-bold text-red-400 mt-1">{loading ? '...' : fmtCurrency(refunds)}</p>
+                </div>
+                <div className="glass-panel p-5 rounded-2xl">
+                    <p className="text-sm text-stone-400">Transactions</p>
+                    <p className="text-2xl font-bold text-stone-100 mt-1">{loading ? '...' : (data?.revenue?.transactions || 0)}</p>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-panel p-6 rounded-2xl flex items-start gap-4">
+                <Link href="/dashboard/reports/financial-summary" className="glass-panel p-6 rounded-2xl flex items-start gap-4 hover:border-emerald-500/50 transition-all group">
                     <div className="h-12 w-12 bg-emerald-500/20 rounded-xl flex items-center justify-center border border-emerald-500/20">
                         <TrendingUp className="h-6 w-6 text-emerald-400" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-stone-100">Processing Fees</h3>
-                        <p className="text-sm text-stone-400 mt-1">Monitor payment processing revenue</p>
+                        <h3 className="font-bold text-stone-100">Financial Summary</h3>
+                        <p className="text-sm text-stone-400 mt-1">Consolidated financial overview</p>
                     </div>
-                </div>
+                </Link>
 
-                <div className="glass-panel p-6 rounded-2xl flex items-start gap-4">
+                <Link href="/dashboard/reports/pnl" className="glass-panel p-6 rounded-2xl flex items-start gap-4 hover:border-purple-500/50 transition-all group">
                     <div className="h-12 w-12 bg-purple-500/20 rounded-xl flex items-center justify-center border border-purple-500/20">
                         <FileText className="h-6 w-6 text-purple-400" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-stone-100">Invoicing</h3>
-                        <p className="text-sm text-stone-400 mt-1">Generate and manage invoices</p>
+                        <h3 className="font-bold text-stone-100">P&amp;L Statement</h3>
+                        <p className="text-sm text-stone-400 mt-1">Revenue, costs, and profit breakdown</p>
                     </div>
-                </div>
+                </Link>
 
-                <div className="glass-panel p-6 rounded-2xl flex items-start gap-4">
+                <Link href="/dashboard/reports/revenue" className="glass-panel p-6 rounded-2xl flex items-start gap-4 hover:border-amber-500/50 transition-all group">
                     <div className="h-12 w-12 bg-amber-500/20 rounded-xl flex items-center justify-center border border-amber-500/20">
                         <DollarSign className="h-6 w-6 text-amber-400" />
                     </div>
                     <div>
                         <h3 className="font-bold text-stone-100">Revenue Analytics</h3>
-                        <p className="text-sm text-stone-400 mt-1">Detailed financial reports and insights</p>
+                        <p className="text-sm text-stone-400 mt-1">Daily revenue trends and breakdowns</p>
                     </div>
-                </div>
-            </div>
-
-            <div className="glass-panel p-6 rounded-xl border border-blue-500/20">
-                <p className="text-sm text-blue-400">
-                    <strong>Note:</strong> Financial management features require payment gateway integration and will be implemented in a future update.
-                </p>
+                </Link>
             </div>
             {/* Configuration Quick Links */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -9,7 +9,7 @@ export default function NPSReportPage() {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        fetch('/api/customers/segmentation?days=30')
+        fetch('/api/reports/nps?days=90')
             .then(r => r.json()).then(d => { setData(d.data); setLoading(false) })
             .catch(() => setLoading(false))
     }, [])

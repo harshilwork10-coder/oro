@@ -10,7 +10,7 @@ export default function RoyaltiesReportPage() {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        fetch('/api/reports/multi-store-comparison?days=30')
+        fetch('/api/reports/royalties?days=90')
             .then(r => r.json()).then(d => { setData(d.data); setLoading(false) })
             .catch(() => setLoading(false))
     }, [])

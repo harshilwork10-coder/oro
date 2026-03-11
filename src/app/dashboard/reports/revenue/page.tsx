@@ -12,7 +12,7 @@ export default function RevenueReportPage() {
 
     useEffect(() => {
         setLoading(true)
-        fetch(`/api/reports/multi-store-comparison?days=${days}`)
+        fetch(`/api/reports/revenue?days=${days}`)
             .then(r => r.json()).then(d => { setData(d.data); setLoading(false) })
             .catch(() => setLoading(false))
     }, [days])

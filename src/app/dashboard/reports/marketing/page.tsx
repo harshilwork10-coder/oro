@@ -10,7 +10,7 @@ export default function MarketingReportPage() {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        fetch('/api/customers/segmentation?days=30')
+        fetch('/api/reports/nps?days=30')
             .then(r => r.json()).then(d => { setData(d.data); setLoading(false) })
             .catch(() => setLoading(false))
     }, [])

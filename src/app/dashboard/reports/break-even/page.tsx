@@ -10,7 +10,7 @@ export default function BreakEvenReportPage() {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        fetch('/api/reports/eod-summary')
+        fetch('/api/reports/revenue?days=30')
             .then(r => r.json()).then(d => { setData(d.data); setLoading(false) })
             .catch(() => setLoading(false))
     }, [])

@@ -10,19 +10,22 @@ export default function PnLReportPage() {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        fetch('/api/reports/eod-summary')
+        fetch('/api/reports/pnl?days=30')
             .then(r => r.json()).then(d => { setData(d.data); setLoading(false) })
             .catch(() => setLoading(false))
     }, [])
 
-    const revenue = data?.revenue || 0
-    const refunds = data?.refunds || 0
-    const voids = data?.voids || 0
-    const netSales = revenue - refunds - voids
-    const estimatedCogs = netSales * 0.35
-    const grossProfit = netSales - estimatedCogs
-    const estimatedExpenses = netSales * 0.25
-    const netProfit = grossProfit - estimatedExpenses
+    const rev = data?.revenue || {}
+    const exp = data?.expenses || {}
+    const profit = data?.profit || {}
+    const revenue = rev.grossRevenue || 0
+    const refunds = rev.refunds || 0
+    const voids = rev.voids || 0
+    const netSales = rev.netSales || 0
+    const taxCollected = rev.taxCollected || 0
+    const laborCost = exp.laborCost || 0
+    const grossProfit = profit.grossProfit || 0
+    const netProfit = profit.netProfit
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white p-6">
@@ -39,17 +42,23 @@ export default function PnLReportPage() {
                         { label: '  Less: Refunds', val: -refunds, color: 'text-red-400' },
                         { label: '  Less: Voids', val: -voids, color: 'text-red-400' },
                         { label: 'Net Sales', val: netSales, color: 'text-white', bold: true, border: true },
-                        { label: '  Estimated COGS (35%)', val: -estimatedCogs, color: 'text-orange-400' },
-                        { label: 'Gross Profit', val: grossProfit, color: 'text-emerald-400', bold: true, border: true },
-                        { label: '  Estimated Operating Expenses (25%)', val: -estimatedExpenses, color: 'text-orange-400' },
-                        { label: 'Net Profit', val: netProfit, color: netProfit >= 0 ? 'text-emerald-400' : 'text-red-400', bold: true, border: true },
+                        { label: '  Tax Collected', val: taxCollected, color: 'text-blue-400' },
+                        { label: 'Gross Profit (pre-expenses)', val: grossProfit, color: 'text-emerald-400', bold: true, border: true },
+                        ...(exp.hasLaborData ? [
+                            { label: '  Labor Cost', val: -laborCost, color: 'text-orange-400' },
+                            { label: 'Net Profit', val: netProfit || 0, color: (netProfit || 0) >= 0 ? 'text-emerald-400' : 'text-red-400', bold: true, border: true },
+                        ] : []),
                     ].map((row, i) => (
                         <div key={i} className={`flex justify-between py-2 ${row.border ? 'border-t border-stone-600 mt-2 pt-3' : ''} ${row.bold ? 'font-bold' : ''}`}>
                             <span className={row.bold ? 'text-white' : 'text-stone-400'}>{row.label}</span>
                             <span className={`font-mono ${row.color}`}>{formatCurrency(Math.abs(row.val))}{row.val < 0 ? ' (-)' : ''}</span>
                         </div>
                     ))}
-                    <p className="text-xs text-stone-600 mt-4">* COGS and expenses are estimated. Connect accounting for actuals.</p>
+                    <p className="text-xs text-stone-600 mt-4">
+                        {exp.hasLaborData
+                            ? '* COGS not yet connected. Connect accounting for full P&L.'
+                            : '* Connect payroll and accounting for complete expense tracking.'}
+                    </p>
                 </div>
             ) : <p className="text-center text-stone-500 py-20">No data yet.</p>}
         </div>
