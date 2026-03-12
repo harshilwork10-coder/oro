@@ -7,7 +7,7 @@ import {
   FileText, Upload, Download, CheckCircle, AlertTriangle,
   XCircle, Clock, DollarSign, Package, ArrowLeft, RefreshCw,
   ChevronDown, ChevronUp, Search, Filter, Truck, Eye,
-  ArrowRight, Shield, AlertCircle, ChevronRight
+  ArrowRight, Shield, AlertCircle, ChevronRight, Wifi, WifiOff, Server
 } from "lucide-react"
 import Link from 'next/link'
 
@@ -109,6 +109,12 @@ export default function InvoiceDashboard() {
   const [actionLoading, setActionLoading] = useState(false)
   const [voidReason, setVoidReason] = useState('')
   const [showVoidModal, setShowVoidModal] = useState(false)
+
+  // FTP state
+  const [ftpFetching, setFtpFetching] = useState(false)
+  const [ftpResult, setFtpResult] = useState<Record<string, unknown> | null>(null)
+  const [ftpTesting, setFtpTesting] = useState(false)
+  const [ftpTestResult, setFtpTestResult] = useState<{ success: boolean; message: string } | null>(null)
 
   if (status === 'unauthenticated') redirect('/login')
 
@@ -438,6 +444,87 @@ export default function InvoiceDashboard() {
         <StatCard label="Posted" value={stats.POSTED?.count || 0} color="text-green-400" bgColor="bg-green-500/10" />
         <StatCard label="Imported" value={stats.IMPORTED?.count || 0} color="text-blue-400" bgColor="bg-blue-500/10" />
         <StatCard label="Voided" value={stats.VOIDED?.count || 0} color="text-red-400" bgColor="bg-red-500/10" />
+      </div>
+
+      {/* FTP Auto-Fetch */}
+      <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <Server size={20} className="text-blue-400" />
+            <div>
+              <h3 className="font-semibold text-sm">Auto-Fetch from Vendor FTP</h3>
+              <p className="text-xs text-gray-500">Connect to vendor FTP server and download new invoices automatically</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                setFtpTesting(true); setFtpTestResult(null)
+                try {
+                  const res = await fetch('/api/invoices/fetch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'test' })
+                  })
+                  setFtpTestResult(await res.json())
+                } catch { setFtpTestResult({ success: false, message: 'Request failed' }) }
+                finally { setFtpTesting(false) }
+              }}
+              disabled={ftpTesting}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+            >
+              {ftpTesting ? <RefreshCw size={12} className="animate-spin" /> : <Wifi size={12} />}
+              Test Connection
+            </button>
+            <button
+              onClick={async () => {
+                setFtpFetching(true); setFtpResult(null)
+                try {
+                  const res = await fetch('/api/invoices/fetch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'fetch' })
+                  })
+                  const data = await res.json()
+                  setFtpResult(data)
+                  if (data.success && data.invoicesCreated > 0) fetchInvoices()
+                } catch { setFtpResult({ success: false, error: 'Fetch failed' }) }
+                finally { setFtpFetching(false) }
+              }}
+              disabled={ftpFetching}
+              className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-500 disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {ftpFetching ? <RefreshCw size={12} className="animate-spin" /> : <Download size={12} />}
+              {ftpFetching ? 'Fetching...' : 'Fetch Now'}
+            </button>
+          </div>
+        </div>
+        {/* FTP Test Result */}
+        {ftpTestResult && (
+          <div className={`mt-2 p-2 rounded text-xs ${ftpTestResult.success ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+            {ftpTestResult.success ? <Wifi size={12} className="inline mr-1" /> : <WifiOff size={12} className="inline mr-1" />}
+            {ftpTestResult.message}
+          </div>
+        )}
+        {/* FTP Fetch Result */}
+        {ftpResult && (
+          <div className={`mt-2 p-3 rounded text-sm ${(ftpResult as { success?: boolean }).success ? 'bg-green-500/10 border border-green-500/20' : 'bg-red-500/10 border border-red-500/20'}`}>
+            {(ftpResult as { success?: boolean }).success ? (
+              <div>
+                <p className="text-green-400 font-medium">✅ {String((ftpResult as { message?: string }).message)}</p>
+                <div className="mt-1 text-xs text-gray-400 flex gap-4">
+                  <span>Files found: {String((ftpResult as { filesFound?: number }).filesFound || 0)}</span>
+                  <span>Downloaded: {String((ftpResult as { filesDownloaded?: number }).filesDownloaded || 0)}</span>
+                  <span>Skipped: {String((ftpResult as { filesSkipped?: number }).filesSkipped || 0)}</span>
+                  <span>Invoices: {String((ftpResult as { invoicesCreated?: number }).invoicesCreated || 0)}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-red-400">❌ {String((ftpResult as { error?: string }).error || (ftpResult as { message?: string }).message || 'Fetch failed')}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Upload Zone */}
