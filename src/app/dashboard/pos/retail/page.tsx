@@ -392,7 +392,7 @@ export default function RetailPOSPage() {
     }, [])
 
     // Handle product tap → add to cart
-    const handleProductTap = useCallback((product: any) => {
+    const handleProductTap = (product: any) => {
         addToCart({
             id: product.id,
             name: product.name,
@@ -406,7 +406,7 @@ export default function RetailPOSPage() {
             isEbtEligible: product.isEbtEligible || product.productCategory?.isEbtEligible || false,
         })
         setToast({ message: `Added: ${product.name}`, type: 'success' })
-    }, [])
+    }
 
     const totalPages = Math.max(1, Math.ceil(productTotal / PRODUCTS_PER_PAGE))
 
@@ -687,41 +687,8 @@ export default function RetailPOSPage() {
         fetchFavorites()
     }, [])
 
-    // Fetch categories for filter dropdown
-    useEffect(() => {
-        const fetchCategories = async () => {
-            try {
-                const res = await fetch('/api/inventory/categories')
-                if (res.ok) {
-                    const data = await res.json()
-                    setCategories(Array.isArray(data.categories) ? data.categories : Array.isArray(data) ? data : [])
-                }
-            } catch (error) {
-                console.error('[POS] Failed to load categories:', error)
-            }
-        }
-        fetchCategories()
-    }, [])
-
-    // Fetch products when category is selected
-    useEffect(() => {
-        if (!selectedCategory) {
-            setCategoryProducts([])
-            return
-        }
-        const fetchCategoryProducts = async () => {
-            try {
-                const res = await fetch(`/api/inventory/products?categoryId=${selectedCategory}&limit=100`)
-                if (res.ok) {
-                    const data = await res.json()
-                    setCategoryProducts(Array.isArray(data.products) ? data.products : Array.isArray(data) ? data : [])
-                }
-            } catch (error) {
-                console.error('[POS] Failed to load category products:', error)
-            }
-        }
-        fetchCategoryProducts()
-    }, [selectedCategory])
+    // BUG-6 FIX: Removed duplicate useEffect hooks for categories and products.
+    // The CRE data fetching block (lines 289-385) handles both correctly.
 
     // Sync cart to SERVER for customer display (station-isolated)
     useEffect(() => {
@@ -1127,8 +1094,8 @@ export default function RetailPOSPage() {
         // For card payments, open PAX terminal modal instead of direct processing
         if ((method === 'CREDIT_CARD' || method === 'DEBIT_CARD') && !paxResponse) {
             setShowPaymentModal(false)
-            const { total } = calculateTotals()
-            setPendingCardAmount(total + tipAmount)
+            const { cashTotal, cardTotal, showDualPricing } = calculateTotals()
+            setPendingCardAmount((showDualPricing ? cardTotal : cashTotal) + tipAmount)
             setShowPaxModal(true)
             return
         }
@@ -1237,6 +1204,11 @@ export default function RetailPOSPage() {
                 setSelectedCustomer(null)
                 setIdVerifiedForTransaction(false) // Reset ID verification for next transaction
                 setTransactionDiscount(null) // Reset transaction discount
+                setAppliedPromotions([])     // BUG-2 FIX: Clear promo list
+                setPromoDiscount(0)          // BUG-2 FIX: Clear promo discount
+                setLoyaltyDiscount(0)        // BUG-2 FIX: Clear loyalty discount
+                setLotteryPayout(0)          // BUG-2 FIX: Clear lottery offset
+                setAppliedPromoCode('')      // BUG-2 FIX: Clear promo code
             } else {
                 const error = await res.json()
                 setToast({ message: error.error || 'Payment failed', type: 'error' })

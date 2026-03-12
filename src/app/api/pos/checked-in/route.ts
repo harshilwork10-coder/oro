@@ -37,9 +37,9 @@ export async function GET() {
             }
         }
 
-        // If still no franchise context, get all recent customers (for demo)
+        // BUG-4 FIX: Never fall back to all customers — that's a cross-tenant data leak
         if (!whereClause.franchiseId) {
-            whereClause = {} // Get all customers as fallback
+            return NextResponse.json({ error: 'No franchise context' }, { status: 400 })
         }
 
         // Find recent customers who checked in today (by createdAt for new, updatedAt for returning)

@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
             chargedMode: chargedMode || 'CASH', // Default to CASH if not specified
             paymentMethod: paymentMethod,
             cashAmount: (paymentMethod === 'SPLIT' ? cashAmount : (paymentMethod === 'CASH' ? total : 0)).toString(),
-            cardAmount: (paymentMethod === 'SPLIT' ? cardAmount : (['CREDIT_CARD', 'EBT'].includes(paymentMethod) ? total : 0)).toString(),
+            cardAmount: (paymentMethod === 'SPLIT' ? cardAmount : (['CREDIT_CARD', 'DEBIT_CARD', 'EBT'].includes(paymentMethod) ? total : 0)).toString(),
             gatewayTxId: gatewayTxId || null,
             authCode: authCode || null,
             cardLast4: cardLast4 || null,
@@ -459,10 +459,7 @@ export async function POST(req: NextRequest) {
 
         // Return generic error to client (don't expose internal details)
         return NextResponse.json({
-            error: 'Transaction failed. Please try again.',
-            details: error.message,
-            code: error.code,
-            meta: error.meta
+            error: 'Transaction failed. Please try again.'
         }, { status: 500 })
     }
 }

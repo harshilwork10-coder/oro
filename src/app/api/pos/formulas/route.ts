@@ -33,18 +33,31 @@ export const GET = withPOSAuth(async (_req: Request, ctx: POSContext) => {
 
         return NextResponse.json({
             success: true,
-            data: formulas.map(f => ({
-                id: f.id,
-                clientName: cMap[f.clientId] || 'Unknown',
-                clientId: f.clientId,
-                brand: '',
-                formula: f.note || '',
-                developer: '',
-                processingTime: '',
-                date: f.createdAt.toISOString().split('T')[0],
-                stylistName: f.createdBy ? (uMap[f.createdBy] || '') : '',
-                version: 1
-            }))
+            data: formulas.map(f => {
+                // BUG-13 FIX: Parse JSON stored in note field
+                let formula = f.note || ''
+                let developer = ''
+                let processingTime = ''
+                try {
+                    const parsed = JSON.parse(f.note || '{}')
+                    formula = parsed.formula || f.note || ''
+                    developer = parsed.developer || ''
+                    processingTime = parsed.processingTime || ''
+                } catch { /* note is plain text, use as-is */ }
+
+                return {
+                    id: f.id,
+                    clientName: cMap[f.clientId] || 'Unknown',
+                    clientId: f.clientId,
+                    brand: '',
+                    formula,
+                    developer,
+                    processingTime,
+                    date: f.createdAt.toISOString().split('T')[0],
+                    stylistName: f.createdBy ? (uMap[f.createdBy] || '') : '',
+                    version: 1
+                }
+            })
         })
     } catch (error) {
         console.error('[FORMULAS_GET]', error)

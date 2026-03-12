@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
-        console.error('[CREATE_APPOINTMENT] Request body:', body)
+        console.log('[CREATE_APPOINTMENT] Request body:', body)
         const { customerName, customerPhone, serviceId, startTime, notes } = body
 
         if (!customerName || !customerPhone || !serviceId || !startTime) {
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
         // Try to get auth user (may be null for walk-in bookings)
         const user = await getAuthUser(req)
-        console.error('[CREATE_APPOINTMENT] Auth user:', user?.id || 'No auth')
+        console.log('[CREATE_APPOINTMENT] Auth user:', user?.id || 'No auth')
 
         // Use service's franchiseId as primary (guaranteed to exist)
         const franchiseId = service.franchiseId
@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
                     franchiseId: franchiseId
                 }
             })
-            console.error('[CREATE_APPOINTMENT] Created new client:', client.id)
+            console.log('[CREATE_APPOINTMENT] Created new client:', client.id)
         }
 
         // Get an employee ID - use auth user or find one from the franchise
@@ -195,8 +195,9 @@ export async function POST(req: NextRequest) {
         }
 
         const durationMs = (service.duration || 30) * 60 * 1000
-        const startDate = new Date(startTime)
-        const endDate = new Date(startTime + durationMs)
+        const startMs = typeof startTime === 'string' ? new Date(startTime).getTime() : Number(startTime)
+        const startDate = new Date(startMs)
+        const endDate = new Date(startMs + durationMs)
 
         // Create the appointment
         const appointment = await prisma.appointment.create({
@@ -212,7 +213,7 @@ export async function POST(req: NextRequest) {
             }
         })
 
-        console.error('[CREATE_APPOINTMENT] Created appointment:', appointment.id)
+        console.log('[CREATE_APPOINTMENT] Created appointment:', appointment.id)
 
         return NextResponse.json({
             success: true,

@@ -109,10 +109,31 @@ export async function GET(request: NextRequest) {
             })
         }
 
-        // Generate available slots (9 AM - 6 PM)
+        // BUG-9 FIX: Fetch actual business hours instead of hardcoding 9-18
+        let startHour = 9
+        let endHour = 18
+        try {
+            const loc = await prisma.location.findUnique({
+                where: { id: locationId },
+                select: { franchiseId: true }
+            })
+            if (loc?.franchiseId) {
+                const franchise = await prisma.franchise.findUnique({
+                    where: { id: loc.franchiseId },
+                    select: { franchisorId: true }
+                })
+                if (franchise?.franchisorId) {
+                    const bizConfig = await (prisma as any).businessConfig?.findUnique?.({
+                        where: { franchisorId: franchise.franchisorId },
+                        select: { openTime: true, closeTime: true }
+                    })
+                    if (bizConfig?.openTime) startHour = parseInt(bizConfig.openTime.split(':')[0]) || 9
+                    if (bizConfig?.closeTime) endHour = parseInt(bizConfig.closeTime.split(':')[0]) || 18
+                }
+            }
+        } catch { /* use defaults */ }
+
         const slots: { time: string; available: boolean }[] = []
-        const startHour = 9
-        const endHour = 18
 
         // Parse the date string to get year, month, day in local context
         const [year, month, day] = date.split('-').map(Number)

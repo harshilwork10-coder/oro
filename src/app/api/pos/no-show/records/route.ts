@@ -48,10 +48,17 @@ export const GET = withPOSAuth(async (_req: Request, ctx: POSContext) => {
     }
 })
 
-export const POST = withPOSAuth(async (req: Request, _ctx: POSContext) => {
+export const POST = withPOSAuth(async (req: Request, ctx: POSContext) => {
     try {
         const { appointmentId } = await req.json()
         if (appointmentId) {
+            // BUG-3 FIX: Verify appointment belongs to this location before updating
+            const appointment = await prisma.appointment.findFirst({
+                where: { id: appointmentId, locationId: ctx.locationId }
+            })
+            if (!appointment) {
+                return NextResponse.json({ error: 'Appointment not found at this location' }, { status: 404 })
+            }
             await prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } })
         }
         return NextResponse.json({ success: true })
