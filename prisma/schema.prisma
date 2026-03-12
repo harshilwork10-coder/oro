@@ -565,6 +565,11 @@ model Franchise {
   tobaccoDeals        TobaccoDeal[]
   manufacturerConfigs ManufacturerConfig[]
 
+  // Vendor Invoice Import
+  inboundFiles     InboundFile[]
+  vendorInvoices   VendorInvoice[]
+  ftpConfig        FtpConfig?
+
   // Tax Configuration
   taxJurisdictions TaxJurisdiction[]
 
@@ -935,6 +940,7 @@ model Location {
   stations           Station[] // POS stations/registers
   paymentLogs        PaymentLog[] @relation("PaymentLogs") // Payment attempt logs
   paymentTerminals   PaymentTerminal[] // Card terminals at this location
+  vendorInvoices     VendorInvoice[]   // Vendor invoices for this location
 
   // Payment Processor Configuration
   processorName   String? // e.g., "DATAWIRE", "TSYS", "VANTIV", "WORLDPAY", "FIRST_DATA"
@@ -1888,6 +1894,8 @@ model Product {
   suppliers          ProductSupplier[]
   purchaseOrderItems PurchaseOrderItem[]
   stockAdjustments   StockAdjustment[]
+  barcodeAliases     ProductBarcodeAlias[]
+  costHistory        ProductCostHistory[]
 
   // Tag-Along Items (cross-sell suggestions)
   tagAlongParent TagAlongItem[] @relation("TagAlongParent")
@@ -2220,15 +2228,18 @@ model Supplier {
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
-  name        String
-  contactName String?
-  email       String?
-  phone       String?
-  address     String?
+  name              String
+  contactName       String?
+  email             String?
+  phone             String?
+  address           String?
+  externalVendorCode String? // Fintech Retailer VendorID
 
   products       ProductSupplier[]
   purchaseOrders PurchaseOrder[]
   orderTemplates OrderTemplate[]
+  invoices       VendorInvoice[]
+  costHistory    ProductCostHistory[]
 
   createdAt DateTime @default(now())
 }
@@ -2240,10 +2251,13 @@ model ProductSupplier {
   supplierId String
   supplier   Supplier @relation(fields: [supplierId], references: [id])
 
-  cost Decimal
-  sku  String?
+  cost            Decimal
+  sku             String?
+  lastInvoiceDate DateTime?
+  lastUpcSeen     String?
 
   @@unique([productId, supplierId])
+  @@index([supplierId, sku])
 }
 
 model PurchaseOrder {
@@ -2289,9 +2303,14 @@ model StockAdjustment {
   locationId String
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
-  quantity Int // Positive (add) or Negative (remove)
-  reason   String // "SALE", "RESTOCK", "DAMAGE", "THEFT", "TRANSFER"
-  notes    String?
+  quantity      Int      // Positive (add) or Negative (remove)
+  reason        String   // "SALE", "RESTOCK", "DAMAGE", "THEFT", "TRANSFER", "VENDOR_INVOICE", "VOID_REVERSAL"
+  notes         String?
+  sourceId      String?  // invoiceId or transactionId
+  uom           String?  // Original unit of measure from invoice
+  baseUnitsDelta Int?    // Converted to sellable units
+  previousStock Int?     // Stock before this adjustment
+  newStock      Int?     // Stock after this adjustment
 
   performedBy String
   createdAt   DateTime @default(now())
@@ -2300,6 +2319,7 @@ model StockAdjustment {
   @@index([locationId])
   @@index([reason])
   @@index([createdAt])
+  @@index([sourceId])
 }
 
 // ============ WORKFORCE MANAGEMENT ============
@@ -5675,4 +5695,199 @@ model RmscScanRecord {
   @@index([locationId, promoType])
   @@index([locationId, loyaltyFlag])
   @@unique([locationId, rowHash])
+}
+
+// ============ VENDOR INVOICE AUTO-IMPORT ============
+
+model InboundFile {
+  id            String    @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  sourceType    String    // "FTP" or "UPLOAD"
+  filename      String
+  remotePath    String?
+  fileHash      String    @unique // SHA256 — prevents reprocessing
+  fileSize      Int?
+  parseStatus   String    @default("PENDING") // PENDING, PARSED, FAILED
+  parseError    String?
+  totalRows     Int       @default(0)
+  parsedRows    Int       @default(0)
+  matchedRows   Int       @default(0)
+  newProductRows Int      @default(0)
+  errorRows     Int       @default(0)
+  errors        Json?     // [{row, field, message}]
+  invoices      VendorInvoice[]
+  uploadedBy    String?
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([franchiseId])
+  @@index([fileHash])
+  @@index([parseStatus])
+}
+
+model VendorInvoice {
+  id               String      @id @default(cuid())
+  franchiseId      String
+  franchise        Franchise   @relation(fields: [franchiseId], references: [id])
+  locationId       String?
+  location         Location?   @relation(fields: [locationId], references: [id])
+  supplierId       String?
+  supplier         Supplier?   @relation(fields: [supplierId], references: [id])
+  inboundFileId    String?
+  inboundFile      InboundFile? @relation(fields: [inboundFileId], references: [id])
+
+  // Header (all from CSV)
+  invoiceNumber    String
+  invoiceType      String    @default("INVOICE") // INVOICE, CREDIT, RETURN
+  vendorName       String
+  vendorStoreNum   String?
+  retailerStoreNum String?
+  retailerVendorId String?
+  invoiceDate      DateTime
+  dueDate          DateTime?
+  processDate      DateTime?
+  totalAmount      Decimal   @db.Decimal(12, 2)
+  itemCount        Int
+  poNumber         String?
+  poDate           DateTime?
+  refInvoiceNumber String?
+
+  // Lifecycle — never delete, only transition
+  status           String    @default("IMPORTED")
+  // IMPORTED → REVIEW_REQUIRED → READY_TO_POST → POSTED → VOIDED
+  matchRate        Decimal?  @db.Decimal(5, 2)
+  totalItems       Int       @default(0)
+  matchedItems     Int       @default(0)
+  newItems         Int       @default(0)
+  errorItems       Int       @default(0)
+  costAlertItems   Int       @default(0)
+
+  // Reconciliation
+  parsedTotal      Decimal?  @db.Decimal(12, 2) // Sum of line extendedPrice
+  discrepancy      Decimal?  @db.Decimal(12, 2) // parsedTotal − totalAmount
+  discrepancyOk    Boolean   @default(false)
+
+  // Posting
+  postedAt         DateTime?
+  postedBy         String?
+  voidedAt         DateTime?
+  voidedBy         String?
+  voidReason       String?
+
+  items            VendorInvoiceItem[]
+  uploadedBy       String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([supplierId, locationId, invoiceNumber, invoiceDate])
+  @@index([franchiseId])
+  @@index([status])
+  @@index([vendorName])
+  @@index([inboundFileId])
+}
+
+model VendorInvoiceItem {
+  id               String        @id @default(cuid())
+  invoiceId        String
+  invoice          VendorInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  // Raw CSV data (all 33 fields preserved)
+  lineNumber       Int
+  vendorProductNum String?
+  quantity         Int
+  unitCost         Decimal       @db.Decimal(12, 4)
+  unitOfMeasure    String?       // CA, BO, EA, CS
+  productVolume    String?
+  caseUpc          String?
+  cleanUpc         String?
+  packUpc          String?
+  productDesc      String
+  productClass     String?       // Wine, Spirits, Beer
+  glCode           String?
+  packsPerCase     Int?
+  unitsPerPack     Int?
+
+  // Adjustments
+  discountAdj      Decimal   @default(0) @db.Decimal(12, 2)
+  depositAdj       Decimal   @default(0) @db.Decimal(12, 2)
+  miscAdj          Decimal   @default(0) @db.Decimal(12, 2)
+  taxAdj           Decimal   @default(0) @db.Decimal(12, 2)
+  deliveryAdj      Decimal   @default(0) @db.Decimal(12, 2)
+  extendedPrice    Decimal   @db.Decimal(12, 2)
+
+  // Computed
+  baseUnitsReceived Int?     // Converted to sellable units
+  perUnitCost       Decimal? @db.Decimal(12, 4) // Cost per single sellable unit
+
+  // Match result
+  matchStatus      String    @default("PENDING")
+  // PENDING, MATCHED, NEW_PRODUCT, SUGGESTED, MANUAL, ERROR
+  matchMethod      String?   // SUPPLIER_SKU, CLEAN_UPC, CASE_UPC, PACK_UPC, LEGACY_BARCODE, MANUAL
+  matchedProductId String?
+  autoCreatedProductId String?
+  suggestedProductIds  Json?  // Top 3 candidates for review
+
+  // Cost tracking
+  costChanged      Boolean   @default(false)
+  previousCost     Decimal?  @db.Decimal(12, 4)
+  costChangePct    Decimal?  @db.Decimal(8, 2)
+
+  createdAt        DateTime  @default(now())
+
+  @@index([invoiceId])
+  @@index([cleanUpc])
+  @@index([matchStatus])
+}
+
+model ProductBarcodeAlias {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  barcode   String   @unique
+  type      String   // CLEAN, CASE, PACK, ALT, MANUAL
+  isPrimary Boolean  @default(false)
+  source    String?  // INVOICE_IMPORT, MANUAL, SCAN
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@index([barcode])
+}
+
+model ProductCostHistory {
+  id         String    @id @default(cuid())
+  productId  String
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+  oldCost    Decimal   @db.Decimal(12, 4)
+  newCost    Decimal   @db.Decimal(12, 4)
+  changePct  Decimal   @db.Decimal(8, 2)
+  sourceType String    // VENDOR_INVOICE, MANUAL
+  sourceId   String?   // invoiceItemId
+  changedBy  String?
+  changedAt  DateTime  @default(now())
+
+  @@index([productId])
+  @@index([changedAt])
+}
+
+model FtpConfig {
+  id            String    @id @default(cuid())
+  franchiseId   String    @unique
+  franchise     Franchise @relation(fields: [franchiseId], references: [id])
+  host          String
+  port          Int       @default(21)
+  protocol      String    @default("SFTP") // FTP, FTPS, SFTP
+  username      String
+  password      String    // Should be encrypted at app layer
+  remotePath    String    @default("/")
+  filePattern   String    @default("*.csv")
+  autoFetch     Boolean   @default(false)
+  fetchSchedule String    @default("0 6 * * *")
+  lastFetchAt   DateTime?
+  costAlertPct  Decimal   @default(10) @db.Decimal(5, 2) // Configurable threshold
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
