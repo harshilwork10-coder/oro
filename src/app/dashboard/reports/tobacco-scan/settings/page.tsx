@@ -11,12 +11,8 @@ import {
     AlertCircle,
     Save,
     RefreshCw,
-    Eye,
-    EyeOff,
     Building2,
     DollarSign,
-    Key,
-    Globe,
 } from "lucide-react"
 
 interface ManufacturerConfig {
@@ -39,7 +35,6 @@ const MANUFACTURER_INFO: Record<string, {
     color: string
     bgColor: string
     brands: string
-    portalHint: string
     accountLabel: string
     defaultRebatePack: number
     defaultRebateCarton: number
@@ -49,7 +44,6 @@ const MANUFACTURER_INFO: Record<string, {
         color: 'text-red-400',
         bgColor: 'bg-red-500/20',
         brands: 'Marlboro, Copenhagen, Skoal, Black & Mild, IQOS, on!',
-        portalHint: 'https://retail.altria.com (Insight C3M / ScanConnect)',
         accountLabel: 'Altria Management Account #',
         defaultRebatePack: 0.04,
         defaultRebateCarton: 0.40,
@@ -59,7 +53,6 @@ const MANUFACTURER_INFO: Record<string, {
         color: 'text-blue-400',
         bgColor: 'bg-blue-500/20',
         brands: 'Camel, Newport, Pall Mall, Natural American Spirit, Grizzly, Vuse, Velo',
-        portalHint: 'RMSC / Circana Portal',
         accountLabel: 'RJR Store ID / RMSC Account #',
         defaultRebatePack: 0.04,
         defaultRebateCarton: 0.40,
@@ -69,7 +62,6 @@ const MANUFACTURER_INFO: Record<string, {
         color: 'text-amber-400',
         bgColor: 'bg-amber-500/20',
         brands: 'Kool, Winston, Maverick, Salem, USA Gold, Dutch Masters',
-        portalHint: 'ITG Brands Portal',
         accountLabel: 'ITG Account Number',
         defaultRebatePack: 0.03,
         defaultRebateCarton: 0.30,
@@ -85,7 +77,7 @@ export default function TobaccoSettingsPage() {
     const [configs, setConfigs] = useState<ManufacturerConfig[]>([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState<string | null>(null)
-    const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
+
     const [editForms, setEditForms] = useState<Record<string, ManufacturerConfig>>({})
     const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
 
@@ -115,6 +107,7 @@ export default function TobaccoSettingsPage() {
                         rebatePerCarton: info.defaultRebateCarton,
                         loyaltyBonus: 0,
                         isActive: false,
+                        lastSyncAt: null,
                     }
                 }
                 setEditForms(forms)
@@ -260,66 +253,6 @@ export default function TobaccoSettingsPage() {
                                 </div>
                             </div>
 
-                            {/* Portal URL */}
-                            <div>
-                                <label className="block text-xs text-stone-400 uppercase mb-1.5 flex items-center gap-1">
-                                    <Globe className="h-3 w-3" /> Portal URL
-                                </label>
-                                <input
-                                    type="url"
-                                    value={form.portalUrl || ''}
-                                    onChange={(e) => updateForm(mfg, 'portalUrl', e.target.value)}
-                                    placeholder={info.portalHint}
-                                    className="w-full px-3 py-2.5 bg-stone-800/50 border border-stone-700 rounded-lg text-stone-200 text-sm focus:outline-none focus:border-amber-500 transition-colors placeholder:text-stone-600"
-                                />
-                            </div>
-
-                            {/* API Credentials */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs text-stone-400 uppercase mb-1.5 flex items-center gap-1">
-                                        <Key className="h-3 w-3" /> API Key <span className="text-stone-600">(optional)</span>
-                                    </label>
-                                    <div className="relative">
-                                        <input
-                                            type={showSecrets[`${mfg}_key`] ? 'text' : 'password'}
-                                            value={form.apiKey || ''}
-                                            onChange={(e) => updateForm(mfg, 'apiKey', e.target.value)}
-                                            placeholder="For auto-submit..."
-                                            className="w-full px-3 py-2.5 pr-10 bg-stone-800/50 border border-stone-700 rounded-lg text-stone-200 text-sm focus:outline-none focus:border-amber-500 transition-colors placeholder:text-stone-600"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowSecrets(prev => ({ ...prev, [`${mfg}_key`]: !prev[`${mfg}_key`] }))}
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300"
-                                        >
-                                            {showSecrets[`${mfg}_key`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                        </button>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-stone-400 uppercase mb-1.5 flex items-center gap-1">
-                                        <Key className="h-3 w-3" /> API Secret <span className="text-stone-600">(optional)</span>
-                                    </label>
-                                    <div className="relative">
-                                        <input
-                                            type={showSecrets[`${mfg}_secret`] ? 'text' : 'password'}
-                                            value={form.apiSecret || ''}
-                                            onChange={(e) => updateForm(mfg, 'apiSecret', e.target.value)}
-                                            placeholder="For auto-submit..."
-                                            className="w-full px-3 py-2.5 pr-10 bg-stone-800/50 border border-stone-700 rounded-lg text-stone-200 text-sm focus:outline-none focus:border-amber-500 transition-colors placeholder:text-stone-600"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowSecrets(prev => ({ ...prev, [`${mfg}_secret`]: !prev[`${mfg}_secret`] }))}
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300"
-                                        >
-                                            {showSecrets[`${mfg}_secret`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
                             {/* Rebate Rates */}
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
@@ -396,8 +329,8 @@ export default function TobaccoSettingsPage() {
             {/* Help text */}
             <div className="text-center py-4">
                 <p className="text-xs text-stone-600">
-                    Contact your distributor or manufacturer trade rep if you don&apos;t have an account number.
-                    API credentials are optional — they&apos;re only needed for automated file submission.
+                    Your account number is on the paper from your distributor or manufacturer trade rep.
+                    Contact them if you don&apos;t have one yet.
                 </p>
             </div>
         </div>
