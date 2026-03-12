@@ -24,6 +24,7 @@ import {
     X,
     ChevronDown,
     ChevronUp,
+    Settings,
 } from "lucide-react"
 import Link from 'next/link'
 
@@ -334,6 +335,13 @@ export default function TobaccoScanPage() {
                     >
                         <Tag className="h-4 w-4" />
                         Manage Deals
+                    </Link>
+                    <Link
+                        href="/dashboard/reports/tobacco-scan/settings"
+                        className="px-4 py-2 bg-stone-700 hover:bg-stone-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    >
+                        <Settings className="h-4 w-4" />
+                        Enrollment
                     </Link>
                     <button
                         onClick={downloadRmscExport}
