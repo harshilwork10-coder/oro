@@ -976,6 +976,8 @@ model Location {
   lotteryPacks        LotteryPack[]
   lotteryTransactions LotteryTransaction[]
   tobaccoSubmissions  TobaccoScanSubmission[]
+  rmscImportBatches   RmscImportBatch[]
+  rmscScanRecords     RmscScanRecord[]
 
   // Tax Jurisdictions (sales tax + excise taxes applicable to this location)
   taxJurisdictions LocationTaxJurisdiction[]
@@ -5608,4 +5610,69 @@ model ApiUsageDaily {
   @@unique([date, locationId, route])
   @@index([locationId, date])
   @@index([date])
+}
+
+// ============ RMSC SCAN DATA IMPORT/EXPORT ============
+
+model RmscImportBatch {
+  id            String           @id @default(cuid())
+  locationId    String
+  location      Location         @relation(fields: [locationId], references: [id])
+  fileName      String
+  fileType      String           // csv, xlsx
+  fileHash      String
+  importedById  String?
+  importedAt    DateTime         @default(now())
+  status        String           @default("COMPLETED") // PENDING, COMPLETED, PARTIAL, FAILED
+  totalRows     Int              @default(0)
+  importedRows  Int              @default(0)
+  duplicateRows Int              @default(0)
+  errorRows     Int              @default(0)
+  errorSummary  Json?
+  records       RmscScanRecord[]
+
+  @@index([locationId, importedAt])
+  @@unique([locationId, fileHash])
+}
+
+model RmscScanRecord {
+  id                 String           @id @default(cuid())
+  importBatchId      String
+  importBatch        RmscImportBatch  @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+
+  locationId         String
+  location           Location         @relation(fields: [locationId], references: [id])
+
+  sourceRowNumber    Int
+  rowHash            String
+
+  // Normalized analytics fields
+  outletNumber       String?
+  transactionDate    DateTime?
+  basketId           String?
+  scanId             String?
+  registerNo         String?
+  upc                String?
+  productDescription String?
+  quantity           Decimal?         @db.Decimal(10, 3)
+  unitPrice          Decimal?         @db.Decimal(10, 2)
+  extendedPrice      Decimal?         @db.Decimal(12, 2)
+  manufacturerCode   String?
+  manufacturerName   String?
+  promoFlag          Boolean          @default(false)
+  promoType          String?
+  multipackFlag      Boolean          @default(false)
+  buydownAmount      Decimal?         @db.Decimal(10, 2)
+  loyaltyFlag        Boolean          @default(false)
+
+  // Exact source preservation
+  rawFields          Json
+
+  createdAt          DateTime         @default(now())
+
+  @@index([locationId, transactionDate])
+  @@index([locationId, manufacturerName])
+  @@index([locationId, promoType])
+  @@index([locationId, loyaltyFlag])
+  @@unique([locationId, rowHash])
 }

@@ -1,0 +1,286 @@
+,UPDATED 1/29/2025,Grey highlighted lines represent example base/non-promoted transactions,,,,,,,,,,,,,CARTON/ROLL UPCs should reflect CARTON/ROLL discount rates,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,FIELD #,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,,,
+Scenario,,Outlet Name,Outlet Number,Address 1,Address 2,City,State,Zip,Transaction Date,Market Basket ID,Scan ID,Register ID,Quantity,Price,UPC Code,UPC Description,Unit Of Measure,Promo Flag,Outlet MultiPack Flag,Outlet MultiPack Quantity,Outlet MultiPack Disc Amt,Acct Promo Name,Acct Disc Amt,Mfg Disc Amt,PID Coupon,PID Coupon Discount,Mfg MultiPack Flag,Mfg MultiPack Quantity,Mfg MultiPack Disc Amt,Mfg Promo Desc,Mfg BuyDown Desc,Mfg BuyDown Amt,Mfg MultiPack Desc,Acct Loyalty ID ,Coupon Desc,,,
+12,"Outlet Funded Multi-Pack 
+Buy 2, Save $0.50",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,6.50,26100005738,Newport 100 Bx Men,Pack,N,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,6.25,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.25,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,6.25,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.25,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,6.25,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.25,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+13,"Co-funded Multi-Pack
+• Newport Multipack 
+    - $2.00 per carton (pack: $0.20)  
+       Buy 2 Save $0.40
+• Outlet funded ($0.10 per pack)",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,6.50,26100005738,Newport 100 Bx Men,Pack,N,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,6.20,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.10,,,,,,Y,2,0.20,,,,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,6.20,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.10,,,,,,Y,2,0.20,,,,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,6.20,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.10,,,,,,Y,2,0.20,,,,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+14,"Camel/Newport Multi-Pack
+• Newport
+   - $2.00 per carton (pack: $0.20)
+     Buy 2 Save $0.40
+• Camel: 
+  - $3.00 per carton (pack: $0.30)
+    Buy 2, Save $0.60
+",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,5.70,1230020608,Camel Bl 99 Bx,Pack,N,,,,,,,,,,,,,RJR Buydown,0.50,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,6.50,26100005738,Newport 100 Bx Men,Pack,N,,,,,,,,,,,,,RJR Buydown,0.25,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123457,1,1,1,50.00,26100805734,Newport 100 Bx Men,Carton,N,,,,,,,,,,,,,RJR Buydown,0.25,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,4,5.40,1230020608,Camel Bl 99 Bx,Pack,Y,,,,,,,,,Y,2,0.30,,RJR Buydown,0.50,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,6.30,26100005738,Newport 100 Bx Men,Pack,Y,,,,,,,,,Y,2,0.20,,RJR Buydown,0.25,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,5.40,1230020608,Camel Bl 99 Bx,Pack,Y,,,,,,,,,Y,2,0.30,,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,6.30,26100005738,Newport 100 Bx Men,Pack,Y,,,,,,,,,Y,2,0.20,,RJR Buydown,0.25,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,6.30,26100005738,Newport 100 Bx Men,Pack,Y,,,,,,,,,Y,2,0.20,,RJR Buydown,0.25,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,7,6.30,26100005738,Newport 100 Bx Men,Pack,Y,,,,,,,,,Y,2,0.20,,RJR Buydown,0.25,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123457,1,1,1,48.00,26100805734,Newport 100 Bx Men,Carton,Y,,,,,,,,,Y,2,2.00,,RJR Buydown,2.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+15,"Lucky Strike Multi-Pack
+$2.50 per carton (pack: $0.25)
+Buy 2, save $0.50",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,5.25,43300109264,LUCKY STRIKE RED 100 BOX,Pack,N,,,,,,,,,,,,,RJR Buydown,1.20,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,50.00,43300109097,LUCKY STRIKE GOLD 100 BOX,Carton,N,,,,,,,,,,,,,RJR Buydown,12.00,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,5.00,43300109264,LUCKY STRIKE RED 100 BOX,Pack,Y,,,,,,,,,Y,2,0.25,,RJR Buydown,1.20,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,47.50,43300109097,LUCKY STRIKE GOLD 100 BOX,Carton,Y,,,,,,,,,Y,2,2.50,,RJR Buydown,12.00,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+16,"
+Pall Mall Multi-Pack
+$2.50 per carton (pack: $0.25)
+Buy 2, Save $0.50
+
+",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,5.25,27200004171,Pall Mall Classic Menthol 100 Box,Pack,N,,,,,,,,,,,,,RJR Buydown,0.70,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,50.00,27200018659,Pall Mall 100 BX Men,Carton,N,,,,,,,,,,,,,RJR Buydown,7.00,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,5.00,27200004171,Pall Mall Classic Menthol 100 Box,Pack,Y,,,,,,,,,Y,2,0.25,,RJR Buydown,0.70,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,47.50,27200018659,Pall Mall 100 BX Men,Carton,Y,,,,,,,,,Y,2,2.50,,RJR Buydown,7.00,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+17,"
+NAS Multi-Pack
+$5.00 per carton (pack: $0.50)
+Buy 2, Save $1.00
+
+",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,7.00,47995855253,Natural American Spirit Org Gold,Pack,N,,,,,,,,,,,,,RJR Buydown,0.50,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,70.00,47995855352,Natural American Spirit Org Gold,Carton,N,,,,,,,,,,,,,RJR Buydown,5.00,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,6.50,47995855253,Natural American Spirit Org Gold,Pack,Y,,,,,,,,,Y,2,0.50,,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,65.00,47995855352,Natural American Spirit Org Gold,Carton,Y,,,,,,,,,Y,2,5.00,,RJR Buydown,5.00,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+18,"
+Grizzly Multi-Can
+$1.25 per roll (can: $0.25)
+Buy 2, Save $0.50
+
+",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,3.00,42100011258,Grizzly Prm Dk Wntrgrn Pch,Can,N,,,,,,,,,,,,,RJR Buydown,0.50,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,15.00,42100011265,Grizzly Prm Dk Wntrgrn Pch,Roll,N,,,,,,,,,,,,,RJR Buydown,2.50,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,2.75,42100011258,Grizzly Prm Dk Wntrgrn Pch,Can,Y,,,,,,,,,Y,2,0.25,,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,13.75,42100011265,Grizzly Prm Dk Wntrgrn Pch,Roll,Y,,,,,,,,,Y,2,1.25,,RJR Buydown,2.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+18a,"Grizzly Multi-Can Buy 2 Get $1 VAP 2Fer Bundle
+$1.25 per roll (can: $0.25)  Buy 2, Save $0.50
+Cans are bundled together in cardboard sleeve buy 2 save $1
+",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,3.00,42100008715,GRIZZLY WINTERGREEN LONG CUT,Can,N,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,4.50,42100023305,GRIZZLY WINTERGREEN LONG CUT $1.00 OFF 2/CAN,Can,Y,,,,,,1.00,,,Y,2,0.50,RJR VAP $1.00 OFF,RJR Buydown,1.00,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+19,"
+ALTO Multi-Pack
+$20.00 per carton (Pack of pods: $4.00)
+Buy 2, Save $8.00
+
+",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,11.99,849205023458,VUSE ALTO POD MENTHOL 5.0% 4/PK,Pack,N,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,59.95,849205023465,VUSE ALTO POD MENTHOL 5.0% 4/PK,Carton,N,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,7.99,849205023458,VUSE ALTO POD MENTHOL 5.0% 4/PK,Pack ,Y,,,,,,,,,Y,2,4.00,,,,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,39.95,849205023465,VUSE ALTO POD MENTHOL 5.0% 4/PK,Carton,Y,,,,,,,,,Y,2,20.00,,,,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+20,"
+Velo Multi-Tin
+$2.50 per sleeve (tin: $0.50)
+Buy 2, Save $1.00
+
+",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,4.49,849205017693,VELO CITRUS 2 MG,Tin,N,,,,,,,,,,,,,RJR Buydown,0.25,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,22.45,849205017709,VELO CITRUS 2 MG,Sleeve,N,,,,,,,,,,,,,RJR Buydown,1.25,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,3.99,849205017693,VELO CITRUS 2 MG,Tin,Y,,,,,,,,,Y,2,0.50,,RJR Buydown,0.25,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,19.95,849205017709,VELO CITRUS 2 MG,Sleeve,Y,,,,,,,,,Y,2,2.50,,RJR Buydown,1.25,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+21,"
+USST Multi-Can 
+$1.25 per roll (can: $0.25)
+Buy 2, Save $0.50
+
+",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,3.00,73100000553,Copenhagen WG Pouch,Can,N,,,,,,,,,,,,,USST Buydown,0.50,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,15.00,73100000554,Copenhagen WG Pouch,Roll,N,,,,,,,,,,,,,USST Buydown,2.50,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,2.75,73100000553,Copenhagen WG Pouch,Can,Y,,,,,,,,,Y,2,0.25,,USST Buydown,0.50,USST MC BEF,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,13.75,73100000554,Copenhagen WG Pouch,Roll,Y,,,,,,,,,Y,2,1.25,,USST Buydown,2.50,USST MC BEF,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+22,"
+Marlboro Multi-Pack 
+$2.50 per carton (pack: $0.25)
+Buy 2, Save $0.50
+
+",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,5.70,28200003577,Marlboro Red,Pack,N,,,,,,,,,,,,,Marl Buydown,0.25,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,57.00,28200003578,Marlboro Red,Carton,N,,,,,,,,,,,,,Marl Buydown,2.50,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,5.45,28200003577,Marlboro Red,Pack,Y,,,,,,,,,Y,2,0.25,,Marl Buydown,0.25,Marlboro MP BEF,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,54.50,28200003578,Marlboro Red,Carton,Y,,,,,,,,,Y,2,2.50,,Marl Buydown,2.50,Marlboro MP BEF,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+Stacked Program Examples,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,5.70,1230020608,Camel Bl 99 Bx,Pack,N,,,,,,,,,,,,,RJR Buydown,0.50,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,6.50,26100005738,Newport 100 Bx Men,Pack,N,,,,,,,,,,,,,RJR Buydown,0.25,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,5.25,27200004171,Pall Mall Classic Menthol 100 Box,Pack,N,,,,,,,,,,,,,RJR Buydown,0.70,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,50.00,27200018659,Pall Mall 100 BX Men,Carton,N,,,,,,,,,,,,,RJR Buydown,7.00,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+23,"Camel, Newport and Pall Mall MFG Multi-Pack Mix & Match
+• Camel / Newport 
+   -$2.00 per carton (pack: $0.20)
+    Buy 2 Save $0.40
+
+• Pall Mall
+  -$2.50 per carton (pack: $0.25)
+   Buy 2, Save $0.50
+",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,5.00,27200004171,Pall Mall Classic Menthol 100 Box,Pack,Y,,,,,,,,,Y,2,0.25,,RJR Buydown,0.70,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,2,1,1,5.00,27200004171,Pall Mall Classic Menthol 100 Box,Pack,Y,,,,,,,,,Y,2,0.25,,RJR Buydown,0.70,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,3,1,1,6.30,26100005738,Newport 100 Bx Men,Pack,Y,,,,,,,,,Y,2,0.20,,RJR Buydown,0.25,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,4,1,1,6.30,26100005738,Newport 100 Bx Men,Pack,Y,,,,,,,,,Y,2,0.20,,RJR Buydown,0.25,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,5.25,27200004171,Pall Mall Classic Menthol 100 Box,Pack,Y,,,,,,,,,Y,2,0.25,,RJR Buydown,0.70,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,2,1,1,6.50,26100005738,Newport 100 Bx Men,Pack,Y,,,,,,,,,Y,2,0.20,,RJR Buydown,0.25,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,3,1,1,5.50,1230020608,Camel Bl 99 Bx,Pack,Y,,,,,,,,,Y,2,0.20,,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+24,"Newport Multi-Pack + MFG Coupon 
+• Newport 
+   -$5.00 per carton (pack: $0.50)
+    Buy 2 Save $1.00
+•Coupon - $1.00 off a pack of Newport
+
+
+•Coupon - $5.00 of a carton of Newport",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,6.50,26100005738,Newport 100 Bx Men,Pack,N,,,,,,,,,,,,,RJR Buydown,0.25,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123457,1,1,1,50.00,26100805734,Newport 100 Bx Men,Carton,N,,,,,,,,,,,,,RJR Buydown,2.5,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,1,6.00,26100005738,Newport 100 Bx Men,Pack,Y,,,,,,,,,Y,2,0.50,,RJR Buydown,0.25,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,5.00,26100005738,Newport 100 Bx Men,Pack,Y,,,,,,,526100210762,1.00,Y,2,0.50,,RJR Buydown,0.25,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123457,1,1,2,5.50,26100005738,Newport 100 Bx Men,Pack,Y,,,,,,,526100210762,0.50,Y,2,0.50,,RJR Buydown,0.25,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123457,1,1,1,40.00,26100805734,Newport 100 Bx Men,Carton,Y,,,,,,,526100220747,5.00,Y,2,5.00,,RJR Buydown,2.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+25,"Outlet Only Funded Multi-Pack + MFG Coupon 
+Buy 2, Save $0.50
+•Coupon - $1.00 off a pack of Newport",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,6.50,26100005738,Newport 100 Bx Men,Pack,N,,,,,,,,,,,,,RJR Buydown,0.25,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,6.25,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.25,,,,,,,,,,RJR Buydown,0.25,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,5.25,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.25,,,,526100210762,1.00,,,,,RJR Buydown,0.25,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,5.75,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.25,,,,526100210762,0.50,,,,,RJR Buydown,0.25,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+26,"Newport MFG Multi-Pack + Outlet Funded Multi-Pack + MFG Coupon
+• Newport Multi-Pack
+   -$2.00 per carton (pack: $0.20)
+    Buy 2 Save $0.40
+• $0.20 – Account funded ($0.10 per pack)
+•Coupon - $1.00 off a pack of Newport",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,6.50,26100005738,Newport 100 Bx Men,Pack,N,,,,,,,,,,,,,RJR Buydown,0.25,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,6.20,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.10,,,,,,Y,2,0.20,,RJR Buydown,0.25,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,5.20,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.10,,,,526100210762.00,1.00,Y,2,0.20,,RJR Buydown,0.25,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,5.70,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.10,,,,526100210762.00,0.50,Y,2,0.20,,RJR Buydown,0.25,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+27,"Camel MFG Multi-Pack + Camel $.075 off VAP 
+• Camel Multi-Pack
+   -$2.00 per carton (pack: $0.20)
+    Buy 2 Save $0.40",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,5.75,12300000949,Camel Crush Slvr 85 Bx Men,Pack,N,,,,,,,,,,,,,RJR Buydown,0.50,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,4.80,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,,,,,,0.75,,,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,4.80,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,,,,,,0.75,,,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,4.80,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,,,,,,0.75,,,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,5.55,12300000949,Camel Crush Slvr 85 Bx Men,Pack,Y,,,,,,,,,Y,2,0.20,,RJR Buydown,0.50,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,4.80,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,,,,,,0.75,,,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+28,"Camel MFG Multi-Pack + Outlet Funded Multi-Pack + Camel $.075 off VAP 
+• Camel Multi-Pack
+   -$2.00 per carton (pack: $0.20)
+    Buy 2 Save $0.40
+• $0.20 – Account funded ($0.10 per pack/$1.00 per carton)",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,5.75,12300000949,Camel Crush Slvr 85 Bx Men,Pack,N,,,,,,,,,,,,,RJR Buydown,0.50,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,57.50,12300194136,Camel Crush Slvr 85 Bx Men,Carton,N,,,,,,,,,,,,,RJR Buydown,5.00,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,4.70,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,Y,2,0.10,,,0.75,,,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,4.70,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,Y,2,0.10,,,0.75,,,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,4.70,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,Y,2,0.10,,,0.75,,,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,5.45,12300000949,Camel Crush Slvr 85 Bx Men,Pack,Y,Y,2,0.10,,,,,,Y,2,0.20,,RJR Buydown,0.50,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,4.70,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,Y,2,0.10,,,0.75,,,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,54.50,12300194136,Camel Crush Slvr 85 Bx Men,Carton,Y,Y,2,1.00,,,,,,Y,2,2.00,,RJR Buydown,5.00,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+29,"Camel MFG Multi-Pack + Outlet Funded Multi-Pack + Camel $.075 off VAP + MFG Coupon 
+• Camel Multi-Pack
+   -$2.00 per carton (pack: $0.20)
+    Buy 2 Save $0.40
+• $0.20 – Account funded ($0.10 per pack/$1.00 per carton)
+• Coupon - $1.00 off 1 pack of Camel
+
+
+
+
+
+• Coupon - $3.00 off 1 carton of Camel",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,5.75,12300000949,Camel Crush Slvr 85 Bx Men,Pack,N,,,,,,,,,,,,,RJR Buydown,0.50,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,57.50,12300194136,Camel Crush Slvr 85 Bx Men,Carton,N,,,,,,,,,,,,,RJR Buydown,5.00,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,3.70,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,Y,2,0.10,,,0.75,512300211760,1.00,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,4.70,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,Y,2,0.10,,,0.75,,,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,4.20,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,Y,2,0.10,,,0.75,512300211760,1.00,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,5.45,12300000949,Camel Crush Slvr 85 Bx Men,Pack,Y,Y,2,0.10,,,,,,Y,2,0.20,,RJR Buydown,0.50,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,3.70,12300502603,Camel Crush Slvr 85 Bx Men $0.75 Off,Pack,Y,Y,2,0.10,,,0.75,512300211760,1.00,Y,2,0.20,RJR VAP $0.75,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,52.50,12300194136,Camel Crush Slvr 85 Bx Men,Carton,Y,Y,2,1.00,,,,512300111879,2.00,Y,2,2.00,,RJR Buydown,5.00,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+30,"Camel MFG Multi-Pack + JBF
+• Camel: 
+  - $3.00 per carton (pack: $0.30)
+    Buy 2, Save $0.60
+• JBF - save additional $1.00 off 2 packs Camel
+
+",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,5.70,1230020608,Camel Bl 99 Bx,Pack,N,,,,,,,,,,,,,RJR Buydown,0.50,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,57.50,12300194136,Camel Crush Slvr 85 Bx Men,Carton,N,,,,,,,,,,,,,RJR Buydown,2.50,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,4.90,1230020608,Camel Bl 99 Bx,Pack,Y,,,,,,0.50,,,Y,2,0.30,JBF,RJR Buydown,0.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123457,1,1,1,54.50,12300194136,Camel Crush Slvr 85 Bx Men,Carton,Y,,,,,,1.00,,,Y,2,2.00,JBF,RJR Buydown,2.50,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+31,"Newport MFG Multi-Pack + Outlet Funded Multi-Pack + JBF + MFG Coupon
+• Newport Multi-Pack
+   -$2.00 per carton (pack: $0.20)
+    Buy 2 Save $0.40
+• $0.20 – Account funded ($0.10 per pack)
+•JBF - Save additional $1.00 off 2 packs Newport 
+•Coupon - $1.00 off a pack of Newport",Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,6.50,26100005738,Newport 100 Bx Men,Pack,N,,,,,,,,,,,,,RJR Buydown,0.25,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,1,5.70,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.10,,,0.50,,,Y,2,0.20,JBF,RJR Buydown,0.25,RJR MP,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:02,123456,2,1,1,4.70,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.10,,,0.50,526100210762.00,1.00,Y,2,0.20,JBF,RJR Buydown,0.25,RJR MP,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,Store 1,1,1234 Main St,,Anytown,OH,45429,2017-11-01-19:41:00,123456,1,1,2,5.20,26100005738,Newport 100 Bx Men,Pack,Y,Y,2,0.10,,,0.50,526100210762.00,0.50,Y,2,0.20,JBF,RJR Buydown,0.25,RJR MP,,,,,
