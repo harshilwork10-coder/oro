@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// PUT — update a specific PaymentTerminal
 export async function PUT(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -16,33 +17,77 @@ export async function PUT(
 
         const { id } = await params
         const body = await request.json()
-        const { paxTerminalIP, paxTerminalPort, processorMID } = body
+        const { name, terminalIP, terminalPort, isActive, stationId } = body
 
-        // Validate IP address format (basic validation)
-        if (paxTerminalIP && !/^(\d{1,3}\.){3}\d{1,3}$/.test(paxTerminalIP)) {
+        // Validate IP address format
+        if (terminalIP && !/^(\d{1,3}\.){3}\d{1,3}$/.test(terminalIP)) {
             return NextResponse.json({ error: 'Invalid IP address format' }, { status: 400 })
         }
 
-        // Update location with new terminal configuration
-        const updated = await prisma.location.update({
+        // Build update data
+        const updateData: any = {}
+        if (name !== undefined) updateData.name = name
+        if (terminalIP !== undefined) updateData.terminalIP = terminalIP
+        if (terminalPort !== undefined) updateData.terminalPort = terminalPort
+        if (isActive !== undefined) updateData.isActive = isActive
+
+        const updated = await prisma.paymentTerminal.update({
             where: { id },
-            data: {
-                paxTerminalIP: paxTerminalIP || null,
-                paxTerminalPort: paxTerminalPort || '10009',
-                processorMID: processorMID || null
+            data: updateData,
+            include: {
+                assignedStation: { select: { id: true, name: true } }
             }
         })
 
-        // Debug log removed
-        // Debug log removed
-        // Debug log removed
-        // Debug log removed
-        // Debug log removed
+        // Handle station assignment change
+        if (stationId !== undefined) {
+            // First unassign any station currently pointing to this terminal
+            await prisma.station.updateMany({
+                where: { dedicatedTerminalId: id },
+                data: { dedicatedTerminalId: null }
+            })
 
-        return NextResponse.json({ success: true, data: updated })
+            // Then set the new assignment
+            if (stationId) {
+                await prisma.station.update({
+                    where: { id: stationId },
+                    data: { dedicatedTerminalId: id }
+                })
+            }
+        }
+
+        return NextResponse.json({ success: true, terminal: updated })
     } catch (error) {
-        console.error('Error updating terminal configuration:', error)
-        return NextResponse.json({ error: 'Failed to update terminal configuration' }, { status: 500 })
+        console.error('Error updating terminal:', error)
+        return NextResponse.json({ error: 'Failed to update terminal' }, { status: 500 })
     }
 }
 
+// DELETE — remove a PaymentTerminal
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const session = await getServerSession(authOptions)
+
+        if (!session || session.user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const { id } = await params
+
+        // Unassign any station first
+        await prisma.station.updateMany({
+            where: { dedicatedTerminalId: id },
+            data: { dedicatedTerminalId: null }
+        })
+
+        await prisma.paymentTerminal.delete({ where: { id } })
+
+        return NextResponse.json({ success: true })
+    } catch (error) {
+        console.error('Error deleting terminal:', error)
+        return NextResponse.json({ error: 'Failed to delete terminal' }, { status: 500 })
+    }
+}

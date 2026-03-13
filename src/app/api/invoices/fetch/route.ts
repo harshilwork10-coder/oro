@@ -28,8 +28,8 @@ export async function POST(request: Request) {
     }
 
     const role = (session.user as { role?: string }).role
-    if (!role || !['OWNER', 'ADMIN', 'PROVIDER'].includes(role)) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!role || !['PROVIDER'].includes(role)) {
+      return NextResponse.json({ error: 'Only PROVIDER can trigger FTP fetch' }, { status: 403 })
     }
 
     const body = await request.json()

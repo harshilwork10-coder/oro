@@ -20,8 +20,8 @@ export async function GET() {
     }
 
     const role = (session.user as { role?: string }).role
-    if (!role || !['OWNER', 'ADMIN', 'PROVIDER'].includes(role)) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!role || !['PROVIDER'].includes(role)) {
+      return NextResponse.json({ error: 'Only PROVIDER can access FTP config' }, { status: 403 })
     }
 
     const config = await prisma.ftpConfig.findUnique({ where: { franchiseId } })
@@ -62,8 +62,8 @@ export async function POST(request: Request) {
     }
 
     const role = (session.user as { role?: string }).role
-    if (!role || !['OWNER', 'PROVIDER'].includes(role)) {
-      return NextResponse.json({ error: 'Only OWNER can configure FTP' }, { status: 403 })
+    if (!role || !['PROVIDER'].includes(role)) {
+      return NextResponse.json({ error: 'Only PROVIDER can configure FTP' }, { status: 403 })
     }
 
     const body = await request.json()

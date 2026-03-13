@@ -115,6 +115,7 @@ interface StationData {
     name: string
     pairingCode: string | null
     isActive: boolean
+    dedicatedTerminal: { id: string; name: string; terminalIP: string; isActive: boolean } | null
 }
 
 interface Client {
@@ -513,7 +514,8 @@ export default function AccountConfigurationsPage() {
                                         id: data.station.id,
                                         name: data.station.name,
                                         pairingCode: data.station.pairingCode,
-                                        isActive: true
+                                        isActive: true,
+                                        dedicatedTerminal: null
                                     }]
                                 }
                             }
@@ -1347,6 +1349,20 @@ export default function AccountConfigurationsPage() {
                                                                         <Trash2 className="w-3 h-3" />
                                                                     </button>
                                                                 </div>
+                                                            </div>
+                                                            {/* Linked Terminal */}
+                                                            <div className="mt-1.5">
+                                                                <span className="text-xs text-stone-500">Terminal: </span>
+                                                                {station.dedicatedTerminal ? (
+                                                                    <span className="text-xs text-purple-400 font-medium">
+                                                                        {station.dedicatedTerminal.name} ({station.dedicatedTerminal.terminalIP})
+                                                                        {!station.dedicatedTerminal.isActive && (
+                                                                            <span className="text-stone-500 ml-1">[disabled]</span>
+                                                                        )}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-xs text-stone-600">Not assigned</span>
+                                                                )}
                                                             </div>
                                                             <div className="mt-1">
                                                                 <span className="text-xs text-stone-500">Pairing: </span>

@@ -66,7 +66,15 @@ export async function GET(request: NextRequest) {
                 franchises: {
                     include: {
                         locations: {
-                            include: { stations: true }
+                            include: {
+                                stations: {
+                                    include: {
+                                        dedicatedTerminal: {
+                                            select: { id: true, name: true, terminalIP: true, isActive: true }
+                                        }
+                                    }
+                                }
+                            }
                         },
                         users: { select: { id: true } }
                     }
@@ -114,7 +122,10 @@ export async function GET(request: NextRequest) {
                         id: s.id,
                         name: s.name,
                         pairingCode: s.pairingCode || null,
-                        isActive: s.isActive
+                        isActive: s.isActive,
+                        dedicatedTerminal: s.dedicatedTerminal
+                            ? { id: s.dedicatedTerminal.id, name: s.dedicatedTerminal.name, terminalIP: s.dedicatedTerminal.terminalIP, isActive: s.dedicatedTerminal.isActive }
+                            : null
                     }))
                 })),
                 users: fr.users

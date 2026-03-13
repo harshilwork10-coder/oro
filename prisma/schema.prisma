@@ -1068,6 +1068,9 @@ model Location {
   // ============ POS REGISTER LAYOUT ============
   posRegisterLayout PosRegisterLayout?
 
+  // ============ OWNER OPERATING SYSTEM ============
+  ownerIssues OwnerIssue[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -5890,4 +5893,334 @@ model FtpConfig {
   costAlertPct  Decimal   @default(10) @db.Decimal(5, 2) // Configurable threshold
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OWNER OPERATING SYSTEM — Intelligence Engine
+// Pipeline: Signal Collectors → OwnerSignal → OwnerIssue → Delivery
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ──── Enums ────
+
+enum OwnerSignalType {
+  CASH_VARIANCE
+  DEPOSIT_OVERDUE
+  VOID_SPIKE
+  REFUND_SPIKE
+  LOW_STOCK_CRITICAL
+  SALES_DROP
+  ID_CHECK_MISSED
+  EMPLOYEE_RISK_HIGH
+  DEVICE_OFFLINE
+  TRANSFER_DISCREPANCY
+}
+
+enum OwnerIssueCategory {
+  CASH
+  INVENTORY
+  SALES
+  COMPLIANCE
+  EMPLOYEE
+  OPERATIONS
+}
+
+enum OwnerIssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum OwnerIssueStatus {
+  OPEN
+  ACKNOWLEDGED
+  ASSIGNED
+  SNOOZED
+  RESOLVED
+  ESCALATED
+  REOPENED
+}
+
+enum OwnerIssueEventType {
+  CREATED
+  ACKNOWLEDGED
+  ASSIGNED
+  SNOOZED
+  RESOLVED
+  ESCALATED
+  NOTE_ADDED
+  REOPENED
+  PRIORITY_CHANGED
+  DUE_CHANGED
+}
+
+enum OwnerIssueResolvedReason {
+  ROOT_CAUSE_FIXED
+  FALSE_POSITIVE
+  DUPLICATE
+  WONT_FIX
+}
+
+enum OwnerSignalEntityType {
+  USER
+  SKU
+  DRAWER
+  SHIFT
+  DEVICE
+  DEPOSIT
+}
+
+enum OwnerIssueSourceType {
+  OWNER_SIGNAL
+  STORE_EXCEPTION
+  SYSTEM_ALERT
+  COMPUTED
+}
+
+enum OwnerDigestType {
+  MORNING
+  DAILY_RECAP
+  WEEKLY
+  CRITICAL_ALERT
+}
+
+enum OwnerDigestChannel {
+  DASHBOARD
+  EMAIL
+  SMS
+}
+
+enum OwnerDigestStatus {
+  QUEUED
+  SENT
+  FAILED
+  DELIVERED
+  OPENED
+}
+
+enum OwnerRecommendationScope {
+  OWNER
+  DELEGATABLE
+  AUTO_CANDIDATE
+}
+
+// ──── Stage 1: Raw Signals ────
+
+model OwnerSignal {
+  id          String               @id @default(cuid())
+  franchiseId String
+  locationId  String
+  signalType  OwnerSignalType
+  entityType  OwnerSignalEntityType?
+  entityId    String?
+  signalDate  DateTime             // Business date (not wall-clock)
+  payload     Json?                // Full context from source module
+  scoreInputs Json?                // Pre-computed: {financialImpact, urgency, ...}
+  dedupKey    String?              // Formula output per signal type
+  processed   Boolean              @default(false)
+  processedAt DateTime?
+  jobRunId    String?              // Idempotency: which cron run created this
+  createdAt   DateTime             @default(now())
+
+  @@index([franchiseId, signalType, signalDate])
+  @@index([franchiseId, processed, createdAt])
+  @@index([dedupKey])
+  @@index([jobRunId])
+}
+
+// ──── Stage 2: Issues (Central queue) ────
+
+model OwnerIssue {
+  id          String             @id @default(cuid())
+  franchiseId String
+  locationId  String
+  location    Location           @relation(fields: [locationId], references: [id])
+
+  // Classification
+  category    OwnerIssueCategory
+  issueType   OwnerSignalType
+  severity    OwnerIssueSeverity @default(MEDIUM)
+
+  // Dedup
+  dedupKey       String?
+  isActiveSignal Boolean          @default(true)
+  repeatCount    Int              @default(1)
+  reopenedCount  Int              @default(0)
+
+  // Scoring
+  priorityScore   Float           @default(0)
+  financialImpact Float           @default(0)
+  urgencyScore    Float           @default(0)
+  complianceRisk  Float           @default(0)
+
+  // Content
+  title       String
+  summary     String             // Human-readable: "Store 3 cash drawer short $47.50"
+  details     Json?
+  reasoning   String?            // "High because deposit 2 days overdue + open cash variance"
+  recommended String?            // "Verify deposit slip"
+
+  // Status + concurrency
+  status  OwnerIssueStatus       @default(OPEN)
+  version Int                    @default(1)
+
+  // Action tracking
+  assignedToId     String?
+  assignedToName   String?
+  assignedAt       DateTime?
+  dueAt            DateTime?
+  snoozedUntil     DateTime?
+  acknowledgedById String?
+  acknowledgedAt   DateTime?
+  resolvedById     String?
+  resolvedAt       DateTime?
+  resolutionNote   String?
+  resolvedReason   OwnerIssueResolvedReason?
+
+  // Dual resolution
+  workflowResolvedAt DateTime?   // User clicked resolve
+  sourceResolvedAt   DateTime?   // Engine confirmed signal gone
+
+  escalatedAt   DateTime?
+  escalatedToId String?
+
+  // Timestamps
+  firstSeenAt DateTime            @default(now())
+  lastSeenAt  DateTime            @default(now())
+
+  // Source
+  sourceType OwnerIssueSourceType?
+  sourceId   String?
+
+  events OwnerIssueEvent[]
+
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@index([franchiseId, status])
+  @@index([franchiseId, status, severity])
+  @@index([franchiseId, assignedToId, status])
+  @@index([locationId, status])
+  @@index([dedupKey])
+  @@index([franchiseId, issueType, status])
+  @@index([priorityScore])
+  @@index([dueAt])
+  @@index([status, snoozedUntil])
+}
+
+// ──── Audit Trail ────
+
+model OwnerIssueEvent {
+  id           String               @id @default(cuid())
+  ownerIssueId String
+  issue        OwnerIssue           @relation(fields: [ownerIssueId], references: [id], onDelete: Cascade)
+  eventType    OwnerIssueEventType
+  fromStatus   OwnerIssueStatus?
+  toStatus     OwnerIssueStatus?
+  actorUserId  String?
+  actorName    String?
+  note         String?
+  meta         Json?                // {oldDueAt, newDueAt, oldAssignee, newAssignee, ...}
+  createdAt    DateTime             @default(now())
+
+  @@index([ownerIssueId, createdAt])
+}
+
+// ──── Store Health ────
+
+model StoreHealthScore {
+  id               String   @id @default(cuid())
+  locationId       String
+  franchiseId      String
+  date             DateTime @db.Date
+  salesHealth      Int      @default(50)
+  cashHealth       Int      @default(50)
+  laborHealth      Int      @default(50)
+  inventoryHealth  Int      @default(50)
+  complianceHealth Int      @default(50)
+  lpHealth         Int      @default(50)
+  overallScore     Int      @default(50)
+  overallStatus    String   @default("GREEN")
+  scoreVersion     String?
+  weightsUsed      Json?
+  rawMetrics       Json?
+  factors          Json?
+  createdAt        DateTime @default(now())
+
+  @@unique([locationId, date])
+  @@index([franchiseId, date])
+  @@index([overallStatus])
+}
+
+// ──── Manager Accountability ────
+
+model ManagerScorecard {
+  id               String   @id @default(cuid())
+  userId           String
+  locationId       String
+  franchiseId      String
+  period           String   // "2026-03" or "2026-W11"
+  avgCloseTime     Float?
+  alertResponseMin Float?
+  issuesIgnored    Int      @default(0)
+  cashVarianceRate Float?
+  voidApprovalRate Float?
+  lowStockDays     Int      @default(0)
+  overallGrade     String   @default("B")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userId, period])
+  @@index([franchiseId, period])
+  @@index([locationId])
+}
+
+// ──── Digest Delivery ────
+
+model OwnerDigest {
+  id            String             @id @default(cuid())
+  userId        String
+  franchiseId   String
+  digestType    OwnerDigestType
+  channel       OwnerDigestChannel
+  businessDate  DateTime           @db.Date
+  issueCount    Int
+  topIssues     Json
+  storeScores   Json
+  recommended   Json?
+  status        OwnerDigestStatus  @default(QUEUED)
+  failureReason String?
+  externalId    String?
+  jobRunId      String?
+  deliveredAt   DateTime           @default(now())
+  openedAt      DateTime?
+
+  @@unique([userId, digestType, channel, businessDate])
+  @@index([userId, digestType])
+  @@index([franchiseId])
+  @@index([status])
+}
+
+// ──── Notification Preferences ────
+
+model OwnerNotificationPreference {
+  id                     String  @id @default(cuid())
+  userId                 String
+  franchiseId            String
+  morningEmailEnabled    Boolean @default(true)
+  morningEmailTime       String? // "06:30" in owner timezone
+  dailyRecapEnabled      Boolean @default(true)
+  weeklyDigestEnabled    Boolean @default(true)
+  criticalSmsEnabled     Boolean @default(true)
+  depositSmsEnabled      Boolean @default(true)
+  complianceSmsEnabled   Boolean @default(true)
+  cashVarianceSmsEnabled Boolean @default(false)
+  quietHoursStart        String? // "22:00"
+  quietHoursEnd          String? // "06:00"
+  weekendEnabled         Boolean @default(true)
+  weightOverrides        Json?   // {DEPOSIT_OVERDUE: 95, SALES_DROP: 40}
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([userId, franchiseId])
 }

@@ -234,6 +234,12 @@ export default function MultiStoreDashboard() {
                                 </h2>
                                 <div className="flex items-center gap-3">
                                     <Link
+                                        href="/dashboard/multi-store/pricing"
+                                        className="text-green-400 hover:text-green-300 flex items-center gap-1 text-sm"
+                                    >
+                                        Store Pricing <ChevronRight className="h-4 w-4" />
+                                    </Link>
+                                    <Link
                                         href="/dashboard/owner/transfers"
                                         className="text-purple-400 hover:text-purple-300 flex items-center gap-1 text-sm"
                                     >

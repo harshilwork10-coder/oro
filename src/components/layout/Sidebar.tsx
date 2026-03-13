@@ -187,6 +187,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Download Reports', href: '/dashboard/reports/download', icon: Download, always: true },
         // RETAIL only - Multi-Store Dashboard and Competitor Pricing
         { name: 'Multi-Store', href: '/dashboard/multi-store', icon: Store, industry: ['RETAIL'] as const },
+        { name: 'Store Pricing', href: '/dashboard/multi-store/pricing', icon: DollarSign, industry: ['RETAIL'] as const },
         { name: 'Competitor Pricing', href: '/dashboard/pricing/competitor', icon: TrendingUp, industry: ['RETAIL'] as const },
         { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },
         // SERVICE only - resources (chairs, rooms)
@@ -307,6 +308,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     // OWNER: Retail/Salon store owner - full management access
     const ownerLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Briefing', href: '/dashboard/owner/briefing', icon: Bell },
         { name: 'POS', href: industryType === 'RETAIL' ? '/dashboard/pos/retail' : '/dashboard/pos/salon', icon: CreditCard },
         { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag },
         { name: 'Deals', href: '/dashboard/deals', icon: Tag },
