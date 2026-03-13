@@ -317,20 +317,9 @@ export default function RetailPOSPage() {
         fetchLayout()
     }, [])
 
-    // Fetch top sellers on mount (for ALL tab)
-    useEffect(() => {
-        const fetchTopSellers = async () => {
-            try {
-                const res = await fetch('/api/pos/retail/top-sellers')
-                if (res.ok) {
-                    const data = await res.json()
-                    const items = data?.data || data?.products || data || []
-                    setFavorites(Array.isArray(items) ? items.slice(0, 20) : [])
-                }
-            } catch (e) { console.error('[CRE] Failed to fetch top sellers:', e) }
-        }
-        fetchTopSellers()
-    }, [])
+    // BUG-5 FIX: Removed duplicate top-sellers fetch.
+    // The canonical fetch is in the favorites useEffect below (line ~675).
+    // This block was fetching 20 items, then the second fetch overwrote with 6.
 
     // Fetch products when category or page changes
     useEffect(() => {
@@ -1224,68 +1213,121 @@ export default function RetailPOSPage() {
     // Handle PAX payment success
     const handlePaxSuccess = (paxResponse: any) => {
         setShowPaxModal(false)
-        // Complete the transaction with PAX response data
-        processPayment('CREDIT_CARD', 0, paxResponse)
+        // BUG-6 FIX: Use actual card type from PAX response instead of always CREDIT_CARD
+        const cardMethod = paxResponse?.cardType?.toUpperCase()?.includes('DEBIT') ? 'DEBIT_CARD' : 'CREDIT_CARD'
+        processPayment(cardMethod, 0, paxResponse)
     }
 
-    // Print last receipt
-    const printLastReceipt = () => {
+    // Generate professional receipt HTML (reusable for both print and reprint)
+    const generateReceiptHTML = (tx: any) => {
+        const storeName = (session?.user as any)?.franchiseName || 'ORO 9 POS'
+        const invoiceNum = tx.invoiceNumber || tx.id?.slice(-8)
+        const txDate = new Date(tx.createdAt)
+        const dateStr = txDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+        const timeStr = txDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+        const cashierName = tx.employee?.name || session?.user?.name || 'Cashier'
+        const subtotalNum = Number(tx.subtotal || 0)
+        const taxNum = Number(tx.tax || 0)
+        const tipNum = Number(tx.tip || 0)
+        const totalNum = Number(tx.total || 0)
+        const payMethod = (tx.paymentMethod || 'CASH').replace('_', ' ')
+        const cardLast4 = tx.cardLast4 || ''
+
+        // Resolve item names from snapshot fields
+        const items = tx.lineItems?.map((item: any) => {
+            const name = item.productNameSnapshot || item.serviceNameSnapshot || item.name || 'Item'
+            return { name, qty: Number(item.quantity || 1), price: Number(item.price || 0), total: Number(item.total || item.price || 0) }
+        }) || []
+
+        const itemsHTML = items.map((item: any) => `
+            <tr>
+                <td style="text-align:left;padding:2px 0;">${item.name}</td>
+                <td style="text-align:center;padding:2px 4px;">${item.qty}</td>
+                <td style="text-align:right;padding:2px 0;">$${item.total.toFixed(2)}</td>
+            </tr>
+        `).join('')
+
+        return `<!DOCTYPE html>
+<html><head>
+<title>Receipt #${invoiceNum}</title>
+<style>
+  @media print { @page { margin: 0; size: 80mm auto; } body { margin: 0; } .no-print { display: none !important; } }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', 'Lucida Console', monospace; width: 302px; margin: 0 auto; padding: 12px 8px; color: #000; background: #fff; font-size: 12px; line-height: 1.4; }
+  .store-name { font-size: 20px; font-weight: 900; text-align: center; letter-spacing: 2px; margin-bottom: 2px; }
+  .store-info { text-align: center; font-size: 11px; color: #333; margin-bottom: 8px; }
+  .divider { border: none; border-top: 1px dashed #999; margin: 8px 0; }
+  .meta-row { display: flex; justify-content: space-between; font-size: 11px; color: #555; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; color: #555; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  th:nth-child(2) { text-align: center; }
+  th:last-child { text-align: right; }
+  td { font-size: 12px; vertical-align: top; }
+  .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 13px; }
+  .grand-total { font-size: 18px; font-weight: 900; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 6px 0; margin: 4px 0; }
+  .payment-badge { display: inline-block; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; margin-top: 4px; }
+  .footer { text-align: center; margin-top: 16px; font-size: 11px; color: #555; }
+  .footer .thanks { font-size: 14px; font-weight: 700; color: #000; margin-bottom: 4px; }
+  .barcode { text-align: center; font-size: 28px; font-family: 'Libre Barcode 39', 'Courier New', monospace; letter-spacing: 4px; margin: 8px 0; }
+  .print-btn { display: block; width: 100%; padding: 12px; margin-top: 16px; background: #222; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .print-btn:hover { background: #444; }
+</style>
+</head><body>
+  <div class="store-name">${storeName}</div>
+  <div class="store-info">Thank you for shopping with us</div>
+  <hr class="divider">
+  <div class="meta-row"><span>Date: ${dateStr}</span><span>Time: ${timeStr}</span></div>
+  <div class="meta-row"><span>Invoice: #${invoiceNum}</span><span>Cashier: ${cashierName}</span></div>
+  <hr class="divider">
+  <table>
+    <thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead>
+    <tbody>${itemsHTML}</tbody>
+  </table>
+  <hr class="divider">
+  <div class="totals-row"><span>Subtotal</span><span>$${subtotalNum.toFixed(2)}</span></div>
+  <div class="totals-row"><span>Tax</span><span>$${taxNum.toFixed(2)}</span></div>
+  ${tipNum > 0 ? `<div class="totals-row"><span>Tip</span><span>$${tipNum.toFixed(2)}</span></div>` : ''}
+  <div class="totals-row grand-total"><span>TOTAL</span><span>$${totalNum.toFixed(2)}</span></div>
+  <div style="text-align:center;margin:8px 0;">
+    <span class="payment-badge">${payMethod}${cardLast4 ? ' •••• ' + cardLast4 : ''}</span>
+  </div>
+  <hr class="divider">
+  <div class="barcode">*${invoiceNum}*</div>
+  <div class="footer">
+    <div class="thanks">Thank You!</div>
+    <div>Please come again</div>
+    <div style="margin-top:6px;font-size:10px;color:#888;">Powered by ORO 9 POS</div>
+  </div>
+  <button class="print-btn no-print" onclick="window.print()">🖨️ Print Receipt</button>
+</body></html>`
+    }
+
+    // Print last receipt (professional receipt popup)
+    const printLastReceipt = async () => {
         if (!lastTransaction) {
             setToast({ message: 'No recent transaction to print', type: 'error' })
             return
         }
-
-        // Create printable receipt
-        const receiptWindow = window.open('', '_blank', 'width=400,height=600')
+        // Try thermal printer first
+        const printAgentReady = await isPrintAgentAvailable()
+        if (printAgentReady) {
+            const thermalReceipt = formatReceiptFromTransaction(
+                { ...lastTransaction, items: lastTransaction.lineItems || [] },
+                { name: (session?.user as any)?.franchiseName || 'Store' },
+                session?.user?.name || 'Cashier'
+            )
+            printReceipt(thermalReceipt).catch(console.error)
+            setToast({ message: 'Reprinting receipt...', type: 'success' })
+            return
+        }
+        // Fallback: professional receipt popup
+        const receiptWindow = window.open('', '_blank', 'width=400,height=700')
         if (!receiptWindow) {
             setToast({ message: 'Please allow popups to print receipt', type: 'error' })
             return
         }
-
-        const receiptHTML = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Receipt #${lastTransaction.invoiceNumber || lastTransaction.id?.slice(-8)}</title>
-                <style>
-                    body { font-family: 'Courier New', monospace; padding: 20px; max-width: 300px; margin: 0 auto; }
-                    .header { text-align: center; margin-bottom: 20px; }
-                    .line { border-top: 1px dashed #000; margin: 10px 0; }
-                    .item { display: flex; justify-content: space-between; margin: 5px 0; }
-                    .total { font-weight: bold; font-size: 1.2em; }
-                    .footer { text-align: center; margin-top: 20px; font-size: 0.8em; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h2>RECEIPT</h2>
-                    <p>#${lastTransaction.invoiceNumber || lastTransaction.id?.slice(-8)}</p>
-                    <p>${new Date(lastTransaction.createdAt).toLocaleString()}</p>
-                </div>
-                <div class="line"></div>
-                ${lastTransaction.lineItems?.map((item: any) => `
-                    <div class="item">
-                        <span>${item.quantity}x ${item.name}</span>
-                        <span>$${(item.price * item.quantity).toFixed(2)}</span>
-                    </div>
-                `).join('') || '<p>No items</p>'}
-                <div class="line"></div>
-                <div class="item"><span>Subtotal:</span><span>$${Number(lastTransaction.subtotal).toFixed(2)}</span></div>
-                <div class="item"><span>Tax:</span><span>$${Number(lastTransaction.tax).toFixed(2)}</span></div>
-                ${lastTransaction.tip > 0 ? `<div class="item"><span>Tip:</span><span>$${Number(lastTransaction.tip).toFixed(2)}</span></div>` : ''}
-                <div class="line"></div>
-                <div class="item total"><span>TOTAL:</span><span>$${(Number(lastTransaction.subtotal) + Number(lastTransaction.tax) + Number(lastTransaction.tip || 0)).toFixed(2)}</span></div>
-                <div class="item"><span>Payment:</span><span>${lastTransaction.paymentMethod}</span></div>
-                <div class="footer">
-                    <p>Thank you for your business!</p>
-                </div>
-            </body>
-            </html>
-        `
-
-        receiptWindow.document.write(receiptHTML)
+        receiptWindow.document.write(generateReceiptHTML(lastTransaction))
         receiptWindow.document.close()
-        receiptWindow.print()
     }
 
     // Price check - lookup product without adding to cart
@@ -2238,9 +2280,6 @@ export default function RetailPOSPage() {
                         PAY {formatCurrency(total)}
                     </button>
 
-                    {/* Action Buttons */}
-
-
                     {/* Customer Info */}
                     <div className="mt-auto p-4 bg-stone-900 border-t border-stone-800">
                         <div className="flex items-center gap-3">
@@ -2251,9 +2290,16 @@ export default function RetailPOSPage() {
                                 <User className="h-5 w-5" />
                                 <span>Customer Info</span>
                             </button>
-                            <button className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 rounded-lg transition-colors">
+                            {/* BUG-1 FIX: Notes button now sets transaction notes */}
+                            <button
+                                onClick={() => {
+                                    const note = prompt('Transaction Note:', customerNotes)
+                                    if (note !== null) setCustomerNotes(note)
+                                }}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${customerNotes ? 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-400' : 'bg-stone-800 hover:bg-stone-700'}`}
+                            >
                                 <FileText className="h-5 w-5" />
-                                <span>Notes</span>
+                                <span>{customerNotes ? 'Notes ✓' : 'Notes'}</span>
                             </button>
                         </div>
                         {selectedCustomer && (
@@ -2274,7 +2320,7 @@ export default function RetailPOSPage() {
                 </div>
             </div>
 
-            {/* Checkout Modal - Same as Salon POS */}
+            {/* Checkout Modal — BUG-3/4/8 FIX: Pass pricing settings and handle tips */}
             {showPaymentModal && (
                 <CheckoutModal
                     isOpen={showPaymentModal}
@@ -2288,14 +2334,16 @@ export default function RetailPOSPage() {
                     customerId={selectedCustomer?.id}
                     customerName={selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined}
                     onComplete={(transaction) => {
+                        // BUG-8 FIX: Pass tip amount from checkout modal
+                        const tipAmount = transaction.tip || 0
                         // Handle card payments via PAX
                         if (transaction.paymentMethod === 'CREDIT_CARD' || transaction.paymentMethod === 'DEBIT_CARD') {
                             setPendingCardAmount(transaction.total)
                             setShowPaymentModal(false)
                             setShowPaxModal(true)
                         } else {
-                            // Process cash payment directly
-                            processPayment(transaction.paymentMethod, 0)
+                            // Process cash payment with tip
+                            processPayment(transaction.paymentMethod, tipAmount)
                         }
                     }}
                 />
@@ -2744,7 +2792,14 @@ export default function RetailPOSPage() {
                     transactions={recentTransactions}
                     onClose={() => setShowRecentTransactions(false)}
                     onSelectTransaction={(tx) => {
-                        // Could implement reprint/refund functionality here - tx.id available
+                        // tx.id available for future features
+                    }}
+                    onReprintReceipt={(tx) => {
+                        const receiptWindow = window.open('', '_blank', 'width=400,height=700')
+                        if (receiptWindow) {
+                            receiptWindow.document.write(generateReceiptHTML(tx))
+                            receiptWindow.document.close()
+                        }
                     }}
                 />
             )}
@@ -3404,10 +3459,11 @@ function ReceiveStockModal({ onClose, onSuccess }: {
 }
 
 // Recent Transactions Modal
-function RecentTransactionsModal({ transactions: initialTransactions, onClose, onSelectTransaction }: {
+function RecentTransactionsModal({ transactions: initialTransactions, onClose, onSelectTransaction, onReprintReceipt }: {
     transactions: any[]
     onClose: () => void
     onSelectTransaction: (tx: any) => void
+    onReprintReceipt?: (tx: any) => void
 }) {
     const [transactions, setTransactions] = useState(initialTransactions)
     const [search, setSearch] = useState('')
@@ -3670,7 +3726,11 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
                                             Void
                                         </button>
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); window.print() }}
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                // BUG-2 FIX: Use parent's professional receipt generator
+                                                onReprintReceipt?.(tx)
+                                            }}
                                             className="flex items-center justify-center gap-1 py-2 bg-stone-700 hover:bg-stone-600 text-stone-300 rounded-lg text-xs font-medium"
                                         >
                                             <Printer className="h-3 w-3" />

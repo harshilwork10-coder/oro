@@ -105,12 +105,14 @@ export async function GET(request: NextRequest) {
             minimumAge,
             isEbtEligible: product.productCategory?.isEbtEligible || false,
             productCategory: product.productCategory,
-            tagAlongItems // Cross-sell suggestions!
-        }
-
-        // Check stock
-        if (product.stock <= 0) {
-            console.error(`[RETAIL] Low stock warning: ${product.name}`)
+            tagAlongItems, // Cross-sell suggestions!
+            // BUG-7 FIX: Include stock warning in response so POS can alert cashier
+            lowStock: product.stock <= 0,
+            stockWarning: product.stock <= 0
+                ? `⚠️ ${product.name} is out of stock (${product.stock} remaining)`
+                : product.stock <= 5
+                    ? `Low stock: ${product.stock} remaining`
+                    : null
         }
 
         return NextResponse.json(result)

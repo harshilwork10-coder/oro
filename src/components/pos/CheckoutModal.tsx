@@ -10,6 +10,7 @@ interface CheckoutModalProps {
     cart: any[]
     subtotal: number
     taxRate: number
+    pricingSettings?: { processingPlan?: string; cardFeePercent?: number }
     customerId?: string
     customerName?: string
     onComplete: (transaction: any) => void
@@ -19,7 +20,7 @@ interface CheckoutModalProps {
     onReviewSubmit?: (rating: number, feedbackTag: string | null) => void
 }
 
-export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate, customerId, customerName, onComplete, onShowTipModal, onShowReviewModal, onTipSelected, onReviewSubmit }: CheckoutModalProps) {
+export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate, pricingSettings, customerId, customerName, onComplete, onShowTipModal, onShowReviewModal, onTipSelected, onReviewSubmit }: CheckoutModalProps) {
     const [tenderAmount, setTenderAmount] = useState<string>('')
     const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'DEBIT_CARD' | 'CREDIT_CARD' | null>(null)
     const [tip, setTip] = useState(0)
@@ -36,10 +37,10 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
     const [payments, setPayments] = useState<{ type: string; amount: number }[]>([])
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0) + lotteryCredit + giftCardCredit
 
-    // Mock merchant config
+    // BUG-3 FIX: Use pricing settings from parent (franchise config) instead of hardcoded values
     const merchantConfig = {
-        processingPlan: 'DUAL_PRICE', // STANDARD, SURCHARGE, DUAL_PRICE
-        cardFeePercent: 3.99
+        processingPlan: pricingSettings?.processingPlan || 'STANDARD',
+        cardFeePercent: pricingSettings?.cardFeePercent || 0
     }
 
     // Calculate card fee based on processing plan
@@ -66,11 +67,14 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
 
     const cardFee = calculateCardFee(paymentMethod)
 
-    // Tax calculation
-    const productSubtotal = cart
+    // BUG-4 FIX: Tax calculation now uses quantity × per-item taxRate
+    // Each cart item may have its own taxRate (e.g., NO_TAX=0, LOW_TAX=2.25, EBT=0)
+    const tax = cart
         .filter(item => item.type === 'product')
-        .reduce((sum, item) => sum + item.price, 0)
-    const tax = productSubtotal * taxRate
+        .reduce((sum, item) => {
+            const itemTaxRate = item.taxRate !== undefined ? item.taxRate : taxRate
+            return sum + (item.price * (item.quantity || 1)) * itemTaxRate
+        }, 0)
 
     // Total calculation (lottery credit reduces amount due)
     const total = subtotal - discount + cardFee + tax + tip - lotteryCredit
