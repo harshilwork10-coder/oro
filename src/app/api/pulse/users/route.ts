@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-// GET: List all employees + their Pulse access status (for owner to manage)
+// GET: List all employees + their Pulse access status (Provider manages on behalf of owner)
 export async function GET() {
     try {
         const session = await getServerSession(authOptions)
@@ -11,10 +11,9 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        // Only OWNER/FRANCHISOR/PROVIDER can manage Pulse users
-        const userRole = session.user.role
-        if (!['FRANCHISOR', 'OWNER', 'PROVIDER'].includes(userRole)) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        // Only PROVIDER can manage Pulse users (owner requests changes through Provider)
+        if (session.user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Only Provider can manage Pulse access' }, { status: 403 })
         }
 
         // Get the franchisor for this owner
@@ -99,7 +98,7 @@ export async function GET() {
     }
 }
 
-// POST: Toggle Pulse access for a user (owner manages their own team)
+// POST: Toggle Pulse access for a user (Provider manages on behalf of owner)
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
@@ -107,9 +106,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const userRole = session.user.role
-        if (!['FRANCHISOR', 'OWNER', 'PROVIDER'].includes(userRole)) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        if (session.user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Only Provider can manage Pulse access' }, { status: 403 })
         }
 
         const { userId, grantAccess, locationIds } = await request.json()
