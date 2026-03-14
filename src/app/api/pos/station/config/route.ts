@@ -33,7 +33,8 @@ export const GET = withPOSAuth(async (_req: Request, ctx: POSContext) => {
                             include: {
                                 dealerBranding: true
                             }
-                        }
+                        },
+                        settings: true
                     }
                 }
             }
@@ -44,8 +45,9 @@ export const GET = withPOSAuth(async (_req: Request, ctx: POSContext) => {
         }
 
         const franchise = location.franchise
+        const settings = franchise?.settings as any
 
-        // Build config response
+        // Build config response — ALL values from DB, with safe defaults
         const config = {
             // Location info (from validated token)
             locationId: location.id,
@@ -53,26 +55,26 @@ export const GET = withPOSAuth(async (_req: Request, ctx: POSContext) => {
             stationName: stationName,
             businessType: location.businessType || 'RETAIL',
 
-            // Tax settings
-            taxRate: 0.0825,
-            taxIncluded: false,
+            // Tax settings — from BusinessConfig
+            taxRate: settings?.taxRate ? parseFloat(settings.taxRate.toString()) : 0.0825,
+            taxIncluded: settings?.taxInclusive ?? false,
 
-            // Dual pricing
-            dualPricingEnabled: false,
-            cashDiscountPercent: 4.0,
+            // Dual pricing — from BusinessConfig (matches bootstrap logic)
+            dualPricingEnabled: settings?.pricingModel === 'DUAL_PRICING' && settings?.showDualPricing === true,
+            cashDiscountPercent: settings?.cardSurcharge ? parseFloat(settings.cardSurcharge.toString()) : 4.0,
 
             // PAX Terminal (from Location table)
             paxTerminalIP: location.paxTerminalIP || null,
             paxTerminalPort: location.paxTerminalPort ? parseInt(location.paxTerminalPort) : 10009,
 
-            // Receipt settings
-            receiptHeader: franchise?.name || '',
-            receiptFooter: 'Thank you for your business!',
+            // Receipt settings — from BusinessConfig
+            receiptHeader: settings?.storeDisplayName || franchise?.name || '',
+            receiptFooter: settings?.receiptFooter || 'Thank you for your business!',
             receiptShowLogo: true,
             receiptLogoUrl: null,
 
-            // Tip settings
-            tipEnabled: true,
+            // Tip settings — from account settings (owner can enable/disable)
+            tipEnabled: settings?.tipPromptEnabled ?? true,
             tipPresets: [15, 18, 20, 25],
 
             // Permissions
@@ -84,8 +86,8 @@ export const GET = withPOSAuth(async (_req: Request, ctx: POSContext) => {
                 openDrawerRequiresPIN: false,
             },
 
-            // Loyalty
-            loyaltyEnabled: false,
+            // Loyalty — from BusinessConfig
+            loyaltyEnabled: settings?.usesLoyalty ?? false,
             pointsPerDollar: 1,
             pointValue: 0.01,
 

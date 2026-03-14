@@ -283,8 +283,8 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             receiptHeader: settings?.storeDisplayName || franchise.name || '',
             receiptFooter: settings?.receiptFooter || 'Thank you!',
 
-            // Tips
-            tipEnabled: true,
+            // Tips - read from account settings (owner can enable/disable)
+            tipEnabled: (settings as any)?.tipPromptEnabled ?? true,
             tipPresets: [15, 18, 20, 25],
 
             // Permissions

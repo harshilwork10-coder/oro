@@ -9,18 +9,25 @@ export async function GET() {
     try {
         const session = await getServerSession(authOptions)
 
-        if (!session || (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR')) {
+        if (!session || !['PROVIDER', 'FRANCHISOR', 'OWNER', 'MANAGER'].includes(session.user.role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // PROVIDER sees all non-provider users
         // FRANCHISOR only sees users in their franchises (via Franchisor record)
+        // OWNER/MANAGER see employees in their own franchise
         // For booking purposes, we only want actual EMPLOYEE role (stylists)
         let whereClause: any = {
             role: 'EMPLOYEE'  // Only show actual stylists, not owners/managers
         }
 
-        if (session.user.role === 'FRANCHISOR') {
+        if (session.user.role === 'OWNER' || session.user.role === 'MANAGER') {
+            // OWNER/MANAGER: scope to their own franchise
+            if (!session.user.franchiseId) {
+                return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
+            }
+            whereClause.franchiseId = session.user.franchiseId
+        } else if (session.user.role === 'FRANCHISOR') {
             // Get the franchisor record for this user
             const franchisor = await prisma.franchisor.findUnique({
                 where: { ownerId: session.user.id },

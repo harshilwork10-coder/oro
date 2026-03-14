@@ -148,8 +148,8 @@ export async function PUT(request: Request) {
         include: { location: true }
     })
 
-    if (!user?.locationId) {
-        return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+    if (!user?.franchiseId) {
+        return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
     }
 
     try {
@@ -196,8 +196,8 @@ export async function DELETE(request: Request) {
         include: { location: true }
     })
 
-    if (!user?.locationId) {
-        return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+    if (!user?.franchiseId) {
+        return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
     }
 
     try {

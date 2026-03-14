@@ -105,15 +105,16 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url)
         const status = searchParams.get('status') // SUSPENDED, TERMINATED, or null for all
 
-        const where: { accountStatus?: string } = {}
-        if (status) {
-            where.accountStatus = status
+        // Build where clause — use status param if provided, otherwise show all non-active
+        const whereClause: any = {}
+        if (status && ['SUSPENDED', 'TERMINATED'].includes(status)) {
+            whereClause.accountStatus = status
+        } else {
+            whereClause.accountStatus = { in: ['SUSPENDED', 'TERMINATED'] as ('SUSPENDED' | 'TERMINATED')[] }
         }
 
         const franchisors = await prisma.franchisor.findMany({
-            where: {
-                accountStatus: { in: ['SUSPENDED', 'TERMINATED'] as ('SUSPENDED' | 'TERMINATED')[] }
-            },
+            where: whereClause,
             include: {
                 owner: { select: { name: true, email: true } },
                 _count: { select: { franchises: true } }

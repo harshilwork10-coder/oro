@@ -51,6 +51,7 @@ const transactionRequestSchema = z.object({
     cardLast4: z.string().optional().nullable(),
     cardType: z.string().optional().nullable(),
     tip: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
+    notes: z.string().optional().nullable(), // Transaction notes from cashier
 })
 
 export async function POST(req: NextRequest) {
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
     const validation = await validateBody(req, transactionRequestSchema)
     if ('error' in validation) return validation.error
 
-    const { items, subtotal, tax, total, subtotalCash, subtotalCard, taxCash, taxCard, totalCash, totalCard, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType, tip } = validation.data
+    const { items, subtotal, tax, total, subtotalCash, subtotalCard, taxCash, taxCard, totalCash, totalCard, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType, tip, notes } = validation.data
 
     // Shift validation (OWNER-CONTROLLED via BusinessConfig.shiftRequirement setting)
     // Look up through franchise -> franchisor -> businessConfig
@@ -170,6 +171,7 @@ export async function POST(req: NextRequest) {
             cardLast4: cardLast4 || null,
             cardType: cardType || null,
             tip: (tip || 0).toString(),
+            notes: notes || null,
             status: 'COMPLETED',
             cashDrawerSessionId: cashDrawerSessionId || null,
             lineItems: (() => {

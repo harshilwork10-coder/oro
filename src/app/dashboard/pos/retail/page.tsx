@@ -527,6 +527,8 @@ export default function RetailPOSPage() {
         // Receipt Print Settings
         receiptPrintMode: 'ALL' | 'CARD_ONLY' | 'EBT_ONLY' | 'CARD_AND_EBT' | 'NONE'
         openDrawerOnCash: boolean
+        // Tip settings (from account config)
+        tipEnabled: boolean
     }
     const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
     const [printerConnected, setPrinterConnected] = useState(false)
@@ -621,7 +623,8 @@ export default function RetailPOSPage() {
                         cardSurcharge: parseFloat(data.cardSurcharge) || 3.99,
                         showDualPricing: data.showDualPricing ?? false,
                         receiptPrintMode: data.receiptPrintMode || 'ALL',
-                        openDrawerOnCash: data.openDrawerOnCash ?? true
+                        openDrawerOnCash: data.openDrawerOnCash ?? true,
+                        tipEnabled: data.tipPromptEnabled ?? true
                     })
                 }
             } catch (error) {
@@ -877,10 +880,16 @@ export default function RetailPOSPage() {
         setToast({ message: `Added: ${product.name}`, type: 'success' })
     }
 
-    // Confirm age verification (ID was scanned and verified)  
+    // Confirm age verification (ID was scanned and verified)
     const confirmAgeVerification = () => {
         if (pendingAgeItem) {
-            setCart(prev => [...prev, pendingAgeItem])
+            // BUG-10/14 FIX: Check for case break AND go through addToCart for proper dual pricing fields
+            if (pendingAgeItem.sellByCase && pendingAgeItem.unitsPerCase) {
+                setPendingCaseBreakProduct(pendingAgeItem)
+                setShowCaseBreakModal(true)
+            } else {
+                addToCart(pendingAgeItem) // BUG-14 FIX: Use addToCart instead of direct setCart
+            }
             setToast({ message: `Added: ${pendingAgeItem.name} (ID Verified)`, type: 'success' })
         }
         // Mark ID as verified for this transaction - won't ask again
@@ -893,7 +902,13 @@ export default function RetailPOSPage() {
     // Skip age verification (regular customer cashier knows)
     const skipAgeVerification = () => {
         if (pendingAgeItem) {
-            setCart(prev => [...prev, pendingAgeItem])
+            // BUG-10/14 FIX: Same case break + addToCart fix
+            if (pendingAgeItem.sellByCase && pendingAgeItem.unitsPerCase) {
+                setPendingCaseBreakProduct(pendingAgeItem)
+                setShowCaseBreakModal(true)
+            } else {
+                addToCart(pendingAgeItem)
+            }
             setToast({ message: `Added: ${pendingAgeItem.name} (ID Skipped)`, type: 'success' })
         }
         // Mark as verified so we don't ask again for this transaction
@@ -1057,6 +1072,7 @@ export default function RetailPOSPage() {
         if (held) {
             setCart(held.items)
             setHeldTransactions(prev => prev.filter(t => t.id !== id))
+            setSelectedItemIndex(null) // BUG-16 FIX: Reset selection to avoid stale index
             setToast({ message: 'Transaction recalled', type: 'success' })
         }
     }
@@ -1066,6 +1082,7 @@ export default function RetailPOSPage() {
         if (cart.length === 0) return
         if (confirm('Void entire transaction?')) {
             setCart([])
+            setSelectedItemIndex(null)     // BUG-16 FIX: Reset selection
             setSelectedCustomer(null)
             setIdVerifiedForTransaction(false)  // Reset ID verification
             setTransactionDiscount(null)        // ✅ Clear manual discount (was leaking into next tx)
@@ -1093,8 +1110,14 @@ export default function RetailPOSPage() {
         setShowPaymentModal(false) // Close modal if open
 
         try {
-            const { subtotal, tax, total, cashTotal, cardTotal } = calculateTotals()
-            const totalWithTip = total + tipAmount
+            const { subtotal, subtotalCash, subtotalCard, tax, taxCash, taxCard, total, cashTotal, cardTotal, showDualPricing } = calculateTotals()
+
+            // SURCHARGE FIX: For card payments with dual pricing, use cardTotal as the charged amount
+            const isCardPayment = ['CREDIT_CARD', 'DEBIT_CARD'].includes(method)
+            const chargedTotal = (isCardPayment && showDualPricing) ? cardTotal : cashTotal
+            const totalWithTip = chargedTotal + tipAmount
+            const chargedSubtotal = (isCardPayment && showDualPricing) ? subtotalCard : subtotalCash
+            const chargedTax = (isCardPayment && showDualPricing) ? taxCard : taxCash
 
             const res = await fetch('/api/pos/transaction', {
                 method: 'POST',
@@ -1114,15 +1137,18 @@ export default function RetailPOSPage() {
                         cashPrice: item.cashPrice || item.price,
                         cardPrice: item.cardPrice
                     })),
-                    subtotal,
-                    tax,
+                    subtotal: chargedSubtotal,
+                    tax: chargedTax,
                     total: totalWithTip,
                     // Dual pricing totals - stored permanently
                     totalCash: cashTotal,
                     totalCard: cardTotal,
                     paymentMethod: method,
                     clientId: selectedCustomer?.id,
-                    tipAmount: tipAmount,
+                    // BUG-9 FIX: Use `tip` (not `tipAmount`) to match Zod schema
+                    tip: tipAmount,
+                    // BUG-13 FIX: Send customer notes to transaction API
+                    notes: customerNotes || undefined,
                     // Include PAX terminal response data if available
                     ...(paxResponse && {
                         gatewayTxId: paxResponse.transactionId,
@@ -1198,6 +1224,8 @@ export default function RetailPOSPage() {
                 setLoyaltyDiscount(0)        // BUG-2 FIX: Clear loyalty discount
                 setLotteryPayout(0)          // BUG-2 FIX: Clear lottery offset
                 setAppliedPromoCode('')      // BUG-2 FIX: Clear promo code
+                setCustomerNotes('')         // BUG-13 FIX: Clear notes for next transaction
+                setSelectedItemIndex(null)   // BUG-16 FIX: Reset selection
             } else {
                 const error = await res.json()
                 setToast({ message: error.error || 'Payment failed', type: 'error' })
@@ -1210,12 +1238,17 @@ export default function RetailPOSPage() {
         }
     }
 
+    // BUG-11 FIX: Track pending tip from checkout modal for PAX card payments
+    const [pendingTipAmount, setPendingTipAmount] = useState(0)
+
     // Handle PAX payment success
     const handlePaxSuccess = (paxResponse: any) => {
         setShowPaxModal(false)
         // BUG-6 FIX: Use actual card type from PAX response instead of always CREDIT_CARD
         const cardMethod = paxResponse?.cardType?.toUpperCase()?.includes('DEBIT') ? 'DEBIT_CARD' : 'CREDIT_CARD'
-        processPayment(cardMethod, 0, paxResponse)
+        // BUG-11 FIX: Use the pending tip from checkout modal instead of always 0
+        processPayment(cardMethod, pendingTipAmount, paxResponse)
+        setPendingTipAmount(0) // Reset after use
     }
 
     // Generate professional receipt HTML (reusable for both print and reprint)
@@ -2331,6 +2364,10 @@ export default function RetailPOSPage() {
                     }))}
                     subtotal={subtotal}
                     taxRate={config?.taxRate || 0}
+                    pricingSettings={pricingSettings ? {
+                        processingPlan: pricingSettings.pricingModel === 'DUAL_PRICING' ? 'DUAL_PRICE' : 'STANDARD',
+                        cardFeePercent: pricingSettings.cardSurcharge || 0
+                    } : undefined}
                     customerId={selectedCustomer?.id}
                     customerName={selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined}
                     onComplete={(transaction) => {
@@ -2338,7 +2375,12 @@ export default function RetailPOSPage() {
                         const tipAmount = transaction.tip || 0
                         // Handle card payments via PAX
                         if (transaction.paymentMethod === 'CREDIT_CARD' || transaction.paymentMethod === 'DEBIT_CARD') {
-                            setPendingCardAmount(transaction.total)
+                            // SURCHARGE FIX: Use page.tsx cardTotal (includes surcharge)
+                            // instead of CheckoutModal's total (which may miscalculate fees)
+                            const { cashTotal: cT, cardTotal: cdT, showDualPricing: dp } = calculateTotals()
+                            const chargedAmount = dp ? cdT : cT
+                            setPendingCardAmount(chargedAmount + tipAmount)
+                            setPendingTipAmount(tipAmount) // BUG-11 FIX: Save tip for PAX callback
                             setShowPaymentModal(false)
                             setShowPaxModal(true)
                         } else {

@@ -20,12 +20,20 @@ export async function GET(request: NextRequest) {
         }
 
         const { searchParams } = new URL(request.url)
-        const franchiseId = searchParams.get('franchiseId')
+        const requestedFranchiseId = searchParams.get('franchiseId')
         const quarter = parseInt(searchParams.get('quarter') || '0') // 1-4
         const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString())
 
+        const user = session.user as any
+        const franchiseId = requestedFranchiseId || user.franchiseId
+
         if (!franchiseId) {
             return NextResponse.json({ error: 'franchiseId required' }, { status: 400 })
+        }
+
+        // Security: Only PROVIDER can access other franchise's data
+        if (franchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         // Calculate quarter date range

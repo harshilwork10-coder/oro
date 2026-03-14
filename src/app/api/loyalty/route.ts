@@ -35,8 +35,20 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const user = session.user as any
+        // Use session franchiseId — NEVER trust client-provided franchiseId for writes
+        const franchiseId = user.franchiseId
+        if (!franchiseId) {
+            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
+        }
+
+        // Only OWNER, MANAGER, PROVIDER can manage loyalty settings
+        if (!['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR'].includes(user.role)) {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+        }
+
         const body = await req.json()
-        const { franchiseId, isEnabled, pointsPerDollar, redemptionRatio } = body
+        const { isEnabled, pointsPerDollar, redemptionRatio } = body
 
         const loyaltyProgram = await prisma.loyaltyProgram.upsert({
             where: { franchiseId },
@@ -52,8 +64,6 @@ export async function POST(req: Request) {
                 redemptionRatio: parseFloat(redemptionRatio)
             }
         })
-
-        // Debug log removed
 
         return NextResponse.json(loyaltyProgram)
     } catch (error) {

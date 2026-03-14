@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         if (departmentId) whereClause.departmentId = departmentId
         if (tobaccoFilter === 'true') whereClause.isTobacco = true
         if (lowStock === 'true') {
-            whereClause.stock = { lte: prisma.product.fields.reorderPoint || 10 }
+            whereClause.stock = { lte: 10 } // Items at or below reorder threshold
         }
 
         // Build query args with cursor pagination

@@ -10,7 +10,7 @@ interface CheckoutModalProps {
     cart: any[]
     subtotal: number
     taxRate: number
-    pricingSettings?: { processingPlan?: string; cardFeePercent?: number }
+    pricingSettings?: { processingPlan?: string; cardFeePercent?: number; tipEnabled?: boolean }
     customerId?: string
     customerName?: string
     onComplete: (transaction: any) => void
@@ -134,8 +134,9 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
         setPaymentMethod(method)
         const currentTender = parseFloat(tenderAmount) || 0
 
-        // For card payments, show tip modal first (only if no tip yet)
-        if ((method === 'CREDIT_CARD' || method === 'DEBIT_CARD') && !waitingForTip && !paymentCompleted && tip === 0) {
+        // For card payments, show tip modal first (only if tips enabled AND no tip yet)
+        const tipIsEnabled = pricingSettings?.tipEnabled !== false // Default to true if not set
+        if (tipIsEnabled && (method === 'CREDIT_CARD' || method === 'DEBIT_CARD') && !waitingForTip && !paymentCompleted && tip === 0) {
             setWaitingForTip(true)
             onShowTipModal?.(true)
             return
