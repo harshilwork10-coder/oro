@@ -563,6 +563,11 @@ export default function RetailPOSPage() {
         tipEnabled: boolean
         // Tax rate (from FranchiseSettings — single source of truth)
         taxRate: number
+        // Store Info (for receipts)
+        storeAddress?: string
+        storePhone?: string
+        receiptHeader?: string
+        receiptFooter?: string
     }
     const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
     const [printerConnected, setPrinterConnected] = useState(false)
@@ -660,7 +665,12 @@ export default function RetailPOSPage() {
                         openDrawerOnCash: data.openDrawerOnCash ?? true,
                         tipEnabled: data.tipPromptEnabled ?? true,
                         // Tax rate from FranchiseSettings (same source as Android POS)
-                        taxRate: parseFloat(data.taxRate) || 0.0825
+                        taxRate: parseFloat(data.taxRate) || 0.0825,
+                        // Store info for receipts (from FranchiseSettings)
+                        storeAddress: data.storeAddress || undefined,
+                        storePhone: data.storePhone || undefined,
+                        receiptHeader: data.receiptHeader || undefined,
+                        receiptFooter: data.receiptFooter || undefined
                     })
                 }
             } catch (error) {
@@ -1319,8 +1329,10 @@ export default function RetailPOSPage() {
                             { ...transaction, items: cart },
                             {
                                 name: (session?.user as any)?.franchiseName || 'Store',
-                                address: pricingSettings.showDualPricing ? undefined : undefined,
-                                phone: undefined
+                                address: pricingSettings.storeAddress || undefined,
+                                phone: pricingSettings.storePhone || undefined,
+                                header: pricingSettings.receiptHeader || undefined,
+                                footer: pricingSettings.receiptFooter || undefined
                             },
                             session?.user?.name || 'Cashier'
                         )
