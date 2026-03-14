@@ -84,4 +84,25 @@ export interface PaymentBreakdown {
     other: number
 }
 
+export interface EmployeeRank {
+    id: string
+    name: string
+    totalSales: number
+    transactionCount: number
+    averageTicket: number
+}
+
+export interface TaxBreakdownItem {
+    taxName: string
+    taxRate: number
+    taxableAmount: number
+    taxAmount: number
+}
+
+export interface CategorySales {
+    name: string
+    revenue: number
+    quantity: number
+}
+
 export type TabType = 'sales' | 'lottery' | 'inventory' | 'reports'

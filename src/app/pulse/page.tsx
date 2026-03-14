@@ -125,7 +125,7 @@ export default function OroPulsePage() {
     // Reports state
     interface OpenDrawer { id: string; currentCash: number; location: string; openedBy: string }
     const [openDrawers, setOpenDrawers] = useState<OpenDrawer[]>([])
-    const [paymentBreakdown, setPaymentBreakdown] = useState({ cash: 0, card: 0, other: 0 })
+    const [paymentBreakdown, setPaymentBreakdown] = useState({ cash: 0, card: 0, other: 0, cashCount: 0, cardCount: 0, otherCount: 0 })
     const [voidCount, setVoidCount] = useState(0)
     const [refundCount, setRefundCount] = useState(0)
     // Report date filters
@@ -134,6 +134,16 @@ export default function OroPulsePage() {
     const [totalSalesReport, setTotalSalesReport] = useState(0)
     const [taxCollected, setTaxCollected] = useState(0)
     const [lotteryStats, setLotteryStats] = useState<LotteryStats>({ sales: 0, payouts: 0, net: 0, salesCount: 0, payoutsCount: 0, topGames: [] })
+
+    // NEW: Enhanced Pulse analytics
+    const [todayProfit, setTodayProfit] = useState(0)
+    const [todayCost, setTodayCost] = useState(0)
+    const [profitMargin, setProfitMargin] = useState(0)
+    const [employeeRanking, setEmployeeRanking] = useState<{ id: string, name: string, totalSales: number, transactionCount: number, averageTicket: number }[]>([])
+    const [taxBreakdown, setTaxBreakdown] = useState<{ taxName: string, taxRate: number, taxableAmount: number, taxAmount: number }[]>([])
+    const [categorySales, setCategorySales] = useState<{ name: string, revenue: number, quantity: number }[]>([])
+    const [repeatCustomerPct, setRepeatCustomerPct] = useState(0)
+    const [uniqueClients, setUniqueClients] = useState(0)
 
     // UI state
     const [activeTab, setActiveTab] = useState<TabType>('sales')
@@ -246,17 +256,26 @@ export default function OroPulsePage() {
                 setTopSellers(data.topSellers || [])
                 setLowStockItems(data.lowStockItems || [])
                 setEmployeesOnClock(data.employeesOnClock || [])
+                // Enhanced analytics from live API
+                setTodayProfit(data.stats?.todayProfit || 0)
+                setTodayCost(data.stats?.todayCost || 0)
+                setProfitMargin(data.stats?.profitMargin || 0)
+                setEmployeeRanking(data.employeeRanking || [])
+                setPaymentBreakdown(data.paymentBreakdown || { cash: 0, card: 0, other: 0, cashCount: 0, cardCount: 0, otherCount: 0 })
+                setTaxBreakdown(data.taxBreakdown || [])
+                setTaxCollected(data.taxCollected || 0)
+                setCategorySales(data.categorySales || [])
+                setRepeatCustomerPct(data.repeatCustomerPct || 0)
+                setUniqueClients(data.uniqueClients || 0)
+                setVoidCount(data.voidCount || 0)
+                setRefundCount(data.refundCount || 0)
             }
-            // Also fetch reports data for cash drawer
+            // Also fetch reports data for cash drawer + lottery
             const reportsRes = await fetch(`/api/pulse/reports?locationId=${selectedLocation}`)
             if (reportsRes.ok) {
                 const reportsData = await reportsRes.json()
                 setOpenDrawers(reportsData.openDrawers || [])
-                setPaymentBreakdown(reportsData.paymentBreakdown || { cash: 0, card: 0, other: 0 })
-                setVoidCount(reportsData.voidCount || 0)
-                setRefundCount(reportsData.refundCount || 0)
                 setTotalSalesReport(reportsData.totalSales || 0)
-                setTaxCollected(reportsData.taxCollected || 0)
                 setLotteryStats(reportsData.lottery || { sales: 0, payouts: 0, net: 0, salesCount: 0, payoutsCount: 0, topGames: [] })
             }
         } catch (error) {
@@ -604,6 +623,84 @@ export default function OroPulsePage() {
                             </div>
                         </div>
 
+                        {/* 💰 Profit / COGS Card */}
+                        {todayCost > 0 && (
+                            <div className="bg-gray-800/50 rounded-xl p-4 mb-4 border border-gray-700">
+                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    💰 Profit Today
+                                </h3>
+                                <div className="grid grid-cols-3 gap-3 text-center">
+                                    <div>
+                                        <p className="text-gray-400 text-[10px] uppercase">Revenue</p>
+                                        <p className="text-green-400 font-bold text-lg">${stats.todaySales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 text-[10px] uppercase">Cost (COGS)</p>
+                                        <p className="text-red-400 font-bold text-lg">${todayCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 text-[10px] uppercase">Gross Profit</p>
+                                        <p className={`font-bold text-lg ${todayProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>${todayProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                    </div>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-gray-700">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-400 text-xs">Margin</span>
+                                        <span className={`text-sm font-bold ${profitMargin >= 30 ? 'text-emerald-400' : profitMargin >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                            {profitMargin.toFixed(1)}%
+                                        </span>
+                                    </div>
+                                    <div className="h-2 rounded-full overflow-hidden bg-gray-700 mt-1">
+                                        <div
+                                            className={`h-full rounded-full transition-all ${profitMargin >= 30 ? 'bg-emerald-500' : profitMargin >= 15 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                                            style={{ width: `${Math.min(profitMargin, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 🏆 Employee Scoreboard */}
+                        {employeeRanking.length > 0 && (
+                            <div className="bg-gray-800/50 rounded-xl p-4 mb-4 border border-gray-700">
+                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    🏆 {isSalon ? 'Stylist' : 'Employee'} Scoreboard
+                                </h3>
+                                <div className="space-y-2">
+                                    {employeeRanking.map((emp, idx) => (
+                                        <div key={emp.id} className="flex items-center justify-between bg-gray-700/30 rounded-lg p-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-500 text-black' : idx === 1 ? 'bg-gray-300 text-black' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-gray-600 text-gray-300'}`}>
+                                                    {idx < 3 ? ['🥇', '🥈', '🥉'][idx] : `#${idx + 1}`}
+                                                </div>
+                                                <div>
+                                                    <p className="text-white text-sm font-medium">{emp.name}</p>
+                                                    <p className="text-gray-500 text-xs">{emp.transactionCount} {isSalon ? 'services' : 'sales'} • Avg ${emp.averageTicket.toFixed(0)}</p>
+                                                </div>
+                                            </div>
+                                            <p className="text-green-400 font-bold">${emp.totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 👤 Repeat Customers */}
+                        {stats.transactionCount > 0 && (
+                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 text-center">
+                                    <p className="text-gray-400 text-xs mb-1">👤 KNOWN CUSTOMERS</p>
+                                    <p className="text-2xl font-bold text-blue-400">{repeatCustomerPct}%</p>
+                                    <p className="text-gray-500 text-[10px]">{uniqueClients} unique</p>
+                                </div>
+                                <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 text-center">
+                                    <p className="text-gray-400 text-xs mb-1">📊 TAX COLLECTED</p>
+                                    <p className="text-2xl font-bold text-purple-400">${taxCollected.toFixed(2)}</p>
+                                    <p className="text-gray-500 text-[10px]">{taxBreakdown.length} jurisdictions</p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Per-Store Breakdown */}
                         {storeBreakdown.length > 1 && (
                             <div className="bg-gray-800/50 rounded-xl p-4 mb-4 border border-gray-700">
@@ -686,21 +783,71 @@ export default function OroPulsePage() {
                                         <div className="flex justify-between text-xs">
                                             <span className="flex items-center gap-1">
                                                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                                Cash ${paymentBreakdown.cash.toFixed(2)}
+                                                Cash ${paymentBreakdown.cash.toFixed(2)} ({paymentBreakdown.cashCount || 0})
                                             </span>
                                             <span className="flex items-center gap-1">
                                                 <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                                Card ${paymentBreakdown.card.toFixed(2)}
+                                                Card ${paymentBreakdown.card.toFixed(2)} ({paymentBreakdown.cardCount || 0})
                                             </span>
-                                        </div>
-                                        <div className="mt-3 pt-3 border-t border-gray-700 flex justify-between text-xs">
-                                            <span className="text-gray-400">Tax Collected</span>
-                                            <span className="text-purple-400 font-bold">${taxCollected.toFixed(2)}</span>
                                         </div>
                                     </>
                                 )
                             })()}
                         </div>
+
+                        {/* 🧾 Tax Jurisdiction Breakdown */}
+                        {taxBreakdown.length > 0 && (
+                            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 mb-4">
+                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    🧾 Tax by Jurisdiction
+                                </h3>
+                                <div className="space-y-2">
+                                    {taxBreakdown.map((t, idx) => (
+                                        <div key={idx} className="flex items-center justify-between bg-gray-700/30 rounded-lg px-3 py-2">
+                                            <div>
+                                                <p className="text-white text-sm">{t.taxName}</p>
+                                                <p className="text-gray-500 text-xs">{(Number(t.taxRate) * 100).toFixed(2)}% on ${t.taxableAmount.toFixed(2)}</p>
+                                            </div>
+                                            <p className="text-purple-400 font-bold">${t.taxAmount.toFixed(2)}</p>
+                                        </div>
+                                    ))}
+                                    <div className="flex items-center justify-between pt-2 border-t border-gray-700 text-xs">
+                                        <span className="text-gray-400 font-medium">Total Tax</span>
+                                        <span className="text-purple-400 font-bold">${taxCollected.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 📊 Category Sales */}
+                        {categorySales.length > 0 && (
+                            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 mb-4">
+                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    📊 {isSalon ? 'Service' : 'Category'} Sales
+                                </h3>
+                                <div className="space-y-2">
+                                    {categorySales.map((cat, idx) => {
+                                        const maxRev = categorySales[0]?.revenue || 1
+                                        const pct = (cat.revenue / maxRev) * 100
+                                        return (
+                                            <div key={idx} className="space-y-1">
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-white truncate flex-1">{cat.name}</span>
+                                                    <span className="text-gray-400 text-xs ml-2">{cat.quantity} sold</span>
+                                                    <span className="text-green-400 font-medium ml-3">${cat.revenue.toFixed(2)}</span>
+                                                </div>
+                                                <div className="h-1.5 rounded-full overflow-hidden bg-gray-700">
+                                                    <div
+                                                        className={`h-full rounded-full ${idx === 0 ? 'bg-orange-500' : idx === 1 ? 'bg-blue-500' : 'bg-gray-500'}`}
+                                                        style={{ width: `${pct}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Void/Refund Alerts */}
                         <div className="grid grid-cols-2 gap-3 mb-4">
