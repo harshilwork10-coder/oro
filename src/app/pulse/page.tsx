@@ -21,7 +21,8 @@ import {
     Edit3,
     Check,
     Download,
-    Bell
+    Bell,
+    Settings
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -153,9 +154,19 @@ export default function OroPulsePage() {
     const [suspiciousActivity, setSuspiciousActivity] = useState<any>({ noSaleDrawerOpens: 0, bigDiscountCount: 0, voidCount: 0, refundCount: 0, hasAlerts: false })
     const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
 
+    // Settings tab - user management
+    const [pulseUsers, setPulseUsers] = useState<any[]>([])
+    const [pulseLocations, setPulseLocations] = useState<{ id: string, name: string }[]>([])
+    const [pulseSeatCount, setPulseSeatCount] = useState(0)
+    const [pulseSeatsUsed, setPulseSeatsUsed] = useState(0)
+    const [settingsLoading, setSettingsLoading] = useState(false)
+    const [settingsSaving, setSettingsSaving] = useState(false)
+    const [locationDropdownUser, setLocationDropdownUser] = useState<string | null>(null)
+
     // UI state
     const [activeTab, setActiveTab] = useState<TabType>('sales')
     const [lastRefresh, setLastRefresh] = useState(new Date())
+    const isOwnerRole = session?.user?.role === 'FRANCHISOR' || session?.user?.role === 'OWNER' || session?.user?.role === 'PROVIDER'
 
     // Determine industry type from session
     const industryType = (session?.user as any)?.industryType || 'RETAIL'
@@ -1966,6 +1977,226 @@ export default function OroPulsePage() {
                     </div>
                 </div>
             )}
+
+                {/* SETTINGS TAB - Owner only */}
+                {activeTab === 'settings' && isOwnerRole && (() => {
+                    // Fetch Pulse users when settings tab opens
+                    const fetchPulseUsers = async () => {
+                        setSettingsLoading(true)
+                        try {
+                            const res = await fetch('/api/pulse/users')
+                            if (res.ok) {
+                                const data = await res.json()
+                                setPulseUsers(data.users || [])
+                                setPulseLocations(data.locations || [])
+                                setPulseSeatCount(data.seatCount || 0)
+                                setPulseSeatsUsed(data.seatsUsed || 0)
+                            }
+                        } catch (e) {
+                            console.error('Failed to fetch pulse users:', e)
+                        } finally {
+                            setSettingsLoading(false)
+                        }
+                    }
+
+                    const toggleAccess = async (userId: string, grant: boolean) => {
+                        setSettingsSaving(true)
+                        try {
+                            const res = await fetch('/api/pulse/users', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ userId, grantAccess: grant })
+                            })
+                            const data = await res.json()
+                            if (!res.ok) {
+                                alert(data.error || 'Failed to update')
+                            } else {
+                                // Refresh the user list
+                                fetchPulseUsers()
+                            }
+                        } catch (e) {
+                            console.error('Failed to toggle access:', e)
+                        } finally {
+                            setSettingsSaving(false)
+                        }
+                    }
+
+                    const updateLocations = async (userId: string, locationIds: string[] | null) => {
+                        setSettingsSaving(true)
+                        try {
+                            await fetch('/api/pulse/users', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ userId, grantAccess: true, locationIds })
+                            })
+                            fetchPulseUsers()
+                        } catch (e) {
+                            console.error('Failed to update locations:', e)
+                        } finally {
+                            setSettingsSaving(false)
+                        }
+                    }
+
+                    // Load users on mount
+                    if (!settingsLoading && pulseUsers.length === 0 && pulseSeatCount === 0) {
+                        fetchPulseUsers()
+                    }
+
+                    return (
+                        <>
+                            {/* Settings Header */}
+                            <div className="bg-gradient-to-br from-gray-700 via-gray-600 to-gray-700 rounded-2xl p-4 mb-4 shadow-lg">
+                                <p className="text-gray-300 text-xs font-medium uppercase">Pulse Access Management</p>
+                                <p className="text-2xl font-black text-white mt-1">
+                                    {pulseSeatsUsed} of {pulseSeatCount} seats used
+                                </p>
+                                <p className="text-gray-400 text-xs mt-1">
+                                    Owner access is always on and doesn't count toward seats
+                                </p>
+                            </div>
+
+                            {settingsLoading ? (
+                                <div className="text-center py-8">
+                                    <RefreshCw className="w-6 h-6 animate-spin text-orange-500 mx-auto mb-2" />
+                                    <p className="text-gray-500 text-sm">Loading team...</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 mb-4">
+                                    {pulseUsers.map(user => {
+                                        const isOwner = user.isOwner
+                                        const hasAccess = user.hasPulseAccess
+                                        const locationRestriction: string[] | null = user.pulseLocationIds
+                                        const restrictedNames = locationRestriction
+                                            ? locationRestriction.map(id => pulseLocations.find(l => l.id === id)?.name || id).join(', ')
+                                            : null
+
+                                        return (
+                                            <div key={user.id} className="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasAccess ? 'bg-green-500/20' : 'bg-gray-700'}`}>
+                                                            <Users className={`w-5 h-5 ${hasAccess ? 'text-green-400' : 'text-gray-500'}`} />
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="text-white font-medium">{user.name || 'Unnamed'}</p>
+                                                                {isOwner && (
+                                                                    <span className="px-2 py-0.5 bg-orange-500/20 text-orange-400 text-[10px] font-bold rounded-full">
+                                                                        OWNER
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-gray-500 text-xs">
+                                                                {user.role}
+                                                                {restrictedNames && hasAccess && (
+                                                                    <span className="text-blue-400"> • {restrictedNames}</span>
+                                                                )}
+                                                                {hasAccess && !locationRestriction && pulseLocations.length > 1 && (
+                                                                    <span className="text-green-400"> • All Stores</span>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {/* Store restriction dropdown for multi-store */}
+                                                        {hasAccess && !isOwner && pulseLocations.length > 1 && (
+                                                            <div className="relative">
+                                                                <button
+                                                                    onClick={() => setLocationDropdownUser(locationDropdownUser === user.id ? null : user.id)}
+                                                                    className="px-2 py-1 text-[10px] bg-gray-700 text-gray-400 rounded-lg hover:bg-gray-600 transition-colors"
+                                                                >
+                                                                    <Store className="w-3 h-3 inline mr-1" />
+                                                                    Stores
+                                                                </button>
+                                                                {locationDropdownUser === user.id && (
+                                                                    <div className="absolute right-0 top-8 w-48 bg-gray-800 border border-gray-600 rounded-xl overflow-hidden z-20 shadow-xl">
+                                                                        <button
+                                                                            onClick={() => { updateLocations(user.id, null); setLocationDropdownUser(null) }}
+                                                                            className={`w-full px-3 py-2 text-left text-xs ${!locationRestriction ? 'bg-green-500/20 text-green-400' : 'text-gray-300 hover:bg-gray-700'}`}
+                                                                        >
+                                                                            ✅ All Stores
+                                                                        </button>
+                                                                        {pulseLocations.map(loc => {
+                                                                            const isSelected = locationRestriction?.includes(loc.id)
+                                                                            return (
+                                                                                <button
+                                                                                    key={loc.id}
+                                                                                    onClick={() => {
+                                                                                        const current = locationRestriction || pulseLocations.map(l => l.id)
+                                                                                        const updated = isSelected
+                                                                                            ? current.filter(id => id !== loc.id)
+                                                                                            : [...current, loc.id]
+                                                                                        updateLocations(user.id, updated.length === pulseLocations.length ? null : updated)
+                                                                                        setLocationDropdownUser(null)
+                                                                                    }}
+                                                                                    className={`w-full px-3 py-2 text-left text-xs border-t border-gray-700 ${isSelected ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:bg-gray-700'}`}
+                                                                                >
+                                                                                    {isSelected ? '✓ ' : ''}{loc.name}
+                                                                                </button>
+                                                                            )
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {/* Grant/Revoke button */}
+                                                        {isOwner ? (
+                                                            <span className="px-3 py-1.5 text-xs bg-green-500/20 text-green-400 rounded-lg font-medium">
+                                                                Always On ✓
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => toggleAccess(user.id, !hasAccess)}
+                                                                disabled={settingsSaving}
+                                                                className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${hasAccess
+                                                                    ? 'bg-green-500/20 text-green-400 hover:bg-red-500/20 hover:text-red-400'
+                                                                    : 'bg-gray-700 text-gray-400 hover:bg-green-500/20 hover:text-green-400'
+                                                                    }`}
+                                                            >
+                                                                {hasAccess ? 'Access ✓' : 'Grant'}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+
+                            {/* Seat limit info */}
+                            {pulseSeatsUsed >= pulseSeatCount && pulseSeatCount > 0 && (
+                                <div className="bg-orange-900/30 border border-orange-500/50 rounded-xl p-4 mb-4">
+                                    <p className="text-orange-400 text-sm font-medium">All seats in use</p>
+                                    <p className="text-orange-300 text-xs mt-1">
+                                        Revoke an existing user's access to free up a seat, or contact your Oro representative to add more seats.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Need more seats CTA */}
+                            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 mb-4 text-center">
+                                <p className="text-gray-400 text-sm mb-2">Need more Pulse seats?</p>
+                                <a
+                                    href="tel:+18001234567"
+                                    className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-600 to-amber-500 text-white px-6 py-2 rounded-xl font-bold text-sm active:scale-95 transition-transform"
+                                >
+                                    📞 Call Oro Support
+                                </a>
+                            </div>
+
+                            {/* Refresh button */}
+                            <button
+                                onClick={() => fetchPulseUsers()}
+                                className="w-full py-3 bg-gray-800 rounded-xl text-gray-400 text-sm font-medium active:scale-98 transition-transform mb-20"
+                            >
+                                <RefreshCw className="w-4 h-4 inline mr-2" />
+                                Refresh Team List
+                            </button>
+                        </>
+                    )
+                })()}
+
             <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 px-2 py-2 safe-area-inset">
                 <div className="flex justify-around max-w-lg mx-auto">
                     {/* Sales - shown for both */}
@@ -2023,6 +2254,17 @@ export default function OroPulsePage() {
                         <BarChart3 className="w-5 h-5" />
                         <span className="text-[10px] mt-1">Reports</span>
                     </button>
+
+                    {/* Settings - Owner/Franchisor only */}
+                    {isOwnerRole && (
+                        <button
+                            onClick={() => setActiveTab('settings')}
+                            className={`flex flex-col items-center py-2 px-3 rounded-xl ${activeTab === 'settings' ? 'text-gray-200' : 'text-gray-500'}`}
+                        >
+                            <Settings className="w-5 h-5" />
+                            <span className="text-[10px] mt-1">Settings</span>
+                        </button>
+                    )}
                 </div>
             </div>
 

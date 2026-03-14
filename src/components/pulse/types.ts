@@ -105,4 +105,4 @@ export interface CategorySales {
     quantity: number
 }
 
-export type TabType = 'sales' | 'lottery' | 'inventory' | 'reports'
+export type TabType = 'sales' | 'lottery' | 'inventory' | 'reports' | 'team' | 'appointments' | 'settings'
