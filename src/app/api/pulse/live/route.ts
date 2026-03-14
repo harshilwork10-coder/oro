@@ -88,6 +88,7 @@ export async function GET(request: NextRequest) {
             },
             include: {
                 employee: { select: { name: true } },
+                client: { select: { firstName: true, lastName: true } },
                 location: { select: { id: true, name: true } },
                 lineItems: { include: { product: { select: { name: true, costPrice: true, productCategory: { select: { name: true } } } }, service: { select: { name: true } } } }
             },
@@ -258,6 +259,107 @@ export async function GET(request: NextRequest) {
 
         const taxCollected = todayTransactions.reduce((sum: number, t: any) => sum + Number(t.tax || 0), 0)
 
+        // ===== HIGH-VALUE INVOICES (Top 5 by total) =====
+        const highValueInvoices = todayTransactions
+            .sort((a: any, b: any) => Number(b.total) - Number(a.total))
+            .slice(0, 5)
+            .map((tx: any) => ({
+                id: tx.id,
+                invoiceNumber: tx.invoiceNumber || tx.id.slice(-6).toUpperCase(),
+                total: Number(tx.total),
+                subtotal: Number(tx.subtotal),
+                tax: Number(tx.tax || 0),
+                discount: Number(tx.discount || 0),
+                paymentMethod: tx.paymentMethod,
+                employee: tx.employee?.name || 'Unknown',
+                client: tx.client ? `${tx.client.firstName || ''} ${tx.client.lastName || ''}`.trim() : null,
+                time: tx.createdAt?.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) || '',
+                location: tx.location?.name || '',
+                items: (tx.lineItems || []).map((li: any) => ({
+                    name: li.product?.name || li.service?.name || li.name || 'Item',
+                    quantity: li.quantity || 1,
+                    price: Number(li.price),
+                    discount: Number(li.discount || 0),
+                    total: Number(li.total)
+                }))
+            }))
+
+        // ===== DISCOUNT TRACKER =====
+        let totalDiscounts = 0
+        const discountByEmployee: Record<string, { name: string, discountTotal: number, count: number }> = {}
+        todayTransactions.forEach((tx: any) => {
+            const disc = Number(tx.discount || 0)
+            if (disc > 0) {
+                totalDiscounts += disc
+                const empName = tx.employee?.name || 'Unknown'
+                const empId = tx.employeeId || 'unknown'
+                if (!discountByEmployee[empId]) {
+                    discountByEmployee[empId] = { name: empName, discountTotal: 0, count: 0 }
+                }
+                discountByEmployee[empId].discountTotal += disc
+                discountByEmployee[empId].count++
+            }
+        })
+        const discountTracker = {
+            totalDiscounts,
+            discountPctOfRevenue: todaySales > 0 ? (totalDiscounts / todaySales) * 100 : 0,
+            transactionsWithDiscount: Object.values(discountByEmployee).reduce((s, e) => s + e.count, 0),
+            byEmployee: Object.values(discountByEmployee).sort((a, b) => b.discountTotal - a.discountTotal)
+        }
+
+        // ===== HOURLY SALES CHART =====
+        const hourlySales: { hour: number, label: string, sales: number, count: number }[] = []
+        for (let h = 0; h < 24; h++) {
+            hourlySales.push({ hour: h, label: h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`, sales: 0, count: 0 })
+        }
+        todayTransactions.forEach((tx: any) => {
+            const hour = tx.createdAt?.getHours() ?? 0
+            hourlySales[hour].sales += Number(tx.total)
+            hourlySales[hour].count++
+        })
+
+        // ===== RECENT ACTIVITY FEED (last 10) =====
+        const recentActivity = todayTransactions
+            .slice(0, 10)
+            .map((tx: any) => ({
+                id: tx.id,
+                invoiceNumber: tx.invoiceNumber || tx.id.slice(-6).toUpperCase(),
+                total: Number(tx.total),
+                paymentMethod: tx.paymentMethod,
+                employee: tx.employee?.name || 'Unknown',
+                client: tx.client ? `${tx.client.firstName || ''} ${tx.client.lastName || ''}`.trim() : null,
+                time: tx.createdAt?.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) || '',
+                itemCount: tx.lineItems?.length || 0,
+                discount: Number(tx.discount || 0),
+                location: tx.location?.name || ''
+            }))
+
+        // ===== SUSPICIOUS ACTIVITY =====
+        let noSaleDrawerOpens = 0
+        try {
+            noSaleDrawerOpens = await prismaAny.drawerActivity.count({
+                where: {
+                    ...locationFilter,
+                    createdAt: { gte: today },
+                    type: 'NO_SALE'
+                }
+            })
+        } catch (e) { /* DrawerActivity may not exist */ }
+
+        const bigDiscountTxns = todayTransactions.filter((tx: any) => {
+            const disc = Number(tx.discount || 0)
+            const sub = Number(tx.subtotal || 0)
+            return sub > 0 && (disc / sub) > 0.20
+        }).length
+
+        const suspiciousActivity = {
+            noSaleDrawerOpens,
+            bigDiscountCount: bigDiscountTxns,
+            voidCount,
+            refundCount,
+            hasAlerts: noSaleDrawerOpens > 0 || bigDiscountTxns > 0 || voidCount > 2 || refundCount > 2
+        }
+
         // Per-store breakdown (only if showing all stores)
         const storeBreakdown = locationId === 'all' || !locationId
             ? locations.map((loc: any) => {
@@ -389,6 +491,12 @@ export async function GET(request: NextRequest) {
             uniqueClients,
             voidCount,
             refundCount,
+            // NEW: Advanced widgets
+            highValueInvoices,
+            discountTracker,
+            hourlySales,
+            recentActivity,
+            suspiciousActivity,
             // Industry-specific data
             lowStockItems,
             upcomingAppointments,

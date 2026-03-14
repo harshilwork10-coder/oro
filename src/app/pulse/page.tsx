@@ -145,6 +145,14 @@ export default function OroPulsePage() {
     const [repeatCustomerPct, setRepeatCustomerPct] = useState(0)
     const [uniqueClients, setUniqueClients] = useState(0)
 
+    // Advanced Pulse widgets
+    const [highValueInvoices, setHighValueInvoices] = useState<any[]>([])
+    const [discountTracker, setDiscountTracker] = useState<any>({ totalDiscounts: 0, discountPctOfRevenue: 0, transactionsWithDiscount: 0, byEmployee: [] })
+    const [hourlySales, setHourlySales] = useState<{ hour: number, label: string, sales: number, count: number }[]>([])
+    const [recentActivity, setRecentActivity] = useState<any[]>([])
+    const [suspiciousActivity, setSuspiciousActivity] = useState<any>({ noSaleDrawerOpens: 0, bigDiscountCount: 0, voidCount: 0, refundCount: 0, hasAlerts: false })
+    const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
+
     // UI state
     const [activeTab, setActiveTab] = useState<TabType>('sales')
     const [lastRefresh, setLastRefresh] = useState(new Date())
@@ -269,6 +277,12 @@ export default function OroPulsePage() {
                 setUniqueClients(data.uniqueClients || 0)
                 setVoidCount(data.voidCount || 0)
                 setRefundCount(data.refundCount || 0)
+                // Advanced widgets
+                setHighValueInvoices(data.highValueInvoices || [])
+                setDiscountTracker(data.discountTracker || { totalDiscounts: 0, discountPctOfRevenue: 0, transactionsWithDiscount: 0, byEmployee: [] })
+                setHourlySales(data.hourlySales || [])
+                setRecentActivity(data.recentActivity || [])
+                setSuspiciousActivity(data.suspiciousActivity || { noSaleDrawerOpens: 0, bigDiscountCount: 0, voidCount: 0, refundCount: 0, hasAlerts: false })
             }
             // Also fetch reports data for cash drawer + lottery
             const reportsRes = await fetch(`/api/pulse/reports?locationId=${selectedLocation}`)
@@ -860,6 +874,207 @@ export default function OroPulsePage() {
                                 <p className={`text-2xl font-bold ${refundCount > 0 ? 'text-orange-400' : 'text-green-400'}`}>{refundCount}</p>
                             </div>
                         </div>
+
+                        {/* 🚨 Suspicious Activity Alert */}
+                        {suspiciousActivity.hasAlerts && (
+                            <div className="bg-gradient-to-r from-red-900/40 to-orange-900/40 border border-red-500/50 rounded-xl p-4 mb-4">
+                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-red-400">
+                                    🚨 Activity Alerts
+                                </h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {suspiciousActivity.noSaleDrawerOpens > 0 && (
+                                        <div className="bg-red-900/30 rounded-lg p-2 text-center">
+                                            <p className="text-red-400 font-bold text-lg">{suspiciousActivity.noSaleDrawerOpens}</p>
+                                            <p className="text-red-300 text-[10px]">No-Sale Opens</p>
+                                        </div>
+                                    )}
+                                    {suspiciousActivity.bigDiscountCount > 0 && (
+                                        <div className="bg-orange-900/30 rounded-lg p-2 text-center">
+                                            <p className="text-orange-400 font-bold text-lg">{suspiciousActivity.bigDiscountCount}</p>
+                                            <p className="text-orange-300 text-[10px]">Big Discounts (&gt;20%)</p>
+                                        </div>
+                                    )}
+                                    {voidCount > 2 && (
+                                        <div className="bg-red-900/30 rounded-lg p-2 text-center">
+                                            <p className="text-red-400 font-bold text-lg">{voidCount}</p>
+                                            <p className="text-red-300 text-[10px]">Voids (High)</p>
+                                        </div>
+                                    )}
+                                    {refundCount > 2 && (
+                                        <div className="bg-orange-900/30 rounded-lg p-2 text-center">
+                                            <p className="text-orange-400 font-bold text-lg">{refundCount}</p>
+                                            <p className="text-orange-300 text-[10px]">Refunds (High)</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ⏰ Hourly Sales Chart */}
+                        {hourlySales.length > 0 && stats.transactionCount > 0 && (
+                            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 mb-4">
+                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    ⏰ Sales by Hour
+                                </h3>
+                                <div className="flex items-end gap-[2px] h-20">
+                                    {hourlySales.filter(h => h.hour >= 5 && h.hour <= 23).map((h) => {
+                                        const maxSales = Math.max(...hourlySales.map(x => x.sales))
+                                        const pct = maxSales > 0 ? (h.sales / maxSales) * 100 : 0
+                                        const isPeak = h.sales === maxSales && h.sales > 0
+                                        return (
+                                            <div key={h.hour} className="flex-1 flex flex-col items-center gap-0.5" title={`${h.label}: $${h.sales.toFixed(0)} (${h.count} orders)`}>
+                                                <div
+                                                    className={`w-full rounded-t transition-all ${isPeak ? 'bg-orange-500' : h.sales > 0 ? 'bg-blue-500/60' : 'bg-gray-700/30'}`}
+                                                    style={{ height: `${Math.max(pct, 2)}%`, minHeight: '2px' }}
+                                                />
+                                                <span className="text-[7px] text-gray-500">{h.label}</span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                                {(() => {
+                                    const peak = hourlySales.reduce((max, h) => h.sales > max.sales ? h : max, hourlySales[0])
+                                    return peak && peak.sales > 0 ? (
+                                        <p className="text-gray-500 text-xs mt-2 text-center">
+                                            Peak: <span className="text-orange-400 font-bold">{peak.label}</span> — ${peak.sales.toFixed(0)} ({peak.count} orders)
+                                        </p>
+                                    ) : null
+                                })()}
+                            </div>
+                        )}
+
+                        {/* 🧾 High-Value Invoices */}
+                        {highValueInvoices.length > 0 && (
+                            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 mb-4">
+                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    🧾 Top Invoices
+                                </h3>
+                                <div className="space-y-2">
+                                    {highValueInvoices.map((inv, idx) => (
+                                        <div key={inv.id}>
+                                            <button
+                                                onClick={() => setExpandedInvoice(expandedInvoice === inv.id ? null : inv.id)}
+                                                className="w-full flex items-center justify-between bg-gray-700/30 rounded-lg p-3 active:scale-[0.98] transition-transform"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${idx === 0 ? 'bg-yellow-500 text-black' : 'bg-gray-600 text-gray-300'}`}>
+                                                        #{idx + 1}
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className="text-white text-sm font-medium">#{inv.invoiceNumber}</p>
+                                                        <p className="text-gray-500 text-xs">
+                                                            {inv.employee} • {inv.time}
+                                                            {inv.client && ` • ${inv.client}`}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-green-400 font-bold">${inv.total.toFixed(2)}</p>
+                                                    {inv.discount > 0 && (
+                                                        <p className="text-red-400 text-[10px]">-${inv.discount.toFixed(2)} disc</p>
+                                                    )}
+                                                </div>
+                                            </button>
+                                            {/* Expanded product detail */}
+                                            {expandedInvoice === inv.id && inv.items?.length > 0 && (
+                                                <div className="ml-10 mt-1 space-y-1 bg-gray-900/50 rounded-lg p-3 border border-gray-700/50">
+                                                    {inv.items.map((item: any, i: number) => (
+                                                        <div key={i} className="flex items-center justify-between text-xs">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-gray-400">{item.quantity}×</span>
+                                                                <span className="text-white">{item.name}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {item.discount > 0 && (
+                                                                    <span className="text-red-400">-${item.discount.toFixed(2)}</span>
+                                                                )}
+                                                                <span className="text-green-400 font-medium">${item.total.toFixed(2)}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    <div className="flex items-center justify-between text-xs pt-2 mt-2 border-t border-gray-700">
+                                                        <span className="text-gray-400">Payment</span>
+                                                        <span className="text-blue-400 font-medium">{inv.paymentMethod}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-gray-400">Tax</span>
+                                                        <span className="text-purple-400">${inv.tax.toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 🏷️ Discount Tracker */}
+                        {discountTracker.totalDiscounts > 0 && (
+                            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 mb-4">
+                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    🏷️ Discounts Given
+                                </h3>
+                                <div className="grid grid-cols-3 gap-3 text-center mb-3">
+                                    <div>
+                                        <p className="text-red-400 font-bold text-lg">${discountTracker.totalDiscounts.toFixed(2)}</p>
+                                        <p className="text-gray-500 text-[10px]">TOTAL</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-orange-400 font-bold text-lg">{discountTracker.discountPctOfRevenue.toFixed(1)}%</p>
+                                        <p className="text-gray-500 text-[10px]">OF REVENUE</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-yellow-400 font-bold text-lg">{discountTracker.transactionsWithDiscount}</p>
+                                        <p className="text-gray-500 text-[10px]">INVOICES</p>
+                                    </div>
+                                </div>
+                                {discountTracker.byEmployee?.length > 0 && (
+                                    <div className="space-y-1 pt-2 border-t border-gray-700">
+                                        <p className="text-gray-500 text-xs mb-1">By Employee</p>
+                                        {discountTracker.byEmployee.map((emp: any, idx: number) => (
+                                            <div key={idx} className="flex items-center justify-between text-xs">
+                                                <span className="text-white">{emp.name}</span>
+                                                <span className="text-red-400 font-medium">${emp.discountTotal.toFixed(2)} ({emp.count}x)</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 📋 Recent Activity Feed */}
+                        {recentActivity.length > 0 && (
+                            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 mb-4">
+                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    📋 Recent Activity
+                                </h3>
+                                <div className="space-y-2">
+                                    {recentActivity.map((tx, idx) => (
+                                        <div key={tx.id} className="flex items-center justify-between bg-gray-700/30 rounded-lg px-3 py-2">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-2 h-2 rounded-full ${tx.paymentMethod === 'CASH' ? 'bg-green-500' : 'bg-blue-500'}`} />
+                                                <div>
+                                                    <p className="text-white text-sm">
+                                                        #{tx.invoiceNumber}
+                                                        {tx.client && <span className="text-gray-400"> • {tx.client}</span>}
+                                                    </p>
+                                                    <p className="text-gray-500 text-xs">
+                                                        {tx.employee} • {tx.time} • {tx.itemCount} items
+                                                        {tx.location && storeBreakdown.length > 1 ? ` • ${tx.location}` : ''}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-green-400 font-bold text-sm">${tx.total.toFixed(2)}</p>
+                                                {tx.discount > 0 && (
+                                                    <p className="text-red-400 text-[10px]">-${tx.discount.toFixed(2)}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Cash Drawer Status */}
                         <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
