@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Code is required' }, { status: 400 })
         }
 
-        // Search by barcode or SKU, include category for age restriction check
+        // Search by barcode or SKU, include category + tag-alongs
         const product = await prisma.product.findFirst({
             where: {
                 franchiseId: user.franchiseId,
@@ -33,17 +33,7 @@ export async function GET(request: NextRequest) {
                     { sku: code }
                 ]
             },
-            select: {
-                id: true,
-                name: true,
-                price: true,
-                sku: true,
-                barcode: true,
-                stock: true,
-                category: true,
-                ageRestricted: true,
-                minimumAge: true,
-                // Include category for category-level age restriction
+            include: {
                 productCategory: {
                     select: {
                         id: true,
@@ -53,11 +43,10 @@ export async function GET(request: NextRequest) {
                         isEbtEligible: true
                     }
                 },
-                // Include tag-along items (cross-sell suggestions)
                 tagAlongParent: {
                     where: { isActive: true },
                     orderBy: { sortOrder: 'asc' },
-                    take: 5, // Limit to 5 suggestions
+                    take: 5,
                     select: {
                         child: {
                             select: {
@@ -91,7 +80,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Extract tag-along suggestions
-        const tagAlongItems = product.tagAlongParent.map(t => t.child)
+        const tagAlongItems = product.tagAlongParent.map((t: any) => t.child)
 
         const result = {
             id: product.id,
@@ -105,7 +94,13 @@ export async function GET(request: NextRequest) {
             minimumAge,
             isEbtEligible: product.productCategory?.isEbtEligible || false,
             productCategory: product.productCategory,
-            tagAlongItems, // Cross-sell suggestions!
+            tagAlongItems,
+            // Tax fields for multi-tax engine
+            taxExempt: product.taxTreatmentOverride === 'EXEMPT',
+            alcoholType: product.alcoholType || null,
+            volumeMl: product.volumeMl || null,
+            abvPercent: product.abvPercent ? parseFloat(product.abvPercent.toString()) : null,
+            isTobacco: product.isTobacco || false,
             // BUG-7 FIX: Include stock warning in response so POS can alert cashier
             lowStock: product.stock <= 0,
             stockWarning: product.stock <= 0
@@ -121,5 +116,3 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to lookup product' }, { status: 500 })
     }
 }
-
-

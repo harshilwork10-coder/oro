@@ -68,6 +68,30 @@ import { useOfflineMode } from '@/lib/use-offline-mode'
 import { OfflineStatusIndicator } from '@/components/pos/OfflineStatusIndicator'
 import QuickSwitchModal from '@/components/pos/QuickSwitchModal'
 
+// Multi-Tax Jurisdiction types
+interface TaxJurisdiction {
+    id: string
+    name: string
+    type: string // STATE, COUNTY, CITY, DISTRICT
+    salesTaxRate: number // e.g., 6.25 for 6.25%
+    priority: number
+    exciseRules: {
+        productType: string
+        ratePerGallon: number | null
+        ratePerUnit: number | null
+        ratePerOz: number | null
+        minAbv: number | null
+        maxAbv: number | null
+    }[]
+}
+
+interface TaxProfile {
+    jurisdictions: TaxJurisdiction[]
+    combinedSalesTaxRate?: number
+    fallbackTaxRate: number
+    hasMultiTax: boolean
+}
+
 interface CartItem {
     id: string
     barcode?: string
@@ -87,6 +111,11 @@ interface CartItem {
     sellByCase?: boolean // For case break products
     unitsPerCase?: number // Units per case for case break
     casePrice?: number // Case price for case break
+    // Tax metadata from product lookup (for multi-tax)
+    taxExempt?: boolean
+    alcoholType?: string
+    volumeMl?: number
+    isTobacco?: boolean
 }
 
 interface TagAlongProduct {
@@ -115,6 +144,9 @@ export default function RetailPOSPage() {
     const { data: session } = useSession()
     const user = session?.user as any
     const { data: config } = useBusinessConfig()
+
+    // Multi-Tax Profile
+    const [taxProfile, setTaxProfile] = useState<TaxProfile | null>(null)
 
     // Barcode input
     const barcodeInputRef = useRef<HTMLInputElement>(null)
@@ -637,6 +669,20 @@ export default function RetailPOSPage() {
         }
         loadPricingSettings()
 
+        // Fetch multi-tax profile for this location
+        const loadTaxProfile = async () => {
+            try {
+                const res = await fetch('/api/pos/tax-profile')
+                if (res.ok) {
+                    const data = await res.json()
+                    setTaxProfile(data)
+                }
+            } catch (error) {
+                console.error('[POS] Failed to load tax profile:', error)
+            }
+        }
+        loadTaxProfile()
+
         // Check if print agent is connected
         isPrintAgentAvailable().then(setPrinterConnected)
     }, [])
@@ -932,23 +978,33 @@ export default function RetailPOSPage() {
     // Round to 2 decimal places (standard half-up)
     const round2 = (n: number) => Math.round(n * 100) / 100
 
-    // Calculate totals (with dual pricing support - Model 1: Tax on Final Charged Price)
+    // Calculate totals (with dual pricing + multi-jurisdiction tax support)
     const calculateTotals = () => {
         const isDualPricing = pricingSettings?.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
         const surcharge = pricingSettings?.cardSurcharge || 3.99
         const isPercentage = pricingSettings?.cardSurchargeType === 'PERCENTAGE'
+
+        // ML per gallon for excise calculations
+        const ML_PER_GALLON = 3785.41
 
         // === ITEM-BASED TRUTH ===
         let subtotalCash = 0
         let subtotalCard = 0
         let taxCash = 0
         let taxCard = 0
+        let totalExciseTax = 0
+
+        // Tax breakdown by jurisdiction (for receipt)
+        const taxBreakdownMap: Record<string, { name: string; type: string; salesTax: number; exciseTax: number }> = {}
+
+        const hasMultiTax = taxProfile?.hasMultiTax && taxProfile.jurisdictions.length > 0
+        // Fallback: single combined rate (as decimal, e.g., 0.0825)
+        const singleTaxRate = pricingSettings?.taxRate || config?.taxRate || 0.0825
 
         cart.forEach(item => {
             const itemTotal = item.price * item.quantity
             const itemDiscount = item.discount ? itemTotal * (item.discount / 100) : 0
             const cashPrice = round2(itemTotal - itemDiscount)
-            // Card price = cash price × (1 + surcharge%) - rounded per item
             const cardPrice = isDualPricing && isPercentage
                 ? round2(cashPrice * (1 + surcharge / 100))
                 : cashPrice
@@ -956,12 +1012,61 @@ export default function RetailPOSPage() {
             subtotalCash += cashPrice
             subtotalCard += cardPrice
 
-            // Calculate tax per item on the price that will be charged
-            // Tax: use item-level rate if set, else franchise settings tax rate (single source of truth)
-            const itemTaxRate = item.taxRate !== undefined ? item.taxRate / 100 : (pricingSettings?.taxRate || config?.taxRate || 0.0825)
-            taxCash += round2(cashPrice * itemTaxRate)
-            taxCard += round2(cardPrice * itemTaxRate)
+            // Skip tax for exempt items
+            if (item.taxExempt) return
+
+            if (hasMultiTax) {
+                // === MULTI-TAX: loop through each jurisdiction ===
+                for (const jur of taxProfile!.jurisdictions) {
+                    const jurTaxRate = jur.salesTaxRate / 100 // Convert 6.25 -> 0.0625
+
+                    // Sales tax per jurisdiction
+                    const cashTaxAmt = round2(cashPrice * jurTaxRate)
+                    const cardTaxAmt = round2(cardPrice * jurTaxRate)
+                    taxCash += cashTaxAmt
+                    taxCard += cardTaxAmt
+
+                    // Track breakdown
+                    if (!taxBreakdownMap[jur.id]) {
+                        taxBreakdownMap[jur.id] = { name: jur.name, type: jur.type, salesTax: 0, exciseTax: 0 }
+                    }
+                    taxBreakdownMap[jur.id].salesTax += cashTaxAmt
+
+                    // === EXCISE taxes (per-unit / per-gallon) ===
+                    if (jur.exciseRules.length > 0) {
+                        for (const rule of jur.exciseRules) {
+                            let excise = 0
+                            // Alcohol: per-gallon rate
+                            if (rule.ratePerGallon && item.alcoholType && item.volumeMl) {
+                                if (rule.productType === item.alcoholType) {
+                                    const gallons = item.volumeMl / ML_PER_GALLON
+                                    excise = round2(gallons * rule.ratePerGallon * item.quantity)
+                                }
+                            }
+                            // Tobacco: per-unit rate
+                            if (rule.ratePerUnit && item.isTobacco && rule.productType.startsWith('TOBACCO')) {
+                                excise = round2(rule.ratePerUnit * item.quantity)
+                            }
+                            if (excise > 0) {
+                                totalExciseTax += excise
+                                taxCash += excise
+                                taxCard += excise
+                                taxBreakdownMap[jur.id].exciseTax += excise
+                            }
+                        }
+                    }
+                }
+            } else {
+                // === SINGLE TAX RATE (backward compatible) ===
+                const itemTaxRate = item.taxRate !== undefined ? item.taxRate / 100 : singleTaxRate
+                taxCash += round2(cashPrice * itemTaxRate)
+                taxCard += round2(cardPrice * itemTaxRate)
+            }
         })
+
+        // Build tax breakdown array (sorted by priority)
+        const taxBreakdown = Object.values(taxBreakdownMap)
+            .map(b => ({ ...b, total: round2(b.salesTax + b.exciseTax) }))
 
         // Apply transaction-level discount
         let transactionDiscountAmount = 0
@@ -976,7 +1081,6 @@ export default function RetailPOSPage() {
         // Discount ratio for proportional tax reduction
         const discountRatio = subtotalCash > 0 ? transactionDiscountAmount / subtotalCash : 0
         const discountedSubtotalCash = round2(Math.max(0, subtotalCash - transactionDiscountAmount - promoDiscount - loyaltyDiscount))
-        // Guard against divide-by-zero when cart is all-zero priced items
         const cardRatio = subtotalCash > 0 ? subtotalCard / subtotalCash : 1
         const discountedSubtotalCard = round2(Math.max(0, subtotalCard - (transactionDiscountAmount + promoDiscount + loyaltyDiscount) * cardRatio))
 
@@ -1005,11 +1109,15 @@ export default function RetailPOSPage() {
             total: cashTotal,
             cashTotal,
             cardTotal,
-            lotteryPayout, // Lottery payout amount (tracked separately, doesn't affect sales)
-            customerPayable: round2(Math.max(0, cashTotal - lotteryPayout)), // What customer actually pays after lottery offset
-            customerPayableCard: round2(Math.max(0, cardTotal - lotteryPayout)), // Card price after lottery offset
+            lotteryPayout,
+            customerPayable: round2(Math.max(0, cashTotal - lotteryPayout)),
+            customerPayableCard: round2(Math.max(0, cardTotal - lotteryPayout)),
             itemCount: cart.reduce((sum, item) => sum + item.quantity, 0),
-            showDualPricing: isDualPricing
+            showDualPricing: isDualPricing,
+            // Multi-tax breakdown (for receipt and reports)
+            taxBreakdown,
+            hasMultiTax: !!hasMultiTax,
+            exciseTax: totalExciseTax
         }
     }
 
