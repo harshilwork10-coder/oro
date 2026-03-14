@@ -529,6 +529,8 @@ export default function RetailPOSPage() {
         openDrawerOnCash: boolean
         // Tip settings (from account config)
         tipEnabled: boolean
+        // Tax rate (from FranchiseSettings — single source of truth)
+        taxRate: number
     }
     const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
     const [printerConnected, setPrinterConnected] = useState(false)
@@ -624,7 +626,9 @@ export default function RetailPOSPage() {
                         showDualPricing: data.showDualPricing ?? false,
                         receiptPrintMode: data.receiptPrintMode || 'ALL',
                         openDrawerOnCash: data.openDrawerOnCash ?? true,
-                        tipEnabled: data.tipPromptEnabled ?? true
+                        tipEnabled: data.tipPromptEnabled ?? true,
+                        // Tax rate from FranchiseSettings (same source as Android POS)
+                        taxRate: parseFloat(data.taxRate) || 0.0825
                     })
                 }
             } catch (error) {
@@ -953,7 +957,8 @@ export default function RetailPOSPage() {
             subtotalCard += cardPrice
 
             // Calculate tax per item on the price that will be charged
-            const itemTaxRate = item.taxRate !== undefined ? item.taxRate / 100 : (config?.taxRate || 0) / 100
+            // Tax: use item-level rate if set, else franchise settings tax rate (single source of truth)
+            const itemTaxRate = item.taxRate !== undefined ? item.taxRate / 100 : (pricingSettings?.taxRate || config?.taxRate || 0.0825)
             taxCash += round2(cashPrice * itemTaxRate)
             taxCard += round2(cardPrice * itemTaxRate)
         })

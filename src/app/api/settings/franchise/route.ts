@@ -153,7 +153,9 @@ export async function POST(request: Request) {
                     tipSuggestions: tipSuggestions || '[15,20,25]',
                     acceptsEbt: acceptsEbt ?? false,
                     acceptsChecks: acceptsChecks ?? false,
-                    acceptsOnAccount: acceptsOnAccount ?? false
+                    acceptsOnAccount: acceptsOnAccount ?? false,
+                    // Sync tax rate to BusinessConfig so useBusinessConfig() stays consistent
+                    ...(taxRate !== undefined && { taxRate })
                 },
                 create: {
                     franchisorId: franchise.franchisorId,
@@ -162,7 +164,8 @@ export async function POST(request: Request) {
                     tipSuggestions: tipSuggestions || '[15,20,25]',
                     acceptsEbt: acceptsEbt ?? false,
                     acceptsChecks: acceptsChecks ?? false,
-                    acceptsOnAccount: acceptsOnAccount ?? false
+                    acceptsOnAccount: acceptsOnAccount ?? false,
+                    ...(taxRate !== undefined && { taxRate })
                 }
             })
         }
