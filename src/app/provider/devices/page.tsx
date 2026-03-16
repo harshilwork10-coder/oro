@@ -12,20 +12,29 @@ import { formatDistanceToNow } from 'date-fns';
 
 type DeviceTab = 'accounts' | 'licenses' | 'stations' | 'requests';
 
-// Types from old page
-type PaxTerminal = {
-    id: string;
-    locationId: string;
-    location: { id: string; name: string; franchise: { name: string } };
-    paxTerminalIP: string | null;
-    paxTerminalPort: string;
-    processorMID: string | null;
-};
-
-type Station = {
+// Types matching the /api/terminals/manage response shape
+type PaymentTerminal = {
     id: string;
     name: string;
-    pairingCode: string;
+    terminalType: string;
+    terminalIP: string;
+    terminalPort: string;
+    isActive: boolean;
+    assignedStation: { id: string; name: string } | null;
+    createdAt: string;
+    updatedAt: string;
+};
+
+type LocationAccount = {
+    locationId: string;
+    locationName: string;
+    franchiseName: string;
+    legacyIP: string | null;
+    legacyPort: string | null;
+    legacyMID: string | null;
+    terminals: PaymentTerminal[];
+    stations: { id: string; name: string; isActive: boolean }[];
+    updatedAt: string;
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -46,9 +55,9 @@ export default function DevicesPage() {
     // Licenses State
     const [licenses, setLicenses] = useState<any[]>([]);
 
-    // PAX Terminals State
-    const [paxTerminals, setPaxTerminals] = useState<PaxTerminal[]>([]);
-    const [paxLoading, setPaxLoading] = useState(false);
+    // Location Accounts State (from /api/terminals/manage)
+    const [accounts, setAccounts] = useState<LocationAccount[]>([]);
+    const [accountsLoading, setAccountsLoading] = useState(false);
     const [paxEditingId, setPaxEditingId] = useState<string | null>(null);
     const [paxSaving, setPaxSaving] = useState(false);
     const [paxEditForm, setPaxEditForm] = useState({ paxTerminalIP: '', paxTerminalPort: '10009', processorMID: '' });
@@ -58,7 +67,7 @@ export default function DevicesPage() {
     const [terminalStatus, setTerminalStatus] = useState<{ [key: string]: { status: string; message: string } }>({});
 
     // Stations State
-    const [stationsByLocation, setStationsByLocation] = useState<{ [locationId: string]: Station[] }>({});
+    const [stationsByLocation, setStationsByLocation] = useState<{ [locationId: string]: any[] }>({});
     const [expandedLocationId, setExpandedLocationId] = useState<string | null>(null);
     const [addingStationFor, setAddingStationFor] = useState<string | null>(null);
     const [newStationName, setNewStationName] = useState('');
@@ -79,7 +88,7 @@ export default function DevicesPage() {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     useEffect(() => {
-        fetchPaxTerminals();
+        fetchAccounts();
         fetchLicenses();
         fetchLocations();
         fetchRequests();
@@ -94,20 +103,20 @@ export default function DevicesPage() {
     }, [toast]);
 
     // Fetch Functions
-    const fetchPaxTerminals = async () => {
-        setPaxLoading(true);
+    const fetchAccounts = async () => {
+        setAccountsLoading(true);
         try {
             const res = await fetch('/api/terminals/manage');
             if (res.ok) {
-                const terminals = await res.json();
-                setPaxTerminals(terminals);
-                // Pre-fetch stations for all locations so counts display correctly
-                terminals.forEach((t: PaxTerminal) => {
-                    fetchStationsForLocation(t.locationId);
+                const data = await res.json();
+                setAccounts(data);
+                // Pre-populate stationsByLocation from accounts data
+                data.forEach((acct: LocationAccount) => {
+                    fetchStationsForLocation(acct.locationId);
                 });
             }
         } catch (e) { console.error(e); }
-        finally { setPaxLoading(false); setIsLoading(false); }
+        finally { setAccountsLoading(false); setIsLoading(false); }
     };
 
     const fetchLicenses = async () => {
@@ -172,12 +181,12 @@ export default function DevicesPage() {
         }
     };
 
-    const startPaxEdit = (terminal: PaxTerminal) => {
-        setPaxEditingId(terminal.locationId);
+    const startPaxEdit = (account: LocationAccount) => {
+        setPaxEditingId(account.locationId);
         setPaxEditForm({
-            paxTerminalIP: terminal.paxTerminalIP || '',
-            paxTerminalPort: terminal.paxTerminalPort || '10009',
-            processorMID: terminal.processorMID || ''
+            paxTerminalIP: account.legacyIP || '',
+            paxTerminalPort: account.legacyPort || '10009',
+            processorMID: account.legacyMID || ''
         });
     };
 
@@ -190,7 +199,7 @@ export default function DevicesPage() {
                 body: JSON.stringify(paxEditForm)
             });
             if (res.ok) {
-                await fetchPaxTerminals();
+                await fetchAccounts();
                 setPaxEditingId(null);
                 setToast({ message: 'Terminal settings saved', type: 'success' });
             } else {
@@ -277,11 +286,12 @@ export default function DevicesPage() {
         finally { setApproving(null); }
     };
 
-    // Filter
-    const filteredTerminals = paxTerminals.filter(t =>
-        t.location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.location.franchise.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.paxTerminalIP && t.paxTerminalIP.includes(searchQuery))
+    // Filter accounts by search
+    const filteredAccounts = accounts.filter(a =>
+        a.locationName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.franchiseName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.legacyIP?.includes(searchQuery) ||
+        a.terminals.some(t => t.terminalIP?.includes(searchQuery))
     );
 
     const filteredLicenses = licenses.filter(l =>
@@ -290,7 +300,7 @@ export default function DevicesPage() {
     );
 
     const tabs: { id: DeviceTab; label: string; count?: number }[] = [
-        { id: 'accounts', label: 'Accounts' },
+        { id: 'accounts', label: 'Accounts', count: accounts.length },
         { id: 'licenses', label: 'Licenses', count: licenses.filter(l => l.status === 'ACTIVE').length },
         { id: 'stations', label: 'Stations' },
         { id: 'requests', label: 'Requests', count: requests.length },
@@ -306,7 +316,7 @@ export default function DevicesPage() {
                 </div>
                 <div className="flex gap-2">
                     <button
-                        onClick={() => { fetchPaxTerminals(); fetchLicenses(); fetchRequests(); }}
+                        onClick={() => { fetchAccounts(); fetchLicenses(); fetchRequests(); }}
                         className="flex items-center gap-2 px-3 py-2 border border-stone-700 text-stone-300 hover:bg-stone-800 rounded-lg text-sm"
                     >
                         <RefreshCw size={16} />
@@ -358,34 +368,34 @@ export default function DevicesPage() {
             {/* ACCOUNTS TAB - PAX Terminal Configuration */}
             {activeTab === 'accounts' && (
                 <div className="space-y-4">
-                    {paxLoading ? (
+                    {accountsLoading ? (
                         <div className="bg-stone-900/50 rounded-xl border border-stone-800 p-12 text-center">
                             <RefreshCw size={32} className="mx-auto text-stone-600 mb-4 animate-spin" />
                             <p className="text-stone-400">Loading accounts...</p>
                         </div>
-                    ) : filteredTerminals.length === 0 ? (
+                    ) : filteredAccounts.length === 0 ? (
                         <div className="bg-stone-900/50 rounded-xl border border-stone-800 p-12 text-center">
                             <Monitor size={48} className="mx-auto text-stone-600 mb-4" />
                             <h2 className="text-lg font-semibold text-stone-100">No accounts found</h2>
                             <p className="text-stone-400 mt-2">Add clients with locations to configure their terminals</p>
                         </div>
                     ) : (
-                        filteredTerminals.map((terminal) => (
-                            <div key={terminal.id} className="bg-stone-900/50 rounded-xl border border-stone-800 overflow-hidden hover:border-stone-700 transition-colors">
+                        filteredAccounts.map((account) => (
+                            <div key={account.locationId} className="bg-stone-900/50 rounded-xl border border-stone-800 overflow-hidden hover:border-stone-700 transition-colors">
                                 {/* Account Header */}
                                 <div className="p-4 border-b border-stone-800 flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-lg font-semibold text-stone-100">{terminal.location.name}</h3>
-                                        <p className="text-sm text-stone-400">{terminal.location.franchise.name}</p>
+                                        <h3 className="text-lg font-semibold text-stone-100">{account.locationName}</h3>
+                                        <p className="text-sm text-stone-400">{account.franchiseName}</p>
                                     </div>
                                     <div className="flex gap-2">
-                                        {terminal.paxTerminalIP && (
+                                        {account.legacyIP && (
                                             <button
-                                                onClick={() => checkTerminalStatus(terminal.locationId, terminal.paxTerminalIP!, terminal.paxTerminalPort)}
-                                                disabled={checkingTerminalId === terminal.locationId}
+                                                onClick={() => checkTerminalStatus(account.locationId, account.legacyIP!, account.legacyPort || '10009')}
+                                                disabled={checkingTerminalId === account.locationId}
                                                 className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded-lg text-sm transition-colors disabled:opacity-50"
                                             >
-                                                {checkingTerminalId === terminal.locationId ? (
+                                                {checkingTerminalId === account.locationId ? (
                                                     <RefreshCw size={14} className="animate-spin" />
                                                 ) : (
                                                     <Wifi size={14} />
@@ -393,9 +403,9 @@ export default function DevicesPage() {
                                                 Check Status
                                             </button>
                                         )}
-                                        {paxEditingId !== terminal.locationId && (
+                                        {paxEditingId !== account.locationId && (
                                             <button
-                                                onClick={() => startPaxEdit(terminal)}
+                                                onClick={() => startPaxEdit(account)}
                                                 className="flex items-center gap-2 px-3 py-2 border border-stone-700 text-stone-300 hover:bg-stone-800 rounded-lg text-sm"
                                             >
                                                 <Edit size={14} />
@@ -406,28 +416,28 @@ export default function DevicesPage() {
                                 </div>
 
                                 {/* Status Display */}
-                                {terminalStatus[terminal.locationId] && (
-                                    <div className={`px-4 py-3 flex items-center gap-3 ${terminalStatus[terminal.locationId].status === 'ONLINE'
+                                {terminalStatus[account.locationId] && (
+                                    <div className={`px-4 py-3 flex items-center gap-3 ${terminalStatus[account.locationId].status === 'ONLINE'
                                         ? 'bg-emerald-500/10 border-b border-emerald-500/20'
                                         : 'bg-red-500/10 border-b border-red-500/20'
                                         }`}>
-                                        {terminalStatus[terminal.locationId].status === 'ONLINE' ? (
+                                        {terminalStatus[account.locationId].status === 'ONLINE' ? (
                                             <Wifi size={18} className="text-emerald-400" />
                                         ) : (
                                             <WifiOff size={18} className="text-red-400" />
                                         )}
                                         <div>
-                                            <p className={`font-medium ${terminalStatus[terminal.locationId].status === 'ONLINE' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                {terminalStatus[terminal.locationId].status}
+                                            <p className={`font-medium ${terminalStatus[account.locationId].status === 'ONLINE' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {terminalStatus[account.locationId].status}
                                             </p>
-                                            <p className="text-sm text-stone-400">{terminalStatus[terminal.locationId].message}</p>
+                                            <p className="text-sm text-stone-400">{terminalStatus[account.locationId].message}</p>
                                         </div>
                                     </div>
                                 )}
 
                                 {/* Edit Form or Display */}
                                 <div className="p-4">
-                                    {paxEditingId === terminal.locationId ? (
+                                    {paxEditingId === account.locationId ? (
                                         <div className="space-y-4">
                                             <div className="grid grid-cols-3 gap-4">
                                                 <div>
@@ -436,7 +446,6 @@ export default function DevicesPage() {
                                                         type="text"
                                                         value={paxEditForm.paxTerminalIP}
                                                         onChange={(e) => {
-                                                            // Only allow digits and dots for IP address
                                                             const filtered = e.target.value.replace(/[^0-9.]/g, '');
                                                             setPaxEditForm({ ...paxEditForm, paxTerminalIP: filtered });
                                                         }}
@@ -451,7 +460,6 @@ export default function DevicesPage() {
                                                         type="text"
                                                         value={paxEditForm.paxTerminalPort}
                                                         onChange={(e) => {
-                                                            // Only allow digits for port
                                                             const filtered = e.target.value.replace(/\D/g, '');
                                                             setPaxEditForm({ ...paxEditForm, paxTerminalPort: filtered });
                                                         }}
@@ -466,7 +474,6 @@ export default function DevicesPage() {
                                                         type="text"
                                                         value={paxEditForm.processorMID}
                                                         onChange={(e) => {
-                                                            // Only allow alphanumeric for MID
                                                             const filtered = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
                                                             setPaxEditForm({ ...paxEditForm, processorMID: filtered });
                                                         }}
@@ -485,7 +492,7 @@ export default function DevicesPage() {
                                                     Cancel
                                                 </button>
                                                 <button
-                                                    onClick={() => handlePaxUpdate(terminal.locationId)}
+                                                    onClick={() => handlePaxUpdate(account.locationId)}
                                                     disabled={paxSaving}
                                                     className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm disabled:opacity-50"
                                                 >
@@ -499,17 +506,17 @@ export default function DevicesPage() {
                                             <div>
                                                 <p className="text-xs text-stone-500 mb-1">IP Address</p>
                                                 <p className="text-stone-100 font-mono">
-                                                    {terminal.paxTerminalIP || <span className="text-stone-600 italic">Not set</span>}
+                                                    {account.legacyIP || <span className="text-stone-600 italic">Not set</span>}
                                                 </p>
                                             </div>
                                             <div>
                                                 <p className="text-xs text-stone-500 mb-1">Port</p>
-                                                <p className="text-stone-100 font-mono">{terminal.paxTerminalPort}</p>
+                                                <p className="text-stone-100 font-mono">{account.legacyPort || '10009'}</p>
                                             </div>
                                             <div>
                                                 <p className="text-xs text-stone-500 mb-1">Merchant ID</p>
                                                 <p className="text-stone-100 font-mono">
-                                                    {terminal.processorMID || <span className="text-stone-600">—</span>}
+                                                    {account.legacyMID || <span className="text-stone-600">—</span>}
                                                 </p>
                                             </div>
                                         </div>
@@ -519,24 +526,24 @@ export default function DevicesPage() {
                                 {/* Stations Section */}
                                 <div className="border-t border-stone-800">
                                     <button
-                                        onClick={() => toggleLocationExpand(terminal.locationId)}
+                                        onClick={() => toggleLocationExpand(account.locationId)}
                                         className="w-full px-4 py-3 flex items-center justify-between hover:bg-stone-800/50 transition-colors"
                                     >
                                         <span className="flex items-center gap-2 text-sm font-medium text-stone-300">
                                             <Smartphone size={16} />
-                                            POS Stations ({stationsByLocation[terminal.locationId]?.length || 0})
+                                            POS Stations ({stationsByLocation[account.locationId]?.length || 0})
                                         </span>
                                         <span className="text-stone-500 text-xs">
-                                            {expandedLocationId === terminal.locationId ? '▼' : '▶'}
+                                            {expandedLocationId === account.locationId ? '▼' : '▶'}
                                         </span>
                                     </button>
 
-                                    {expandedLocationId === terminal.locationId && (
+                                    {expandedLocationId === account.locationId && (
                                         <div className="px-4 pb-4 space-y-3">
                                             {/* Add Station Button */}
-                                            {addingStationFor !== terminal.locationId && (
+                                            {addingStationFor !== account.locationId && (
                                                 <button
-                                                    onClick={() => setAddingStationFor(terminal.locationId)}
+                                                    onClick={() => setAddingStationFor(account.locationId)}
                                                     className="flex items-center gap-2 px-3 py-2 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded-lg text-sm"
                                                 >
                                                     <Plus size={14} />
@@ -545,7 +552,7 @@ export default function DevicesPage() {
                                             )}
 
                                             {/* Add Station Form */}
-                                            {addingStationFor === terminal.locationId && (
+                                            {addingStationFor === account.locationId && (
                                                 <div className="flex gap-2 p-3 bg-stone-800/50 rounded-lg items-center">
                                                     <input
                                                         type="text"
@@ -559,7 +566,7 @@ export default function DevicesPage() {
                                                         🔒 8-char code auto
                                                     </span>
                                                     <button
-                                                        onClick={() => handleAddStation(terminal.locationId)}
+                                                        onClick={() => handleAddStation(account.locationId)}
                                                         disabled={!newStationName}
                                                         className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
@@ -575,10 +582,10 @@ export default function DevicesPage() {
                                             )}
 
                                             {/* Station List */}
-                                            {stationsByLocation[terminal.locationId]?.length === 0 ? (
+                                            {stationsByLocation[account.locationId]?.length === 0 ? (
                                                 <p className="text-stone-500 text-sm py-2">No stations configured</p>
                                             ) : (
-                                                stationsByLocation[terminal.locationId]?.map((station) => (
+                                                stationsByLocation[account.locationId]?.map((station: any) => (
                                                     <div key={station.id} className="flex items-center justify-between p-3 bg-stone-800/50 rounded-lg">
                                                         <div className="flex items-center gap-3">
                                                             <Smartphone size={16} className="text-blue-400" />
@@ -589,7 +596,7 @@ export default function DevicesPage() {
                                                         </div>
                                                         <div className="flex gap-1">
                                                             <button
-                                                                onClick={() => handleRegenerateCode(terminal.locationId, station.id)}
+                                                                onClick={() => handleRegenerateCode(account.locationId, station.id)}
                                                                 disabled={regeneratingStationId === station.id}
                                                                 className="p-2 text-orange-400 hover:bg-orange-500/20 rounded-lg disabled:opacity-50"
                                                                 title="Regenerate pairing code"
@@ -597,7 +604,7 @@ export default function DevicesPage() {
                                                                 <RefreshCw size={14} className={regeneratingStationId === station.id ? 'animate-spin' : ''} />
                                                             </button>
                                                             <button
-                                                                onClick={() => handleDeleteStation(terminal.locationId, station.id)}
+                                                                onClick={() => handleDeleteStation(account.locationId, station.id)}
                                                                 className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"
                                                             >
                                                                 <Trash2 size={14} />
@@ -702,22 +709,22 @@ export default function DevicesPage() {
             {/* STATIONS TAB - Browse all stations by location */}
             {activeTab === 'stations' && (
                 <div className="space-y-4">
-                    {paxTerminals.length === 0 ? (
+                    {accounts.length === 0 ? (
                         <div className="bg-stone-900/50 rounded-xl border border-stone-800 p-12 text-center">
                             <Smartphone size={48} className="mx-auto text-stone-600 mb-4" />
                             <h2 className="text-lg font-semibold text-stone-100">No stations</h2>
                             <p className="text-stone-400 mt-2">Add locations and configure their POS stations in the Accounts tab</p>
                         </div>
                     ) : (
-                        paxTerminals.map((terminal) => (
-                            <div key={terminal.id} className="bg-stone-900/50 rounded-xl border border-stone-800 p-4">
+                        accounts.map((account) => (
+                            <div key={account.locationId} className="bg-stone-900/50 rounded-xl border border-stone-800 p-4">
                                 <div className="flex items-center justify-between mb-4">
                                     <div>
-                                        <h3 className="font-semibold text-stone-100">{terminal.location.name}</h3>
-                                        <p className="text-sm text-stone-500">{terminal.location.franchise.name}</p>
+                                        <h3 className="font-semibold text-stone-100">{account.locationName}</h3>
+                                        <p className="text-sm text-stone-500">{account.franchiseName}</p>
                                     </div>
                                     <button
-                                        onClick={() => { setExpandedLocationId(terminal.locationId); setAddingStationFor(terminal.locationId); fetchStationsForLocation(terminal.locationId); setActiveTab('accounts'); }}
+                                        onClick={() => { setExpandedLocationId(account.locationId); setAddingStationFor(account.locationId); fetchStationsForLocation(account.locationId); setActiveTab('accounts'); }}
                                         className="flex items-center gap-2 px-3 py-2 bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 rounded-lg text-sm"
                                     >
                                         <Plus size={14} />
@@ -725,7 +732,7 @@ export default function DevicesPage() {
                                     </button>
                                 </div>
                                 <p className="text-stone-400 text-sm">
-                                    {stationsByLocation[terminal.locationId]?.length || 0} stations configured
+                                    {stationsByLocation[account.locationId]?.length || 0} stations configured
                                 </p>
                             </div>
                         ))
@@ -772,7 +779,7 @@ export default function DevicesPage() {
             <AddTerminalModal
                 isOpen={showAddModal}
                 onClose={() => setShowAddModal(false)}
-                onSuccess={() => { fetchLicenses(); fetchPaxTerminals(); }}
+                onSuccess={() => { fetchLicenses(); fetchAccounts(); }}
                 locations={locations}
             />
 
@@ -781,7 +788,7 @@ export default function DevicesPage() {
                 isOpen={showTransferModal}
                 onClose={() => setShowTransferModal(false)}
                 terminal={selectedTerminal}
-                onSuccess={() => { fetchLicenses(); fetchPaxTerminals(); }}
+                onSuccess={() => { fetchLicenses(); fetchAccounts(); }}
             />
 
             {/* Toast */}
