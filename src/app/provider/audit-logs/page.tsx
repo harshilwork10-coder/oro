@@ -221,7 +221,7 @@ export default function AuditLogsPage() {
                 const data = await dealerRes.json();
                 setDealers(data.dealers || []);
             }
-            const franchiseRes = await fetch('/api/admin/franchises');
+            const franchiseRes = await fetch('/api/admin/franchisors');
             if (franchiseRes.ok) {
                 const data = await franchiseRes.json();
                 const uniqueStates = [...new Set((data.franchises || [])
@@ -238,7 +238,7 @@ export default function AuditLogsPage() {
     const searchStores = useCallback(async (query: string) => {
         if (query.length < 2) { setStoreSearchResults([]); return; }
         try {
-            const res = await fetch(`/api/admin/franchises?search=${encodeURIComponent(query)}&limit=20`);
+            const res = await fetch(`/api/admin/franchisors?search=${encodeURIComponent(query)}&limit=20`);
             if (res.ok) {
                 const data = await res.json();
                 setStoreSearchResults((data.franchises || []).map((f: any) => ({

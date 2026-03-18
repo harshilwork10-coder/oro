@@ -168,7 +168,11 @@ export default function LotteryPage() {
 
     const activatePack = async (packId: string) => {
         try {
-            await fetch(`/api/lottery/packs/${packId}/activate`, { method: 'POST' })
+            await fetch('/api/lottery/packs/activate-by-scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ packId })
+            })
             fetchData()
         } catch (error) {
             console.error('Failed to activate pack:', error)
