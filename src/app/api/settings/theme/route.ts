@@ -54,8 +54,10 @@ export async function PUT(request: Request) {
 
         const user = session.user as any
 
-        // Only OWNER, MANAGER, PROVIDER, FRANCHISOR can change themes
-        if (!['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR'].includes(user.role)) {
+        // Any business role can change their theme
+        const allowedRoles = ['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'ADMIN']
+        if (!allowedRoles.includes(user.role)) {
+            console.error('[THEME] Permission denied for role:', user.role)
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
