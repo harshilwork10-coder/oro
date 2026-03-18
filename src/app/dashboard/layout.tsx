@@ -45,7 +45,7 @@ export default function DashboardLayout({
     return (
         <SessionGuard>
             <ThemeProvider>
-            <div className="flex h-screen bg-stone-950 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-900/20 via-stone-950 to-stone-950 text-stone-100">
+            <div className="flex h-screen text-[var(--theme-text)]" style={{ backgroundColor: 'var(--theme-bg)' }}>
 
                 {/* Sidebar - Hidden for: POS pages, retail employees */}
                 {!hideSidebar && <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />}
@@ -53,7 +53,7 @@ export default function DashboardLayout({
 
                 <div className="flex flex-1 flex-col overflow-hidden relative">
                     {/* Ambient Background Glow */}
-                    <div className="absolute top-0 left-0 w-full h-96 bg-orange-500/5 blur-[100px] pointer-events-none" />
+                    <div className="absolute top-0 left-0 w-full h-96 blur-[100px] pointer-events-none" style={{ backgroundColor: 'var(--theme-accent-muted)' }} />
 
                     {/* MobileHeader - hide for POS pages, retail employees, and when sidebar is open */}
                     {!hideSidebar && !sidebarOpen && <MobileHeader onMenuClick={() => setSidebarOpen(true)} />}
