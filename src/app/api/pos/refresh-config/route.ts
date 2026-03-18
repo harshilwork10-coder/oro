@@ -70,6 +70,10 @@ export async function GET(request: NextRequest) {
                         terminalPort: station.dedicatedTerminal.terminalPort,
                         terminalType: station.dedicatedTerminal.terminalType
                     } : null
+                },
+                theme: {
+                    themeId: location.themeId || 'classic_oro',
+                    highContrast: location.highContrast || false
                 }
             }
         })

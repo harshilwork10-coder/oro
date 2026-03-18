@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { THEME_PRESETS } from '@/lib/themes'
 
 // GET - Fetch current theme settings
 export async function GET() {
@@ -69,7 +70,7 @@ export async function PUT(request: Request) {
         const { themeId, highContrast, locationId } = body
 
         // Validate themeId
-        const validThemes = ['classic_oro', 'rose_gold', 'blush_pink', 'lavender_night', 'mint_clean', 'ocean_blue']
+        const validThemes = Object.keys(THEME_PRESETS)
         if (themeId && !validThemes.includes(themeId)) {
             return NextResponse.json(
                 { error: 'Invalid theme ID' },
