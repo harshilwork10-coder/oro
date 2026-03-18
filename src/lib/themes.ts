@@ -2,6 +2,7 @@
 // Only preset themes allowed - no free color picker to ensure UI consistency
 
 export type ThemeId =
+    | 'oro_orange'       // Original ORO orange
     | 'classic_oro'      // Default gold
     | 'rose_gold'        // Upscale salons
     | 'blush_pink'       // Feminine, soft
@@ -53,6 +54,26 @@ const FIXED_COLORS = {
 }
 
 export const THEME_PRESETS: Record<ThemeId, ThemePreset> = {
+    oro_orange: {
+        id: 'oro_orange',
+        name: 'ORO Orange',
+        description: 'Original ORO signature theme',
+        preview: { accent: '#F97316', bg: '#1C1210' },
+        tokens: {
+            bg: '#1C1210',
+            surface: '#261A15',
+            surface2: '#30221A',
+            accent: '#F97316',
+            accentLight: '#FB923C',
+            accentDark: '#EA580C',
+            accentMuted: 'rgba(249, 115, 22, 0.15)',
+            textPrimary: '#FFFAF5',
+            textSecondary: '#F0D8C0',
+            textMuted: '#A88868',
+            ...FIXED_COLORS,
+        },
+    },
+
     classic_oro: {
         id: 'classic_oro',
         name: 'Classic ORO',
