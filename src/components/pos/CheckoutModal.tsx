@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { X, CreditCard, DollarSign, Delete, Banknote, Coins, Trophy, Gift } from 'lucide-react'
+import { useState } from 'react'
+import { X, CreditCard, DollarSign, Delete, Banknote, Trophy, Gift } from 'lucide-react'
 import GiftCardModal from './GiftCardModal'
+import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 
 interface CheckoutModalProps {
     isOpen: boolean
@@ -36,6 +37,11 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
     // Split Payment Tracking
     const [payments, setPayments] = useState<{ type: string; amount: number }[]>([])
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0) + lotteryCredit + giftCardCredit
+
+    // PAX Terminal — inline for per-card-charge split payments
+    const [showPaxModal, setShowPaxModal] = useState(false)
+    const [pendingPaxAmount, setPendingPaxAmount] = useState(0)
+    const [pendingPaxMethod, setPendingPaxMethod] = useState<'CREDIT_CARD' | 'DEBIT_CARD'>('CREDIT_CARD')
 
     // BUG-3 FIX: Use pricing settings from parent (franchise config) instead of hardcoded values
     const merchantConfig = {
@@ -76,10 +82,9 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
             return sum + (item.price * (item.quantity || 1)) * itemTaxRate
         }, 0)
 
-    // Total calculation (lottery credit reduces amount due)
-    const total = subtotal - discount + cardFee + tax + tip - lotteryCredit
-    const remaining = Math.max(0, total - (parseFloat(tenderAmount) || 0))
-    const changeDue = (parseFloat(tenderAmount) || 0) - total
+    // Total calculation (lottery + gift card credits reduce amount due)
+    const total = subtotal - discount + cardFee + tax + tip - lotteryCredit - giftCardCredit
+    const remainingToPay = Math.max(0, total - payments.reduce((s, p) => s + p.amount, 0))
 
     // Apply lottery credit (winning ticket redemption)
     const applyLotteryCredit = async () => {
@@ -142,25 +147,39 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
             return
         }
 
-        // If no amount entered, fill remaining for cash or exact for card
-        if (currentTender === 0) {
-            const remainingToPay = total - totalPaid
-            if (method === 'CASH') {
+        // Determine the charge amount
+        const chargeAmount = currentTender > 0 ? Math.min(currentTender, remainingToPay) : remainingToPay
+
+        if (chargeAmount <= 0) return
+
+        if (method === 'CASH') {
+            // Cash: if no amount entered, fill the display first (user sees exact amount)
+            if (currentTender === 0) {
                 setTenderAmount(remainingToPay.toFixed(2))
                 return
-            } else {
-                // Card pays exact remaining
-                addPayment(method, remainingToPay)
-                return
             }
+            addPayment('CASH', chargeAmount)
+        } else {
+            // CARD: Open PAX terminal for this specific partial/full amount
+            setPendingPaxAmount(chargeAmount)
+            setPendingPaxMethod(method)
+            setShowPaxModal(true)
         }
+    }
 
-        addPayment(method, currentTender)
+    // PAX terminal approved a card charge
+    const handlePaxSuccess = () => {
+        setShowPaxModal(false)
+        addPayment(pendingPaxMethod, pendingPaxAmount)
+    }
+
+    // PAX terminal was cancelled/closed — stay in checkout
+    const handlePaxClose = () => {
+        setShowPaxModal(false)
     }
 
     // Add a payment to the split payment list
     const addPayment = (method: string, amount: number) => {
-        const remainingToPay = total - totalPaid
         const paymentAmount = Math.min(amount, remainingToPay)
 
         if (paymentAmount <= 0) return
@@ -169,10 +188,10 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
         setPayments(newPayments)
         setTenderAmount('')
 
-        const newTotalPaid = newPayments.reduce((sum, p) => sum + p.amount, 0) + lotteryCredit
+        const newTotalPaid = newPayments.reduce((sum, p) => sum + p.amount, 0) + lotteryCredit + giftCardCredit
 
         // Check if fully paid
-        if (newTotalPaid >= total - 0.01) {
+        if (newTotalPaid >= (subtotal - discount + cardFee + tax + tip) - 0.01) {
             completeTransaction(newPayments)
         }
     }
@@ -191,14 +210,16 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
             subtotal,
             discount,
             lotteryCredit,
+            giftCardCredit,
             cardFee,
             tax,
             tip,
-            total,
+            total: subtotal - discount + cardFee + tax + tip,
             paymentMethod: primaryMethod,
             payments: finalPayments, // Array of all payments
             cashAmount: cashTotal,
             cardAmount: cardTotal,
+            paxProcessed: finalPayments.some(p => p.type !== 'CASH'), // Flag: PAX already handled card charges
             customerId: customerId || null,
             timestamp: new Date()
         }
@@ -211,7 +232,18 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
         }
     }
 
+    // Undo last payment
+    const removeLastPayment = () => {
+        if (payments.length > 0) {
+            setPayments(payments.slice(0, -1))
+        }
+    }
+
     if (!isOpen) return null
+
+    const changeDue = payments.length > 0 && payments[payments.length - 1]?.type === 'CASH'
+        ? (payments.reduce((s, p) => s + p.amount, 0) + lotteryCredit + giftCardCredit) - (subtotal - discount + cardFee + tax + tip)
+        : 0
 
     return (
         <>
@@ -219,13 +251,20 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
                 <div className="bg-stone-900 rounded-3xl w-full max-w-5xl h-[80vh] overflow-hidden shadow-2xl border border-stone-800 flex flex-col">
                     {/* Header */}
                     <div className="bg-stone-950 px-8 py-4 flex items-center justify-between border-b border-stone-800">
-                        <h2 className="text-2xl font-bold text-white">Checkout</h2>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-2xl font-bold text-white">Checkout</h2>
+                            {payments.length > 0 && (
+                                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full text-xs font-bold">
+                                    Split: {payments.length} payment{payments.length > 1 ? 's' : ''}
+                                </span>
+                            )}
+                        </div>
                         <button onClick={onClose} className="text-stone-400 hover:text-white transition-colors">
                             <X className="h-8 w-8" />
                         </button>
                     </div>
 
-                    <div className="flex-1 grid grid-cols-12 gap-0">
+                    <div className="flex-1 grid grid-cols-12 gap-0 relative">
                         {/* Left Column: Input & Keypad (5 cols) */}
                         <div className="col-span-5 bg-stone-900 p-6 border-r border-stone-800 flex flex-col">
                             <div className="flex items-center gap-2 mb-4">
@@ -315,6 +354,13 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
                                 <Trophy className="h-5 w-5" />
                                 Lottery
                             </button>
+
+                            {/* Split payment hint */}
+                            <div className="bg-stone-800/50 rounded-lg p-2 border border-stone-700/50">
+                                <p className="text-stone-500 text-[10px] text-center leading-snug">
+                                    Enter partial $ amount then tap card to split across multiple cards
+                                </p>
+                            </div>
                         </div>
 
                         {/* Lottery Credit Input Modal */}
@@ -371,8 +417,8 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
                         <div className="col-span-4 bg-stone-950 p-6 flex flex-col">
                             <div className="mb-6">
                                 <h3 className="text-stone-400 font-medium mb-1 text-right">Amount Remaining</h3>
-                                <div className={`text-5xl font-bold text-right tracking-tight ${(total - totalPaid) <= 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
-                                    ${Math.max(0, total - totalPaid).toFixed(2)}
+                                <div className={`text-5xl font-bold text-right tracking-tight ${remainingToPay <= 0.01 ? 'text-emerald-400' : 'text-orange-400'}`}>
+                                    ${remainingToPay.toFixed(2)}
                                 </div>
                             </div>
 
@@ -416,6 +462,7 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
                                                     )}
                                                     <span className={p.type === 'CASH' ? 'text-emerald-400' : 'text-blue-400'}>
                                                         {p.type === 'CASH' ? 'Cash' : p.type === 'CREDIT_CARD' ? 'Credit' : 'Debit'}
+                                                        {p.type !== 'CASH' && <span className="text-stone-600 text-xs ml-1">✓ PAX</span>}
                                                     </span>
                                                 </span>
                                                 <span className="font-medium text-white">${p.amount.toFixed(2)}</span>
@@ -429,13 +476,23 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
                                 )}
                             </div>
 
-                            {changeDue > 0 && (
+                            {changeDue > 0.01 && (
                                 <div className="bg-stone-900 rounded-xl border border-stone-800 p-4 mb-4">
                                     <div className="flex justify-between items-center">
                                         <span className="text-stone-400">Change Due</span>
                                         <span className="text-2xl font-bold text-orange-400">${changeDue.toFixed(2)}</span>
                                     </div>
                                 </div>
+                            )}
+
+                            {/* Undo Last Payment */}
+                            {payments.length > 0 && remainingToPay > 0.01 && (
+                                <button
+                                    onClick={removeLastPayment}
+                                    className="w-full py-2 mb-2 bg-amber-900/20 hover:bg-amber-900/40 text-amber-400 border border-amber-900/50 rounded-xl font-medium text-sm transition-all"
+                                >
+                                    Undo Last Payment
+                                </button>
                             )}
 
                             <button
@@ -459,10 +516,10 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
                             </button>
                         ))}
                         <button
-                            onClick={() => handleQuickAmount(Math.ceil(total))}
+                            onClick={() => handleQuickAmount(Math.ceil(subtotal - discount + cardFee + tax + tip))}
                             className="py-3 bg-amber-900/20 hover:bg-amber-900/40 text-amber-400 border border-amber-900/50 rounded-xl font-bold text-lg transition-all"
                         >
-                            ${Math.ceil(total).toFixed(2)}
+                            ${Math.ceil(subtotal - discount + cardFee + tax + tip).toFixed(2)}
                         </button>
                     </div>
                 </div>
@@ -478,7 +535,15 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
                     setShowGiftCardModal(false)
                 }}
             />
+
+            {/* PAX Terminal Modal — Opens per split card charge */}
+            <PaxPaymentModal
+                isOpen={showPaxModal}
+                onClose={handlePaxClose}
+                onSuccess={handlePaxSuccess}
+                amount={pendingPaxAmount}
+                invoiceNumber={String(Math.floor(Date.now() / 1000) % 9999 + 1)}
+            />
         </>
     )
 }
-

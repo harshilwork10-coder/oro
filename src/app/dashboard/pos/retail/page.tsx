@@ -2496,20 +2496,24 @@ export default function RetailPOSPage() {
                     customerId={selectedCustomer?.id}
                     customerName={selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined}
                     onComplete={(transaction) => {
-                        // BUG-8 FIX: Pass tip amount from checkout modal
                         const tipAmount = transaction.tip || 0
-                        // Handle card payments via PAX
+
+                        // If CheckoutModal already processed card charges via PAX (split payments),
+                        // skip opening PAX again — just finalize the transaction
+                        if (transaction.paxProcessed) {
+                            processPayment(transaction.paymentMethod, tipAmount)
+                            return
+                        }
+
+                        // Legacy path: single card payment not yet processed by PAX
                         if (transaction.paymentMethod === 'CREDIT_CARD' || transaction.paymentMethod === 'DEBIT_CARD') {
-                            // SURCHARGE FIX: Use page.tsx cardTotal (includes surcharge)
-                            // instead of CheckoutModal's total (which may miscalculate fees)
                             const { cashTotal: cT, cardTotal: cdT, showDualPricing: dp } = calculateTotals()
                             const chargedAmount = dp ? cdT : cT
                             setPendingCardAmount(chargedAmount + tipAmount)
-                            setPendingTipAmount(tipAmount) // BUG-11 FIX: Save tip for PAX callback
+                            setPendingTipAmount(tipAmount)
                             setShowPaymentModal(false)
                             setShowPaxModal(true)
                         } else {
-                            // Process cash payment with tip
                             processPayment(transaction.paymentMethod, tipAmount)
                         }
                     }}
