@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
+    const mode = searchParams.get('mode') // 'summary' = counts only, null = full logs
     const entityType = searchParams.get('entityType')
     const entityId = searchParams.get('entityId')
     const action = searchParams.get('action')
@@ -51,6 +52,20 @@ export async function GET(request: NextRequest) {
             { entityId: { contains: search } },
             { action: { contains: search } }
         ]
+    }
+
+    // SUMMARY MODE: return only action counts (lightweight, no log details)
+    if (mode === 'summary') {
+        const counts = await prisma.auditLog.groupBy({
+            by: ['action'],
+            where,
+            _count: { action: true }
+        })
+        const summary = Object.fromEntries(
+            counts.map(c => [c.action, c._count.action])
+        )
+        const total = counts.reduce((sum, c) => sum + c._count.action, 0)
+        return NextResponse.json({ summary, total })
     }
 
     const logs = await prisma.auditLog.findMany({
