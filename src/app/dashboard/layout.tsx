@@ -9,6 +9,7 @@ import MobileHeader from "@/components/layout/MobileHeader"
 import SessionGuard from "@/components/security/SessionGuard"
 import AccountSelector from "@/components/layout/AccountSelector"
 import LocationToggle from "@/components/dashboard/LocationToggle"
+import { ThemeProvider } from '@/components/providers/ThemeProvider'
 // PWA prompt removed during cleanup
 
 export default function DashboardLayout({
@@ -43,6 +44,7 @@ export default function DashboardLayout({
 
     return (
         <SessionGuard>
+            <ThemeProvider>
             <div className="flex h-screen bg-stone-950 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-900/20 via-stone-950 to-stone-950 text-stone-100">
 
                 {/* Sidebar - Hidden for: POS pages, retail employees */}
@@ -80,6 +82,7 @@ export default function DashboardLayout({
 
 
             </div>
+            </ThemeProvider>
         </SessionGuard>
     )
 }
