@@ -65,7 +65,29 @@ export async function GET(request: NextRequest) {
         changes: log.changes ? JSON.parse(log.changes) : null
     }))
 
-    return NextResponse.json({ logs: parsedLogs })
+    // Resolve franchise/store names from changes.franchiseId
+    const franchiseIds = [...new Set(
+        parsedLogs
+            .map(l => l.changes?.franchiseId)
+            .filter(Boolean)
+    )] as string[]
+
+    let franchiseMap: Record<string, string> = {}
+    if (franchiseIds.length > 0) {
+        const franchises = await prisma.franchise.findMany({
+            where: { id: { in: franchiseIds } },
+            select: { id: true, name: true }
+        })
+        franchiseMap = Object.fromEntries(franchises.map(f => [f.id, f.name]))
+    }
+
+    // Attach storeName to each log
+    const enrichedLogs = parsedLogs.map(log => ({
+        ...log,
+        storeName: franchiseMap[log.changes?.franchiseId] || null
+    }))
+
+    return NextResponse.json({ logs: enrichedLogs })
 }
 
 // POST - Create a new audit log entry

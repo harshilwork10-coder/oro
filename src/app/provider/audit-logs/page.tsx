@@ -18,6 +18,7 @@ interface AuditLog {
     entityId: string;
     changes: any;
     status: string;
+    storeName: string | null;
     createdAt: string;
 }
 
@@ -553,6 +554,7 @@ export default function AuditLogsPage() {
                                                                 </span>
                                                             </td>
                                                             <td className="px-2 py-2.5 text-stone-300 text-xs w-28">{log.userEmail?.split('@')[0] || 'Unknown'}</td>
+                                                            <td className="px-2 py-2.5 text-orange-400 text-xs w-36 truncate">{log.storeName || <span className="text-stone-600">—</span>}</td>
                                                             <td className="px-2 py-2.5 text-stone-200 text-xs">{formatDetails(log)}</td>
                                                             <td className="px-2 py-2.5 w-8"><ChevronRight size={14} className="text-stone-600" /></td>
                                                         </tr>
