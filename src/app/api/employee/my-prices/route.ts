@@ -10,43 +10,34 @@ export async function GET(request: NextRequest) {
         const user = session?.user as any
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const employee = await prisma.employee.findUnique({
-            where: { id: user.employeeId || user.id },
+        // Get commission rules for this employee
+        const commissionRules = await prisma.commissionRule.findMany({
+            where: { userId: user.id },
             select: {
                 id: true,
-                firstName: true,
-                lastName: true,
-                commissionRate: true,
-                servicePrices: true
+                type: true,
+                rate: true,
+                flatAmount: true,
             }
         })
 
+        // Get employee service price overrides
+        const priceOverrides = await prisma.employeeServicePriceOverride.findMany({
+            where: { userId: user.id },
+            include: { service: { select: { id: true, name: true, price: true } } }
+        })
+
         return NextResponse.json({
-            commissionRate: employee?.commissionRate,
-            servicePrices: employee?.servicePrices || []
+            commissionRules,
+            priceOverrides: priceOverrides.map(o => ({
+                serviceId: o.serviceId,
+                serviceName: o.service?.name,
+                basePrice: Number(o.service?.price || 0),
+                overridePrice: Number(o.price),
+            }))
         })
     } catch (error) {
         console.error('[EMPLOYEE_MY_PRICES]', error)
-        return NextResponse.json({ commissionRate: null, servicePrices: [] })
-    }
-}
-
-// POST - Update employee's custom service prices
-export async function POST(request: NextRequest) {
-    try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        const body = await request.json()
-        await prisma.employee.update({
-            where: { id: user.employeeId || user.id },
-            data: { servicePrices: body.servicePrices }
-        })
-
-        return NextResponse.json({ success: true })
-    } catch (error) {
-        console.error('[EMPLOYEE_MY_PRICES_UPDATE]', error)
-        return NextResponse.json({ error: 'Failed to update prices' }, { status: 500 })
+        return NextResponse.json({ commissionRules: [], priceOverrides: [] })
     }
 }

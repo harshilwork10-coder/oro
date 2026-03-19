@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -10,8 +9,7 @@ import { prisma } from '@/lib/prisma'
  * "Any 3 sodas for $5" — customer picks any items from a set 
  * and gets a group price when they hit the quantity threshold.
  * 
- * Different from BXGY: Mix-and-Match is quantity-based group pricing
- * on ANY items within a category or product set.
+ * Uses the Promotion model with type MIX_MATCH
  * 
  * GET — list active mix-and-match deals
  * POST — create a new mix-and-match deal
@@ -27,8 +25,8 @@ export async function GET(request: NextRequest) {
         const franchiseId = user.franchiseId
         if (!franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        // Get active deals that are mix-and-match type
-        const deals = await prisma.deal.findMany({
+        // Get active promotions that are mix-and-match type
+        const deals = await prisma.promotion.findMany({
             where: {
                 franchiseId,
                 isActive: true,
@@ -47,7 +45,7 @@ export async function GET(request: NextRequest) {
         })
 
         const formatted = deals.map(d => {
-            const conditions = typeof d.conditions === 'string' ? JSON.parse(d.conditions) : (d.conditions || {})
+            const conditions = typeof d.conditions === 'string' ? JSON.parse(d.conditions as string) : (d.conditions || {}) as any
             return {
                 id: d.id,
                 name: d.name,
@@ -94,7 +92,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'name, quantityRequired, groupPrice required' }, { status: 400 })
         }
 
-        const deal = await prisma.deal.create({
+        const deal = await prisma.promotion.create({
             data: {
                 franchiseId,
                 name,
@@ -143,7 +141,7 @@ export async function PUT(request: NextRequest) {
 
         // Get active mix-match deals
         const now = new Date()
-        const deals = await prisma.deal.findMany({
+        const deals = await prisma.promotion.findMany({
             where: {
                 franchiseId,
                 isActive: true,
@@ -165,7 +163,7 @@ export async function PUT(request: NextRequest) {
         const discounts: { dealId: string; dealName: string; savings: number; detail: string; appliedToItems: string[] }[] = []
 
         for (const deal of deals) {
-            const cond = typeof deal.conditions === 'string' ? JSON.parse(deal.conditions) : (deal.conditions || {})
+            const cond = typeof deal.conditions === 'string' ? JSON.parse(deal.conditions as string) : (deal.conditions || {}) as any
             const qtyRequired = cond.quantityRequired || 0
             const groupPrice = cond.groupPrice || Number(deal.discountValue || 0)
             const dealCategories: string[] = (cond.categories || []).map((c: string) => c.toLowerCase())
