@@ -13,17 +13,22 @@ export async function POST(request: Request) {
 
         const body = await request.json()
         const { productId, barcode, quantity } = body
+        const user = session.user as { id: string; franchiseId?: string }
 
         if (!quantity || quantity < 1) {
             return NextResponse.json({ error: 'Invalid quantity' }, { status: 400 })
         }
 
-        // Find product by ID or barcode
+        // Find product by ID or barcode, scoped to user's franchise
         let product
         if (productId) {
-            product = await prisma.product.findUnique({ where: { id: productId } })
+            product = await prisma.product.findFirst({
+                where: { id: productId, ...(user.franchiseId ? { franchiseId: user.franchiseId } : {}) }
+            })
         } else if (barcode) {
-            product = await prisma.product.findFirst({ where: { barcode } })
+            product = await prisma.product.findFirst({
+                where: { barcode, ...(user.franchiseId ? { franchiseId: user.franchiseId } : {}) }
+            })
         }
 
         if (!product) {
