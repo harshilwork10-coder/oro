@@ -117,7 +117,7 @@ export default function ScanQuickAddModal({ barcode, onAdd, onClose }: ScanQuick
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
             <div className="w-full max-w-lg bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
                 {/* Header */}
                 <div className="p-4 border-b border-stone-800 flex justify-between items-center bg-gradient-to-r from-emerald-900/30 to-stone-900">

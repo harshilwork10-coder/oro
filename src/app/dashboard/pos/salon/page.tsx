@@ -1353,7 +1353,7 @@ function POSContent() {
         // CLOCK_IN_ONLY mode - Simple clock in button without cash counting
         if (shiftRequirement === 'CLOCK_IN_ONLY') {
             return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
                     <div className="p-8 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl w-full max-w-md">
                         <div className="text-center mb-8">
                             <div className="h-20 w-20 bg-emerald-600/20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-emerald-500/50">
@@ -1383,7 +1383,7 @@ function POSContent() {
 
         // CASH_COUNT_ONLY or BOTH mode - Full denomination counting UI
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 overflow-y-auto">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 overflow-y-auto">
                 <div className={`p-6 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl my-8 flex gap-6 ${usesVirtualKeypad ? 'w-full max-w-4xl' : 'w-[600px] flex-col'}`}>
                     <div className="flex-1">
                         <div className="text-center mb-6">
@@ -1610,7 +1610,7 @@ function POSContent() {
         }
 
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 overflow-y-auto">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 overflow-y-auto">
                 <div className="w-full max-w-4xl p-6 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl my-8 flex gap-6">
                     {/* Left: Denominations */}
                     <div className="flex-1">
@@ -1730,7 +1730,7 @@ function POSContent() {
     return (
         <>
             {showDebug && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
                     <div className="bg-stone-900 border-2 border-red-500 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
                         <h3 className="text-xl font-bold text-red-500 flex items-center gap-2">
                             🐞 DEBUG MODE
@@ -2439,7 +2439,7 @@ function POSContent() {
 
                     {/* Checkout Modal */}
                     {showCheckoutModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="w-full max-w-2xl bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                                 <div className="p-6 border-b border-stone-800 flex items-center justify-between">
                                     <h2 className="text-2xl font-bold text-white">Payment Method</h2>
@@ -2523,7 +2523,7 @@ function POSContent() {
 
                     {/* Cash Tendering Modal */}
                     {showCashTendering && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
                             <div className="w-full max-w-sm bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                                 <div className="p-3 border-b border-stone-800 flex items-center justify-between shrink-0">
                                     <h2 className="text-lg font-bold text-white">Cash Payment</h2>
@@ -2730,7 +2730,7 @@ function POSContent() {
                         const isValidSplit = cashAmt > 0 && cashAmt < splitTotal && cashReceivedAmt >= cashAmt
 
                         return (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                                 <div className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                                     <div className="p-4 border-b border-stone-800 flex items-center justify-between">
                                         <h2 className="text-xl font-bold text-white">Split Payment</h2>
@@ -2878,7 +2878,7 @@ function POSContent() {
 
                     {/* Discount Modal */}
                     {showDiscountModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
                             <div className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                                 <div className="p-6 border-b border-stone-800 flex justify-between items-center">
                                     <h3 className="text-xl font-bold text-white">Apply Discount</h3>
@@ -2980,7 +2980,7 @@ function POSContent() {
 
                     {/* Tip Waiting Modal */}
                     {showTipWaiting && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="bg-stone-900 rounded-2xl border border-stone-700 p-8 max-w-md w-full text-center">
                                 <div className="mb-6">
                                     <div className="w-16 h-16 mx-auto bg-orange-500/20 rounded-full flex items-center justify-center mb-4">
@@ -3037,7 +3037,7 @@ function POSContent() {
 
                     {/* Clear Cart Confirmation Modal */}
                     {showClearCartConfirm && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="bg-stone-900 rounded-2xl border border-stone-700 p-6 w-[360px] shadow-2xl">
                                 <div className="text-center mb-6">
                                     <div className="h-16 w-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -3074,7 +3074,7 @@ function POSContent() {
 
                     {/* Custom Item Modal with Pin Pad */}
                     {showOpenItemModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="bg-stone-900 rounded-2xl border border-stone-700 p-6 w-[400px] shadow-2xl">
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-xl font-bold text-white">Custom Item</h3>
@@ -3183,7 +3183,7 @@ function POSContent() {
 
                     {/* Customer Discounts Modal */}
                     {showDiscounts && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <CustomerDiscounts
                                 franchiseId={user?.franchiseId || ''}
                                 customerPhone={selectedCustomer?.phone}
@@ -3201,7 +3201,7 @@ function POSContent() {
 
                     {/* Customer Display Modal */}
                     {showDisplayModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-stone-700">
                                 <h2 className="text-xl font-bold text-white text-center mb-2">Customer Display</h2>
                                 <p className="text-stone-400 text-center text-sm mb-6">Open this URL on your second tablet</p>
@@ -3280,7 +3280,7 @@ function POSContent() {
 
                     {/* Customer Selection Modal */}
                     {showCustomerModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-stone-700 max-h-[80vh] flex flex-col">
                                 <h2 className="text-xl font-bold text-white text-center mb-2">Select Customer</h2>
                                 <p className="text-stone-400 text-center text-sm mb-4">Choose a customer or search by name/phone</p>
@@ -3419,7 +3419,7 @@ function POSContent() {
             {/* Shift Report Modal - Auto prints */}
             {
                 shiftReport && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 print:bg-white print:p-0">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 print:bg-white print:p-0">
                         <div className="w-full max-w-md bg-white text-black p-6 rounded-xl shadow-2xl print:shadow-none print:max-w-full">
                             <div className="text-center mb-4 border-b pb-4">
                                 <h2 className="text-xl font-bold">SHIFT REPORT</h2>

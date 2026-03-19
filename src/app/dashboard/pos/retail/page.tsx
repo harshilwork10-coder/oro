@@ -1584,7 +1584,7 @@ export default function RetailPOSPage() {
 
             {/* Exit Fullscreen PIN Modal */}
             {showExitModal && (
-                <div className="fixed inset-0 bg-black/90 z-[300] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[300] flex items-center justify-center p-4">
                     <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full border border-stone-700">
                         <div className="text-center mb-6">
                             <div className="w-16 h-16 mx-auto bg-orange-500/20 rounded-full flex items-center justify-center mb-4">
@@ -2672,7 +2672,7 @@ export default function RetailPOSPage() {
 
             {/* Age Verification Modal */}
             {showAgeVerification && pendingAgeItem && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
                     <div className="bg-stone-900 rounded-2xl p-8 max-w-md w-full mx-4 border border-stone-700">
                         <div className="text-center">
                             <AlertTriangle className="h-16 w-16 text-amber-500 mx-auto mb-4" />
@@ -2763,7 +2763,7 @@ export default function RetailPOSPage() {
 
             {/* MORE Departments Picker Modal */}
             {showMoreDepts && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
                     <div className="bg-stone-900 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col border border-stone-700">
                         <div className="flex items-center justify-between p-4 border-b border-stone-800">
                             <h2 className="text-lg font-bold">All Departments</h2>
@@ -2828,7 +2828,7 @@ export default function RetailPOSPage() {
 
             {/* Price Check Input Modal */}
             {showPriceCheckInputModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
                     <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full border border-stone-700">
                         <h2 className="text-xl font-bold text-white mb-4">Price Check</h2>
                         <input
@@ -2876,7 +2876,7 @@ export default function RetailPOSPage() {
 
             {/* Price Check Modal */}
             {showPriceCheckModal && priceCheckProduct && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
                     <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full border border-stone-700">
                         <div className="text-center">
                             <h2 className="text-2xl font-bold text-white mb-4">Price Check</h2>
@@ -3081,7 +3081,7 @@ function DiscountModal({ item, onApply, onClose }: { item: CartItem; onApply: (d
     const [discount, setDiscount] = useState(item.discount?.toString() || '')
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full mx-4 border border-stone-700">
                 <h2 className="text-xl font-bold mb-4">Apply Discount</h2>
                 <p className="text-stone-400 mb-4">{item.name}</p>
@@ -3118,7 +3118,7 @@ function QuantityModal({ item, onApply, onClose }: { item: CartItem; onApply: (q
     const [qty, setQty] = useState(item.quantity.toString())
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full mx-4 border border-stone-700">
                 <h2 className="text-xl font-bold mb-4">Change Quantity</h2>
                 <p className="text-stone-400 mb-4">{item.name}</p>
@@ -3144,7 +3144,7 @@ function PriceModal({ item, onApply, onClose }: { item: CartItem; onApply: (pric
     const [price, setPrice] = useState(item.price.toString())
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full mx-4 border border-stone-700">
                 <h2 className="text-xl font-bold mb-4">Change Price</h2>
                 <p className="text-stone-400 mb-4">{item.name}</p>
@@ -3200,7 +3200,7 @@ function SearchModal({ onSelect, onClose }: { onSelect: (product: any) => void; 
     }, [query])
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-2xl w-full mx-4 border border-stone-700 max-h-[80vh] flex flex-col">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-bold">Search Products</h2>
@@ -3265,7 +3265,7 @@ function StationModal({
     onClose: () => void
 }) {
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
             <div className="bg-stone-900 rounded-2xl p-6 w-full max-w-lg">
                 <h2 className="text-2xl font-bold mb-2">Select Your Station</h2>
                 <p className="text-stone-400 mb-6">Choose which register you're working at:</p>
@@ -3331,7 +3331,7 @@ function CustomerLookupModal({ onClose, onSelectCustomer }: {
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full border border-stone-700">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Customer Lookup</h2>
@@ -3452,7 +3452,7 @@ function CashDropModal({ onClose, onSuccess }: {
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full border border-stone-700">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">💵 Cash Drop</h2>
@@ -3563,7 +3563,7 @@ function ReceiveStockModal({ onClose, onSuccess }: {
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full border border-stone-700">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">📦 Receive Stock</h2>
@@ -3756,7 +3756,7 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-stone-900 rounded-2xl w-full max-w-2xl border border-stone-700 max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="p-4 border-b border-stone-800 flex justify-between items-center bg-gradient-to-r from-purple-600/20 to-stone-900">
@@ -3956,7 +3956,7 @@ function CaseBreakModal({ product, onSelect, onClose }: {
     }
 
     return (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-stone-900 rounded-2xl w-full max-w-md border border-stone-700 overflow-hidden">
                 {/* Header */}
                 <div className="p-4 border-b border-stone-800 bg-gradient-to-r from-amber-600 to-orange-600">

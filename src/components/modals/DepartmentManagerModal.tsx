@@ -154,7 +154,7 @@ export default function DepartmentManagerModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
             <div className="bg-stone-900 rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden border border-stone-700 shadow-2xl">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-stone-700">

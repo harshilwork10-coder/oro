@@ -218,7 +218,7 @@ export default function ReviewApplicationModal({
     )
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
             <div className="glass-panel rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-stone-700">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-stone-700">

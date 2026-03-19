@@ -290,7 +290,7 @@ export default function PromotionManagerModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
             <div className="bg-stone-900 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-stone-700 shadow-2xl flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-stone-700 bg-gradient-to-r from-purple-600/20 to-pink-600/20">

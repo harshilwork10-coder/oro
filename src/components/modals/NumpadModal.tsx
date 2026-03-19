@@ -88,7 +88,7 @@ export default function NumpadModal({
     const displayValue = display || '0'
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
             <div className="w-full max-w-sm bg-stone-900 rounded-2xl border border-stone-700 overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-stone-700">

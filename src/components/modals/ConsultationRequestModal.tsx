@@ -58,7 +58,7 @@ export default function ConsultationRequestModal({ isOpen, onClose, onSuccess }:
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
                 <button
                     onClick={onClose}
