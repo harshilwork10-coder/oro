@@ -71,6 +71,8 @@ export async function PUT(request: Request) {
         const body = await request.json()
         const { themeId, highContrast, locationId } = body
 
+        console.error(`[THEME PUT] user=${user.email} role=${user.role} franchiseId=${user.franchiseId} themeId=${themeId} locationId=${locationId || 'ALL'}`)
+
         // Validate themeId
         const validThemes = Object.keys(THEME_PRESETS)
         if (themeId && !validThemes.includes(themeId)) {
