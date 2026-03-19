@@ -344,7 +344,9 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             .update(JSON.stringify({
                 dual: stationConfig.dualPricingEnabled,
                 pax: stationConfig.paxTerminalIP,
-                flags: featureFlags
+                flags: featureFlags,
+                themeId: stationConfig.themeId,
+                highContrast: stationConfig.highContrast
             }))
             .digest('hex').slice(0, 8)
 
