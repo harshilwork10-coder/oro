@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { THEME_PRESETS } from '@/lib/themes'
+import { cacheDelete, CACHE_KEYS } from '@/lib/cache'
 
 // GET - Fetch current theme settings
 export async function GET() {
@@ -104,6 +105,11 @@ export async function PUT(request: Request) {
                 data: updateData,
                 select: { themeId: true, highContrast: true }
             })
+
+            // Bust the Redis cache so Android picks up the new theme immediately
+            await cacheDelete(CACHE_KEYS.BOOTSTRAP(locationId)).catch(() => {})
+            console.error(`[THEME] Cache invalidated for location: ${locationId}`)
+
             return NextResponse.json({
                 themeId: updated.themeId,
                 highContrast: updated.highContrast,
@@ -116,6 +122,16 @@ export async function PUT(request: Request) {
             where: { franchiseId: user.franchiseId },
             data: updateData
         })
+
+        // Bust the Redis cache for ALL locations in this franchise so Android picks up immediately
+        const allLocations = await prisma.location.findMany({
+            where: { franchiseId: user.franchiseId },
+            select: { id: true }
+        })
+        await Promise.all(
+            allLocations.map(loc => cacheDelete(CACHE_KEYS.BOOTSTRAP(loc.id)).catch(() => {}))
+        )
+        console.error(`[THEME] Cache invalidated for ${allLocations.length} location(s) in franchise ${user.franchiseId}`)
 
         return NextResponse.json({
             themeId: themeId || 'classic_oro',
