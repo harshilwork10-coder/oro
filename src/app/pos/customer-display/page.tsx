@@ -1,8 +1,14 @@
 /**
- * Customer-Facing Display
+ * Customer-Facing Display (Salon / Generic)
  *
  * Full-screen page shown on a secondary monitor facing the customer.
  * Receives live cart data via BroadcastChannel — ZERO API calls.
+ *
+ * Adaptive layout using CSS clamp() — fits any hardware:
+ *   - PAX e800 8" (800×1280)
+ *   - PAX e800 12.5" / 15.6" (1920×1080)
+ *   - Standard 2nd monitor
+ *   - Any tablet or kiosk display
  *
  * Shows:
  * - Items as cashier scans them (real-time)
@@ -72,20 +78,20 @@ export default function CustomerDisplayPage() {
     // IDLE STATE — Show branding + promo
     if (state.status === 'IDLE' || state.items.length === 0) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 flex flex-col items-center justify-center text-white">
+            <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 flex flex-col items-center justify-center text-white p-[clamp(1rem,4vw,2rem)]">
                 <div className="text-center">
-                    <h1 className="text-6xl font-bold mb-2 bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
+                    <h1 className="text-[clamp(2rem,8vw,4rem)] font-bold mb-[clamp(0.25rem,1vw,0.5rem)] bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
                         ORO 9
                     </h1>
-                    <p className="text-stone-400 text-xl mb-12">Welcome!</p>
+                    <p className="text-stone-400 text-[clamp(1rem,3.5vw,1.5rem)] mb-[clamp(2rem,6vw,3rem)]">Welcome!</p>
 
-                    <div className="bg-stone-900/60 border border-stone-700 rounded-2xl px-12 py-6 max-w-lg mx-auto">
-                        <p className="text-lg text-stone-300 transition-all duration-500">
+                    <div className="bg-stone-900/60 border border-stone-700 rounded-2xl px-[clamp(2rem,6vw,3rem)] py-[clamp(1rem,3vw,1.5rem)] max-w-lg mx-auto">
+                        <p className="text-[clamp(0.875rem,2.5vw,1.25rem)] text-stone-300 transition-all duration-500">
                             {PROMO_MESSAGES[promoIndex]}
                         </p>
                     </div>
 
-                    <p className="text-stone-500 text-4xl font-mono mt-12">
+                    <p className="text-stone-500 text-[clamp(1.5rem,5vw,2.5rem)] font-mono mt-[clamp(2rem,6vw,3rem)]">
                         {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                 </div>
@@ -96,12 +102,16 @@ export default function CustomerDisplayPage() {
     // COMPLETE STATE — Thank you
     if (state.status === 'COMPLETE') {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-stone-900 to-stone-950 flex flex-col items-center justify-center text-white">
+            <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-stone-900 to-stone-950 flex flex-col items-center justify-center text-white p-[clamp(1rem,4vw,2rem)]">
                 <div className="text-center">
-                    <div className="text-8xl mb-6">✓</div>
-                    <h1 className="text-5xl font-bold text-emerald-400 mb-4">Thank You!</h1>
-                    <p className="text-2xl text-stone-300">Your total was {formatCurrency(state.total)}</p>
-                    {state.customerName && <p className="text-lg text-stone-400 mt-2">See you next time, {state.customerName}!</p>}
+                    <div className="text-[clamp(3rem,10vw,5rem)] mb-[clamp(1rem,3vw,1.5rem)]">✓</div>
+                    <h1 className="text-[clamp(1.75rem,7vw,3.5rem)] font-bold text-emerald-400 mb-[clamp(0.5rem,2vw,1rem)]">Thank You!</h1>
+                    <p className="text-[clamp(1rem,3.5vw,1.75rem)] text-stone-300">Your total was {formatCurrency(state.total)}</p>
+                    {state.customerName && (
+                        <p className="text-[clamp(0.875rem,2.5vw,1.25rem)] text-stone-400 mt-[clamp(0.25rem,1vw,0.5rem)]">
+                            See you next time, {state.customerName}!
+                        </p>
+                    )}
                 </div>
             </div>
         )
@@ -111,41 +121,59 @@ export default function CustomerDisplayPage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white flex flex-col">
             {/* Header */}
-            <div className="flex justify-between items-center px-8 py-4 border-b border-stone-800">
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">ORO 9</h1>
-                <p className="text-stone-400">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+            <div className="flex justify-between items-center px-[clamp(1rem,4vw,2rem)] py-[clamp(0.5rem,2vw,1rem)] border-b border-stone-800 flex-shrink-0">
+                <h1 className="text-[clamp(1rem,3.5vw,1.75rem)] font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">ORO 9</h1>
+                <p className="text-stone-400 text-[clamp(0.75rem,2vw,1rem)]">
+                    {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
             </div>
 
             {/* Items */}
-            <div className="flex-1 overflow-y-auto px-8 py-4">
-                {state.items.map((item, i) => (
-                    <div key={i} className={`flex justify-between items-center py-4 px-4 rounded-xl mb-2 ${i === state.items.length - 1 ? 'bg-emerald-500/10 border border-emerald-500/30 scale-[1.02]' : 'bg-stone-900/50'} transition-all`}>
-                        <div className="flex items-center gap-4">
-                            <span className="text-lg font-semibold">{item.name}</span>
-                            {item.quantity > 1 && <span className="text-sm text-stone-400 bg-stone-700 px-2 py-0.5 rounded">×{item.quantity}</span>}
+            <div className="flex-1 overflow-y-auto px-[clamp(1rem,4vw,2rem)] py-[clamp(0.5rem,2vw,1rem)]">
+                {state.items.map((item, i) => {
+                    const isLatest = i === state.items.length - 1
+                    return (
+                        <div
+                            key={i}
+                            className={`flex justify-between items-center py-[clamp(0.5rem,2vw,1rem)] px-[clamp(0.5rem,2vw,1rem)] rounded-xl mb-[clamp(0.25rem,0.75vw,0.5rem)] transition-all ${
+                                isLatest
+                                    ? 'bg-emerald-500/10 border border-emerald-500/30 scale-[1.02]'
+                                    : 'bg-stone-900/50'
+                            }`}
+                        >
+                            <div className="flex items-center gap-[clamp(0.5rem,2vw,1rem)] min-w-0 flex-1">
+                                <span className="text-[clamp(0.875rem,2.5vw,1.25rem)] font-semibold truncate">{item.name}</span>
+                                {item.quantity > 1 && (
+                                    <span className="text-[clamp(0.625rem,1.5vw,0.875rem)] text-stone-400 bg-stone-700 px-[clamp(0.25rem,1vw,0.5rem)] py-0.5 rounded flex-shrink-0">
+                                        ×{item.quantity}
+                                    </span>
+                                )}
+                            </div>
+                            <span className="text-[clamp(0.875rem,3vw,1.5rem)] font-mono text-emerald-400 flex-shrink-0 ml-[clamp(0.5rem,1vw,0.75rem)]">
+                                {formatCurrency(item.total)}
+                            </span>
                         </div>
-                        <span className="text-xl font-mono text-emerald-400">{formatCurrency(item.total)}</span>
-                    </div>
-                ))}
+                    )
+                })}
             </div>
 
             {/* Totals */}
-            <div className="border-t border-stone-700 px-8 py-6 bg-stone-950/80">
-                <div className="flex justify-between text-lg text-stone-400 mb-2">
+            <div className="border-t border-stone-700 px-[clamp(1rem,4vw,2rem)] py-[clamp(0.75rem,3vw,1.5rem)] bg-stone-950/80 flex-shrink-0">
+                <div className="flex justify-between text-[clamp(0.875rem,2.5vw,1.25rem)] text-stone-400 mb-[clamp(0.25rem,1vw,0.5rem)]">
                     <span>Subtotal ({state.items.length} items)</span>
                     <span>{formatCurrency(state.subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-lg text-stone-400 mb-4">
+                <div className="flex justify-between text-[clamp(0.875rem,2.5vw,1.25rem)] text-stone-400 mb-[clamp(0.5rem,2vw,1rem)]">
                     <span>Tax</span>
                     <span>{formatCurrency(state.tax)}</span>
                 </div>
-                <div className="flex justify-between text-3xl font-bold">
+                <div className="flex justify-between text-[clamp(1.25rem,5vw,2.25rem)] font-bold">
                     <span>Total</span>
                     <span className="text-emerald-400">{formatCurrency(state.total)}</span>
                 </div>
 
                 {state.status === 'PAYMENT' && (
-                    <div className="mt-4 text-center py-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-400 text-xl animate-pulse">
+                    <div className="mt-[clamp(0.5rem,2vw,1rem)] text-center py-[clamp(0.5rem,1.5vw,0.75rem)] bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-400 text-[clamp(0.875rem,3vw,1.5rem)] animate-pulse">
                         Processing payment...
                     </div>
                 )}
