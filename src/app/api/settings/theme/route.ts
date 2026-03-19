@@ -54,11 +54,14 @@ export async function PUT(request: Request) {
 
         const user = session.user as any
 
+        // DIAGNOSTIC: Log full session to trace 403 issues
+        console.error(`[THEME PUT] Session: id=${user.id} email=${user.email} role=${user.role} franchiseId=${user.franchiseId}`)
+
         // Any business role can change their theme
         const allowedRoles = ['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'ADMIN']
         if (!allowedRoles.includes(user.role)) {
-            console.error('[THEME] Permission denied for role:', user.role)
-            return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+            console.error('[THEME] Permission denied for role:', user.role, '— Full user:', JSON.stringify({ id: user.id, email: user.email, role: user.role }))
+            return NextResponse.json({ error: 'Permission denied', role: user.role || 'NO_ROLE' }, { status: 403 })
         }
 
         if (!user.franchiseId) {
