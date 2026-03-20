@@ -67,7 +67,7 @@ export async function getAuthUser(request?: NextRequest | Request): Promise<Auth
 
                 // Validate required fields
                 if (!payload.userId || !payload.franchiseId) {
-                    console.log('[AUTH] Token missing required fields')
+                    console.error('[AUTH] Token missing required fields')
                     return null
                 }
 
@@ -78,13 +78,13 @@ export async function getAuthUser(request?: NextRequest | Request): Promise<Auth
                 })
 
                 if (!user || !user.isActive) {
-                    console.log('[AUTH] User not found or inactive:', payload.userId)
+                    console.error('[AUTH] User not found or inactive:', payload.userId)
                     return null
                 }
 
                 // SECURITY: Verify franchiseId hasn't changed
                 if (user.franchiseId !== payload.franchiseId) {
-                    console.log('[AUTH] Token franchiseId mismatch - potential security issue')
+                    console.error('[AUTH] Token franchiseId mismatch - potential security issue')
                     return null
                 }
 
@@ -98,7 +98,7 @@ export async function getAuthUser(request?: NextRequest | Request): Promise<Auth
                 }
             } catch (e: any) {
                 if (e.name === 'TokenExpiredError') {
-                    console.log('[AUTH] JWT token expired')
+                    console.error('[AUTH] JWT token expired')
                 } else if (e.name === 'JsonWebTokenError') {
                     console.error('[AUTH] Invalid JWT signature - possible forgery attempt')
                 } else {

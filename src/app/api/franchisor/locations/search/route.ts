@@ -56,8 +56,9 @@ export async function GET(request: NextRequest) {
         };
 
         // Get locations with pagination
+        // franchiseLocation may not be in main schema — any-cast
         const [locations, total] = await Promise.all([
-            prisma.franchiseLocation.findMany({
+            (prisma as any).franchiseLocation.findMany({
                 where,
                 select: {
                     id: true,
@@ -79,26 +80,26 @@ export async function GET(request: NextRequest) {
                 take: pageSize,
                 ...(cursor && { cursor: { id: cursor } })
             }),
-            prisma.franchiseLocation.count({ where })
+            (prisma as any).franchiseLocation.count({ where })
         ]);
 
         // Get facets (counts for filters)
         const [stateFacets, cityFacets, regionFacets] = await Promise.all([
-            prisma.franchiseLocation.groupBy({
+            (prisma as any).franchiseLocation.groupBy({
                 by: ['state'],
                 where: scopeWhere,
                 _count: true,
                 orderBy: { _count: { state: 'desc' } },
                 take: 50
             }),
-            prisma.franchiseLocation.groupBy({
+            (prisma as any).franchiseLocation.groupBy({
                 by: ['city'],
                 where: { ...scopeWhere, ...(state && { state }) },
                 _count: true,
                 orderBy: { _count: { city: 'desc' } },
                 take: 50
             }),
-            prisma.franchiseLocation.groupBy({
+            (prisma as any).franchiseLocation.groupBy({
                 by: ['region'],
                 where: scopeWhere,
                 _count: true,
@@ -115,9 +116,9 @@ export async function GET(request: NextRequest) {
             totalPages: Math.ceil(total / pageSize),
             nextCursor: locations.length === pageSize ? locations[locations.length - 1]?.id : null,
             facets: {
-                states: stateFacets.map(f => ({ value: f.state, count: f._count })).filter(f => f.value),
-                cities: cityFacets.map(f => ({ value: f.city, count: f._count })).filter(f => f.value),
-                regions: regionFacets.map(f => ({ value: f.region, count: f._count })).filter(f => f.value)
+                states: stateFacets.map((f: any) => ({ value: f.state, count: f._count })).filter((f: any) => f.value),
+                cities: cityFacets.map((f: any) => ({ value: f.city, count: f._count })).filter((f: any) => f.value),
+                regions: regionFacets.map((f: any) => ({ value: f.region, count: f._count })).filter((f: any) => f.value)
             }
         });
     } catch (error) {

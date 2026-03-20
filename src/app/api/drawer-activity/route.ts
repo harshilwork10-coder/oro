@@ -47,13 +47,27 @@ export async function POST(request: NextRequest) {
         } = body
 
         // Validate required fields
-        if (!type || !locationId) {
-            return NextResponse.json({ error: 'Type and location required' }, { status: 400 })
+        if (!type) {
+            return NextResponse.json({ error: 'Activity type is required' }, { status: 400 })
+        }
+
+        // Auto-resolve locationId: body > session > franchise's first location
+        let resolvedLocationId = locationId || user.locationId
+        if (!resolvedLocationId) {
+            const loc = await prisma.location.findFirst({
+                where: { franchiseId: user.franchiseId },
+                select: { id: true }
+            })
+            resolvedLocationId = loc?.id
+        }
+
+        if (!resolvedLocationId) {
+            return NextResponse.json({ error: 'No location found' }, { status: 400 })
         }
 
         // Security: Verify location belongs to user's franchise
         const location = await prisma.location.findUnique({
-            where: { id: locationId },
+            where: { id: resolvedLocationId },
             select: { franchiseId: true }
         })
 
@@ -79,7 +93,7 @@ export async function POST(request: NextRequest) {
                 amount: amount ? parseFloat(amount) : null,
                 employeeId: user.id,
                 shiftId: shiftId || null,
-                locationId,
+                locationId: resolvedLocationId,
                 transactionId: transactionId || null,
                 timestamp: new Date()
             },

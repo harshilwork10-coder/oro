@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
@@ -37,7 +37,11 @@ import {
     Maximize,
     Lock,
     Eye,
-    EyeOff
+    EyeOff,
+    ChevronLeft,
+    ChevronRight,
+    Grid3X3,
+    MoreHorizontal
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useBusinessConfig } from '@/hooks/useBusinessConfig'
@@ -53,6 +57,7 @@ import LotteryModal from '@/components/pos/LotteryModal'
 import LotteryPayoutModal from '@/components/pos/LotteryPayoutModal'
 import ReceiptModal from '@/components/pos/ReceiptModal'
 import UniversalSearch from '@/components/pos/UniversalSearch'
+import NumpadModal from '@/components/modals/NumpadModal'
 import {
     printReceipt,
     openCashDrawer,
@@ -62,6 +67,30 @@ import {
 import { useOfflineMode } from '@/lib/use-offline-mode'
 import { OfflineStatusIndicator } from '@/components/pos/OfflineStatusIndicator'
 import QuickSwitchModal from '@/components/pos/QuickSwitchModal'
+
+// Multi-Tax Jurisdiction types
+interface TaxJurisdiction {
+    id: string
+    name: string
+    type: string // STATE, COUNTY, CITY, DISTRICT
+    salesTaxRate: number // e.g., 6.25 for 6.25%
+    priority: number
+    exciseRules: {
+        productType: string
+        ratePerGallon: number | null
+        ratePerUnit: number | null
+        ratePerOz: number | null
+        minAbv: number | null
+        maxAbv: number | null
+    }[]
+}
+
+interface TaxProfile {
+    jurisdictions: TaxJurisdiction[]
+    combinedSalesTaxRate?: number
+    fallbackTaxRate: number
+    hasMultiTax: boolean
+}
 
 interface CartItem {
     id: string
@@ -82,6 +111,11 @@ interface CartItem {
     sellByCase?: boolean // For case break products
     unitsPerCase?: number // Units per case for case break
     casePrice?: number // Case price for case break
+    // Tax metadata from product lookup (for multi-tax)
+    taxExempt?: boolean
+    alcoholType?: string
+    volumeMl?: number
+    isTobacco?: boolean
 }
 
 interface TagAlongProduct {
@@ -111,6 +145,9 @@ export default function RetailPOSPage() {
     const user = session?.user as any
     const { data: config } = useBusinessConfig()
 
+    // Multi-Tax Profile
+    const [taxProfile, setTaxProfile] = useState<TaxProfile | null>(null)
+
     // Barcode input
     const barcodeInputRef = useRef<HTMLInputElement>(null)
     const [barcodeInput, setBarcodeInput] = useState('')
@@ -131,6 +168,7 @@ export default function RetailPOSPage() {
     const [showDiscountModal, setShowDiscountModal] = useState(false)
     const [showQuantityModal, setShowQuantityModal] = useState(false)
     const [showPriceModal, setShowPriceModal] = useState(false)
+    const [showQtyNumpad, setShowQtyNumpad] = useState(false)
     const [showUniversalSearch, setShowUniversalSearch] = useState(false)
     const [showAgeVerification, setShowAgeVerification] = useState(false)
     const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -166,6 +204,12 @@ export default function RetailPOSPage() {
     const [appliedPromotions, setAppliedPromotions] = useState<AppliedPromotion[]>([])
     const [promoDiscount, setPromoDiscount] = useState(0)
 
+    // Promo Code & Loyalty
+    const [promoCode, setPromoCode] = useState('')
+    const [appliedPromoCode, setAppliedPromoCode] = useState('')
+    const [loyaltyDiscount, setLoyaltyDiscount] = useState(0)
+    const [showLoyaltyRedeem, setShowLoyaltyRedeem] = useState(false)
+
     // Today's Stats (live sales header)
     const [todayStats, setTodayStats] = useState<{ sales: number; transactions: number; avgTicket: number } | null>(null)
 
@@ -191,6 +235,43 @@ export default function RetailPOSPage() {
     const [categories, setCategories] = useState<{ id: string; name: string; itemCount?: number }[]>([])
     const [selectedCategory, setSelectedCategory] = useState<string>('')
     const [categoryProducts, setCategoryProducts] = useState<any[]>([])
+
+    // ========== CRE-STYLE LAYOUT STATE ==========
+    const [layoutConfig, setLayoutConfig] = useState<any>(null)
+    const [productCache, setProductCache] = useState<Map<string, any[]>>(new Map())
+    const [productPage, setProductPage] = useState(1)
+    const [productTotal, setProductTotal] = useState(0)
+    const [showMoreDepts, setShowMoreDepts] = useState(false)
+    const [deptSearch, setDeptSearch] = useState('')
+    const [activeQuickFilter, setActiveQuickFilter] = useState<string>('ALL')
+    const [loadingProducts, setLoadingProducts] = useState(false)
+    const PRODUCTS_PER_PAGE = 20
+
+    // Pinned category IDs from layout config (or fallback first 10)
+    const pinnedCategories = useMemo(() => {
+        if (layoutConfig?.pinnedCategoryIds?.length > 0) {
+            return layoutConfig.pinnedCategoryIds
+                .map((id: string) => categories.find(c => c.id === id))
+                .filter(Boolean)
+        }
+        // Fallback: first 10 categories
+        return categories.slice(0, 10)
+    }, [layoutConfig, categories])
+
+    // Quick filters for current category
+    const currentQuickFilters = useMemo(() => {
+        if (!selectedCategory || !layoutConfig?.quickFilters) return []
+        return layoutConfig.quickFilters[selectedCategory] || []
+    }, [selectedCategory, layoutConfig])
+
+    // Category overrides (colors/icons)
+    const getCategoryStyle = useCallback((catId: string) => {
+        const overrides = layoutConfig?.categoryOverrides?.[catId]
+        return {
+            color: overrides?.color || '#57534e', // stone-600 default
+            icon: overrides?.icon || '📦'
+        }
+    }, [layoutConfig])
 
     // SMS Receipt Modal
     const [showReceiptModal, setShowReceiptModal] = useState(false)
@@ -236,6 +317,119 @@ export default function RetailPOSPage() {
         document.addEventListener('keydown', handleKeyDown)
         return () => document.removeEventListener('keydown', handleKeyDown)
     }, [])
+
+    // ========== CRE DATA FETCHING ==========
+
+    // Fetch categories on mount
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const res = await fetch('/api/inventory/categories?take=200')
+                if (res.ok) {
+                    const data = await res.json()
+                    const items = data?.data || data?.categories || data || []
+                    setCategories(Array.isArray(items) ? items : [])
+                }
+            } catch (e) { console.error('[CRE] Failed to fetch categories:', e) }
+        }
+        fetchCategories()
+    }, [])
+
+    // Fetch layout config on mount
+    useEffect(() => {
+        const fetchLayout = async () => {
+            try {
+                const res = await fetch('/api/pos/retail/layout')
+                if (res.ok) {
+                    const data = await res.json()
+                    setLayoutConfig(data?.data?.config || null)
+                }
+            } catch (e) { console.error('[CRE] Failed to fetch layout:', e) }
+        }
+        fetchLayout()
+    }, [])
+
+    // BUG-5 FIX: Removed duplicate top-sellers fetch.
+    // The canonical fetch is in the favorites useEffect below (line ~675).
+    // This block was fetching 20 items, then the second fetch overwrote with 6.
+
+    // Fetch products when category or page changes
+    useEffect(() => {
+        if (!selectedCategory) {
+            setCategoryProducts([])
+            return
+        }
+
+        // Check cache first (page 1 only)
+        const cacheKey = `${selectedCategory}:${activeQuickFilter}`
+        if (productPage === 1 && productCache.has(cacheKey)) {
+            setCategoryProducts(productCache.get(cacheKey) || [])
+            return
+        }
+
+        const controller = new AbortController()
+        const fetchProducts = async () => {
+            setLoadingProducts(true)
+            try {
+                const skip = (productPage - 1) * PRODUCTS_PER_PAGE
+                let url = `/api/inventory/products?categoryId=${selectedCategory}&take=${PRODUCTS_PER_PAGE}&skip=${skip}`
+
+                // Apply keyword filter if active
+                if (activeQuickFilter !== 'ALL' && currentQuickFilters.length > 0) {
+                    const filter = currentQuickFilters.find((f: any) => f.label === activeQuickFilter)
+                    if (filter?.keywords?.length > 0) {
+                        url += `&search=${encodeURIComponent(filter.keywords.join(' '))}`
+                    }
+                }
+
+                const res = await fetch(url, { signal: controller.signal })
+                if (res.ok) {
+                    const data = await res.json()
+                    const items = data?.data || data?.products || data || []
+                    const products = Array.isArray(items) ? items : []
+                    setCategoryProducts(products)
+                    setProductTotal(data?.total || data?.pagination?.total || products.length)
+
+                    // Cache page 1
+                    if (productPage === 1) {
+                        setProductCache(prev => new Map(prev).set(cacheKey, products))
+                    }
+                }
+            } catch (e: any) {
+                if (e.name !== 'AbortError') console.error('[CRE] Failed to fetch products:', e)
+            } finally {
+                setLoadingProducts(false)
+            }
+        }
+        fetchProducts()
+        return () => controller.abort()
+    }, [selectedCategory, productPage, activeQuickFilter])
+
+    // Handle department selection
+    const selectDepartment = useCallback((catId: string) => {
+        setSelectedCategory(catId)
+        setProductPage(1)
+        setActiveQuickFilter('ALL')
+    }, [])
+
+    // Handle product tap → add to cart
+    const handleProductTap = (product: any) => {
+        addToCart({
+            id: product.id,
+            name: product.name,
+            price: Number(product.price || product.cashPrice || 0),
+            barcode: product.barcode,
+            sku: product.sku,
+            cashPrice: product.cashPrice ? Number(product.cashPrice) : undefined,
+            cardPrice: product.cardPrice ? Number(product.cardPrice) : undefined,
+            ageRestricted: product.ageRestricted || product.productCategory?.ageRestricted || false,
+            minimumAge: product.minimumAge || product.productCategory?.minimumAge || null,
+            isEbtEligible: product.isEbtEligible || product.productCategory?.isEbtEligible || false,
+        })
+        setToast({ message: `Added: ${product.name}`, type: 'success' })
+    }
+
+    const totalPages = Math.max(1, Math.ceil(productTotal / PRODUCTS_PER_PAGE))
 
     // ===== KIOSK MODE FEATURES =====
     const [isFullscreen, setIsFullscreen] = useState(false)
@@ -365,6 +559,15 @@ export default function RetailPOSPage() {
         // Receipt Print Settings
         receiptPrintMode: 'ALL' | 'CARD_ONLY' | 'EBT_ONLY' | 'CARD_AND_EBT' | 'NONE'
         openDrawerOnCash: boolean
+        // Tip settings (from account config)
+        tipEnabled: boolean
+        // Tax rate (from FranchiseSettings — single source of truth)
+        taxRate: number
+        // Store Info (for receipts)
+        storeAddress?: string
+        storePhone?: string
+        receiptHeader?: string
+        receiptFooter?: string
     }
     const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
     const [printerConnected, setPrinterConnected] = useState(false)
@@ -415,17 +618,25 @@ export default function RetailPOSPage() {
                     // Device is paired - find the station
                     const paired = stationList.find((s: StationInfo) => s.id === pairedStationId)
                     if (paired) {
+                        // ✅ Use the correctly paired station (not stationList[0])
                         setSelectedStation(paired)
                     } else {
                         // Paired station no longer exists - clear and show pairing
                         localStorage.removeItem('pairedStationId')
-                        setShowStationPairing(true)
+                        if (stationList.length === 1) {
+                            // Auto-re-pair to the only available station
+                            localStorage.setItem('pairedStationId', stationList[0].id)
+                            setSelectedStation(stationList[0])
+                        } else {
+                            setShowStationPairing(true)
+                        }
                     }
-                    // Only one station - auto-pair device to it
+                } else if (stationList.length === 1) {
+                    // Only one station and device not paired - auto-pair
                     localStorage.setItem('pairedStationId', stationList[0].id)
                     setSelectedStation(stationList[0])
                 } else {
-                    // Multiple stations, device not paired - show pairing screen (Provider only)
+                    // Multiple stations, device not paired - show pairing screen
                     setShowStationPairing(true)
                 }
             } catch (error) {
@@ -451,7 +662,15 @@ export default function RetailPOSPage() {
                         cardSurcharge: parseFloat(data.cardSurcharge) || 3.99,
                         showDualPricing: data.showDualPricing ?? false,
                         receiptPrintMode: data.receiptPrintMode || 'ALL',
-                        openDrawerOnCash: data.openDrawerOnCash ?? true
+                        openDrawerOnCash: data.openDrawerOnCash ?? true,
+                        tipEnabled: data.tipPromptEnabled ?? true,
+                        // Tax rate from FranchiseSettings (same source as Android POS)
+                        taxRate: parseFloat(data.taxRate) || 0.0825,
+                        // Store info for receipts (from FranchiseSettings)
+                        storeAddress: data.storeAddress || undefined,
+                        storePhone: data.storePhone || undefined,
+                        receiptHeader: data.receiptHeader || undefined,
+                        receiptFooter: data.receiptFooter || undefined
                     })
                 }
             } catch (error) {
@@ -459,6 +678,20 @@ export default function RetailPOSPage() {
             }
         }
         loadPricingSettings()
+
+        // Fetch multi-tax profile for this location
+        const loadTaxProfile = async () => {
+            try {
+                const res = await fetch('/api/pos/tax-profile')
+                if (res.ok) {
+                    const data = await res.json()
+                    setTaxProfile(data)
+                }
+            } catch (error) {
+                console.error('[POS] Failed to load tax profile:', error)
+            }
+        }
+        loadTaxProfile()
 
         // Check if print agent is connected
         isPrintAgentAvailable().then(setPrinterConnected)
@@ -506,41 +739,8 @@ export default function RetailPOSPage() {
         fetchFavorites()
     }, [])
 
-    // Fetch categories for filter dropdown
-    useEffect(() => {
-        const fetchCategories = async () => {
-            try {
-                const res = await fetch('/api/inventory/categories')
-                if (res.ok) {
-                    const data = await res.json()
-                    setCategories(Array.isArray(data.categories) ? data.categories : Array.isArray(data) ? data : [])
-                }
-            } catch (error) {
-                console.error('[POS] Failed to load categories:', error)
-            }
-        }
-        fetchCategories()
-    }, [])
-
-    // Fetch products when category is selected
-    useEffect(() => {
-        if (!selectedCategory) {
-            setCategoryProducts([])
-            return
-        }
-        const fetchCategoryProducts = async () => {
-            try {
-                const res = await fetch(`/api/inventory/products?categoryId=${selectedCategory}&limit=100`)
-                if (res.ok) {
-                    const data = await res.json()
-                    setCategoryProducts(Array.isArray(data.products) ? data.products : Array.isArray(data) ? data : [])
-                }
-            } catch (error) {
-                console.error('[POS] Failed to load category products:', error)
-            }
-        }
-        fetchCategoryProducts()
-    }, [selectedCategory])
+    // BUG-6 FIX: Removed duplicate useEffect hooks for categories and products.
+    // The CRE data fetching block (lines 289-385) handles both correctly.
 
     // Sync cart to SERVER for customer display (station-isolated)
     useEffect(() => {
@@ -607,7 +807,9 @@ export default function RetailPOSPage() {
                             name: item.name,
                             price: item.price,
                             quantity: item.quantity
-                        }))
+                        })),
+                        promoCode: appliedPromoCode || undefined,
+                        loyaltyId: selectedCustomer?.id || undefined
                     })
                 })
 
@@ -622,7 +824,7 @@ export default function RetailPOSPage() {
         }
 
         checkPromotions()
-    }, [cart])
+    }, [cart, appliedPromoCode, selectedCustomer])
 
 
     // Handle barcode scan (Enter key from scanner)
@@ -738,10 +940,16 @@ export default function RetailPOSPage() {
         setToast({ message: `Added: ${product.name}`, type: 'success' })
     }
 
-    // Confirm age verification (ID was scanned and verified)  
+    // Confirm age verification (ID was scanned and verified)
     const confirmAgeVerification = () => {
         if (pendingAgeItem) {
-            setCart(prev => [...prev, pendingAgeItem])
+            // BUG-10/14 FIX: Check for case break AND go through addToCart for proper dual pricing fields
+            if (pendingAgeItem.sellByCase && pendingAgeItem.unitsPerCase) {
+                setPendingCaseBreakProduct(pendingAgeItem)
+                setShowCaseBreakModal(true)
+            } else {
+                addToCart(pendingAgeItem) // BUG-14 FIX: Use addToCart instead of direct setCart
+            }
             setToast({ message: `Added: ${pendingAgeItem.name} (ID Verified)`, type: 'success' })
         }
         // Mark ID as verified for this transaction - won't ask again
@@ -754,7 +962,13 @@ export default function RetailPOSPage() {
     // Skip age verification (regular customer cashier knows)
     const skipAgeVerification = () => {
         if (pendingAgeItem) {
-            setCart(prev => [...prev, pendingAgeItem])
+            // BUG-10/14 FIX: Same case break + addToCart fix
+            if (pendingAgeItem.sellByCase && pendingAgeItem.unitsPerCase) {
+                setPendingCaseBreakProduct(pendingAgeItem)
+                setShowCaseBreakModal(true)
+            } else {
+                addToCart(pendingAgeItem)
+            }
             setToast({ message: `Added: ${pendingAgeItem.name} (ID Skipped)`, type: 'success' })
         }
         // Mark as verified so we don't ask again for this transaction
@@ -774,23 +988,33 @@ export default function RetailPOSPage() {
     // Round to 2 decimal places (standard half-up)
     const round2 = (n: number) => Math.round(n * 100) / 100
 
-    // Calculate totals (with dual pricing support - Model 1: Tax on Final Charged Price)
+    // Calculate totals (with dual pricing + multi-jurisdiction tax support)
     const calculateTotals = () => {
         const isDualPricing = pricingSettings?.pricingModel === 'DUAL_PRICING' && pricingSettings.showDualPricing
         const surcharge = pricingSettings?.cardSurcharge || 3.99
         const isPercentage = pricingSettings?.cardSurchargeType === 'PERCENTAGE'
+
+        // ML per gallon for excise calculations
+        const ML_PER_GALLON = 3785.41
 
         // === ITEM-BASED TRUTH ===
         let subtotalCash = 0
         let subtotalCard = 0
         let taxCash = 0
         let taxCard = 0
+        let totalExciseTax = 0
+
+        // Tax breakdown by jurisdiction (for receipt)
+        const taxBreakdownMap: Record<string, { name: string; type: string; salesTax: number; exciseTax: number }> = {}
+
+        const hasMultiTax = taxProfile?.hasMultiTax && taxProfile.jurisdictions.length > 0
+        // Fallback: single combined rate (as decimal, e.g., 0.0825)
+        const singleTaxRate = pricingSettings?.taxRate || config?.taxRate || 0.0825
 
         cart.forEach(item => {
             const itemTotal = item.price * item.quantity
             const itemDiscount = item.discount ? itemTotal * (item.discount / 100) : 0
             const cashPrice = round2(itemTotal - itemDiscount)
-            // Card price = cash price × (1 + surcharge%) - rounded per item
             const cardPrice = isDualPricing && isPercentage
                 ? round2(cashPrice * (1 + surcharge / 100))
                 : cashPrice
@@ -798,11 +1022,61 @@ export default function RetailPOSPage() {
             subtotalCash += cashPrice
             subtotalCard += cardPrice
 
-            // Calculate tax per item on the price that will be charged
-            const itemTaxRate = item.taxRate !== undefined ? item.taxRate / 100 : (config?.taxRate || 0) / 100
-            taxCash += round2(cashPrice * itemTaxRate)
-            taxCard += round2(cardPrice * itemTaxRate)
+            // Skip tax for exempt items
+            if (item.taxExempt) return
+
+            if (hasMultiTax) {
+                // === MULTI-TAX: loop through each jurisdiction ===
+                for (const jur of taxProfile!.jurisdictions) {
+                    const jurTaxRate = jur.salesTaxRate / 100 // Convert 6.25 -> 0.0625
+
+                    // Sales tax per jurisdiction
+                    const cashTaxAmt = round2(cashPrice * jurTaxRate)
+                    const cardTaxAmt = round2(cardPrice * jurTaxRate)
+                    taxCash += cashTaxAmt
+                    taxCard += cardTaxAmt
+
+                    // Track breakdown
+                    if (!taxBreakdownMap[jur.id]) {
+                        taxBreakdownMap[jur.id] = { name: jur.name, type: jur.type, salesTax: 0, exciseTax: 0 }
+                    }
+                    taxBreakdownMap[jur.id].salesTax += cashTaxAmt
+
+                    // === EXCISE taxes (per-unit / per-gallon) ===
+                    if (jur.exciseRules.length > 0) {
+                        for (const rule of jur.exciseRules) {
+                            let excise = 0
+                            // Alcohol: per-gallon rate
+                            if (rule.ratePerGallon && item.alcoholType && item.volumeMl) {
+                                if (rule.productType === item.alcoholType) {
+                                    const gallons = item.volumeMl / ML_PER_GALLON
+                                    excise = round2(gallons * rule.ratePerGallon * item.quantity)
+                                }
+                            }
+                            // Tobacco: per-unit rate
+                            if (rule.ratePerUnit && item.isTobacco && rule.productType.startsWith('TOBACCO')) {
+                                excise = round2(rule.ratePerUnit * item.quantity)
+                            }
+                            if (excise > 0) {
+                                totalExciseTax += excise
+                                taxCash += excise
+                                taxCard += excise
+                                taxBreakdownMap[jur.id].exciseTax += excise
+                            }
+                        }
+                    }
+                }
+            } else {
+                // === SINGLE TAX RATE (backward compatible) ===
+                const itemTaxRate = item.taxRate !== undefined ? item.taxRate / 100 : singleTaxRate
+                taxCash += round2(cashPrice * itemTaxRate)
+                taxCard += round2(cardPrice * itemTaxRate)
+            }
         })
+
+        // Build tax breakdown array (sorted by priority)
+        const taxBreakdown = Object.values(taxBreakdownMap)
+            .map(b => ({ ...b, total: round2(b.salesTax + b.exciseTax) }))
 
         // Apply transaction-level discount
         let transactionDiscountAmount = 0
@@ -816,8 +1090,9 @@ export default function RetailPOSPage() {
 
         // Discount ratio for proportional tax reduction
         const discountRatio = subtotalCash > 0 ? transactionDiscountAmount / subtotalCash : 0
-        const discountedSubtotalCash = round2(Math.max(0, subtotalCash - transactionDiscountAmount - promoDiscount))
-        const discountedSubtotalCard = round2(Math.max(0, subtotalCard - (transactionDiscountAmount + promoDiscount) * (subtotalCard / subtotalCash || 1)))
+        const discountedSubtotalCash = round2(Math.max(0, subtotalCash - transactionDiscountAmount - promoDiscount - loyaltyDiscount))
+        const cardRatio = subtotalCash > 0 ? subtotalCard / subtotalCash : 1
+        const discountedSubtotalCard = round2(Math.max(0, subtotalCard - (transactionDiscountAmount + promoDiscount + loyaltyDiscount) * cardRatio))
 
         // Reduce taxes proportionally by discount
         taxCash = round2(taxCash * (1 - discountRatio))
@@ -844,11 +1119,15 @@ export default function RetailPOSPage() {
             total: cashTotal,
             cashTotal,
             cardTotal,
-            lotteryPayout, // Lottery payout amount (tracked separately, doesn't affect sales)
-            customerPayable: round2(Math.max(0, cashTotal - lotteryPayout)), // What customer actually pays after lottery offset
-            customerPayableCard: round2(Math.max(0, cardTotal - lotteryPayout)), // Card price after lottery offset
+            lotteryPayout,
+            customerPayable: round2(Math.max(0, cashTotal - lotteryPayout)),
+            customerPayableCard: round2(Math.max(0, cardTotal - lotteryPayout)),
             itemCount: cart.reduce((sum, item) => sum + item.quantity, 0),
-            showDualPricing: isDualPricing
+            showDualPricing: isDualPricing,
+            // Multi-tax breakdown (for receipt and reports)
+            taxBreakdown,
+            hasMultiTax: !!hasMultiTax,
+            exciseTax: totalExciseTax
         }
     }
 
@@ -916,6 +1195,7 @@ export default function RetailPOSPage() {
         if (held) {
             setCart(held.items)
             setHeldTransactions(prev => prev.filter(t => t.id !== id))
+            setSelectedItemIndex(null) // BUG-16 FIX: Reset selection to avoid stale index
             setToast({ message: 'Transaction recalled', type: 'success' })
         }
     }
@@ -925,8 +1205,13 @@ export default function RetailPOSPage() {
         if (cart.length === 0) return
         if (confirm('Void entire transaction?')) {
             setCart([])
+            setSelectedItemIndex(null)     // BUG-16 FIX: Reset selection
             setSelectedCustomer(null)
-            setIdVerifiedForTransaction(false) // Reset ID verification for next transaction
+            setIdVerifiedForTransaction(false)  // Reset ID verification
+            setTransactionDiscount(null)        // ✅ Clear manual discount (was leaking into next tx)
+            setAppliedPromotions([])            // ✅ Clear promo list
+            setPromoDiscount(0)                 // ✅ Clear promo discount amount
+            setLotteryPayout(0)                 // ✅ Clear lottery offset
             setToast({ message: 'Transaction voided', type: 'success' })
         }
     }
@@ -938,8 +1223,8 @@ export default function RetailPOSPage() {
         // For card payments, open PAX terminal modal instead of direct processing
         if ((method === 'CREDIT_CARD' || method === 'DEBIT_CARD') && !paxResponse) {
             setShowPaymentModal(false)
-            const { total } = calculateTotals()
-            setPendingCardAmount(total + tipAmount)
+            const { cashTotal, cardTotal, showDualPricing } = calculateTotals()
+            setPendingCardAmount((showDualPricing ? cardTotal : cashTotal) + tipAmount)
             setShowPaxModal(true)
             return
         }
@@ -948,8 +1233,14 @@ export default function RetailPOSPage() {
         setShowPaymentModal(false) // Close modal if open
 
         try {
-            const { subtotal, tax, total, cashTotal, cardTotal } = calculateTotals()
-            const totalWithTip = total + tipAmount
+            const { subtotal, subtotalCash, subtotalCard, tax, taxCash, taxCard, total, cashTotal, cardTotal, showDualPricing } = calculateTotals()
+
+            // SURCHARGE FIX: For card payments with dual pricing, use cardTotal as the charged amount
+            const isCardPayment = ['CREDIT_CARD', 'DEBIT_CARD'].includes(method)
+            const chargedTotal = (isCardPayment && showDualPricing) ? cardTotal : cashTotal
+            const totalWithTip = chargedTotal + tipAmount
+            const chargedSubtotal = (isCardPayment && showDualPricing) ? subtotalCard : subtotalCash
+            const chargedTax = (isCardPayment && showDualPricing) ? taxCard : taxCash
 
             const res = await fetch('/api/pos/transaction', {
                 method: 'POST',
@@ -969,15 +1260,18 @@ export default function RetailPOSPage() {
                         cashPrice: item.cashPrice || item.price,
                         cardPrice: item.cardPrice
                     })),
-                    subtotal,
-                    tax,
+                    subtotal: chargedSubtotal,
+                    tax: chargedTax,
                     total: totalWithTip,
                     // Dual pricing totals - stored permanently
                     totalCash: cashTotal,
                     totalCard: cardTotal,
                     paymentMethod: method,
                     clientId: selectedCustomer?.id,
-                    tipAmount: tipAmount,
+                    // BUG-9 FIX: Use `tip` (not `tipAmount`) to match Zod schema
+                    tip: tipAmount,
+                    // BUG-13 FIX: Send customer notes to transaction API
+                    notes: customerNotes || undefined,
                     // Include PAX terminal response data if available
                     ...(paxResponse && {
                         gatewayTxId: paxResponse.transactionId,
@@ -1035,8 +1329,10 @@ export default function RetailPOSPage() {
                             { ...transaction, items: cart },
                             {
                                 name: (session?.user as any)?.franchiseName || 'Store',
-                                address: pricingSettings.showDualPricing ? undefined : undefined,
-                                phone: undefined
+                                address: pricingSettings.storeAddress || undefined,
+                                phone: pricingSettings.storePhone || undefined,
+                                header: pricingSettings.receiptHeader || undefined,
+                                footer: pricingSettings.receiptFooter || undefined
                             },
                             session?.user?.name || 'Cashier'
                         )
@@ -1048,6 +1344,13 @@ export default function RetailPOSPage() {
                 setSelectedCustomer(null)
                 setIdVerifiedForTransaction(false) // Reset ID verification for next transaction
                 setTransactionDiscount(null) // Reset transaction discount
+                setAppliedPromotions([])     // BUG-2 FIX: Clear promo list
+                setPromoDiscount(0)          // BUG-2 FIX: Clear promo discount
+                setLoyaltyDiscount(0)        // BUG-2 FIX: Clear loyalty discount
+                setLotteryPayout(0)          // BUG-2 FIX: Clear lottery offset
+                setAppliedPromoCode('')      // BUG-2 FIX: Clear promo code
+                setCustomerNotes('')         // BUG-13 FIX: Clear notes for next transaction
+                setSelectedItemIndex(null)   // BUG-16 FIX: Reset selection
             } else {
                 const error = await res.json()
                 setToast({ message: error.error || 'Payment failed', type: 'error' })
@@ -1060,71 +1363,129 @@ export default function RetailPOSPage() {
         }
     }
 
+    // BUG-11 FIX: Track pending tip from checkout modal for PAX card payments
+    const [pendingTipAmount, setPendingTipAmount] = useState(0)
+
     // Handle PAX payment success
     const handlePaxSuccess = (paxResponse: any) => {
         setShowPaxModal(false)
-        // Complete the transaction with PAX response data
-        processPayment('CREDIT_CARD', 0, paxResponse)
+        // BUG-6 FIX: Use actual card type from PAX response instead of always CREDIT_CARD
+        const cardMethod = paxResponse?.cardType?.toUpperCase()?.includes('DEBIT') ? 'DEBIT_CARD' : 'CREDIT_CARD'
+        // BUG-11 FIX: Use the pending tip from checkout modal instead of always 0
+        processPayment(cardMethod, pendingTipAmount, paxResponse)
+        setPendingTipAmount(0) // Reset after use
     }
 
-    // Print last receipt
-    const printLastReceipt = () => {
+    // Generate professional receipt HTML (reusable for both print and reprint)
+    const generateReceiptHTML = (tx: any) => {
+        const storeName = (session?.user as any)?.franchiseName || 'ORO 9 POS'
+        const invoiceNum = tx.invoiceNumber || tx.id?.slice(-8)
+        const txDate = new Date(tx.createdAt)
+        const dateStr = txDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+        const timeStr = txDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+        const cashierName = tx.employee?.name || session?.user?.name || 'Cashier'
+        const subtotalNum = Number(tx.subtotal || 0)
+        const taxNum = Number(tx.tax || 0)
+        const tipNum = Number(tx.tip || 0)
+        const totalNum = Number(tx.total || 0)
+        const payMethod = (tx.paymentMethod || 'CASH').replace('_', ' ')
+        const cardLast4 = tx.cardLast4 || ''
+
+        // Resolve item names from snapshot fields
+        const items = tx.lineItems?.map((item: any) => {
+            const name = item.productNameSnapshot || item.serviceNameSnapshot || item.name || 'Item'
+            return { name, qty: Number(item.quantity || 1), price: Number(item.price || 0), total: Number(item.total || item.price || 0) }
+        }) || []
+
+        const itemsHTML = items.map((item: any) => `
+            <tr>
+                <td style="text-align:left;padding:2px 0;">${item.name}</td>
+                <td style="text-align:center;padding:2px 4px;">${item.qty}</td>
+                <td style="text-align:right;padding:2px 0;">$${item.total.toFixed(2)}</td>
+            </tr>
+        `).join('')
+
+        return `<!DOCTYPE html>
+<html><head>
+<title>Receipt #${invoiceNum}</title>
+<style>
+  @media print { @page { margin: 0; size: 80mm auto; } body { margin: 0; } .no-print { display: none !important; } }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', 'Lucida Console', monospace; width: 302px; margin: 0 auto; padding: 12px 8px; color: #000; background: #fff; font-size: 12px; line-height: 1.4; }
+  .store-name { font-size: 20px; font-weight: 900; text-align: center; letter-spacing: 2px; margin-bottom: 2px; }
+  .store-info { text-align: center; font-size: 11px; color: #333; margin-bottom: 8px; }
+  .divider { border: none; border-top: 1px dashed #999; margin: 8px 0; }
+  .meta-row { display: flex; justify-content: space-between; font-size: 11px; color: #555; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; color: #555; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  th:nth-child(2) { text-align: center; }
+  th:last-child { text-align: right; }
+  td { font-size: 12px; vertical-align: top; }
+  .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 13px; }
+  .grand-total { font-size: 18px; font-weight: 900; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 6px 0; margin: 4px 0; }
+  .payment-badge { display: inline-block; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; margin-top: 4px; }
+  .footer { text-align: center; margin-top: 16px; font-size: 11px; color: #555; }
+  .footer .thanks { font-size: 14px; font-weight: 700; color: #000; margin-bottom: 4px; }
+  .barcode { text-align: center; font-size: 28px; font-family: 'Libre Barcode 39', 'Courier New', monospace; letter-spacing: 4px; margin: 8px 0; }
+  .print-btn { display: block; width: 100%; padding: 12px; margin-top: 16px; background: #222; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .print-btn:hover { background: #444; }
+</style>
+</head><body>
+  <div class="store-name">${storeName}</div>
+  <div class="store-info">Thank you for shopping with us</div>
+  <hr class="divider">
+  <div class="meta-row"><span>Date: ${dateStr}</span><span>Time: ${timeStr}</span></div>
+  <div class="meta-row"><span>Invoice: #${invoiceNum}</span><span>Cashier: ${cashierName}</span></div>
+  <hr class="divider">
+  <table>
+    <thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead>
+    <tbody>${itemsHTML}</tbody>
+  </table>
+  <hr class="divider">
+  <div class="totals-row"><span>Subtotal</span><span>$${subtotalNum.toFixed(2)}</span></div>
+  <div class="totals-row"><span>Tax</span><span>$${taxNum.toFixed(2)}</span></div>
+  ${tipNum > 0 ? `<div class="totals-row"><span>Tip</span><span>$${tipNum.toFixed(2)}</span></div>` : ''}
+  <div class="totals-row grand-total"><span>TOTAL</span><span>$${totalNum.toFixed(2)}</span></div>
+  <div style="text-align:center;margin:8px 0;">
+    <span class="payment-badge">${payMethod}${cardLast4 ? ' •••• ' + cardLast4 : ''}</span>
+  </div>
+  <hr class="divider">
+  <div class="barcode">*${invoiceNum}*</div>
+  <div class="footer">
+    <div class="thanks">Thank You!</div>
+    <div>Please come again</div>
+    <div style="margin-top:6px;font-size:10px;color:#888;">Powered by ORO 9 POS</div>
+  </div>
+  <button class="print-btn no-print" onclick="window.print()">🖨️ Print Receipt</button>
+</body></html>`
+    }
+
+    // Print last receipt (professional receipt popup)
+    const printLastReceipt = async () => {
         if (!lastTransaction) {
             setToast({ message: 'No recent transaction to print', type: 'error' })
             return
         }
-
-        // Create printable receipt
-        const receiptWindow = window.open('', '_blank', 'width=400,height=600')
+        // Try thermal printer first
+        const printAgentReady = await isPrintAgentAvailable()
+        if (printAgentReady) {
+            const thermalReceipt = formatReceiptFromTransaction(
+                { ...lastTransaction, items: lastTransaction.lineItems || [] },
+                { name: (session?.user as any)?.franchiseName || 'Store' },
+                session?.user?.name || 'Cashier'
+            )
+            printReceipt(thermalReceipt).catch(console.error)
+            setToast({ message: 'Reprinting receipt...', type: 'success' })
+            return
+        }
+        // Fallback: professional receipt popup
+        const receiptWindow = window.open('', '_blank', 'width=400,height=700')
         if (!receiptWindow) {
             setToast({ message: 'Please allow popups to print receipt', type: 'error' })
             return
         }
-
-        const receiptHTML = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Receipt #${lastTransaction.invoiceNumber || lastTransaction.id?.slice(-8)}</title>
-                <style>
-                    body { font-family: 'Courier New', monospace; padding: 20px; max-width: 300px; margin: 0 auto; }
-                    .header { text-align: center; margin-bottom: 20px; }
-                    .line { border-top: 1px dashed #000; margin: 10px 0; }
-                    .item { display: flex; justify-content: space-between; margin: 5px 0; }
-                    .total { font-weight: bold; font-size: 1.2em; }
-                    .footer { text-align: center; margin-top: 20px; font-size: 0.8em; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h2>RECEIPT</h2>
-                    <p>#${lastTransaction.invoiceNumber || lastTransaction.id?.slice(-8)}</p>
-                    <p>${new Date(lastTransaction.createdAt).toLocaleString()}</p>
-                </div>
-                <div class="line"></div>
-                ${lastTransaction.lineItems?.map((item: any) => `
-                    <div class="item">
-                        <span>${item.quantity}x ${item.name}</span>
-                        <span>$${(item.price * item.quantity).toFixed(2)}</span>
-                    </div>
-                `).join('') || '<p>No items</p>'}
-                <div class="line"></div>
-                <div class="item"><span>Subtotal:</span><span>$${Number(lastTransaction.subtotal).toFixed(2)}</span></div>
-                <div class="item"><span>Tax:</span><span>$${Number(lastTransaction.tax).toFixed(2)}</span></div>
-                ${lastTransaction.tip > 0 ? `<div class="item"><span>Tip:</span><span>$${Number(lastTransaction.tip).toFixed(2)}</span></div>` : ''}
-                <div class="line"></div>
-                <div class="item total"><span>TOTAL:</span><span>$${(Number(lastTransaction.subtotal) + Number(lastTransaction.tax) + Number(lastTransaction.tip || 0)).toFixed(2)}</span></div>
-                <div class="item"><span>Payment:</span><span>${lastTransaction.paymentMethod}</span></div>
-                <div class="footer">
-                    <p>Thank you for your business!</p>
-                </div>
-            </body>
-            </html>
-        `
-
-        receiptWindow.document.write(receiptHTML)
+        receiptWindow.document.write(generateReceiptHTML(lastTransaction))
         receiptWindow.document.close()
-        receiptWindow.print()
     }
 
     // Price check - lookup product without adding to cart
@@ -1223,7 +1584,7 @@ export default function RetailPOSPage() {
 
             {/* Exit Fullscreen PIN Modal */}
             {showExitModal && (
-                <div className="fixed inset-0 bg-black/90 z-[300] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[300] flex items-center justify-center p-4">
                     <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full border border-stone-700">
                         <div className="text-center mb-6">
                             <div className="w-16 h-16 mx-auto bg-orange-500/20 rounded-full flex items-center justify-center mb-4">
@@ -1410,28 +1771,15 @@ export default function RetailPOSPage() {
                         />
                     </div>
 
-                    {/* Category Filter Dropdown */}
-                    <select
-                        value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
-                        className={`bg-stone-800 border border-stone-700 rounded-lg text-sm focus:outline-none focus:border-orange-500 ${compactMode ? 'py-2 px-2' : 'py-3 px-3'} ${selectedCategory ? 'text-orange-400' : 'text-stone-400'}`}
-                    >
-                        <option value="">All Depts</option>
-                        {categories.map((cat) => (
-                            <option key={cat.id} value={cat.id}>
-                                {cat.name}
-                            </option>
-                        ))}
-                    </select>
-
-                    {/* Quantity Input */}
-                    <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 rounded-lg px-3 py-2">
+                    {/* Quantity Input — keyboard + tap numpad */}
+                    <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 hover:border-orange-500 rounded-lg px-3 py-2 cursor-pointer transition-colors">
                         <span className="text-stone-400 text-sm">Qty:</span>
                         <input
                             type="number"
                             value={quantityInput}
                             onChange={(e) => setQuantityInput(e.target.value)}
-                            className="w-16 bg-transparent text-center text-lg font-bold focus:outline-none"
+                            onClick={() => setShowQtyNumpad(true)}
+                            className="w-16 bg-transparent text-center text-lg font-bold focus:outline-none cursor-pointer [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             min="1"
                         />
                     </div>
@@ -1520,196 +1868,187 @@ export default function RetailPOSPage() {
                 />
             </div>
 
-            {/* Tag-Along Suggestions Bar (Cross-sell) */}
-            {tagAlongItems.length > 0 && (
-                <div className="px-4 py-2 bg-gradient-to-r from-amber-900/30 to-orange-900/30 border-b border-amber-700/50">
-                    <div className="flex items-center gap-3">
-                        <span className="text-amber-400 text-sm font-medium whitespace-nowrap">
-                            💡 Customers also buy:
-                        </span>
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+
+            {/* ========== CRE-STYLE DEPARTMENT TABS + PRODUCT GRID ========== */}
+
+            {/* Main Content - 2 Column: Product Grid (left) + Cart (right) */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* LEFT SIDE - Department Tabs + Product Grid */}
+                <div className="flex-1 flex flex-col border-r border-stone-800 min-w-0">
+
+                    {/* Department Tab Bar */}
+                    <div className="flex items-center gap-1 px-2 py-1.5 bg-stone-900/80 border-b border-stone-800 overflow-x-auto flex-shrink-0">
+                        {/* ALL (Top Sellers) */}
+                        <button
+                            onClick={() => selectDepartment('')}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${!selectedCategory
+                                ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/30'
+                                : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+                                }`}
+                        >
+                            <span>⭐</span>
+                            <span>ALL</span>
+                        </button>
+
+                        {/* Pinned Department Tabs */}
+                        {pinnedCategories.map((cat: any) => {
+                            const style = getCategoryStyle(cat.id)
+                            const isActive = selectedCategory === cat.id
+                            return (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => selectDepartment(cat.id)}
+                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${isActive
+                                        ? 'text-white shadow-lg'
+                                        : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+                                        }`}
+                                    style={isActive ? { backgroundColor: style.color, boxShadow: `0 4px 14px ${style.color}40` } : {}}
+                                >
+                                    <span className="text-base">{style.icon}</span>
+                                    <span className="hidden sm:inline">{cat.name}</span>
+                                    <span className="sm:hidden">{cat.name.slice(0, 6)}</span>
+                                </button>
+                            )
+                        })}
+
+                        {/* MORE Button */}
+                        {categories.length > pinnedCategories.length && (
+                            <button
+                                onClick={() => { setShowMoreDepts(true); setDeptSearch('') }}
+                                className="flex items-center gap-1 px-3 py-2 bg-stone-800 hover:bg-stone-700 rounded-lg text-sm font-medium text-stone-400 whitespace-nowrap transition-colors flex-shrink-0"
+                            >
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span>MORE</span>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Quick Filter Row (shown when category has filters configured) */}
+                    {selectedCategory && currentQuickFilters.length > 0 && (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-stone-900/50 border-b border-stone-800 overflow-x-auto flex-shrink-0">
+                            <button
+                                onClick={() => { setActiveQuickFilter('ALL'); setProductPage(1) }}
+                                className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all ${activeQuickFilter === 'ALL'
+                                    ? 'bg-orange-500 text-white'
+                                    : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                    }`}
+                            >
+                                ALL
+                            </button>
+                            {currentQuickFilters.map((filter: any, idx: number) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => { setActiveQuickFilter(filter.label); setProductPage(1) }}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all ${activeQuickFilter === filter.label
+                                        ? 'bg-orange-500 text-white'
+                                        : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                        }`}
+                                >
+                                    {filter.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Tag-Along Suggestions Bar (inline) */}
+                    {tagAlongItems.length > 0 && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-900/20 to-orange-900/20 border-b border-amber-700/30 overflow-x-auto flex-shrink-0">
+                            <span className="text-amber-400 text-xs font-medium whitespace-nowrap">💡 Also buy:</span>
                             {tagAlongItems.map((item) => (
                                 <button
                                     key={item.id}
                                     onClick={() => {
-                                        addToCart({
-                                            id: item.id,
-                                            name: item.name,
-                                            price: item.price,
-                                            barcode: item.barcode,
-                                            sku: item.sku
-                                        })
+                                        addToCart({ id: item.id, name: item.name, price: item.price, barcode: item.barcode, sku: item.sku })
                                         setToast({ message: `Added: ${item.name}`, type: 'success' })
                                     }}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-600/50 rounded-full text-sm whitespace-nowrap transition-colors"
+                                    className="flex items-center gap-1 px-2 py-1 bg-amber-600/20 hover:bg-amber-600/40 border border-amber-600/30 rounded text-xs whitespace-nowrap transition-colors"
                                 >
                                     <span>{item.name}</span>
-                                    <span className="text-amber-300 font-medium">
-                                        {formatCurrency(Number(item.price))}
-                                    </span>
-                                    <span className="text-xs bg-amber-500/50 px-1.5 py-0.5 rounded">+ADD</span>
+                                    <span className="text-amber-300 font-medium">{formatCurrency(Number(item.price))}</span>
                                 </button>
                             ))}
-                        </div>
-                        <button
-                            onClick={() => setTagAlongItems([])}
-                            className="text-stone-500 hover:text-stone-300 ml-auto"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Favorites Bar (Top Sellers Quick Buttons) */}
-            {favorites.length > 0 && !selectedCategory && (
-                <div className="px-4 py-2 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-b border-purple-700/50">
-                    <div className="flex items-center gap-3">
-                        <span className="text-purple-400 text-sm font-medium whitespace-nowrap">
-                            ⭐ Quick:
-                        </span>
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                            {favorites.map((item) => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => {
-                                        addToCart({
-                                            id: item.id,
-                                            name: item.name,
-                                            price: item.price,
-                                            barcode: item.barcode
-                                        })
-                                        setToast({ message: `Added: ${item.name}`, type: 'success' })
-                                    }}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-600/50 rounded-lg text-sm whitespace-nowrap transition-colors"
-                                >
-                                    <span className="font-medium">{item.name}</span>
-                                    <span className="text-purple-300 font-medium">
-                                        {formatCurrency(Number(item.price))}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Category Products Grid - Shows when category is selected */}
-            {selectedCategory && categoryProducts.length > 0 && (
-                <div className="bg-gradient-to-r from-orange-900/20 to-amber-900/20 border-b border-orange-700/50 max-h-48 overflow-y-auto">
-                    <div className="px-4 py-2">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-orange-400 text-sm font-medium">
-                                📦 {categories.find(c => c.id === selectedCategory)?.name} ({categoryProducts.length} items)
-                            </span>
-                            <button
-                                onClick={() => setSelectedCategory('')}
-                                className="text-xs text-stone-400 hover:text-white px-2 py-1 bg-stone-800 rounded"
-                            >
-                                Clear Filter
+                            <button onClick={() => setTagAlongItems([])} className="text-stone-500 hover:text-stone-300 ml-auto flex-shrink-0">
+                                <X className="h-3 w-3" />
                             </button>
                         </div>
-                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-                            {categoryProducts.map((product: any) => (
-                                <button
-                                    key={product.id}
-                                    onClick={() => {
-                                        addToCart({
-                                            id: product.id,
-                                            name: product.name,
-                                            price: Number(product.price),
-                                            barcode: product.barcode
-                                        })
-                                        setToast({ message: `Added: ${product.name}`, type: 'success' })
-                                    }}
-                                    className="flex flex-col items-center p-2 bg-orange-600/20 hover:bg-orange-600/40 border border-orange-600/30 rounded-lg text-xs transition-colors"
-                                >
-                                    <span className="font-medium text-white truncate w-full text-center">{product.name}</span>
-                                    <span className="text-orange-300 font-bold">{formatCurrency(Number(product.price))}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
+                    )}
 
-            {/* Main Content */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Left Side - Item List */}
-                <div className="flex-1 flex flex-col border-r border-stone-800">
-                    {/* Table Header */}
-                    <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-stone-900 border-b border-stone-800 text-sm font-medium text-stone-400">
-                        <div className="col-span-1">#</div>
-                        <div className="col-span-6">Item Info</div>
-                        <div className="col-span-2 text-center">Quantity</div>
-                        <div className="col-span-2 text-right">Price</div>
-                        <div className="col-span-1"></div>
-                    </div>
-
-                    {/* Item List */}
-                    <div className="flex-1 overflow-y-auto">
-                        {cart.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-stone-500">
-                                <ShoppingCart className="h-16 w-16 mb-4 opacity-20" />
-                                <p className="text-lg">Scan items to begin</p>
-                            </div>
-                        ) : (
-                            cart.map((item, idx) => (
-                                <div
-                                    key={idx}
-                                    onClick={() => setSelectedItemIndex(idx)}
-                                    className={`grid grid-cols-12 gap-2 px-4 py-3 border-b border-stone-800 cursor-pointer transition-colors ${selectedItemIndex === idx
-                                        ? 'bg-orange-500/20 border-l-4 border-l-orange-500'
-                                        : 'hover:bg-stone-900'
-                                        }`}
-                                >
-                                    <div className="col-span-1 text-stone-500 font-mono">{idx + 1}</div>
-                                    <div className="col-span-6">
-                                        <p className="font-medium">{item.name}</p>
-                                        <div className="flex items-center gap-2 text-xs text-stone-500">
-                                            {item.barcode && <span>BC: {item.barcode}</span>}
-                                            {item.sku && <span>SKU: {item.sku}</span>}
-                                            {item.isEbtEligible && (
-                                                <span className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium">EBT</span>
-                                            )}
-                                            {item.ageRestricted && (
-                                                <span className="text-amber-500">21+</span>
-                                            )}
-                                        </div>
-                                        {item.discount && item.discount > 0 && (
-                                            <span className="text-xs text-orange-400">-{item.discount}% OFF</span>
-                                        )}
-                                    </div>
-                                    <div className="col-span-2 flex items-center justify-center gap-2">
+                    {/* Product Button Grid */}
+                    <div className="flex-1 overflow-y-auto p-2">
+                        {!selectedCategory ? (
+                            /* ALL Tab — Top Sellers / Favorites */
+                            favorites.length > 0 ? (
+                                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                                    {favorites.map((item: any) => (
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); updateQuantity(idx, item.quantity - 1) }}
-                                            className="w-8 h-8 rounded bg-stone-800 hover:bg-stone-700 flex items-center justify-center"
+                                            key={item.id}
+                                            onClick={() => handleProductTap(item)}
+                                            className="flex flex-col items-center justify-center p-2 bg-gradient-to-b from-stone-800 to-stone-850 hover:from-amber-600/30 hover:to-amber-700/20 border border-stone-700 hover:border-amber-500/50 rounded-xl transition-all active:scale-95 min-h-[80px]"
                                         >
-                                            -
+                                            <span className="text-xs font-semibold text-white text-center leading-tight line-clamp-2 mb-1">{item.name}</span>
+                                            <span className="text-sm font-bold text-emerald-400">{formatCurrency(Number(item.price))}</span>
                                         </button>
-                                        <span className="w-10 text-center font-bold">{item.quantity}</span>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); updateQuantity(idx, item.quantity + 1) }}
-                                            className="w-8 h-8 rounded bg-stone-800 hover:bg-stone-700 flex items-center justify-center"
-                                        >
-                                            +
-                                        </button>
-                                    </div>
-                                    <div className="col-span-2 text-right font-medium">
-                                        {formatCurrency(item.price * item.quantity)}
-                                    </div>
-                                    <div className="col-span-1 flex justify-end">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); removeItem(idx) }}
-                                            className="w-8 h-8 rounded bg-red-500/20 hover:bg-red-500/40 text-red-400 flex items-center justify-center transition-colors"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </button>
-                                    </div>
+                                    ))}
                                 </div>
-                            ))
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-stone-500">
+                                    <Grid3X3 className="h-16 w-16 mb-4 opacity-20" />
+                                    <p className="text-lg font-medium">Quick Access Buttons</p>
+                                    <p className="text-sm text-stone-600 mt-1">Select a department above or scan a barcode</p>
+                                </div>
+                            )
+                        ) : (
+                            /* Department Products Grid */
+                            loadingProducts ? (
+                                <div className="flex flex-col items-center justify-center h-full text-stone-500">
+                                    <Loader2 className="h-10 w-10 animate-spin mb-3 text-orange-500" />
+                                    <p className="text-sm">Loading products...</p>
+                                </div>
+                            ) : categoryProducts.length > 0 ? (
+                                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                                    {categoryProducts.map((product: any) => (
+                                        <button
+                                            key={product.id}
+                                            onClick={() => handleProductTap(product)}
+                                            className="flex flex-col items-center justify-center p-2 bg-gradient-to-b from-stone-800 to-stone-850 hover:from-orange-600/30 hover:to-orange-700/20 border border-stone-700 hover:border-orange-500/50 rounded-xl transition-all active:scale-95 min-h-[80px]"
+                                        >
+                                            <span className="text-xs font-semibold text-white text-center leading-tight line-clamp-2 mb-1">{product.name}</span>
+                                            <span className="text-sm font-bold text-emerald-400">{formatCurrency(Number(product.price || product.cashPrice || 0))}</span>
+                                            {product.ageRestricted && <span className="text-[9px] text-amber-400 mt-0.5">21+</span>}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-stone-500">
+                                    <Package className="h-12 w-12 mb-3 opacity-20" />
+                                    <p className="text-sm">No products in this category</p>
+                                </div>
+                            )
                         )}
                     </div>
+
+                    {/* Pagination Bar (only when in a category with products) */}
+                    {selectedCategory && categoryProducts.length > 0 && (
+                        <div className="flex items-center justify-between px-3 py-1.5 bg-stone-900 border-t border-stone-800 flex-shrink-0">
+                            <button
+                                onClick={() => setProductPage(p => Math.max(1, p - 1))}
+                                disabled={productPage <= 1}
+                                className="flex items-center gap-1 px-3 py-1 bg-stone-800 hover:bg-stone-700 disabled:opacity-30 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
+                            >
+                                <ChevronLeft className="h-3 w-3" /> PREV
+                            </button>
+                            <span className="text-xs text-stone-500 font-medium">
+                                Page {productPage} / {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setProductPage(p => Math.min(totalPages, p + 1))}
+                                disabled={productPage >= totalPages}
+                                className="flex items-center gap-1 px-3 py-1 bg-stone-800 hover:bg-stone-700 disabled:opacity-30 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
+                            >
+                                NEXT <ChevronRight className="h-3 w-3" />
+                            </button>
+                        </div>
+                    )}
 
                     {/* Bottom Action Bar - Compact for 15.5" POS */}
                     <div className="flex flex-col gap-1 p-2 bg-stone-900 border-t border-stone-800">
@@ -1872,10 +2211,150 @@ export default function RetailPOSPage() {
                     </div>
                 </div>
 
-                {/* Right Side - Totals & Payment - Narrower on compact */}
-                <div className={`flex flex-col bg-stone-950 ${compactMode ? 'w-64' : 'w-80'}`}>
+                {/* RIGHT SIDE - Cart + Totals + Payment */}
+                <div className={`flex flex-col bg-stone-950 ${compactMode ? 'w-72' : 'w-96'}`}>
+                    {/* Cart Header */}
+                    <div className="flex items-center justify-between px-3 py-2 bg-stone-900 border-b border-stone-800">
+                        <span className="text-sm font-semibold text-stone-400">Cart ({itemCount} items)</span>
+                        {cart.length > 0 && (
+                            <button onClick={voidTransaction} className="text-xs text-red-400 hover:text-red-300 transition-colors">
+                                Clear All
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Cart Items List */}
+                    <div className="flex-1 overflow-y-auto">
+                        {cart.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-stone-600 py-8">
+                                <ShoppingCart className="h-10 w-10 mb-2 opacity-30" />
+                                <p className="text-xs">Scan or tap items</p>
+                            </div>
+                        ) : (
+                            cart.map((item, idx) => (
+                                <div
+                                    key={idx}
+                                    onClick={() => setSelectedItemIndex(idx)}
+                                    className={`flex items-center gap-2 px-3 py-2 border-b border-stone-800/50 cursor-pointer transition-colors ${selectedItemIndex === idx
+                                        ? 'bg-orange-500/15 border-l-2 border-l-orange-500'
+                                        : 'hover:bg-stone-900/50'
+                                        }`}
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">{item.name}</p>
+                                        <div className="flex items-center gap-1 text-[10px] text-stone-500">
+                                            {item.barcode && <span>{item.barcode}</span>}
+                                            {item.isEbtEligible && <span className="text-green-400">EBT</span>}
+                                            {item.ageRestricted && <span className="text-amber-400">21+</span>}
+                                            {item.discount && item.discount > 0 && (
+                                                <span className="text-orange-400">-{item.discount}%</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); updateQuantity(idx, item.quantity - 1) }}
+                                            className="w-6 h-6 rounded bg-stone-800 hover:bg-stone-700 flex items-center justify-center text-xs"
+                                        >-</button>
+                                        <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); updateQuantity(idx, item.quantity + 1) }}
+                                            className="w-6 h-6 rounded bg-stone-800 hover:bg-stone-700 flex items-center justify-center text-xs"
+                                        >+</button>
+                                    </div>
+                                    <span className="text-sm font-medium w-16 text-right flex-shrink-0">
+                                        {formatCurrency(item.price * item.quantity)}
+                                    </span>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); removeItem(idx) }}
+                                        className="w-5 h-5 rounded bg-red-500/20 hover:bg-red-500/40 text-red-400 flex items-center justify-center flex-shrink-0 transition-colors"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* Promo Code + Loyalty Section */}
+                    <div className="bg-stone-900/50 border-t border-stone-800 px-3 py-2 space-y-2">
+                        {/* Promo Code Input */}
+                        <div className="flex gap-1">
+                            <input
+                                type="text"
+                                value={promoCode}
+                                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && promoCode.trim()) {
+                                        setAppliedPromoCode(promoCode.trim())
+                                    }
+                                }}
+                                placeholder="Promo code..."
+                                className="flex-1 px-2 py-1.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-center font-mono tracking-wider focus:outline-none focus:border-amber-500 placeholder:text-stone-600 placeholder:font-sans placeholder:tracking-normal"
+                            />
+                            {appliedPromoCode ? (
+                                <button
+                                    onClick={() => { setAppliedPromoCode(''); setPromoCode('') }}
+                                    className="px-3 py-1.5 bg-red-900/30 text-red-400 rounded-lg text-xs font-bold hover:bg-red-900/50 border border-red-500/30"
+                                >
+                                    ✕
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => promoCode.trim() && setAppliedPromoCode(promoCode.trim())}
+                                    disabled={!promoCode.trim()}
+                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-xs font-bold text-white"
+                                >
+                                    Apply
+                                </button>
+                            )}
+                        </div>
+                        {appliedPromoCode && (
+                            <p className="text-[10px] text-amber-400 text-center">Code <span className="font-mono font-bold">{appliedPromoCode}</span> applied</p>
+                        )}
+
+                        {/* Loyalty Points Display */}
+                        {selectedCustomer && (
+                            <div className="bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">⭐</span>
+                                        <div>
+                                            <p className="text-xs text-amber-400 font-bold">{selectedCustomer.name}</p>
+                                            <p className="text-[10px] text-stone-400">{selectedCustomer.loyaltyPoints ?? 0} pts available</p>
+                                        </div>
+                                    </div>
+                                    {(selectedCustomer.loyaltyPoints ?? 0) > 0 && loyaltyDiscount === 0 && (
+                                        <button
+                                            onClick={() => {
+                                                // 100 points = $1.00 (standard ratio)
+                                                const pointValue = (selectedCustomer.loyaltyPoints ?? 0) * 0.01
+                                                const maxRedeem = Math.min(pointValue, subtotal)
+                                                setLoyaltyDiscount(Math.round(maxRedeem * 100) / 100)
+                                            }}
+                                            className="px-2 py-1 bg-amber-600 hover:bg-amber-500 rounded text-[10px] font-bold text-white"
+                                        >
+                                            Redeem
+                                        </button>
+                                    )}
+                                    {loyaltyDiscount > 0 && (
+                                        <button
+                                            onClick={() => setLoyaltyDiscount(0)}
+                                            className="px-2 py-1 bg-red-900/30 text-red-400 rounded text-[10px] font-bold hover:bg-red-900/50 border border-red-500/30"
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
+                                {loyaltyDiscount > 0 && (
+                                    <p className="text-xs text-emerald-400 mt-1 font-bold">✓ {formatCurrency(loyaltyDiscount)} loyalty discount applied</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
                     {/* Totals */}
-                    <div className={`space-y-2 bg-stone-900 border-b border-stone-800 ${compactMode ? 'p-2' : 'p-4 space-y-3'}`}>
+                    <div className={`space-y-2 bg-stone-900 border-t border-stone-800 ${compactMode ? 'p-2' : 'p-3 space-y-2'}`}>
                         <div className={`flex justify-between ${compactMode ? 'text-base' : 'text-lg'}`}>
                             <span className="text-emerald-400">Sub Total</span>
                             <span className="font-bold">{formatCurrency(subtotal)}</span>
@@ -1901,6 +2380,21 @@ export default function RetailPOSPage() {
                                         <span className="text-pink-400">-{formatCurrency(promo.discountAmount)}</span>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {/* Loyalty Discount Line */}
+                        {loyaltyDiscount > 0 && (
+                            <div className="flex justify-between text-sm">
+                                <span className="text-amber-400 flex items-center gap-1">⭐ Loyalty</span>
+                                <span className="font-bold text-amber-400">-{formatCurrency(loyaltyDiscount)}</span>
+                            </div>
+                        )}
+
+                        {/* Total Savings Banner */}
+                        {(promoDiscount + loyaltyDiscount) > 0 && (
+                            <div className="bg-emerald-500/10 rounded-lg px-3 py-2 border border-emerald-500/20 text-center">
+                                <p className="text-emerald-400 font-bold text-sm">🎉 You saved {formatCurrency(promoDiscount + loyaltyDiscount)}!</p>
                             </div>
                         )}
 
@@ -1944,9 +2438,6 @@ export default function RetailPOSPage() {
                         PAY {formatCurrency(total)}
                     </button>
 
-                    {/* Action Buttons */}
-
-
                     {/* Customer Info */}
                     <div className="mt-auto p-4 bg-stone-900 border-t border-stone-800">
                         <div className="flex items-center gap-3">
@@ -1957,9 +2448,16 @@ export default function RetailPOSPage() {
                                 <User className="h-5 w-5" />
                                 <span>Customer Info</span>
                             </button>
-                            <button className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 rounded-lg transition-colors">
+                            {/* BUG-1 FIX: Notes button now sets transaction notes */}
+                            <button
+                                onClick={() => {
+                                    const note = prompt('Transaction Note:', customerNotes)
+                                    if (note !== null) setCustomerNotes(note)
+                                }}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${customerNotes ? 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-400' : 'bg-stone-800 hover:bg-stone-700'}`}
+                            >
                                 <FileText className="h-5 w-5" />
-                                <span>Notes</span>
+                                <span>{customerNotes ? 'Notes ✓' : 'Notes'}</span>
                             </button>
                         </div>
                         {selectedCustomer && (
@@ -1980,7 +2478,7 @@ export default function RetailPOSPage() {
                 </div>
             </div>
 
-            {/* Checkout Modal - Same as Salon POS */}
+            {/* Checkout Modal — BUG-3/4/8 FIX: Pass pricing settings and handle tips */}
             {showPaymentModal && (
                 <CheckoutModal
                     isOpen={showPaymentModal}
@@ -1991,17 +2489,32 @@ export default function RetailPOSPage() {
                     }))}
                     subtotal={subtotal}
                     taxRate={config?.taxRate || 0}
+                    pricingSettings={pricingSettings ? {
+                        processingPlan: pricingSettings.pricingModel === 'DUAL_PRICING' ? 'DUAL_PRICE' : 'STANDARD',
+                        cardFeePercent: pricingSettings.cardSurcharge || 0
+                    } : undefined}
                     customerId={selectedCustomer?.id}
                     customerName={selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : undefined}
                     onComplete={(transaction) => {
-                        // Handle card payments via PAX
+                        const tipAmount = transaction.tip || 0
+
+                        // If CheckoutModal already processed card charges via PAX (split payments),
+                        // skip opening PAX again — just finalize the transaction
+                        if (transaction.paxProcessed) {
+                            processPayment(transaction.paymentMethod, tipAmount)
+                            return
+                        }
+
+                        // Legacy path: single card payment not yet processed by PAX
                         if (transaction.paymentMethod === 'CREDIT_CARD' || transaction.paymentMethod === 'DEBIT_CARD') {
-                            setPendingCardAmount(transaction.total)
+                            const { cashTotal: cT, cardTotal: cdT, showDualPricing: dp } = calculateTotals()
+                            const chargedAmount = dp ? cdT : cT
+                            setPendingCardAmount(chargedAmount + tipAmount)
+                            setPendingTipAmount(tipAmount)
                             setShowPaymentModal(false)
                             setShowPaxModal(true)
                         } else {
-                            // Process cash payment directly
-                            processPayment(transaction.paymentMethod, 0)
+                            processPayment(transaction.paymentMethod, tipAmount)
                         }
                     }}
                 />
@@ -2159,7 +2672,7 @@ export default function RetailPOSPage() {
 
             {/* Age Verification Modal */}
             {showAgeVerification && pendingAgeItem && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
                     <div className="bg-stone-900 rounded-2xl p-8 max-w-md w-full mx-4 border border-stone-700">
                         <div className="text-center">
                             <AlertTriangle className="h-16 w-16 text-amber-500 mx-auto mb-4" />
@@ -2190,35 +2703,53 @@ export default function RetailPOSPage() {
                 </div>
             )}
 
-            {/* Discount Modal */}
-            {showDiscountModal && selectedItemIndex !== null && (
-                <DiscountModal
-                    item={cart[selectedItemIndex]}
-                    onApply={applyDiscount}
-                    onClose={() => setShowDiscountModal(false)}
-                />
-            )}
+            {/* Discount Numpad Modal */}
+            <NumpadModal
+                isOpen={showDiscountModal && selectedItemIndex !== null}
+                onClose={() => setShowDiscountModal(false)}
+                onSubmit={(value) => { applyDiscount(value); setShowDiscountModal(false) }}
+                title={`Discount % — ${selectedItemIndex !== null ? cart[selectedItemIndex]?.name : ''}`}
+                prefix=""
+                allowDecimal={false}
+                maxValue={100}
+                initialValue={selectedItemIndex !== null ? (cart[selectedItemIndex]?.discount || 0) : 0}
+            />
 
-            {/* Quantity Modal */}
-            {showQuantityModal && selectedItemIndex !== null && (
-                <QuantityModal
-                    item={cart[selectedItemIndex]}
-                    onApply={(qty) => {
-                        updateQuantity(selectedItemIndex, qty)
-                        setShowQuantityModal(false)
-                    }}
-                    onClose={() => setShowQuantityModal(false)}
-                />
-            )}
+            {/* Quantity Numpad Modal */}
+            <NumpadModal
+                isOpen={showQuantityModal && selectedItemIndex !== null}
+                onClose={() => setShowQuantityModal(false)}
+                onSubmit={(value) => { if (selectedItemIndex !== null) { updateQuantity(selectedItemIndex, value); } setShowQuantityModal(false) }}
+                title={`Quantity — ${selectedItemIndex !== null ? cart[selectedItemIndex]?.name : ''}`}
+                prefix=""
+                allowDecimal={false}
+                maxValue={9999}
+                initialValue={selectedItemIndex !== null ? cart[selectedItemIndex]?.quantity || 1 : 1}
+            />
 
-            {/* Price Modal */}
-            {showPriceModal && selectedItemIndex !== null && (
-                <PriceModal
-                    item={cart[selectedItemIndex]}
-                    onApply={changePrice}
-                    onClose={() => setShowPriceModal(false)}
-                />
-            )}
+            {/* Price Override Numpad Modal */}
+            <NumpadModal
+                isOpen={showPriceModal && selectedItemIndex !== null}
+                onClose={() => setShowPriceModal(false)}
+                onSubmit={(value) => { changePrice(value); setShowPriceModal(false) }}
+                title={`Change Price — ${selectedItemIndex !== null ? cart[selectedItemIndex]?.name : ''}`}
+                prefix="$"
+                allowDecimal={true}
+                maxValue={99999.99}
+                initialValue={selectedItemIndex !== null ? cart[selectedItemIndex]?.price || 0 : 0}
+            />
+
+            {/* Top-bar Qty Numpad */}
+            <NumpadModal
+                isOpen={showQtyNumpad}
+                onClose={() => setShowQtyNumpad(false)}
+                onSubmit={(value) => { setQuantityInput(Math.max(1, Math.round(value)).toString()); setShowQtyNumpad(false) }}
+                title="Scan Quantity"
+                prefix=""
+                allowDecimal={false}
+                maxValue={9999}
+                initialValue={parseInt(quantityInput) || 1}
+            />
 
             {/* Universal Search Modal (F3 or Search button) */}
             <UniversalSearch
@@ -2230,9 +2761,74 @@ export default function RetailPOSPage() {
                 }}
             />
 
+            {/* MORE Departments Picker Modal */}
+            {showMoreDepts && (
+                <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                    <div className="bg-stone-900 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col border border-stone-700">
+                        <div className="flex items-center justify-between p-4 border-b border-stone-800">
+                            <h2 className="text-lg font-bold">All Departments</h2>
+                            <button onClick={() => setShowMoreDepts(false)} className="p-2 hover:bg-stone-800 rounded-lg">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="px-4 pt-3 pb-2">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
+                                <input
+                                    type="text"
+                                    value={deptSearch}
+                                    onChange={(e) => setDeptSearch(e.target.value)}
+                                    placeholder="Search departments..."
+                                    className="w-full pl-10 pr-4 py-2.5 bg-stone-800 border border-stone-700 rounded-lg focus:outline-none focus:border-orange-500 text-sm"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto px-2 pb-3">
+                            <div className="grid grid-cols-2 gap-2">
+                                {categories
+                                    .filter(cat => !deptSearch || cat.name.toLowerCase().includes(deptSearch.toLowerCase()))
+                                    .map(cat => {
+                                        const style = getCategoryStyle(cat.id)
+                                        const isPinned = pinnedCategories.some((p: any) => p.id === cat.id)
+                                        return (
+                                            <button
+                                                key={cat.id}
+                                                onClick={() => {
+                                                    selectDepartment(cat.id)
+                                                    setShowMoreDepts(false)
+                                                }}
+                                                className={`flex items-center gap-2 p-3 rounded-xl text-left transition-all ${selectedCategory === cat.id
+                                                    ? 'bg-orange-500/20 border-2 border-orange-500'
+                                                    : 'bg-stone-800 hover:bg-stone-700 border-2 border-transparent'
+                                                    }`}
+                                            >
+                                                <span className="text-lg">{style.icon}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium truncate">{cat.name}</p>
+                                                    {cat.itemCount !== undefined && (
+                                                        <p className="text-[10px] text-stone-500">{cat.itemCount} items</p>
+                                                    )}
+                                                </div>
+                                                {isPinned && (
+                                                    <span className="text-[10px] text-amber-400">⭐</span>
+                                                )}
+                                            </button>
+                                        )
+                                    })
+                                }
+                            </div>
+                            {categories.filter(cat => !deptSearch || cat.name.toLowerCase().includes(deptSearch.toLowerCase())).length === 0 && (
+                                <p className="text-center text-stone-500 py-8 text-sm">No departments match "{deptSearch}"</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Price Check Input Modal */}
             {showPriceCheckInputModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
                     <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full border border-stone-700">
                         <h2 className="text-xl font-bold text-white mb-4">Price Check</h2>
                         <input
@@ -2280,7 +2876,7 @@ export default function RetailPOSPage() {
 
             {/* Price Check Modal */}
             {showPriceCheckModal && priceCheckProduct && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
                     <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full border border-stone-700">
                         <div className="text-center">
                             <h2 className="text-2xl font-bold text-white mb-4">Price Check</h2>
@@ -2367,7 +2963,14 @@ export default function RetailPOSPage() {
                     transactions={recentTransactions}
                     onClose={() => setShowRecentTransactions(false)}
                     onSelectTransaction={(tx) => {
-                        // Could implement reprint/refund functionality here - tx.id available
+                        // tx.id available for future features
+                    }}
+                    onReprintReceipt={(tx) => {
+                        const receiptWindow = window.open('', '_blank', 'width=400,height=700')
+                        if (receiptWindow) {
+                            receiptWindow.document.write(generateReceiptHTML(tx))
+                            receiptWindow.document.close()
+                        }
                     }}
                 />
             )}
@@ -2478,7 +3081,7 @@ function DiscountModal({ item, onApply, onClose }: { item: CartItem; onApply: (d
     const [discount, setDiscount] = useState(item.discount?.toString() || '')
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full mx-4 border border-stone-700">
                 <h2 className="text-xl font-bold mb-4">Apply Discount</h2>
                 <p className="text-stone-400 mb-4">{item.name}</p>
@@ -2515,7 +3118,7 @@ function QuantityModal({ item, onApply, onClose }: { item: CartItem; onApply: (q
     const [qty, setQty] = useState(item.quantity.toString())
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full mx-4 border border-stone-700">
                 <h2 className="text-xl font-bold mb-4">Change Quantity</h2>
                 <p className="text-stone-400 mb-4">{item.name}</p>
@@ -2541,7 +3144,7 @@ function PriceModal({ item, onApply, onClose }: { item: CartItem; onApply: (pric
     const [price, setPrice] = useState(item.price.toString())
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full mx-4 border border-stone-700">
                 <h2 className="text-xl font-bold mb-4">Change Price</h2>
                 <p className="text-stone-400 mb-4">{item.name}</p>
@@ -2597,7 +3200,7 @@ function SearchModal({ onSelect, onClose }: { onSelect: (product: any) => void; 
     }, [query])
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-2xl w-full mx-4 border border-stone-700 max-h-[80vh] flex flex-col">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-bold">Search Products</h2>
@@ -2662,7 +3265,7 @@ function StationModal({
     onClose: () => void
 }) {
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
             <div className="bg-stone-900 rounded-2xl p-6 w-full max-w-lg">
                 <h2 className="text-2xl font-bold mb-2">Select Your Station</h2>
                 <p className="text-stone-400 mb-6">Choose which register you're working at:</p>
@@ -2728,7 +3331,7 @@ function CustomerLookupModal({ onClose, onSelectCustomer }: {
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full border border-stone-700">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Customer Lookup</h2>
@@ -2740,9 +3343,9 @@ function CustomerLookupModal({ onClose, onSelectCustomer }: {
                     <input
                         type="tel"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                         placeholder="Enter phone number..."
-                        className="flex-1 px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-lg"
+                        className="flex-1 px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-lg text-center font-mono tracking-widest focus:outline-none focus:border-blue-500"
                         autoFocus
                     />
                     <button
@@ -2752,6 +3355,25 @@ function CustomerLookupModal({ onClose, onSelectCustomer }: {
                     >
                         {loading ? '...' : 'Search'}
                     </button>
+                </div>
+                {/* Phone Numpad */}
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map(key => (
+                        <button
+                            key={key}
+                            onClick={() => {
+                                if (key === 'C') setPhone('')
+                                else if (key === '⌫') setPhone(p => p.slice(0, -1))
+                                else if (phone.length < 10) setPhone(p => p + key)
+                            }}
+                            className={`py-4 rounded-xl text-xl font-bold transition-all active:scale-95 ${key === 'C' ? 'bg-red-900/20 text-red-400 hover:bg-red-900/40 border border-red-500/30'
+                                : key === '⌫' ? 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                    : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
+                                }`}
+                        >
+                            {key}
+                        </button>
+                    ))}
                 </div>
                 {result && (
                     result.found ? (
@@ -2830,7 +3452,7 @@ function CashDropModal({ onClose, onSuccess }: {
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full border border-stone-700">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">💵 Cash Drop</h2>
@@ -2838,20 +3460,47 @@ function CashDropModal({ onClose, onSuccess }: {
                         <X className="h-5 w-5" />
                     </button>
                 </div>
-                <p className="text-stone-400 mb-4">Enter amount to drop to safe:</p>
+                <p className="text-stone-400 mb-2">Enter amount to drop to safe:</p>
+                {/* Amount Input — keyboard + numpad */}
                 <input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full px-4 py-4 bg-stone-800 border border-stone-700 rounded-lg text-center text-3xl font-bold mb-4"
-                    autoFocus
+                    type="text"
+                    inputMode="decimal"
+                    value={amount ? `$${amount}` : ''}
+                    onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9.]/g, '')
+                        if (raw.split('.').length > 2) return
+                        if (raw.includes('.') && raw.split('.')[1]?.length > 2) return
+                        setAmount(raw)
+                    }}
+                    placeholder="$0.00"
+                    className="w-full px-4 py-4 bg-stone-800 border border-stone-700 rounded-lg text-center text-3xl font-bold mb-3 font-mono focus:outline-none focus:border-green-500"
                 />
-                <div className="grid grid-cols-4 gap-2 mb-4">
-                    {[20, 50, 100, 200].map(val => (
+                {/* Numpad */}
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                    {['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0', '⌫'].map(key => (
+                        <button
+                            key={key}
+                            onClick={() => {
+                                if (key === '⌫') setAmount(p => p.slice(0, -1))
+                                else if (key === '.' && amount.includes('.')) return
+                                else if (amount.includes('.') && amount.split('.')[1]?.length >= 2) return
+                                else setAmount(p => p + key)
+                            }}
+                            className={`py-4 rounded-xl text-xl font-bold transition-all active:scale-95 ${key === '⌫' ? 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
+                                }`}
+                        >
+                            {key}
+                        </button>
+                    ))}
+                </div>
+                {/* Quick amounts */}
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                    <button onClick={() => setAmount('')} className="py-2 bg-red-900/20 text-red-400 hover:bg-red-900/40 rounded-lg text-sm font-bold border border-red-500/30">Clear</button>
+                    {[50, 100, 200].map(val => (
                         <button
                             key={val}
-                            onClick={() => setAmount(val.toString())}
+                            onClick={() => setAmount(val.toFixed(2))}
                             className="py-2 bg-stone-800 hover:bg-stone-700 rounded-lg font-medium"
                         >
                             ${val}
@@ -2914,7 +3563,7 @@ function ReceiveStockModal({ onClose, onSuccess }: {
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-stone-900 rounded-2xl p-6 max-w-sm w-full border border-stone-700">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">📦 Receive Stock</h2>
@@ -2939,14 +3588,34 @@ function ReceiveStockModal({ onClose, onSuccess }: {
                         <p className="text-sm text-stone-400">Current stock: {product.stock || 0}</p>
                     </div>
                 )}
-                <div className="flex items-center gap-3 mb-4">
-                    <span className="text-stone-400">Quantity:</span>
+                <div className="mb-3">
+                    <span className="text-stone-400 text-sm">Quantity:</span>
                     <input
                         type="number"
                         value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
-                        className="flex-1 px-4 py-2 bg-stone-800 border border-stone-700 rounded-lg text-center text-xl"
+                        onChange={(e) => setQuantity(e.target.value.replace(/\D/g, '') || '1')}
+                        className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-lg text-center text-2xl font-bold font-mono mt-1 focus:outline-none focus:border-orange-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
+                </div>
+                {/* Qty Numpad */}
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map(key => (
+                        <button
+                            key={key}
+                            onClick={() => {
+                                if (key === 'C') setQuantity('1')
+                                else if (key === '⌫') setQuantity(p => p.length > 1 ? p.slice(0, -1) : '1')
+                                else if (quantity === '0' || quantity === '1') setQuantity(key)
+                                else setQuantity(p => p + key)
+                            }}
+                            className={`py-3 rounded-xl text-lg font-bold transition-all active:scale-95 ${key === 'C' ? 'bg-red-900/20 text-red-400 hover:bg-red-900/40 border border-red-500/30'
+                                : key === '⌫' ? 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                    : 'bg-stone-800 text-white hover:bg-stone-700 border border-stone-700 hover:border-stone-500'
+                                }`}
+                        >
+                            {key}
+                        </button>
+                    ))}
                 </div>
                 <button
                     onClick={handleReceive}
@@ -2961,10 +3630,11 @@ function ReceiveStockModal({ onClose, onSuccess }: {
 }
 
 // Recent Transactions Modal
-function RecentTransactionsModal({ transactions: initialTransactions, onClose, onSelectTransaction }: {
+function RecentTransactionsModal({ transactions: initialTransactions, onClose, onSelectTransaction, onReprintReceipt }: {
     transactions: any[]
     onClose: () => void
     onSelectTransaction: (tx: any) => void
+    onReprintReceipt?: (tx: any) => void
 }) {
     const [transactions, setTransactions] = useState(initialTransactions)
     const [search, setSearch] = useState('')
@@ -3086,7 +3756,7 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-stone-900 rounded-2xl w-full max-w-2xl border border-stone-700 max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="p-4 border-b border-stone-800 flex justify-between items-center bg-gradient-to-r from-purple-600/20 to-stone-900">
@@ -3227,7 +3897,11 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
                                             Void
                                         </button>
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); window.print() }}
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                // BUG-2 FIX: Use parent's professional receipt generator
+                                                onReprintReceipt?.(tx)
+                                            }}
                                             className="flex items-center justify-center gap-1 py-2 bg-stone-700 hover:bg-stone-600 text-stone-300 rounded-lg text-xs font-medium"
                                         >
                                             <Printer className="h-3 w-3" />
@@ -3282,7 +3956,7 @@ function CaseBreakModal({ product, onSelect, onClose }: {
     }
 
     return (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-stone-900 rounded-2xl w-full max-w-md border border-stone-700 overflow-hidden">
                 {/* Header */}
                 <div className="p-4 border-b border-stone-800 bg-gradient-to-r from-amber-600 to-orange-600">

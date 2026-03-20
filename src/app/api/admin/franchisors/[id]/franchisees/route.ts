@@ -9,10 +9,10 @@ import { prisma } from '@/lib/prisma'
  */
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id: franchisorId } = await params
     const session = await getServerSession(authOptions)
-    const franchisorId = params.id
 
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -23,13 +23,9 @@ export async function GET(
         const franchisees = await prisma.franchise.findMany({
             where: { franchisorId },
             include: {
-                memberships: {
-                    where: { isPrimary: true },
-                    include: {
-                        user: {
-                            select: { id: true, name: true, email: true }
-                        }
-                    },
+                users: {
+                    where: { role: 'OWNER' },
+                    select: { id: true, name: true, email: true },
                     take: 1
                 },
                 locations: {
@@ -42,8 +38,8 @@ export async function GET(
         const data = franchisees.map(f => ({
             id: f.id,
             name: f.name,
-            ownerName: f.memberships[0]?.user?.name || null,
-            ownerEmail: f.memberships[0]?.user?.email || null,
+            ownerName: f.users[0]?.name || null,
+            ownerEmail: f.users[0]?.email || null,
             locationCount: f.locations.length,
             status: f.accountStatus || 'ACTIVE',
             createdAt: f.createdAt.toISOString()

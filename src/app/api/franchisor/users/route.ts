@@ -21,37 +21,33 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        // Get the franchisor owner
+        // Get the franchisor owner via ownerId
         const franchisor = await prisma.franchisor.findUnique({
             where: { id: franchisorId },
-            select: {
-                owner: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        role: true,
-                        isActive: true,
-                        lastLoginAt: true
-                    }
-                }
-            }
+            select: { ownerId: true }
         })
+        const ownerUser = franchisor?.ownerId
+            ? await prisma.user.findUnique({
+                where: { id: franchisor.ownerId },
+                select: { id: true, name: true, email: true, role: true, isActive: true }
+            })
+            : null
 
         // Get all users from franchises under this franchisor
-        const franchises = await prisma.franchise.findMany({
+        const franchiseIds = (await prisma.franchise.findMany({
             where: { franchisorId },
-            include: {
-                users: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        role: true,
-                        isActive: true,
-                        lastLoginAt: true
-                    }
-                }
+            select: { id: true, name: true }
+        }))
+
+        const franchiseUsers = await prisma.user.findMany({
+            where: { franchiseId: { in: franchiseIds.map(f => f.id) } },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                isActive: true,
+                franchiseId: true
             }
         })
 
@@ -59,23 +55,22 @@ export async function GET(req: NextRequest) {
         const userMap = new Map<string, any>()
 
         // Add franchisor owner
-        if (franchisor?.owner) {
-            userMap.set(franchisor.owner.id, {
-                ...franchisor.owner,
+        if (ownerUser) {
+            userMap.set(ownerUser.id, {
+                ...ownerUser,
                 context: 'Brand HQ'
             })
         }
 
         // Add franchise users
-        franchises.forEach(f => {
-            f.users.forEach(u => {
-                if (!userMap.has(u.id)) {
-                    userMap.set(u.id, {
-                        ...u,
-                        context: f.name
-                    })
-                }
-            })
+        franchiseUsers.forEach(u => {
+            if (!userMap.has(u.id)) {
+                const franchise = franchiseIds.find(f => f.id === u.franchiseId)
+                userMap.set(u.id, {
+                    ...u,
+                    context: franchise?.name || 'Franchise'
+                })
+            }
         })
 
         const users = Array.from(userMap.values())

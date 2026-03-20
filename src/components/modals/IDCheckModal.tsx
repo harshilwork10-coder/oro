@@ -120,7 +120,7 @@ export default function IDCheckModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
             <div className="bg-stone-900 rounded-2xl w-full max-w-lg border border-stone-700 shadow-2xl overflow-hidden">
                 {/* Header */}
                 <div className="bg-red-600 p-4 flex items-center gap-3">

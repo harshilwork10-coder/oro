@@ -77,6 +77,15 @@ export async function middleware(req: NextRequest) {
             const home = (role && roleHome[role]) || '/dashboard'
             return NextResponse.redirect(new URL(home, req.url))
         }
+
+        // FRANCHISOR businessType guard: Only BRAND_FRANCHISOR can access /franchisor routes
+        // MULTI_LOCATION_OWNER users use /dashboard/* instead
+        if (role === 'FRANCHISOR' && pathname.startsWith('/franchisor')) {
+            const businessType = token.businessType as string | undefined
+            if (businessType !== 'BRAND_FRANCHISOR') {
+                return NextResponse.redirect(new URL('/dashboard', req.url))
+            }
+        }
     }
 
     // Add security headers to all responses

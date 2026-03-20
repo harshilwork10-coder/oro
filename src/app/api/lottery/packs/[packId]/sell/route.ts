@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 // POST - Sell tickets from a pack
 export async function POST(
     request: NextRequest,
-    { params }: { params: { packId: string } }
+    { params }: { params: Promise<{ packId: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -17,7 +17,7 @@ export async function POST(
         }
 
         const { quantity } = await request.json()
-        const packId = params.packId
+        const { packId } = await params
 
         if (!quantity || quantity < 1) {
             return NextResponse.json({ error: 'Invalid quantity' }, { status: 400 })

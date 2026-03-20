@@ -132,7 +132,7 @@ export async function POST(request: Request) {
             where: { franchiseId: user.franchiseId },
             select: { id: true }
         })
-        console.log(`[FranchiseSettings] Pricing update - invalidating ${franchiseLocations.length} location caches`)
+        console.error(`[FranchiseSettings] Pricing update - invalidating ${franchiseLocations.length} location caches`)
         for (const loc of franchiseLocations) {
             await invalidateLocationCache(loc.id)
         }
@@ -153,7 +153,9 @@ export async function POST(request: Request) {
                     tipSuggestions: tipSuggestions || '[15,20,25]',
                     acceptsEbt: acceptsEbt ?? false,
                     acceptsChecks: acceptsChecks ?? false,
-                    acceptsOnAccount: acceptsOnAccount ?? false
+                    acceptsOnAccount: acceptsOnAccount ?? false,
+                    // Sync tax rate to BusinessConfig so useBusinessConfig() stays consistent
+                    ...(taxRate !== undefined && { taxRate })
                 },
                 create: {
                     franchisorId: franchise.franchisorId,
@@ -162,7 +164,8 @@ export async function POST(request: Request) {
                     tipSuggestions: tipSuggestions || '[15,20,25]',
                     acceptsEbt: acceptsEbt ?? false,
                     acceptsChecks: acceptsChecks ?? false,
-                    acceptsOnAccount: acceptsOnAccount ?? false
+                    acceptsOnAccount: acceptsOnAccount ?? false,
+                    ...(taxRate !== undefined && { taxRate })
                 }
             })
         }

@@ -76,7 +76,7 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }: AddTe
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="glass-panel rounded-2xl shadow-2xl w-full max-w-4xl p-0 relative overflow-hidden flex flex-col md:flex-row h-[600px]">
 
                 {/* Left Side - Role Selection */}

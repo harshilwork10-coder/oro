@@ -12,9 +12,12 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const today = new Date()
-        const dayStart = startOfDay(today)
-        const dayEnd = endOfDay(today)
+        // Accept optional ?date=YYYY-MM-DD to view appointments for a specific date
+        const { searchParams } = new URL(req.url)
+        const dateParam = searchParams.get('date')
+        const targetDate = dateParam ? new Date(dateParam + 'T12:00:00') : new Date()
+        const dayStart = startOfDay(targetDate)
+        const dayEnd = endOfDay(targetDate)
 
         // Get location IDs for this franchise
         const locations = await prisma.location.findMany({
@@ -195,8 +198,9 @@ export async function POST(req: NextRequest) {
         }
 
         const durationMs = (service.duration || 30) * 60 * 1000
-        const startDate = new Date(startTime)
-        const endDate = new Date(startTime + durationMs)
+        const startMs = typeof startTime === 'string' ? new Date(startTime).getTime() : Number(startTime)
+        const startDate = new Date(startMs)
+        const endDate = new Date(startMs + durationMs)
 
         // Create the appointment
         const appointment = await prisma.appointment.create({

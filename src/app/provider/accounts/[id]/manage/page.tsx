@@ -45,7 +45,7 @@ export default function AccountManagementPage() {
 
     const fetchFranchise = async () => {
         try {
-            const res = await fetch(`/api/admin/franchises/${franchiseId}`)
+            const res = await fetch(`/api/admin/franchisors/${franchiseId}`)
             const data = await res.json()
             setFranchise(data)
         } catch (e) {
@@ -60,7 +60,7 @@ export default function AccountManagementPage() {
 
         setActionLoading(action)
         try {
-            const res = await fetch(`/api/admin/franchises/${franchiseId}/${endpoint}`, {
+            const res = await fetch(`/api/admin/franchisors/${franchiseId}/${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
@@ -82,7 +82,7 @@ export default function AccountManagementPage() {
     const handleExport = async () => {
         setActionLoading('export')
         try {
-            const res = await fetch(`/api/admin/franchises/${franchiseId}/export-data`)
+            const res = await fetch(`/api/admin/franchisors/${franchiseId}/export-data`)
             const blob = await res.blob()
             const url = window.URL.createObjectURL(blob)
             const a = document.createElement('a')
@@ -355,7 +355,7 @@ export default function AccountManagementPage() {
 
                                 setActionLoading('delete')
                                 try {
-                                    const res = await fetch(`/api/admin/franchises/${franchiseId}/delete`, {
+                                    const res = await fetch(`/api/admin/franchisors/${franchiseId}/delete`, {
                                         method: 'DELETE'
                                     })
                                     const data = await res.json()

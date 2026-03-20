@@ -73,7 +73,7 @@ export default function AddFranchisorModal({ isOpen, onClose, onSuccess }: AddFr
 
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="glass-panel rounded-2xl shadow-2xl w-full max-w-4xl p-6 relative">
                 <button
                     onClick={onClose}

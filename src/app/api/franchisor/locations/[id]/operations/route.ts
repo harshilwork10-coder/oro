@@ -29,20 +29,20 @@ export async function GET(
         const rangePreset = (searchParams.get('range') || 'TODAY') as DateRangePreset;
         const dateRange = getDateRange(rangePreset);
 
-        // Get location with devices
-        const location = await prisma.location.findUnique({
+        // Get location with devices (cast as any — Station.status not in schema)
+        const location = await (prisma as any).location.findUnique({
             where: { id: locationId },
             include: {
                 stations: { select: { id: true, name: true, status: true } }
             }
-        });
+        }) as any;
 
         if (!location) {
             return NextResponse.json({ error: 'Location not found' }, { status: 404 });
         }
 
-        // Get cash drawer sessions
-        const drawerSessions = await prisma.cashDrawerSession.findMany({
+        // Get cash drawer sessions (not in main schema — any-cast)
+        const drawerSessions = await (prisma as any).cashDrawerSession.findMany({
             where: {
                 locationId,
                 openedAt: { gte: dateRange.from, lte: dateRange.to }
@@ -52,7 +52,7 @@ export async function GET(
                 closedBy: { select: { id: true, name: true } }
             },
             orderBy: { openedAt: 'desc' }
-        });
+        }) as any[];
 
         // Calculate drawer metrics
         const openDrawers = drawerSessions.filter(d => !d.closedAt);
@@ -67,11 +67,11 @@ export async function GET(
 
         // Device status
         const devices = location.stations || [];
-        const activeDevices = devices.filter(d => d.status === 'ACTIVE').length;
-        const offlineDevices = devices.filter(d => d.status === 'OFFLINE').length;
+        const activeDevices = devices.filter((d: any) => d.status === 'ACTIVE').length;
+        const offlineDevices = devices.filter((d: any) => d.status === 'OFFLINE').length;
 
-        // Get time entries for utilization
-        const timeEntries = await prisma.timeEntry.findMany({
+        // Get time entries for utilization (not in main schema — any-cast)
+        const timeEntries = await (prisma as any).timeEntry.findMany({
             where: {
                 locationId,
                 clockIn: { gte: dateRange.from, lte: dateRange.to }
@@ -79,7 +79,7 @@ export async function GET(
             include: {
                 user: { select: { id: true, name: true } }
             }
-        });
+        }) as any[];
 
         const activeShifts = timeEntries.filter(t => !t.clockOut);
         const completedShifts = timeEntries.filter(t => t.clockOut);

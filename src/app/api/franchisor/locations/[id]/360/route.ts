@@ -41,22 +41,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             ? { preset: 'CUSTOM' as DateRangePreset, from: new Date(customFrom), to: new Date(customTo), timezone: 'America/Chicago' }
             : getDateRange(rangePreset);
 
-        // Fetch location header
-        const location = await prisma.franchiseLocation.findUnique({
+        // Fetch location header with franchiseId
+        const location = await prisma.location.findUnique({
             where: { id: locationId },
             select: {
                 id: true,
                 name: true,
-                storeCode: true,
                 address: true,
-                city: true,
-                state: true,
-                zipCode: true,
-                status: true,
-                phone: true,
-                franchisee: {
-                    select: { id: true, name: true }
-                }
+                franchiseId: true
             }
         });
 
@@ -64,14 +56,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             return NextResponse.json({ error: 'Location not found' }, { status: 404 });
         }
 
+        const franchiseId = location.franchiseId;
+
         // Get stations/devices info
         const stations = await prisma.station.findMany({
-            where: { storeId: locationId },
+            where: { locationId },
             select: {
                 id: true,
                 name: true,
-                status: true,
-                lastSync: true
+                isActive: true
             }
         });
 
@@ -84,11 +77,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             // Transaction KPIs
             prisma.transaction.aggregate({
                 where: {
-                    storeId: locationId,
+                    ...(franchiseId ? { franchiseId } : {}),
                     createdAt: { gte: dateRange.from, lte: dateRange.to },
                     status: { not: 'VOIDED' }
                 },
-                _sum: { total: true, tipAmount: true },
+                _sum: { total: true, tip: true },
                 _count: true
             }),
 
@@ -102,15 +95,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                 _count: true
             }).catch(() => []),
 
-            // Unique customers
+            // Unique clients
             prisma.transaction.findMany({
                 where: {
-                    storeId: locationId,
+                    ...(franchiseId ? { franchiseId } : {}),
                     createdAt: { gte: dateRange.from, lte: dateRange.to },
-                    customerId: { not: null }
+                    clientId: { not: null }
                 },
-                select: { customerId: true },
-                distinct: ['customerId']
+                select: { clientId: true },
+                distinct: ['clientId']
             })
         ]);
 
@@ -125,7 +118,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         // Calculate refunds/voids for the period
         const refundVoidStats = await prisma.transaction.aggregate({
             where: {
-                storeId: locationId,
+                ...(franchiseId ? { franchiseId } : {}),
                 createdAt: { gte: dateRange.from, lte: dateRange.to },
                 type: { in: ['REFUND', 'VOID'] }
             },
@@ -147,12 +140,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             alerts.push({ type: 'HIGH_NO_SHOW', severity: 'WARNING', message: `No-show rate is ${((noShows / totalBooked) * 100).toFixed(1)}%` });
         }
 
-        // Check for device offline
-        const offlineStations = stations.filter(s => {
-            if (!s.lastSync) return true;
-            const hoursSinceSync = (Date.now() - new Date(s.lastSync).getTime()) / (1000 * 60 * 60);
-            return hoursSinceSync > 24;
-        });
+        // Check for device offline (based on isActive flag)
+        const offlineStations = stations.filter(s => !s.isActive);
         if (offlineStations.length > 0) {
             alerts.push({ type: 'DEVICE_OFFLINE', severity: 'CRITICAL', message: `${offlineStations.length} station(s) offline` });
         }
@@ -163,15 +152,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
         return NextResponse.json({
             header: {
-                ...location,
-                franchisee: location.franchisee?.name || 'N/A',
+                id: location.id,
+                name: location.name,
+                address: location.address || '',
                 devices: {
                     paired: stations.length,
-                    online: stations.filter(s => s.status === 'ACTIVE').length,
-                    lastSync: stations.reduce((latest, s) => {
-                        if (!s.lastSync) return latest;
-                        return !latest || new Date(s.lastSync) > new Date(latest) ? s.lastSync : latest;
-                    }, null as Date | null)
+                    online: stations.filter(s => s.isActive).length,
+                    lastSync: null
                 }
             },
             dateRange: {
@@ -183,7 +170,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                 grossSales,
                 netSales,
                 refunds,
-                tips: Number(transactionStats._sum?.tipAmount || 0),
+                tips: Number(transactionStats._sum?.tip || 0),
                 transactionCount: transactionStats._count || 0,
                 avgTicket: transactionStats._count ? netSales / transactionStats._count : 0,
                 appointments: {

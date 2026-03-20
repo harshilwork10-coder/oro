@@ -1,28 +1,30 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-// GET: Get top-selling products for quick buttons
-export async function GET(request: Request) {
+// GET - Fetch top-selling products for quick-access buttons on POS
+export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = session?.user as any
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const user = session.user as any
         const { searchParams } = new URL(request.url)
         const limit = parseInt(searchParams.get('limit') || '6')
 
-        // Get top sellers by transaction count in last 30 days
-        const thirtyDaysAgo = new Date()
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-        const topSellers = await prisma.transactionLineItem.groupBy({
+        // Get most frequently sold items from recent transactions
+        const topItems = await prisma.transactionItem.groupBy({
             by: ['productId'],
             where: {
-                createdAt: { gte: thirtyDaysAgo },
+                transaction: {
+                    franchiseId: user.franchiseId,
+                    ...(user.locationId ? { locationId: user.locationId } : {}),
+                    status: 'COMPLETED',
+                    createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // Last 30 days
+                },
                 productId: { not: null }
             },
             _sum: { quantity: true },
@@ -30,41 +32,38 @@ export async function GET(request: Request) {
             take: limit
         })
 
-        // Get product details
-        const productIds = topSellers
-            .map(t => t.productId)
+        const productIds = topItems
+            .map(item => item.productId)
             .filter((id): id is string => id !== null)
 
-        const products = await prisma.product.findMany({
-            where: { id: { in: productIds } },
-            select: {
-                id: true,
-                name: true,
-                price: true,
-                barcode: true
-            }
-        })
-
-        // Order by sales volume
-        const orderedProducts = topSellers
-            .filter(t => t.productId)
-            .map(t => {
-                const product = products.find(p => p.id === t.productId)
-                return product ? {
-                    id: product.id,
-                    name: product.name,
-                    price: Number(product.price),
-                    barcode: product.barcode,
-                    soldCount: t._sum?.quantity || 0
-                } : null
+        const products = productIds.length > 0
+            ? await prisma.product.findMany({
+                where: { id: { in: productIds } },
+                select: {
+                    id: true,
+                    name: true,
+                    price: true,
+                    barcode: true,
+                    imageUrl: true,
+                    category: { select: { name: true } }
+                }
             })
-            .filter(Boolean)
+            : []
 
-        return NextResponse.json({ products: orderedProducts })
+        // Sort by frequency and attach sold count
+        const productsWithCount = productIds.map(id => {
+            const product = products.find(p => p.id === id)
+            const topItem = topItems.find(t => t.productId === id)
+            return product ? {
+                ...product,
+                categoryName: product.category?.name,
+                soldCount: topItem?._sum?.quantity || 0
+            } : null
+        }).filter(Boolean)
 
+        return NextResponse.json({ products: productsWithCount })
     } catch (error) {
-        console.error('Error getting top sellers:', error)
-        return NextResponse.json({ error: 'Failed to get top sellers' }, { status: 500 })
+        console.error('[TOP_SELLERS]', error)
+        return NextResponse.json({ products: [] })
     }
 }
-

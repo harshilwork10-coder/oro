@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
                 cardSurchargeType: franchiseSettings.cardSurchargeType || 'PERCENTAGE',
                 cardSurcharge: Number(franchiseSettings.cardSurcharge) || 0,
                 showDualPricing: franchiseSettings.showDualPricing || false,
-                taxRate: 0.08 // Defaulting to 0.08 while verifying DB column
+                taxRate: Number(franchiseSettings.taxRate) || 0.08
             } : {
                 pricingModel: 'STANDARD',
                 cardSurchargeType: 'PERCENTAGE',

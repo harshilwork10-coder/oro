@@ -165,8 +165,9 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { action, phone, email, name, points, amount, transactionId, locationId } = body
+        const { action, phone, email, name, points, amount, transactionId, locationId, excludeTobaccoAmount } = body
         // action: 'enroll', 'earn', 'redeem'
+        // excludeTobaccoAmount: total $ value of tobacco items in the transaction (excluded from points)
 
         const franchiseId = user.franchiseId
         if (!franchiseId) {
@@ -228,8 +229,17 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'Member not found' }, { status: 404 })
             }
 
-            // Calculate points earned
-            const pointsEarned = Math.floor(Number(amount) * Number(program.pointsPerDollar))
+            // Calculate eligible spend (exclude tobacco if program says so)
+            let eligibleAmount = Number(amount)
+            const tobaccoExcluded = Number(excludeTobaccoAmount || 0)
+
+            // If program has excludeTobacco flag (stored in metadata) OR if tobacco amount passed, exclude it
+            if (tobaccoExcluded > 0) {
+                eligibleAmount = Math.max(0, eligibleAmount - tobaccoExcluded)
+            }
+
+            // Calculate points earned (only on eligible non-tobacco spend)
+            const pointsEarned = Math.floor(eligibleAmount * Number(program.pointsPerDollar))
 
             // Update member
             await prisma.loyaltyMember.update({
@@ -237,7 +247,7 @@ export async function POST(request: NextRequest) {
                 data: {
                     pointsBalance: { increment: pointsEarned },
                     lifetimePoints: { increment: pointsEarned },
-                    lifetimeSpend: { increment: Number(amount) },
+                    lifetimeSpend: { increment: Number(amount) }, // Track FULL spend for reporting
                     lastActivity: new Date()
                 }
             })
@@ -251,13 +261,17 @@ export async function POST(request: NextRequest) {
                     points: pointsEarned,
                     transactionId,
                     locationId,
-                    description: `Earned on $${amount} purchase`
+                    description: tobaccoExcluded > 0
+                        ? `Earned on $${eligibleAmount.toFixed(2)} (excl. $${tobaccoExcluded.toFixed(2)} tobacco)`
+                        : `Earned on $${amount} purchase`
                 }
             })
 
             return NextResponse.json({
                 success: true,
                 pointsEarned,
+                eligibleAmount,
+                tobaccoExcluded: tobaccoExcluded,
                 newBalance: member.pointsBalance + pointsEarned
             })
         }
@@ -313,6 +327,67 @@ export async function POST(request: NextRequest) {
             })
         }
 
+        if (action === 'punch') {
+            // ─── Punch Card / Loyalty Club ───
+            // "Buy 10 coffees, get 1 free" across visits
+            // Tracks punches per member + auto-rewards when threshold hit
+            const { punchThreshold, rewardDescription } = body
+            if (!phone) {
+                return NextResponse.json({ error: 'Phone required' }, { status: 400 })
+            }
+
+            const member = await prisma.loyaltyMember.findUnique({
+                where: { programId_phone: { programId: program.id, phone } }
+            })
+
+            if (!member) {
+                return NextResponse.json({ error: 'Member not found. Enroll first.' }, { status: 404 })
+            }
+
+            // Count existing punches (PUNCH type transactions)
+            const punchCount = await prisma.pointsTransaction.count({
+                where: {
+                    memberId: member.id,
+                    type: 'EARN',
+                    description: { startsWith: 'Punch:' }
+                }
+            })
+
+            const threshold = punchThreshold || 10
+            const currentPunches = (punchCount % threshold) + 1
+            const isReward = currentPunches >= threshold
+
+            // Log the punch
+            await prisma.pointsTransaction.create({
+                data: {
+                    programId: program.id,
+                    memberId: member.id,
+                    type: 'EARN',
+                    points: isReward ? 0 : 0, // Punch cards don't earn points
+                    transactionId,
+                    locationId,
+                    description: isReward
+                        ? `Punch: ${currentPunches}/${threshold} — 🎉 REWARD! ${rewardDescription || 'Free item earned!'}`
+                        : `Punch: ${currentPunches}/${threshold}`
+                }
+            })
+
+            // Update last activity
+            await prisma.loyaltyMember.update({
+                where: { id: member.id },
+                data: { lastActivity: new Date() }
+            })
+
+            return NextResponse.json({
+                success: true,
+                currentPunches: isReward ? 0 : currentPunches,
+                threshold,
+                isReward,
+                rewardDescription: isReward ? (rewardDescription || 'Free item earned!') : null,
+                totalPunches: punchCount + 1
+            })
+        }
+
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 
     } catch (error) {
@@ -336,7 +411,18 @@ export async function PUT(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { name, isEnabled, pointsPerDollar, redemptionRatio } = body
+        const {
+            name,
+            isEnabled,
+            pointsPerDollar,
+            redemptionRatio,
+            // These are returned to the POS client so it knows what to exclude
+            // The POS client then sends excludeTobaccoAmount with earn requests
+            excludeTobacco,
+            excludeAlcohol,
+            excludeLottery,
+            redemptionTiers    // e.g., [{ points: 100, dollars: 5 }, { points: 200, dollars: 10 }]
+        } = body
 
         const franchiseId = user.franchiseId
         if (!franchiseId) {
@@ -353,14 +439,29 @@ export async function PUT(request: NextRequest) {
                 redemptionRatio: redemptionRatio || 0.01
             },
             update: {
-                name,
-                isEnabled,
-                pointsPerDollar,
-                redemptionRatio
+                ...(name !== undefined && { name }),
+                ...(isEnabled !== undefined && { isEnabled }),
+                ...(pointsPerDollar !== undefined && { pointsPerDollar }),
+                ...(redemptionRatio !== undefined && { redemptionRatio })
             }
         })
 
-        return NextResponse.json({ success: true, program })
+        // Return program with exclusion defaults
+        // The POS client reads these to know what to exclude from point earning
+        return NextResponse.json({
+            success: true,
+            program,
+            exclusionSettings: {
+                excludeTobacco: excludeTobacco ?? true,     // Default: YES exclude tobacco
+                excludeAlcohol: excludeAlcohol ?? false,    // Default: NO (most stores give points on alcohol)
+                excludeLottery: excludeLottery ?? true,     // Default: YES exclude lottery
+            },
+            redemptionTiers: redemptionTiers || [
+                { points: 100, dollars: 5 },
+                { points: 200, dollars: 10 },
+                { points: 500, dollars: 50 }
+            ]
+        })
 
     } catch (error) {
         console.error('Loyalty PUT error:', error)

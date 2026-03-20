@@ -75,7 +75,7 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
         }>(cacheKey)
 
         if (forceRefresh) {
-            console.log(`[Bootstrap] FORCE REFRESH requested for location ${locationId}`)
+            console.error(`[Bootstrap] FORCE REFRESH requested for location ${locationId}`)
         }
 
         if (cachedResponse) {
@@ -246,24 +246,32 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             ? parseFloat(settings.taxRate.toString())
             : 0.0825  // Default 8.25%
 
+        // Get business config for per-item-type tax flags
+        const businessConfig = await prisma.businessConfig.findFirst({
+            where: { franchisorId: franchise.franchisorId },
+            select: { taxServices: true, taxProducts: true }
+        })
+
         const taxConfig = {
             taxRate,
-            taxIncluded: false
+            taxIncluded: false,
+            taxServices: businessConfig?.taxServices ?? true,  // Salon: usually false
+            taxProducts: businessConfig?.taxProducts ?? true   // Products: usually true
         }
 
         // DUAL PRICING DEBUG - Log entire settings object
-        console.log('='.repeat(50))
-        console.log('[Bootstrap DUAL PRICING DEBUG]')
-        console.log('  settings object:', settings ? JSON.stringify({
+        console.error('='.repeat(50))
+        console.error('[Bootstrap DUAL PRICING DEBUG]')
+        console.error('  settings object:', settings ? JSON.stringify({
             id: settings.id,
             pricingModel: settings.pricingModel,
             cardSurcharge: settings.cardSurcharge,
             showDualPricing: settings.showDualPricing
         }) : 'NULL SETTINGS!')
-        console.log('  franchiseId:', franchiseId)
-        console.log('  locationId:', location.id)
-        console.log('  Computed dualPricingEnabled:', settings?.pricingModel === 'DUAL_PRICING')
-        console.log('='.repeat(50))
+        console.error('  franchiseId:', franchiseId)
+        console.error('  locationId:', location.id)
+        console.error('  Computed dualPricingEnabled:', settings?.pricingModel === 'DUAL_PRICING')
+        console.error('='.repeat(50))
 
         const stationConfig = {
             locationId: location.id,
@@ -283,8 +291,8 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             receiptHeader: settings?.storeDisplayName || franchise.name || '',
             receiptFooter: settings?.receiptFooter || 'Thank you!',
 
-            // Tips
-            tipEnabled: true,
+            // Tips - read from account settings (owner can enable/disable)
+            tipEnabled: (settings as any)?.tipPromptEnabled ?? true,
             tipPresets: [15, 18, 20, 25],
 
             // Permissions
@@ -321,7 +329,7 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             })
             featureFlags = flagsResult.featureFlags
         } catch (e) {
-            console.warn('[Bootstrap] Feature flags failed:', e)
+            console.error('[Bootstrap] Feature flags failed:', e)
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -344,7 +352,9 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             .update(JSON.stringify({
                 dual: stationConfig.dualPricingEnabled,
                 pax: stationConfig.paxTerminalIP,
-                flags: featureFlags
+                flags: featureFlags,
+                themeId: stationConfig.themeId,
+                highContrast: stationConfig.highContrast
             }))
             .digest('hex').slice(0, 8)
 
@@ -430,7 +440,7 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
                 versions: { menu: menuVersion, staff: staffVersion, config: configVersion }
             }, CACHE_TTL.BOOTSTRAP)
         } catch (e) {
-            console.warn('[Bootstrap] Failed to store in cache:', e)
+            console.error('[Bootstrap] Failed to store in cache:', e)
         }
 
         return NextResponse.json(responseBody, {

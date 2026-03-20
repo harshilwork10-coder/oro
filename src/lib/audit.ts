@@ -52,32 +52,32 @@ export interface AuditLogParams {
 export async function auditLog(params: AuditLogParams): Promise<void> {
     try {
         // Get request headers for IP and user agent (if available)
-        let ipAddress: string | null = null
-        let userAgent: string | null = null
+        let ipAddress: string | undefined = undefined
+        let userAgent: string | undefined = undefined
 
         try {
             const headersList = await headers()
-            ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip')
-            userAgent = headersList.get('user-agent')
+            ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || undefined
+            userAgent = headersList.get('user-agent') || undefined
         } catch {
             // Headers not available (e.g., in non-request context)
         }
 
-        await prisma.auditLog.create({
-            data: {
-                userId: params.userId,
-                userEmail: params.userEmail,
-                userRole: params.userRole,
-                action: params.action,
-                entityType: params.entityType,
-                entityId: params.entityId,
-                franchiseId: params.franchiseId,
-                locationId: params.locationId,
-                ipAddress,
-                userAgent,
-                metadata: params.metadata ? JSON.stringify(params.metadata) : null
-            }
-        })
+        // Build data object conditionally to avoid passing undefined to required String fields
+        const auditData: Record<string, unknown> = {
+            action: params.action,
+            entityType: params.entityType,
+            ...(params.userId ? { userId: params.userId } : {}),
+            ...(params.userEmail ? { userEmail: params.userEmail } : {}),
+            ...(params.userRole ? { userRole: params.userRole } : {}),
+            ...(params.entityId ? { entityId: params.entityId } : {}),
+            ...(params.franchiseId ? { franchiseId: params.franchiseId } : {}),
+            ...(params.locationId ? { locationId: params.locationId } : {}),
+            ...(ipAddress ? { ipAddress } : {}),
+            ...(userAgent ? { userAgent } : {}),
+            ...(params.metadata ? { metadata: JSON.stringify(params.metadata) } : {}),
+        }
+        await prisma.auditLog.create({ data: auditData as Parameters<typeof prisma.auditLog.create>[0]['data'] })
     } catch (error) {
         // Never fail the main operation due to audit logging failure
         console.error('Audit log failed:', error)

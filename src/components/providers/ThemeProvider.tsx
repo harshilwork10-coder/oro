@@ -76,19 +76,32 @@ export function ThemeProvider({ children, defaultTheme = 'classic_oro' }: ThemeP
     }, [defaultTheme])
 
     const setTheme = async (id: ThemeId) => {
+        const previousTheme = themeId
         setThemeId(id)
         applyTheme(id)
         localStorage.setItem('selected_theme', id)
 
         // Save to server
         try {
-            await fetch('/api/settings/theme', {
+            const res = await fetch('/api/settings/theme', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ themeId: id }),
             })
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                console.error('[ThemeProvider] PUT failed:', res.status, data)
+                // Revert to previous theme since server didn't save
+                setThemeId(previousTheme)
+                applyTheme(previousTheme)
+                localStorage.setItem('selected_theme', previousTheme)
+            }
         } catch (e) {
-            console.error('Error saving theme:', e)
+            console.error('[ThemeProvider] Error saving theme:', e)
+            // Revert on network error
+            setThemeId(previousTheme)
+            applyTheme(previousTheme)
+            localStorage.setItem('selected_theme', previousTheme)
         }
     }
 

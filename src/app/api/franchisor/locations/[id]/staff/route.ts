@@ -40,14 +40,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         // Get employees at this location
         const employees = await prisma.user.findMany({
             where: {
-                OR: [
-                    { locationId },
-                    { memberships: { some: { locationId } } }
-                ],
+                locationId,
                 role: { in: ['EMPLOYEE', 'MANAGER', 'STYLIST'] }
             },
             select: { id: true, name: true, role: true, image: true }
         });
+
+        // Get location's franchiseId for transaction lookups
+        const location = await prisma.location.findUnique({
+            where: { id: locationId },
+            select: { franchiseId: true }
+        });
+        const franchiseId = location?.franchiseId;
 
         // Get transaction stats per employee
         const employeeStats = await Promise.all(
@@ -56,7 +60,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                     // Revenue
                     prisma.transaction.aggregate({
                         where: {
-                            storeId: locationId,
+                            ...(franchiseId ? { franchiseId } : {}),
                             employeeId: emp.id,
                             createdAt: { gte: dateRange.from, lte: dateRange.to },
                             status: { not: 'VOIDED' }
@@ -67,12 +71,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                     // Tips
                     prisma.transaction.aggregate({
                         where: {
-                            storeId: locationId,
+                            ...(franchiseId ? { franchiseId } : {}),
                             employeeId: emp.id,
                             createdAt: { gte: dateRange.from, lte: dateRange.to },
-                            tipAmount: { gt: 0 }
+                            tip: { gt: 0 }
                         },
-                        _sum: { tipAmount: true }
+                        _sum: { tip: true }
                     }),
                     // Appointments (for salon)
                     prisma.appointment.groupBy({
@@ -98,7 +102,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                     revenue: Number(txStats._sum?.total || 0),
                     transactionCount: txStats._count || 0,
                     avgTicket: txStats._count ? Number(txStats._sum?.total || 0) / txStats._count : 0,
-                    tips: Number(tipStats._sum?.tipAmount || 0),
+                    tips: Number(tipStats._sum?.tip || 0),
                     appointments: {
                         booked: Object.values(apptByStatus).reduce((a, b) => a + b, 0),
                         completed: apptByStatus['COMPLETED'] || 0,

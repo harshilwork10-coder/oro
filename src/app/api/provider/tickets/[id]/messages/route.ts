@@ -6,8 +6,9 @@ import { prisma } from '@/lib/prisma'
 // POST - Add message to ticket
 export async function POST(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id: ticketId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user || session.user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
@@ -24,7 +25,7 @@ export async function POST(
         // Create the message
         const ticketMessage = await prisma.ticketMessage.create({
             data: {
-                ticketId: params.id,
+                ticketId,
                 message,
                 authorUserId: session.user.id,
                 isInternal: isInternal || false
@@ -44,8 +45,9 @@ export async function POST(
 // GET - Get messages for ticket
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id: ticketId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user || session.user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
@@ -53,7 +55,7 @@ export async function GET(
 
     try {
         const messages = await prisma.ticketMessage.findMany({
-            where: { ticketId: params.id },
+            where: { ticketId },
             include: { authorUser: true },
             orderBy: { createdAt: 'asc' }
         })

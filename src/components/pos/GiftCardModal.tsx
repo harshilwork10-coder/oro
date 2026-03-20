@@ -110,14 +110,14 @@ export default function GiftCardModal({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    amount: value,
-                    franchiseId
+                    initialAmount: value,
+                    franchiseId: franchiseId === 'current' ? undefined : franchiseId
                 })
             })
             const result = await res.json()
 
-            if (result.success || result.code) {
-                const code = result.code || result.giftCard?.code
+            if (result.code || result.data?.code) {
+                const code = result.code || result.data?.code
                 setSuccess(`Gift Card Created: ${code}`)
                 setCardCode(code)
                 if (onSellGiftCard) {
@@ -167,11 +167,13 @@ export default function GiftCardModal({
             const res = await fetch(`/api/gift-cards/${cardCode}`)
             const result = await res.json()
 
-            if (result.balance !== undefined) {
+            // API returns raw GiftCard model — balance is in 'currentBalance'
+            const balance = result.balance ?? (result.currentBalance !== undefined ? Number(result.currentBalance) : undefined)
+            if (balance !== undefined) {
                 setCardData({
                     code: result.code || cardCode,
-                    balance: result.balance,
-                    originalAmount: result.originalAmount || result.balance,
+                    balance: balance,
+                    originalAmount: result.originalAmount || Number(result.initialAmount) || balance,
                     issuedAt: result.issuedAt || result.createdAt
                 })
             } else if (result.error) {

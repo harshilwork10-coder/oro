@@ -77,7 +77,7 @@ export default function EditStationModal({ isOpen, onClose, onSuccess, station, 
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
             <div className="w-full max-w-md bg-stone-900 border border-stone-800 rounded-xl shadow-2xl">
                 <div className="flex items-center justify-between p-4 border-b border-stone-800">
                     <h3 className="text-lg font-bold text-stone-100 flex items-center gap-2">

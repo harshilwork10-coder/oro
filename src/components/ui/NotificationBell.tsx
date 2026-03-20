@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Bell, Check, X, Package, Clock, AlertTriangle, DollarSign, Info } from 'lucide-react'
 
 interface Notification {
@@ -38,7 +38,7 @@ export default function NotificationBell() {
     const [loading, setLoading] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
 
-    async function fetchNotifications() {
+    const fetchNotifications = useCallback(async function () {
         try {
             const res = await fetch('/api/notifications?limit=10')
             if (res.ok) {
@@ -49,7 +49,7 @@ export default function NotificationBell() {
         } catch (e) {
             console.error('Failed to fetch notifications', e)
         }
-    }
+    }, [])
 
     async function markAsRead(id: string) {
         try {
@@ -86,7 +86,7 @@ export default function NotificationBell() {
         // Poll every 30 seconds
         const interval = setInterval(fetchNotifications, 30000)
         return () => clearInterval(interval)
-    }, [])
+    }, [fetchNotifications])
 
     // Close dropdown when clicking outside
     useEffect(() => {

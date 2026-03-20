@@ -1,140 +1,43 @@
 'use client'
 
-import { useState } from 'react'
-import {
-    Users,
-    ArrowLeft,
-    Award,
-    TrendingUp,
-    FileText,
-    DollarSign,
-    ChevronRight,
-    Search
-} from 'lucide-react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { ArrowLeft, Users, RefreshCw } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 
-const customerReports = [
-    {
-        id: 'customer-list',
-        name: 'Customer List',
-        description: 'All registered customers with contact info',
-        icon: Users,
-        href: '/dashboard/reports/customer/list',
-        status: 'available'
-    },
-    {
-        id: 'loyalty-points',
-        name: 'Loyalty Points Report',
-        description: 'Customer points balances and redemption history',
-        icon: Award,
-        href: '/dashboard/reports/customer/loyalty',
-        status: 'available'
-    },
-    {
-        id: 'top-spenders',
-        name: 'Top Spenders',
-        description: 'Customers ranked by total spending',
-        icon: TrendingUp,
-        href: '/dashboard/reports/customer/top-spenders',
-        status: 'available'
-    },
-    {
-        id: 'ar-summary',
-        name: 'A/R Summary (Store Accounts)',
-        description: 'Customers with open balances and house accounts',
-        icon: DollarSign,
-        href: '/dashboard/reports/customer/ar-summary',
-        status: 'available'
-    },
-    {
-        id: 'retention',
-        name: 'Client Retention',
-        description: 'Track returning clients and rebooking rates',
-        icon: TrendingUp,
-        href: '/dashboard/reports/customer/retention',
-        status: 'available'
-    }
-]
+export default function CustomerReportPage() {
+    const [data, setData] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
+    const [days, setDays] = useState(30)
 
-export default function CustomerReportsPage() {
-    const [searchTerm, setSearchTerm] = useState('')
-
-    const filteredReports = customerReports.filter(report =>
-        report.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        report.description.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    useEffect(() => {
+        setLoading(true)
+        fetch(`/api/customers/segmentation?days=${days}`)
+            .then(r => r.json()).then(d => { setData(d.data); setLoading(false) })
+            .catch(() => setLoading(false))
+    }, [days])
 
     return (
-        <div className="p-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Link
-                        href="/dashboard/reports"
-                        className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
-                    >
-                        <ArrowLeft className="w-5 h-5 text-gray-400" />
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600">
-                                <Users className="w-6 h-6 text-white" />
-                            </div>
-                            Customer Reports
-                        </h1>
-                        <p className="text-gray-400 mt-1">4 reports available</p>
-                    </div>
-                </div>
-
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
-                        type="text"
-                        placeholder="Search reports..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500 w-64"
-                    />
-                </div>
+        <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white p-6">
+            <div className="flex items-center gap-4 mb-8">
+                <Link href="/dashboard/reports" className="p-2 hover:bg-stone-800 rounded-lg"><ArrowLeft className="h-6 w-6" /></Link>
+                <div className="flex-1"><h1 className="text-3xl font-bold flex items-center gap-2"><Users className="h-8 w-8 text-purple-500" /> Customer Report</h1>
+                    <p className="text-stone-400">Customer segments and spending patterns</p></div>
+                <select value={days} onChange={e => setDays(Number(e.target.value))} className="bg-stone-800 border border-stone-600 rounded-lg px-3 py-2">
+                    <option value={7}>7 Days</option><option value={30}>30 Days</option><option value={90}>90 Days</option>
+                </select>
             </div>
-
-            {/* Reports List */}
-            <div className="space-y-3">
-                {filteredReports.map((report) => {
-                    const Icon = report.icon
-                    const isAvailable = report.status === 'available'
-
-                    return (
-                        <Link
-                            key={report.id}
-                            href={isAvailable ? report.href : '#'}
-                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isAvailable
-                                ? 'bg-gray-800/50 border-gray-700 hover:border-purple-500/50 hover:bg-gray-800'
-                                : 'bg-gray-800/30 border-gray-700/50 cursor-not-allowed opacity-60'
-                                }`}
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="p-2 rounded-lg bg-gray-700">
-                                    <Icon className="w-5 h-5 text-gray-400" />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="font-medium text-white">{report.name}</h3>
-                                        {!isAvailable && (
-                                            <span className="text-xs bg-gray-600 text-gray-300 px-2 py-0.5 rounded">Coming Soon</span>
-                                        )}
-                                    </div>
-                                    <p className="text-sm text-gray-400 mt-0.5">{report.description}</p>
-                                </div>
-                            </div>
-                            {isAvailable && (
-                                <ChevronRight className="w-5 h-5 text-gray-500" />
-                            )}
-                        </Link>
-                    )
-                })}
-            </div>
+            {loading ? <div className="text-center py-20"><RefreshCw className="h-8 w-8 animate-spin mx-auto" /></div> : data ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {(data.segments || []).map((seg: any, i: number) => (
+                        <div key={i} className="bg-stone-900/80 border border-stone-700 rounded-2xl p-5">
+                            <p className="text-sm text-stone-400">{seg.name || 'Segment'}</p>
+                            <p className="text-3xl font-bold text-purple-400 mt-1">{seg.count || 0}</p>
+                            <p className="text-xs text-stone-500 mt-1">{formatCurrency(seg.totalSpend || 0)} total</p>
+                        </div>
+                    ))}
+                </div>
+            ) : <p className="text-center text-stone-500 py-20">No customer data yet.</p>}
         </div>
     )
 }
-

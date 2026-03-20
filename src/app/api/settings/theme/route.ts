@@ -1,27 +1,37 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { THEME_PRESETS } from '@/lib/themes'
+import { cacheDelete, CACHE_KEYS } from '@/lib/cache'
 
 // GET - Fetch current theme settings
 export async function GET() {
     try {
-        const cookieStore = await cookies()
-        const locationId = cookieStore.get('locationId')?.value
-
-        if (!locationId) {
-            // Return default theme if no location
+        const session = await getServerSession(authOptions)
+        if (!session?.user) {
+            // Return defaults for unauthenticated requests (Android initial load)
             return NextResponse.json({
                 themeId: 'classic_oro',
                 highContrast: false
             })
         }
 
-        // Get theme from Location
-        const location = await prisma.location.findUnique({
-            where: { id: locationId },
-            select: { themeId: true, highContrast: true }
+        const user = session.user as any
+        if (!user.franchiseId) {
+            return NextResponse.json({
+                themeId: 'classic_oro',
+                highContrast: false
+            })
+        }
+
+        // Get theme from the user's franchise location
+        const franchise = await prisma.franchise.findUnique({
+            where: { id: user.franchiseId },
+            include: { locations: { take: 1, select: { themeId: true, highContrast: true } } }
         })
 
+        const location = franchise?.locations?.[0]
         return NextResponse.json({
             themeId: location?.themeId || 'classic_oro',
             highContrast: location?.highContrast || false
@@ -35,24 +45,40 @@ export async function GET() {
     }
 }
 
-// PUT - Update theme settings
+// PUT - Update theme settings (requires auth + OWNER/MANAGER role)
 export async function PUT(request: Request) {
     try {
-        const cookieStore = await cookies()
-        const locationId = cookieStore.get('locationId')?.value
+        const session = await getServerSession(authOptions)
+        if (!session?.user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
-        if (!locationId) {
+        const user = session.user as any
+
+        // DIAGNOSTIC: Log full session to trace 403 issues
+        console.error(`[THEME PUT] Session: id=${user.id} email=${user.email} role=${user.role} franchiseId=${user.franchiseId}`)
+
+        // Any business role can change their theme
+        const allowedRoles = ['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'ADMIN']
+        if (!allowedRoles.includes(user.role)) {
+            console.error('[THEME] Permission denied for role:', user.role, '— Full user:', JSON.stringify({ id: user.id, email: user.email, role: user.role }))
+            return NextResponse.json({ error: 'Permission denied', role: user.role || 'NO_ROLE' }, { status: 403 })
+        }
+
+        if (!user.franchiseId) {
             return NextResponse.json(
-                { error: 'No location selected' },
+                { error: 'No franchise associated' },
                 { status: 400 }
             )
         }
 
         const body = await request.json()
-        const { themeId, highContrast } = body
+        const { themeId, highContrast, locationId } = body
+
+        console.error(`[THEME PUT] user=${user.email} role=${user.role} franchiseId=${user.franchiseId} themeId=${themeId} locationId=${locationId || 'ALL'}`)
 
         // Validate themeId
-        const validThemes = ['classic_oro', 'rose_gold', 'blush_pink', 'lavender_night', 'mint_clean', 'ocean_blue']
+        const validThemes = Object.keys(THEME_PRESETS)
         if (themeId && !validThemes.includes(themeId)) {
             return NextResponse.json(
                 { error: 'Invalid theme ID' },
@@ -65,17 +91,52 @@ export async function PUT(request: Request) {
         if (themeId !== undefined) updateData.themeId = themeId
         if (highContrast !== undefined) updateData.highContrast = highContrast
 
-        // Update location
-        const location = await prisma.location.update({
-            where: { id: locationId },
-            data: updateData,
-            select: { themeId: true, highContrast: true }
+        // If locationId provided, update specific location (verify it belongs to user's franchise)
+        if (locationId) {
+            const location = await prisma.location.findFirst({
+                where: { id: locationId, franchiseId: user.franchiseId }
+            })
+            if (!location) {
+                return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+            }
+
+            const updated = await prisma.location.update({
+                where: { id: locationId },
+                data: updateData,
+                select: { themeId: true, highContrast: true }
+            })
+
+            // Bust the Redis cache so Android picks up the new theme immediately
+            await cacheDelete(CACHE_KEYS.BOOTSTRAP(locationId)).catch(() => {})
+            console.error(`[THEME] Cache invalidated for location: ${locationId}`)
+
+            return NextResponse.json({
+                themeId: updated.themeId,
+                highContrast: updated.highContrast,
+                message: 'Theme saved successfully'
+            })
+        }
+
+        // No locationId — update all locations for this franchise
+        await prisma.location.updateMany({
+            where: { franchiseId: user.franchiseId },
+            data: updateData
         })
 
+        // Bust the Redis cache for ALL locations in this franchise so Android picks up immediately
+        const allLocations = await prisma.location.findMany({
+            where: { franchiseId: user.franchiseId },
+            select: { id: true }
+        })
+        await Promise.all(
+            allLocations.map(loc => cacheDelete(CACHE_KEYS.BOOTSTRAP(loc.id)).catch(() => {}))
+        )
+        console.error(`[THEME] Cache invalidated for ${allLocations.length} location(s) in franchise ${user.franchiseId}`)
+
         return NextResponse.json({
-            themeId: location.themeId,
-            highContrast: location.highContrast,
-            message: 'Theme saved successfully'
+            themeId: themeId || 'classic_oro',
+            highContrast: highContrast || false,
+            message: 'Theme saved for all locations'
         })
     } catch (error) {
         console.error('Error saving theme:', error)

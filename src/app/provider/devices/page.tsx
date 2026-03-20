@@ -12,20 +12,29 @@ import { formatDistanceToNow } from 'date-fns';
 
 type DeviceTab = 'accounts' | 'licenses' | 'stations' | 'requests';
 
-// Types from old page
-type PaxTerminal = {
-    id: string;
-    locationId: string;
-    location: { id: string; name: string; franchise: { name: string } };
-    paxTerminalIP: string | null;
-    paxTerminalPort: string;
-    processorMID: string | null;
-};
-
-type Station = {
+// Types matching the /api/terminals/manage response shape
+type PaymentTerminal = {
     id: string;
     name: string;
-    pairingCode: string;
+    terminalType: string;
+    terminalIP: string;
+    terminalPort: string;
+    isActive: boolean;
+    assignedStation: { id: string; name: string } | null;
+    createdAt: string;
+    updatedAt: string;
+};
+
+type LocationAccount = {
+    locationId: string;
+    locationName: string;
+    franchiseName: string;
+    legacyIP: string | null;
+    legacyPort: string | null;
+    legacyMID: string | null;
+    terminals: PaymentTerminal[];
+    stations: { id: string; name: string; isActive: boolean }[];
+    updatedAt: string;
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -46,19 +55,23 @@ export default function DevicesPage() {
     // Licenses State
     const [licenses, setLicenses] = useState<any[]>([]);
 
-    // PAX Terminals State
-    const [paxTerminals, setPaxTerminals] = useState<PaxTerminal[]>([]);
-    const [paxLoading, setPaxLoading] = useState(false);
-    const [paxEditingId, setPaxEditingId] = useState<string | null>(null);
-    const [paxSaving, setPaxSaving] = useState(false);
-    const [paxEditForm, setPaxEditForm] = useState({ paxTerminalIP: '', paxTerminalPort: '10009', processorMID: '' });
+    // Location Accounts State (from /api/terminals/manage)
+    const [accounts, setAccounts] = useState<LocationAccount[]>([]);
+    const [accountsLoading, setAccountsLoading] = useState(false);
+
+    // Inline Add Terminal Form State
+    const [addingTerminalFor, setAddingTerminalFor] = useState<string | null>(null);
+    const [newTerminalForm, setNewTerminalForm] = useState({ name: '', terminalIP: '', terminalPort: '10009', stationId: '' });
+    const [savingTerminal, setSavingTerminal] = useState(false);
+    const [editingTerminalId, setEditingTerminalId] = useState<string | null>(null);
+    const [editTerminalForm, setEditTerminalForm] = useState({ name: '', terminalIP: '', terminalPort: '10009' });
 
     // Terminal Status Check
     const [checkingTerminalId, setCheckingTerminalId] = useState<string | null>(null);
     const [terminalStatus, setTerminalStatus] = useState<{ [key: string]: { status: string; message: string } }>({});
 
     // Stations State
-    const [stationsByLocation, setStationsByLocation] = useState<{ [locationId: string]: Station[] }>({});
+    const [stationsByLocation, setStationsByLocation] = useState<{ [locationId: string]: any[] }>({});
     const [expandedLocationId, setExpandedLocationId] = useState<string | null>(null);
     const [addingStationFor, setAddingStationFor] = useState<string | null>(null);
     const [newStationName, setNewStationName] = useState('');
@@ -79,7 +92,7 @@ export default function DevicesPage() {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     useEffect(() => {
-        fetchPaxTerminals();
+        fetchAccounts();
         fetchLicenses();
         fetchLocations();
         fetchRequests();
@@ -94,20 +107,20 @@ export default function DevicesPage() {
     }, [toast]);
 
     // Fetch Functions
-    const fetchPaxTerminals = async () => {
-        setPaxLoading(true);
+    const fetchAccounts = async () => {
+        setAccountsLoading(true);
         try {
             const res = await fetch('/api/terminals/manage');
             if (res.ok) {
-                const terminals = await res.json();
-                setPaxTerminals(terminals);
-                // Pre-fetch stations for all locations so counts display correctly
-                terminals.forEach((t: PaxTerminal) => {
-                    fetchStationsForLocation(t.locationId);
+                const data = await res.json();
+                setAccounts(data);
+                // Pre-populate stationsByLocation from accounts data
+                data.forEach((acct: LocationAccount) => {
+                    fetchStationsForLocation(acct.locationId);
                 });
             }
         } catch (e) { console.error(e); }
-        finally { setPaxLoading(false); setIsLoading(false); }
+        finally { setAccountsLoading(false); setIsLoading(false); }
     };
 
     const fetchLicenses = async () => {
@@ -136,21 +149,17 @@ export default function DevicesPage() {
 
     const fetchStationsForLocation = async (locationId: string) => {
         try {
-            console.log('[Devices] Fetching stations for location:', locationId);
             const res = await fetch(`/api/settings/stations?locationId=${locationId}`);
             const data = await res.json();
-            console.log('[Devices] Stations API response for', locationId, ':', res.status, data);
             if (res.ok) {
                 setStationsByLocation(prev => ({ ...prev, [locationId]: data.stations || [] }));
-            } else {
-                console.error('[Devices] Error fetching stations:', data.error);
             }
-        } catch (e) { console.error('[Devices] fetchStationsForLocation error:', e); }
+        } catch (e) { console.log('[Devices] fetchStationsForLocation error:', e); }
     };
 
-    // PAX Terminal Functions
-    const checkTerminalStatus = async (locationId: string, ipAddress: string, port: string = '10009') => {
-        setCheckingTerminalId(locationId);
+    // Terminal Functions
+    const checkTerminalStatus = async (terminalId: string, ipAddress: string, port: string = '10009') => {
+        setCheckingTerminalId(terminalId);
         try {
             const res = await fetch('/api/admin/terminals/discover', {
                 method: 'POST',
@@ -160,46 +169,101 @@ export default function DevicesPage() {
             const data = await res.json();
             setTerminalStatus(prev => ({
                 ...prev,
-                [locationId]: { status: data.status, message: data.message }
+                [terminalId]: { status: data.status, message: data.message }
             }));
         } catch {
             setTerminalStatus(prev => ({
                 ...prev,
-                [locationId]: { status: 'ERROR', message: 'Failed to check' }
+                [terminalId]: { status: 'ERROR', message: 'Failed to check' }
             }));
         } finally {
             setCheckingTerminalId(null);
         }
     };
 
-    const startPaxEdit = (terminal: PaxTerminal) => {
-        setPaxEditingId(terminal.locationId);
-        setPaxEditForm({
-            paxTerminalIP: terminal.paxTerminalIP || '',
-            paxTerminalPort: terminal.paxTerminalPort || '10009',
-            processorMID: terminal.processorMID || ''
-        });
-    };
-
-    const handlePaxUpdate = async (locationId: string) => {
-        setPaxSaving(true);
+    const handleAddTerminal = async (locationId: string) => {
+        if (!newTerminalForm.name || !newTerminalForm.terminalIP) {
+            setToast({ message: 'Name and IP are required', type: 'error' });
+            return;
+        }
+        setSavingTerminal(true);
         try {
-            const res = await fetch(`/api/terminals/manage/${locationId}`, {
-                method: 'PUT',
+            const res = await fetch('/api/terminals/manage', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(paxEditForm)
+                body: JSON.stringify({
+                    locationId,
+                    name: newTerminalForm.name,
+                    terminalIP: newTerminalForm.terminalIP,
+                    terminalPort: newTerminalForm.terminalPort || '10009',
+                    stationId: newTerminalForm.stationId || undefined
+                })
             });
             if (res.ok) {
-                await fetchPaxTerminals();
-                setPaxEditingId(null);
-                setToast({ message: 'Terminal settings saved', type: 'success' });
+                await fetchAccounts();
+                setAddingTerminalFor(null);
+                setNewTerminalForm({ name: '', terminalIP: '', terminalPort: '10009', stationId: '' });
+                setToast({ message: 'Terminal added', type: 'success' });
             } else {
-                setToast({ message: 'Failed to save', type: 'error' });
+                const err = await res.json();
+                setToast({ message: err.error || 'Failed to add', type: 'error' });
             }
         } catch (e) {
-            setToast({ message: 'Error saving terminal', type: 'error' });
+            setToast({ message: 'Error adding terminal', type: 'error' });
         } finally {
-            setPaxSaving(false);
+            setSavingTerminal(false);
+        }
+    };
+
+    const handleDeleteTerminal = async (terminalId: string) => {
+        if (!confirm('Delete this terminal?')) return;
+        try {
+            const res = await fetch(`/api/terminals/manage/${terminalId}`, { method: 'DELETE' });
+            if (res.ok) {
+                await fetchAccounts();
+                setToast({ message: 'Terminal deleted', type: 'success' });
+            }
+        } catch (e) { console.log(e); }
+    };
+
+    const handleAssignStation = async (terminalId: string, stationId: string) => {
+        try {
+            const res = await fetch(`/api/terminals/manage/${terminalId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stationId: stationId || null })
+            });
+            if (res.ok) {
+                await fetchAccounts();
+                setToast({ message: 'Station assigned', type: 'success' });
+            }
+        } catch (e) { console.log(e); }
+    };
+
+    const handleUpdateTerminal = async (terminalId: string) => {
+        setSavingTerminal(true);
+        try {
+            const res = await fetch(`/api/terminals/manage/${terminalId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: editTerminalForm.name,
+                    terminalIP: editTerminalForm.terminalIP,
+                    terminalPort: editTerminalForm.terminalPort
+                })
+            });
+            if (res.ok) {
+                await fetchAccounts();
+                setEditingTerminalId(null);
+                setToast({ message: 'Terminal updated', type: 'success' });
+            } else {
+                const err = await res.json();
+                setToast({ message: err.error || 'Failed to update', type: 'error' });
+            }
+        } catch (e) {
+            setToast({ message: 'Error updating terminal', type: 'error' });
+        } finally {
+            setSavingTerminal(false);
         }
     };
 
@@ -277,11 +341,12 @@ export default function DevicesPage() {
         finally { setApproving(null); }
     };
 
-    // Filter
-    const filteredTerminals = paxTerminals.filter(t =>
-        t.location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.location.franchise.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.paxTerminalIP && t.paxTerminalIP.includes(searchQuery))
+    // Filter accounts by search
+    const filteredAccounts = accounts.filter(a =>
+        a.locationName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.franchiseName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.legacyIP?.includes(searchQuery) ||
+        a.terminals.some(t => t.terminalIP?.includes(searchQuery))
     );
 
     const filteredLicenses = licenses.filter(l =>
@@ -290,7 +355,7 @@ export default function DevicesPage() {
     );
 
     const tabs: { id: DeviceTab; label: string; count?: number }[] = [
-        { id: 'accounts', label: 'Accounts' },
+        { id: 'accounts', label: 'Accounts', count: accounts.length },
         { id: 'licenses', label: 'Licenses', count: licenses.filter(l => l.status === 'ACTIVE').length },
         { id: 'stations', label: 'Stations' },
         { id: 'requests', label: 'Requests', count: requests.length },
@@ -306,7 +371,7 @@ export default function DevicesPage() {
                 </div>
                 <div className="flex gap-2">
                     <button
-                        onClick={() => { fetchPaxTerminals(); fetchLicenses(); fetchRequests(); }}
+                        onClick={() => { fetchAccounts(); fetchLicenses(); fetchRequests(); }}
                         className="flex items-center gap-2 px-3 py-2 border border-stone-700 text-stone-300 hover:bg-stone-800 rounded-lg text-sm"
                     >
                         <RefreshCw size={16} />
@@ -358,185 +423,202 @@ export default function DevicesPage() {
             {/* ACCOUNTS TAB - PAX Terminal Configuration */}
             {activeTab === 'accounts' && (
                 <div className="space-y-4">
-                    {paxLoading ? (
+                    {accountsLoading ? (
                         <div className="bg-stone-900/50 rounded-xl border border-stone-800 p-12 text-center">
                             <RefreshCw size={32} className="mx-auto text-stone-600 mb-4 animate-spin" />
                             <p className="text-stone-400">Loading accounts...</p>
                         </div>
-                    ) : filteredTerminals.length === 0 ? (
+                    ) : filteredAccounts.length === 0 ? (
                         <div className="bg-stone-900/50 rounded-xl border border-stone-800 p-12 text-center">
                             <Monitor size={48} className="mx-auto text-stone-600 mb-4" />
                             <h2 className="text-lg font-semibold text-stone-100">No accounts found</h2>
                             <p className="text-stone-400 mt-2">Add clients with locations to configure their terminals</p>
                         </div>
                     ) : (
-                        filteredTerminals.map((terminal) => (
-                            <div key={terminal.id} className="bg-stone-900/50 rounded-xl border border-stone-800 overflow-hidden hover:border-stone-700 transition-colors">
+                        filteredAccounts.map((account) => (
+                            <div key={account.locationId} className="bg-stone-900/50 rounded-xl border border-stone-800 overflow-hidden hover:border-stone-700 transition-colors">
                                 {/* Account Header */}
                                 <div className="p-4 border-b border-stone-800 flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-lg font-semibold text-stone-100">{terminal.location.name}</h3>
-                                        <p className="text-sm text-stone-400">{terminal.location.franchise.name}</p>
+                                        <h3 className="text-lg font-semibold text-stone-100">{account.locationName}</h3>
+                                        <p className="text-sm text-stone-400">{account.franchiseName} · {account.terminals.length} terminal{account.terminals.length !== 1 ? 's' : ''} · {account.stations.length} station{account.stations.length !== 1 ? 's' : ''}</p>
                                     </div>
-                                    <div className="flex gap-2">
-                                        {terminal.paxTerminalIP && (
-                                            <button
-                                                onClick={() => checkTerminalStatus(terminal.locationId, terminal.paxTerminalIP!, terminal.paxTerminalPort)}
-                                                disabled={checkingTerminalId === terminal.locationId}
-                                                className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded-lg text-sm transition-colors disabled:opacity-50"
-                                            >
-                                                {checkingTerminalId === terminal.locationId ? (
-                                                    <RefreshCw size={14} className="animate-spin" />
-                                                ) : (
-                                                    <Wifi size={14} />
-                                                )}
-                                                Check Status
-                                            </button>
-                                        )}
-                                        {paxEditingId !== terminal.locationId && (
-                                            <button
-                                                onClick={() => startPaxEdit(terminal)}
-                                                className="flex items-center gap-2 px-3 py-2 border border-stone-700 text-stone-300 hover:bg-stone-800 rounded-lg text-sm"
-                                            >
-                                                <Edit size={14} />
-                                                Edit
-                                            </button>
-                                        )}
-                                    </div>
+                                    <button
+                                        onClick={() => { setAddingTerminalFor(addingTerminalFor === account.locationId ? null : account.locationId); setNewTerminalForm({ name: '', terminalIP: '', terminalPort: '10009', stationId: '' }); }}
+                                        className="flex items-center gap-2 px-3 py-2 bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 rounded-lg text-sm font-medium"
+                                    >
+                                        <Plus size={14} />
+                                        Add Terminal
+                                    </button>
                                 </div>
 
-                                {/* Status Display */}
-                                {terminalStatus[terminal.locationId] && (
-                                    <div className={`px-4 py-3 flex items-center gap-3 ${terminalStatus[terminal.locationId].status === 'ONLINE'
-                                        ? 'bg-emerald-500/10 border-b border-emerald-500/20'
-                                        : 'bg-red-500/10 border-b border-red-500/20'
-                                        }`}>
-                                        {terminalStatus[terminal.locationId].status === 'ONLINE' ? (
-                                            <Wifi size={18} className="text-emerald-400" />
-                                        ) : (
-                                            <WifiOff size={18} className="text-red-400" />
-                                        )}
-                                        <div>
-                                            <p className={`font-medium ${terminalStatus[terminal.locationId].status === 'ONLINE' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                {terminalStatus[terminal.locationId].status}
-                                            </p>
-                                            <p className="text-sm text-stone-400">{terminalStatus[terminal.locationId].message}</p>
+                                {/* Add Terminal Inline Form */}
+                                {addingTerminalFor === account.locationId && (
+                                    <div className="p-4 border-b border-stone-800 bg-stone-800/30">
+                                        <p className="text-xs font-medium text-stone-400 mb-3">Add New CC Machine / Terminal</p>
+                                        <div className="grid grid-cols-4 gap-3 mb-3">
+                                            <input
+                                                type="text" placeholder="Terminal Name (e.g. PAX-1)"
+                                                value={newTerminalForm.name}
+                                                onChange={(e) => setNewTerminalForm({ ...newTerminalForm, name: e.target.value })}
+                                                className="px-3 py-2 bg-stone-900 border border-stone-700 rounded-lg text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            />
+                                            <input
+                                                type="text" placeholder="IP (192.168.1.100)"
+                                                value={newTerminalForm.terminalIP}
+                                                onChange={(e) => setNewTerminalForm({ ...newTerminalForm, terminalIP: e.target.value.replace(/[^0-9.]/g, '') })}
+                                                maxLength={15}
+                                                className="px-3 py-2 bg-stone-900 border border-stone-700 rounded-lg text-stone-100 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            />
+                                            <input
+                                                type="text" placeholder="Port (10009)"
+                                                value={newTerminalForm.terminalPort}
+                                                onChange={(e) => setNewTerminalForm({ ...newTerminalForm, terminalPort: e.target.value.replace(/\D/g, '') })}
+                                                maxLength={5}
+                                                className="px-3 py-2 bg-stone-900 border border-stone-700 rounded-lg text-stone-100 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            />
+                                            <select
+                                                value={newTerminalForm.stationId}
+                                                onChange={(e) => setNewTerminalForm({ ...newTerminalForm, stationId: e.target.value })}
+                                                className="px-3 py-2 bg-stone-900 border border-stone-700 rounded-lg text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            >
+                                                <option value="">Assign to Station...</option>
+                                                {account.stations.map(s => (
+                                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="flex gap-2 justify-end">
+                                            <button onClick={() => setAddingTerminalFor(null)} className="px-3 py-2 border border-stone-700 text-stone-300 hover:bg-stone-800 rounded-lg text-sm">Cancel</button>
+                                            <button
+                                                onClick={() => handleAddTerminal(account.locationId)}
+                                                disabled={savingTerminal || !newTerminalForm.name || !newTerminalForm.terminalIP}
+                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm disabled:opacity-50"
+                                            >
+                                                <Save size={14} />
+                                                {savingTerminal ? 'Adding...' : 'Add'}
+                                            </button>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Edit Form or Display */}
-                                <div className="p-4">
-                                    {paxEditingId === terminal.locationId ? (
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-3 gap-4">
-                                                <div>
-                                                    <label className="block text-xs font-medium text-stone-400 mb-2">Terminal IP Address</label>
-                                                    <input
-                                                        type="text"
-                                                        value={paxEditForm.paxTerminalIP}
-                                                        onChange={(e) => {
-                                                            // Only allow digits and dots for IP address
-                                                            const filtered = e.target.value.replace(/[^0-9.]/g, '');
-                                                            setPaxEditForm({ ...paxEditForm, paxTerminalIP: filtered });
-                                                        }}
-                                                        placeholder="192.168.1.100"
-                                                        maxLength={15}
-                                                        className="w-full px-4 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 font-mono focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-stone-400 mb-2">Port</label>
-                                                    <input
-                                                        type="text"
-                                                        value={paxEditForm.paxTerminalPort}
-                                                        onChange={(e) => {
-                                                            // Only allow digits for port
-                                                            const filtered = e.target.value.replace(/\D/g, '');
-                                                            setPaxEditForm({ ...paxEditForm, paxTerminalPort: filtered });
-                                                        }}
-                                                        placeholder="10009"
-                                                        maxLength={5}
-                                                        className="w-full px-4 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 font-mono focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-stone-400 mb-2">Merchant ID (MID)</label>
-                                                    <input
-                                                        type="text"
-                                                        value={paxEditForm.processorMID}
-                                                        onChange={(e) => {
-                                                            // Only allow alphanumeric for MID
-                                                            const filtered = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
-                                                            setPaxEditForm({ ...paxEditForm, processorMID: filtered });
-                                                        }}
-                                                        placeholder="Optional"
-                                                        maxLength={20}
-                                                        className="w-full px-4 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 font-mono focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-2 justify-end">
-                                                <button
-                                                    onClick={() => setPaxEditingId(null)}
-                                                    className="flex items-center gap-2 px-4 py-2 border border-stone-700 text-stone-300 hover:bg-stone-800 rounded-lg text-sm"
-                                                >
-                                                    <X size={14} />
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    onClick={() => handlePaxUpdate(terminal.locationId)}
-                                                    disabled={paxSaving}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm disabled:opacity-50"
-                                                >
-                                                    <Save size={14} />
-                                                    {paxSaving ? 'Saving...' : 'Save'}
-                                                </button>
-                                            </div>
+                                {/* Terminals List */}
+                                <div className="divide-y divide-stone-800/50">
+                                    {account.terminals.length === 0 ? (
+                                        <div className="p-4 text-center">
+                                            <p className="text-stone-500 text-sm">No terminals configured. Click "Add Terminal" above.</p>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-3 gap-6">
-                                            <div>
-                                                <p className="text-xs text-stone-500 mb-1">IP Address</p>
-                                                <p className="text-stone-100 font-mono">
-                                                    {terminal.paxTerminalIP || <span className="text-stone-600 italic">Not set</span>}
-                                                </p>
+                                        account.terminals.map((term) => (
+                                            <div key={term.id} className="p-4">
+                                                {editingTerminalId === term.id ? (
+                                                    /* Edit mode for this terminal */
+                                                    <div className="space-y-3">
+                                                        <div className="grid grid-cols-3 gap-3">
+                                                            <div>
+                                                                <label className="block text-xs text-stone-500 mb-1">Name</label>
+                                                                <input type="text" value={editTerminalForm.name}
+                                                                    onChange={(e) => setEditTerminalForm({ ...editTerminalForm, name: e.target.value })}
+                                                                    className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs text-stone-500 mb-1">IP Address</label>
+                                                                <input type="text" value={editTerminalForm.terminalIP}
+                                                                    onChange={(e) => setEditTerminalForm({ ...editTerminalForm, terminalIP: e.target.value.replace(/[^0-9.]/g, '') })}
+                                                                    maxLength={15}
+                                                                    className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs text-stone-500 mb-1">Port</label>
+                                                                <input type="text" value={editTerminalForm.terminalPort}
+                                                                    onChange={(e) => setEditTerminalForm({ ...editTerminalForm, terminalPort: e.target.value.replace(/\D/g, '') })}
+                                                                    maxLength={5}
+                                                                    className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-2 justify-end">
+                                                            <button onClick={() => setEditingTerminalId(null)} className="px-3 py-2 border border-stone-700 text-stone-300 hover:bg-stone-800 rounded-lg text-sm"><X size={14} /></button>
+                                                            <button onClick={() => handleUpdateTerminal(term.id)} disabled={savingTerminal}
+                                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm disabled:opacity-50">
+                                                                <Save size={14} /> {savingTerminal ? 'Saving...' : 'Save'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    /* Display mode */
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-4 flex-1">
+                                                            <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                                                                <Monitor size={16} className="text-orange-400" />
+                                                            </div>
+                                                            <div className="min-w-[120px]">
+                                                                <p className="text-stone-100 font-medium text-sm">{term.name}</p>
+                                                                <p className="text-stone-500 text-xs font-mono">{term.terminalIP}:{term.terminalPort}</p>
+                                                            </div>
+                                                            {/* Station Assignment Dropdown */}
+                                                            <div className="flex items-center gap-2">
+                                                                <Smartphone size={14} className="text-stone-500" />
+                                                                <select
+                                                                    value={term.assignedStation?.id || ''}
+                                                                    onChange={(e) => handleAssignStation(term.id, e.target.value)}
+                                                                    className="px-3 py-1.5 bg-stone-800 border border-stone-700 rounded-lg text-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                                >
+                                                                    <option value="">Unassigned</option>
+                                                                    {account.stations.map(s => (
+                                                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                            {/* Status badge */}
+                                                            {terminalStatus[term.id] && (
+                                                                <span className={`text-xs px-2 py-0.5 rounded ${terminalStatus[term.id].status === 'ONLINE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                                    {terminalStatus[term.id].status}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            <button onClick={() => checkTerminalStatus(term.id, term.terminalIP, term.terminalPort)}
+                                                                disabled={checkingTerminalId === term.id}
+                                                                className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg disabled:opacity-50" title="Check status">
+                                                                {checkingTerminalId === term.id ? <RefreshCw size={14} className="animate-spin" /> : <Wifi size={14} />}
+                                                            </button>
+                                                            <button onClick={() => { setEditingTerminalId(term.id); setEditTerminalForm({ name: term.name, terminalIP: term.terminalIP, terminalPort: term.terminalPort }); }}
+                                                                className="p-2 text-stone-400 hover:bg-stone-700 rounded-lg" title="Edit terminal">
+                                                                <Edit size={14} />
+                                                            </button>
+                                                            <button onClick={() => handleDeleteTerminal(term.id)}
+                                                                className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg" title="Delete terminal">
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div>
-                                                <p className="text-xs text-stone-500 mb-1">Port</p>
-                                                <p className="text-stone-100 font-mono">{terminal.paxTerminalPort}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-stone-500 mb-1">Merchant ID</p>
-                                                <p className="text-stone-100 font-mono">
-                                                    {terminal.processorMID || <span className="text-stone-600">—</span>}
-                                                </p>
-                                            </div>
-                                        </div>
+                                        ))
                                     )}
                                 </div>
 
                                 {/* Stations Section */}
                                 <div className="border-t border-stone-800">
                                     <button
-                                        onClick={() => toggleLocationExpand(terminal.locationId)}
+                                        onClick={() => toggleLocationExpand(account.locationId)}
                                         className="w-full px-4 py-3 flex items-center justify-between hover:bg-stone-800/50 transition-colors"
                                     >
                                         <span className="flex items-center gap-2 text-sm font-medium text-stone-300">
                                             <Smartphone size={16} />
-                                            POS Stations ({stationsByLocation[terminal.locationId]?.length || 0})
+                                            POS Stations ({stationsByLocation[account.locationId]?.length || 0})
                                         </span>
                                         <span className="text-stone-500 text-xs">
-                                            {expandedLocationId === terminal.locationId ? '▼' : '▶'}
+                                            {expandedLocationId === account.locationId ? '▼' : '▶'}
                                         </span>
                                     </button>
 
-                                    {expandedLocationId === terminal.locationId && (
+                                    {expandedLocationId === account.locationId && (
                                         <div className="px-4 pb-4 space-y-3">
                                             {/* Add Station Button */}
-                                            {addingStationFor !== terminal.locationId && (
+                                            {addingStationFor !== account.locationId && (
                                                 <button
-                                                    onClick={() => setAddingStationFor(terminal.locationId)}
+                                                    onClick={() => setAddingStationFor(account.locationId)}
                                                     className="flex items-center gap-2 px-3 py-2 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded-lg text-sm"
                                                 >
                                                     <Plus size={14} />
@@ -545,7 +627,7 @@ export default function DevicesPage() {
                                             )}
 
                                             {/* Add Station Form */}
-                                            {addingStationFor === terminal.locationId && (
+                                            {addingStationFor === account.locationId && (
                                                 <div className="flex gap-2 p-3 bg-stone-800/50 rounded-lg items-center">
                                                     <input
                                                         type="text"
@@ -559,7 +641,7 @@ export default function DevicesPage() {
                                                         🔒 8-char code auto
                                                     </span>
                                                     <button
-                                                        onClick={() => handleAddStation(terminal.locationId)}
+                                                        onClick={() => handleAddStation(account.locationId)}
                                                         disabled={!newStationName}
                                                         className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
@@ -575,10 +657,10 @@ export default function DevicesPage() {
                                             )}
 
                                             {/* Station List */}
-                                            {stationsByLocation[terminal.locationId]?.length === 0 ? (
+                                            {stationsByLocation[account.locationId]?.length === 0 ? (
                                                 <p className="text-stone-500 text-sm py-2">No stations configured</p>
                                             ) : (
-                                                stationsByLocation[terminal.locationId]?.map((station) => (
+                                                stationsByLocation[account.locationId]?.map((station: any) => (
                                                     <div key={station.id} className="flex items-center justify-between p-3 bg-stone-800/50 rounded-lg">
                                                         <div className="flex items-center gap-3">
                                                             <Smartphone size={16} className="text-blue-400" />
@@ -589,7 +671,7 @@ export default function DevicesPage() {
                                                         </div>
                                                         <div className="flex gap-1">
                                                             <button
-                                                                onClick={() => handleRegenerateCode(terminal.locationId, station.id)}
+                                                                onClick={() => handleRegenerateCode(account.locationId, station.id)}
                                                                 disabled={regeneratingStationId === station.id}
                                                                 className="p-2 text-orange-400 hover:bg-orange-500/20 rounded-lg disabled:opacity-50"
                                                                 title="Regenerate pairing code"
@@ -597,7 +679,7 @@ export default function DevicesPage() {
                                                                 <RefreshCw size={14} className={regeneratingStationId === station.id ? 'animate-spin' : ''} />
                                                             </button>
                                                             <button
-                                                                onClick={() => handleDeleteStation(terminal.locationId, station.id)}
+                                                                onClick={() => handleDeleteStation(account.locationId, station.id)}
                                                                 className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"
                                                             >
                                                                 <Trash2 size={14} />
@@ -702,22 +784,22 @@ export default function DevicesPage() {
             {/* STATIONS TAB - Browse all stations by location */}
             {activeTab === 'stations' && (
                 <div className="space-y-4">
-                    {paxTerminals.length === 0 ? (
+                    {accounts.length === 0 ? (
                         <div className="bg-stone-900/50 rounded-xl border border-stone-800 p-12 text-center">
                             <Smartphone size={48} className="mx-auto text-stone-600 mb-4" />
                             <h2 className="text-lg font-semibold text-stone-100">No stations</h2>
                             <p className="text-stone-400 mt-2">Add locations and configure their POS stations in the Accounts tab</p>
                         </div>
                     ) : (
-                        paxTerminals.map((terminal) => (
-                            <div key={terminal.id} className="bg-stone-900/50 rounded-xl border border-stone-800 p-4">
+                        accounts.map((account) => (
+                            <div key={account.locationId} className="bg-stone-900/50 rounded-xl border border-stone-800 p-4">
                                 <div className="flex items-center justify-between mb-4">
                                     <div>
-                                        <h3 className="font-semibold text-stone-100">{terminal.location.name}</h3>
-                                        <p className="text-sm text-stone-500">{terminal.location.franchise.name}</p>
+                                        <h3 className="font-semibold text-stone-100">{account.locationName}</h3>
+                                        <p className="text-sm text-stone-500">{account.franchiseName}</p>
                                     </div>
                                     <button
-                                        onClick={() => { setExpandedLocationId(terminal.locationId); setAddingStationFor(terminal.locationId); fetchStationsForLocation(terminal.locationId); setActiveTab('accounts'); }}
+                                        onClick={() => { setExpandedLocationId(account.locationId); setAddingStationFor(account.locationId); fetchStationsForLocation(account.locationId); setActiveTab('accounts'); }}
                                         className="flex items-center gap-2 px-3 py-2 bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 rounded-lg text-sm"
                                     >
                                         <Plus size={14} />
@@ -725,7 +807,7 @@ export default function DevicesPage() {
                                     </button>
                                 </div>
                                 <p className="text-stone-400 text-sm">
-                                    {stationsByLocation[terminal.locationId]?.length || 0} stations configured
+                                    {stationsByLocation[account.locationId]?.length || 0} stations configured
                                 </p>
                             </div>
                         ))
@@ -772,7 +854,7 @@ export default function DevicesPage() {
             <AddTerminalModal
                 isOpen={showAddModal}
                 onClose={() => setShowAddModal(false)}
-                onSuccess={() => { fetchLicenses(); fetchPaxTerminals(); }}
+                onSuccess={() => { fetchLicenses(); fetchAccounts(); }}
                 locations={locations}
             />
 
@@ -781,7 +863,7 @@ export default function DevicesPage() {
                 isOpen={showTransferModal}
                 onClose={() => setShowTransferModal(false)}
                 terminal={selectedTerminal}
-                onSuccess={() => { fetchLicenses(); fetchPaxTerminals(); }}
+                onSuccess={() => { fetchLicenses(); fetchAccounts(); }}
             />
 
             {/* Toast */}

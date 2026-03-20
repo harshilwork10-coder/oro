@@ -15,32 +15,30 @@ export async function GET(request: NextRequest) {
         const mobileUser = await getAuthUser(request)
         if (mobileUser) {
             userId = mobileUser.id
-            userEmail = mobileUser.email
-            console.log('[PAX Settings] Mobile auth:', mobileUser.email)
+            userEmail = mobileUser.email ?? null
+            console.error('[PAX Settings] Mobile auth:', mobileUser.email)
         } else {
             // Fall back to web session auth
             const session = await getServerSession(authOptions)
             if (session?.user?.email) {
                 userEmail = session.user.email
-                console.log('[PAX Settings] Session auth:', session.user.email)
+                console.error('[PAX Settings] Session auth:', session.user.email)
             }
         }
 
         if (!userId && !userEmail) {
-            console.log('[PAX Settings] No auth found')
+            console.error('[PAX Settings] No auth found')
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        // Get user with their location
+        // Get user with their locationId
         const user = await prisma.user.findUnique({
             where: userId ? { id: userId } : { email: userEmail! },
-            include: {
-                location: true
-            }
+            select: { id: true, locationId: true }
         })
 
-        if (!user?.location) {
-            console.log('[PAX Settings] User has no location:', userEmail || userId)
+        if (!user?.locationId) {
+            console.error('[PAX Settings] User has no location:', userEmail || userId)
             return NextResponse.json({
                 error: 'No location assigned',
                 paxTerminalIP: null,
@@ -48,13 +46,22 @@ export async function GET(request: NextRequest) {
             })
         }
 
-        console.log('[PAX Settings] Location:', user.location.name, 'PAX IP:', user.location.paxTerminalIP)
+        const location = await prisma.location.findUnique({
+            where: { id: user.locationId },
+            select: { name: true, paxTerminalIP: true, paxTerminalPort: true, processorMID: true }
+        })
+
+        if (!location) {
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+        }
+
+        console.error('[PAX Settings] Location:', location.name, 'PAX IP:', location.paxTerminalIP)
 
         return NextResponse.json({
-            paxTerminalIP: user.location.paxTerminalIP,
-            paxTerminalPort: user.location.paxTerminalPort || '10009',
-            processorMID: user.location.processorMID,
-            locationName: user.location.name
+            paxTerminalIP: location.paxTerminalIP,
+            paxTerminalPort: location.paxTerminalPort || '10009',
+            processorMID: location.processorMID,
+            locationName: location.name
         })
     } catch (error) {
         console.error('Error fetching PAX settings:', error)

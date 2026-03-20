@@ -30,17 +30,25 @@ export async function POST(
             return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
         }
 
+        // Security: Verify transaction belongs to user's franchise
+        if (transaction.franchiseId !== session.user.franchiseId) {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+        }
+
         if (transaction.status !== 'COMPLETED') {
             return NextResponse.json({
                 error: 'Can only void completed transactions'
             }, { status: 400 })
         }
 
-        // Mark as voided (reason logged to console for audit)
-        // Debug log removed voided transaction ${transactionId}. Reason: ${reason}`)
+        // Mark as voided with who did it and when
         await prisma.transaction.update({
             where: { id: transactionId },
-            data: { status: 'VOIDED' }
+            data: {
+                status: 'VOIDED',
+                voidedById: (session.user as any).id,
+                voidedAt: new Date(),
+            }
         })
 
         return NextResponse.json({ success: true })

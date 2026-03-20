@@ -39,20 +39,26 @@ export async function GET(req: NextRequest) {
         const days60Ago = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
         const days90Ago = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
 
-        // Get locations
-        const locations = await prisma.location.findMany({
-            where: {
-                franchisorId,
-                ...(locationId ? { id: locationId } : {})
-            },
-            select: { id: true }
-        })
-        const locationIds = locations.map(l => l.id)
+        // Get all franchises for this franchisor, then get locationIds
+        const franchisorData = await prisma.franchisor.findUnique({
+            where: { id: franchisorId },
+            include: {
+                franchises: {
+                    include: {
+                        locations: { select: { id: true } }
+                    }
+                }
+            }
+        }) as any
+
+        const locationIds: string[] = (franchisorData?.franchises ?? []).flatMap((f: any) =>
+            (f.locations ?? []).map((l: any) => l.id)
+        ).filter((id: string) => !locationId || id === locationId)
 
         // Get all transactions with client info
         const transactions = await prisma.transaction.findMany({
             where: {
-                locationId: { in: locationIds },
+                franchiseId: { in: (franchisorData?.franchises ?? []).map((f: any) => f.id) },
                 status: { in: ['COMPLETED', 'PARTIAL_REFUND'] },
                 clientId: { not: null }
             },

@@ -42,10 +42,11 @@ export async function POST(request: NextRequest) {
             franchiseId = franchisor.franchises[0].id
         } else {
             // Create a new franchise for this franchisor
+            const franchiseName = franchisor.name || 'franchise'
             const franchise = await prisma.franchise.create({
                 data: {
-                    name: franchisor.name,
-                    slug: `${franchisor.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
+                    name: franchiseName,
+                    slug: `${franchiseName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
                     franchisorId: franchisor.id
                 }
             })

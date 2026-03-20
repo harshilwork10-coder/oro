@@ -1,0 +1,262 @@
+/**
+ * Barcode Scanner Module
+ * Handles USB HID barcode scanners in keyboard wedge mode
+ *
+ * Most retail barcode scanners work as keyboard devices — they "type" the barcode
+ * followed by Enter. This module detects rapid keystroke sequences (< 50ms between keys)
+ * to distinguish scanner input from human typing.
+ */
+
+export interface ScanResult {
+    barcode: string
+    type: 'UPC-A' | 'UPC-E' | 'EAN-13' | 'EAN-8' | 'CODE-128' | 'CODE-39' | 'QR' | 'UNKNOWN'
+    timestamp: Date
+    /** If this is a price-embedded barcode (prefix 2), contains extracted data */
+    embedded?: EmbeddedBarcodeData | null
+}
+
+/**
+ * Price/Weight Embedded Barcode Data
+ * 
+ * Used by scanner-scale combo units (NCR 7878, Datalogic Magellan, Honeywell Stratos).
+ * Deli/produce items get weighed and labeled with a barcode that contains the price/weight.
+ * 
+ * UPC-A Format: 2 PPPPP VVVVV C
+ *   Prefix "2" = in-store price/weight embedded
+ *   PPPPP = PLU number (internal product lookup)
+ *   VVVVV = embedded value (price in cents OR weight × 100)
+ *   C = check digit
+ */
+export interface EmbeddedBarcodeData {
+    /** True if this barcode has embedded price/weight */
+    isPriceEmbedded: boolean
+    /** PLU number (5-digit internal product code) */
+    plu: string
+    /** Embedded price in dollars (e.g. 3.78) — if price-embedded */
+    embeddedPrice: number | null
+    /** Embedded weight in lbs (e.g. 0.42) — if weight-embedded */
+    embeddedWeight: number | null
+    /** Whether this is a price barcode or weight barcode */
+    embedType: 'PRICE' | 'WEIGHT' | 'NONE'
+    /** Raw 5-digit value field from barcode */
+    rawValue: string
+}
+
+export interface ScannerConfig {
+    /** Max ms between keystrokes to be considered scanner input (default: 50ms) */
+    maxKeystrokeInterval: number
+    /** Min barcode length to accept (default: 4) */
+    minLength: number
+    /** Max barcode length to accept (default: 48 for QR codes) */
+    maxLength: number
+    /** Character that terminates scan (default: Enter) */
+    terminatorKey: string
+    /** Prefix characters to strip (some scanners add these) */
+    prefixToStrip: string[]
+    /** Suffix characters to strip */
+    suffixToStrip: string[]
+    /**
+     * How to interpret prefix-2 barcodes.
+     * 'PRICE' = value field is price in cents ($3.78 → 00378)
+     * 'WEIGHT' = value field is weight × 100 (0.42 lb → 00042)
+     * 'AUTO' = try to detect based on value range
+     * Default: 'PRICE' (most common in c-stores)
+     */
+    embeddedBarcodeMode: 'PRICE' | 'WEIGHT' | 'AUTO'
+}
+
+const DEFAULT_SCANNER_CONFIG: ScannerConfig = {
+    maxKeystrokeInterval: 50,
+    minLength: 4,
+    maxLength: 48,
+    terminatorKey: 'Enter',
+    prefixToStrip: [],
+    suffixToStrip: [],
+    embeddedBarcodeMode: 'PRICE',
+}
+
+export class BarcodeScanner {
+    private config: ScannerConfig
+    private buffer: string = ''
+    private lastKeystrokeTime: number = 0
+    private onScan: ((result: ScanResult) => void) | null = null
+    private keydownHandler: ((e: KeyboardEvent) => void) | null = null
+    private active = false
+    private timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    constructor(config: Partial<ScannerConfig> = {}) {
+        this.config = { ...DEFAULT_SCANNER_CONFIG, ...config }
+    }
+
+    /** Start listening for barcode scans */
+    startListening(callback: (result: ScanResult) => void): void {
+        if (this.active) return
+        this.onScan = callback
+        this.active = true
+
+        this.keydownHandler = (e: KeyboardEvent) => {
+            const now = Date.now()
+            const timeSinceLastKey = now - this.lastKeystrokeTime
+
+            // If too much time has passed, start a new buffer
+            if (timeSinceLastKey > this.config.maxKeystrokeInterval && this.buffer.length > 0) {
+                this.buffer = ''
+            }
+
+            if (e.key === this.config.terminatorKey) {
+                // Scanner finished — check if this looks like a scanner input
+                if (this.buffer.length >= this.config.minLength && this.buffer.length <= this.config.maxLength) {
+                    // Prevent the Enter from triggering form submission
+                    e.preventDefault()
+                    e.stopPropagation()
+
+                    const barcode = this.cleanBarcode(this.buffer)
+                    const type = this.detectBarcodeType(barcode)
+                    const embedded = this.parsePriceEmbeddedBarcode(barcode)
+
+                    if (this.onScan) {
+                        this.onScan({ barcode, type, timestamp: new Date(), embedded })
+                    }
+                }
+                this.buffer = ''
+            } else if (e.key.length === 1) {
+                // Single character — add to buffer
+                this.buffer += e.key
+            }
+
+            this.lastKeystrokeTime = now
+
+            // Auto-clear buffer after timeout (in case Enter never comes)
+            if (this.timeoutId) clearTimeout(this.timeoutId)
+            this.timeoutId = setTimeout(() => { this.buffer = '' }, 200)
+        }
+
+        document.addEventListener('keydown', this.keydownHandler, { capture: true })
+    }
+
+    /** Stop listening */
+    stopListening(): void {
+        this.active = false
+        if (this.keydownHandler) {
+            document.removeEventListener('keydown', this.keydownHandler, { capture: true })
+            this.keydownHandler = null
+        }
+        if (this.timeoutId) clearTimeout(this.timeoutId)
+        this.buffer = ''
+    }
+
+    /** Clean barcode by stripping prefix/suffix */
+    private cleanBarcode(barcode: string): string {
+        let cleaned = barcode
+        for (const prefix of this.config.prefixToStrip) {
+            if (cleaned.startsWith(prefix)) cleaned = cleaned.slice(prefix.length)
+        }
+        for (const suffix of this.config.suffixToStrip) {
+            if (cleaned.endsWith(suffix)) cleaned = cleaned.slice(0, -suffix.length)
+        }
+        return cleaned
+    }
+
+    /**
+     * Parse price/weight-embedded barcodes (prefix "2")
+     * 
+     * Used by scanner-scale combo units for deli/produce items.
+     * Format: 2 PPPPP VVVVV C
+     *   2     = in-store prefix (price or weight embedded)
+     *   PPPPP = 5-digit PLU (internal product lookup number)
+     *   VVVVV = 5-digit value (price in cents or weight × 100)
+     *   C     = check digit
+     * 
+     * Examples:
+     *   "212345003789" → PLU 12345, Price $3.78
+     *   "212345000425" → PLU 12345, Weight 0.42 lb (if weight mode)
+     *   "200401006495" → PLU 00401, Price $64.95 (if lobster!)
+     */
+    parsePriceEmbeddedBarcode(barcode: string): EmbeddedBarcodeData | null {
+        // Must be 12-digit UPC-A starting with "2"
+        if (barcode.length !== 12 || !/^\d+$/.test(barcode) || barcode[0] !== '2') {
+            return null
+        }
+
+        const plu = barcode.substring(1, 6)      // digits 2-6: PLU number
+        const rawValue = barcode.substring(6, 11) // digits 7-11: price or weight
+        const valueNum = parseInt(rawValue, 10)
+
+        let embedType: 'PRICE' | 'WEIGHT' | 'NONE' = 'NONE'
+        let embeddedPrice: number | null = null
+        let embeddedWeight: number | null = null
+
+        if (this.config.embeddedBarcodeMode === 'PRICE') {
+            embedType = 'PRICE'
+            embeddedPrice = valueNum / 100  // cents → dollars
+        } else if (this.config.embeddedBarcodeMode === 'WEIGHT') {
+            embedType = 'WEIGHT'
+            embeddedWeight = valueNum / 100 // hundredths of lb → lbs
+        } else {
+            // AUTO mode: if value > 10000 ($100+), likely price; 
+            // if value < 5000 (50 lbs), could be weight
+            // Most deli items are under $50 and under 5 lbs
+            // Heuristic: values under 1000 (10 lbs) are likely weight
+            if (valueNum <= 1000) {
+                embedType = 'WEIGHT'
+                embeddedWeight = valueNum / 100
+            } else {
+                embedType = 'PRICE'
+                embeddedPrice = valueNum / 100
+            }
+        }
+
+        return {
+            isPriceEmbedded: true,
+            plu,
+            embeddedPrice,
+            embeddedWeight,
+            embedType,
+            rawValue,
+        }
+    }
+
+    /** Detect barcode format based on length and content */
+    private detectBarcodeType(barcode: string): ScanResult['type'] {
+        const isNumericOnly = /^\d+$/.test(barcode)
+
+        if (isNumericOnly) {
+            switch (barcode.length) {
+                case 12: return 'UPC-A'
+                case 8: return 'UPC-E'
+                case 13: return 'EAN-13'
+            }
+            if (barcode.length === 8 && barcode.startsWith('0')) return 'EAN-8'
+        }
+
+        // CODE-39 allows A-Z, 0-9, and some special chars
+        if (/^[A-Z0-9\-\.\ \$\/\+\%]+$/i.test(barcode) && barcode.length <= 43) return 'CODE-39'
+
+        // CODE-128 supports full ASCII
+        if (barcode.length >= 1 && barcode.length <= 48) return 'CODE-128'
+
+        // Long alphanumeric — likely QR
+        if (barcode.length > 20) return 'QR'
+
+        return 'UNKNOWN'
+    }
+
+    /** Validate UPC-A check digit */
+    static validateUPC(barcode: string): boolean {
+        if (barcode.length !== 12 || !/^\d+$/.test(barcode)) return false
+        const digits = barcode.split('').map(Number)
+        const sum = digits.reduce((s, d, i) => s + d * (i % 2 === 0 ? 3 : 1), 0)
+        return sum % 10 === 0
+    }
+
+    /** Generate UPC-A check digit */
+    static generateCheckDigit(barcode11: string): string {
+        if (barcode11.length !== 11 || !/^\d+$/.test(barcode11)) throw new Error('Need 11-digit UPC base')
+        const digits = barcode11.split('').map(Number)
+        const sum = digits.reduce((s, d, i) => s + d * (i % 2 === 0 ? 3 : 1), 0)
+        const checkDigit = (10 - (sum % 10)) % 10
+        return barcode11 + checkDigit
+    }
+}
+
+export default BarcodeScanner

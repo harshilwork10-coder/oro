@@ -63,7 +63,7 @@ export interface DateRange {
 export function getDateRange(preset: DateRangePreset, timezone: string = 'America/Chicago'): DateRange {
     const now = new Date();
     let from: Date;
-    let to: Date = now;
+    const to: Date = now;
 
     switch (preset) {
         case 'TODAY':

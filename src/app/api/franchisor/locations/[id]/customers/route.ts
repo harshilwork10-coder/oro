@@ -2,7 +2,7 @@
  * Location Customers Tab API
  * 
  * Returns customer metrics for a location
- * - Unique customers
+ * - Unique customers (by clientId)
  * - New vs returning
  * - VIP list
  * - Inactive customers
@@ -38,42 +38,52 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         const rangePreset = (searchParams.get('range') || 'MTD') as DateRangePreset;
         const dateRange = getDateRange(rangePreset);
 
-        // Get unique customers in date range
-        const customersInRange = await prisma.transaction.findMany({
+        // Get location's franchiseId (transactions linked by franchise, not location)
+        const location = await prisma.location.findUnique({
+            where: { id: locationId },
+            select: { franchiseId: true }
+        });
+        const franchiseId = location?.franchiseId;
+        if (!franchiseId) {
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 });
+        }
+
+        // Get unique clients in date range
+        const txInRange = await prisma.transaction.findMany({
             where: {
-                storeId: locationId,
+                franchiseId,
                 createdAt: { gte: dateRange.from, lte: dateRange.to },
-                customerId: { not: null }
+                clientId: { not: null }
             },
             select: {
-                customerId: true,
+                clientId: true,
                 createdAt: true,
                 total: true
             }
         });
 
-        const uniqueCustomerIds = [...new Set(customersInRange.map(t => t.customerId).filter(Boolean))];
+        const uniqueClientIds = [...new Set(txInRange.map(t => t.clientId).filter(Boolean))] as string[];
 
         // Identify new vs returning
-        const customersWithHistory = await prisma.transaction.groupBy({
-            by: ['customerId'],
+        const returningData = await prisma.transaction.groupBy({
+            by: ['clientId'],
             where: {
-                storeId: locationId,
-                customerId: { in: uniqueCustomerIds as string[] },
+                franchiseId,
+                clientId: { in: uniqueClientIds },
                 createdAt: { lt: dateRange.from }
             },
             _count: true
         });
 
-        const returningCustomerIds = new Set(customersWithHistory.map(c => c.customerId));
-        const newCustomerIds = uniqueCustomerIds.filter(id => !returningCustomerIds.has(id));
+        const returningClientIds = new Set(returningData.map(c => c.clientId));
+        const newClientIds = uniqueClientIds.filter(id => !returningClientIds.has(id));
 
-        // Get VIP customers (top spenders)
-        const customerSpending = await prisma.transaction.groupBy({
-            by: ['customerId'],
+        // Get VIP clients (top spenders)
+        const clientSpending = await prisma.transaction.groupBy({
+            by: ['clientId'],
             where: {
-                storeId: locationId,
-                customerId: { not: null },
+                franchiseId,
+                clientId: { not: null },
                 status: { not: 'VOIDED' }
             },
             _sum: { total: true },
@@ -82,14 +92,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             take: 20
         });
 
-        const vipCustomerIds = customerSpending.slice(0, 10).map(c => c.customerId).filter(Boolean);
-        const vipDetails = await prisma.customer.findMany({
-            where: { id: { in: vipCustomerIds as string[] } },
+        const vipClientIds = clientSpending.slice(0, 10).map(c => c.clientId).filter(Boolean) as string[];
+        const vipDetails = await prisma.client.findMany({
+            where: { id: { in: vipClientIds } },
             select: { id: true, firstName: true, lastName: true, phone: true, email: true }
         });
 
         const vipList = vipDetails.map(c => {
-            const spending = customerSpending.find(s => s.customerId === c.id);
+            const spending = clientSpending.find(s => s.clientId === c.id);
             return {
                 ...c,
                 totalSpent: Number(spending?._sum?.total || 0),
@@ -100,44 +110,29 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         // Get inactive customers (no visit in 30/60/90 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
         const sixtyDaysAgo = new Date();
         sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-
         const ninetyDaysAgo = new Date();
         ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-        // Recent customers (visited within 30 days)
-        const recentCustomers = await prisma.transaction.findMany({
-            where: {
-                storeId: locationId,
-                createdAt: { gte: thirtyDaysAgo },
-                customerId: { not: null }
-            },
-            select: { customerId: true },
-            distinct: ['customerId']
-        });
-        const recentIds = new Set(recentCustomers.map(c => c.customerId));
-
-        // All customers who visited in past year
         const yearAgo = new Date();
         yearAgo.setFullYear(yearAgo.getFullYear() - 1);
 
-        const allCustomers = await prisma.transaction.findMany({
+        const allTxLastYear = await prisma.transaction.findMany({
             where: {
-                storeId: locationId,
+                franchiseId,
                 createdAt: { gte: yearAgo },
-                customerId: { not: null }
+                clientId: { not: null }
             },
-            select: { customerId: true, createdAt: true },
+            select: { clientId: true, createdAt: true },
             orderBy: { createdAt: 'desc' }
         });
 
         // Group by last visit date
         const lastVisitMap = new Map<string, Date>();
-        for (const tx of allCustomers) {
-            if (tx.customerId && !lastVisitMap.has(tx.customerId)) {
-                lastVisitMap.set(tx.customerId, tx.createdAt);
+        for (const tx of allTxLastYear) {
+            if (tx.clientId && !lastVisitMap.has(tx.clientId)) {
+                lastVisitMap.set(tx.clientId, tx.createdAt);
             }
         }
 
@@ -155,11 +150,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                 to: dateRange.to.toISOString()
             },
             summary: {
-                uniqueCustomers: uniqueCustomerIds.length,
-                newCustomers: newCustomerIds.length,
-                returningCustomers: returningCustomerIds.size,
-                newVsReturningRatio: uniqueCustomerIds.length > 0
-                    ? (newCustomerIds.length / uniqueCustomerIds.length * 100).toFixed(1) + '%'
+                uniqueCustomers: uniqueClientIds.length,
+                newCustomers: newClientIds.length,
+                returningCustomers: returningClientIds.size,
+                newVsReturningRatio: uniqueClientIds.length > 0
+                    ? (newClientIds.length / uniqueClientIds.length * 100).toFixed(1) + '%'
                     : '0%'
             },
             vipList,

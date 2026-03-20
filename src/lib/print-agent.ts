@@ -41,7 +41,8 @@ export interface ReceiptData {
     change?: number;
     cardLast4?: string;
     barcode?: string;
-    footer?: string;
+    header?: string;   // Custom receipt header (e.g., greeting, promo message)
+    footer?: string;   // Custom receipt footer (e.g., return policy, thank-you message)
     openDrawer?: boolean;
 }
 
@@ -217,7 +218,7 @@ export async function printTestPage(): Promise<{ success: boolean; message?: str
  */
 export function formatReceiptFromTransaction(
     transaction: any,
-    storeInfo: { name: string; address?: string; phone?: string },
+    storeInfo: { name: string; address?: string; phone?: string; header?: string; footer?: string },
     cashierName?: string
 ): ReceiptData {
     // Determine if dual pricing should be shown on receipt
@@ -253,6 +254,8 @@ export function formatReceiptFromTransaction(
         amountPaid: Number(transaction.amountPaid || transaction.total || 0),
         change: Number(transaction.change || 0),
         barcode: transaction.id || transaction.transactionNumber,
+        header: storeInfo.header,
+        footer: storeInfo.footer,
         openDrawer: transaction.paymentMethod === 'CASH'
     };
 }

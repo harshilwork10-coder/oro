@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 // GET - Get store account details and transactions
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -37,7 +37,7 @@ export async function GET(
         }
 
         const client = await prisma.client.findUnique({
-            where: { id: params.id },
+            where: { id: (await params).id },
             select: {
                 id: true,
                 firstName: true,
@@ -62,7 +62,7 @@ export async function GET(
 
         // SECURITY: Verify client belongs to user's franchise
         if (client.franchiseId !== franchiseId) {
-            console.error(`[SECURITY] IDOR attempt: User ${session.user.id} tried to access client ${params.id}`)
+            console.error(`[SECURITY] IDOR attempt: User ${session.user.id} tried to access client ${(await params).id}`)
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
@@ -97,7 +97,7 @@ export async function GET(
 // POST - Charge or make payment to store account
 export async function POST(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -136,7 +136,7 @@ export async function POST(
 
         // Get current balance
         const client = await prisma.client.findUnique({
-            where: { id: params.id },
+            where: { id: (await params).id },
             select: {
                 id: true,
                 firstName: true,
@@ -154,7 +154,7 @@ export async function POST(
 
         // SECURITY: Verify client belongs to user's franchise
         if (client.franchiseId !== franchiseId) {
-            console.error(`[SECURITY] IDOR attempt: User ${session.user.id} tried to modify client ${params.id}`)
+            console.error(`[SECURITY] IDOR attempt: User ${session.user.id} tried to modify client ${(await params).id}`)
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 

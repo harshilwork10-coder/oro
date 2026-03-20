@@ -81,7 +81,7 @@ interface AuthLogEvent {
 }
 
 function logAuthEvent(event: AuthLogEvent): void {
-    console.log(JSON.stringify(event))
+    console.error(JSON.stringify(event))
 }
 
 function getClientIP(request: Request): string {
@@ -205,7 +205,7 @@ export async function authenticatePOSRequest(
         }
     } catch (e) {
         // If DB check fails, allow through (fail-open for availability)
-        console.warn('[POS_AUTH] Station validation DB check failed, allowing through:', e)
+        console.error('[POS_AUTH] Station validation DB check failed, allowing through:', e)
     }
 
     // Success - log and return context

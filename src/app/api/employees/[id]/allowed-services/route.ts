@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 // GET /api/employees/[id]/allowed-services - Get employee's allowed services
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -14,7 +14,7 @@ export async function GET(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { id: employeeId } = params
+        const { id: employeeId } = await params
 
         // Get employee with their allowed services
         const employee = await prisma.user.findUnique({
@@ -67,7 +67,7 @@ export async function GET(
 // PUT /api/employees/[id]/allowed-services - Update employee's allowed services
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions)
@@ -75,7 +75,7 @@ export async function PUT(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { id: employeeId } = params
+        const { id: employeeId } = await params
         const body = await request.json()
         const { serviceIds, canSetOwnPrices } = body
 

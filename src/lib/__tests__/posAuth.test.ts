@@ -65,7 +65,7 @@ describe('POS Authentication', () => {
                 'REG1'
             )
 
-            const { prisma } = require('@/lib/prisma')
+            const { prisma } = require('@/lib/prisma') as { prisma: { station: { findUnique: jest.Mock } } }
             prisma.station.findUnique.mockResolvedValue({ isTrusted: true })
 
             const request = createMockRequest({
@@ -91,7 +91,7 @@ describe('POS Authentication', () => {
                 'REG1'
             )
 
-            const { prisma } = require('@/lib/prisma')
+            const { prisma } = require('@/lib/prisma') as { prisma: { station: { findUnique: jest.Mock } } }
             prisma.station.findUnique.mockResolvedValue({ isTrusted: false })
 
             const request = createMockRequest({
@@ -134,10 +134,10 @@ describe('POS Authentication', () => {
                 'REG1'
             )
 
-            const { prisma } = require('@/lib/prisma')
+            const { prisma } = require('@/lib/prisma') as { prisma: { station: { findUnique: jest.Mock } } }
             prisma.station.findUnique.mockResolvedValue({ isTrusted: true })
 
-            let capturedContext: any = null
+            let capturedContext: { stationId: string; locationId: string; franchiseId: string; stationName: string } | null = null
             const handler = withPOSAuth(async (_req, ctx) => {
                 capturedContext = ctx
                 return NextResponse.json({ success: true })
@@ -150,11 +150,11 @@ describe('POS Authentication', () => {
             await handler(request)
 
             expect(capturedContext).not.toBeNull()
-            expect(capturedContext.stationId).toBe('station-123')
+            expect(capturedContext!.stationId).toBe('station-123')
         })
 
         it('returns 403 for missing token without calling handler', async () => {
-            let handlerCalled = false
+            let handlerCalled = false // eslint-disable-line prefer-const
             const handler = withPOSAuth(async () => {
                 handlerCalled = true
                 return NextResponse.json({ success: true })

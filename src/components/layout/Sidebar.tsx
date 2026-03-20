@@ -187,11 +187,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Download Reports', href: '/dashboard/reports/download', icon: Download, always: true },
         // RETAIL only - Multi-Store Dashboard and Competitor Pricing
         { name: 'Multi-Store', href: '/dashboard/multi-store', icon: Store, industry: ['RETAIL'] as const },
+        { name: 'Store Pricing', href: '/dashboard/multi-store/pricing', icon: DollarSign, industry: ['RETAIL'] as const },
         { name: 'Competitor Pricing', href: '/dashboard/pricing/competitor', icon: TrendingUp, industry: ['RETAIL'] as const },
         { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },
         // SERVICE only - resources (chairs, rooms)
         { name: 'Resources', href: '/dashboard/resources', icon: Armchair, feature: 'enableResources' as const, industry: ['SERVICE'] as const },
         { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones, always: true },
+        { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Sparkles, always: true },
         { name: 'Security', href: '/dashboard/settings/security', icon: Shield, always: true },
     ]
 
@@ -219,6 +221,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
         { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
         { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones },
+        { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Sparkles },
         { name: 'Security', href: '/dashboard/settings/security', icon: Shield },
     ]
 
@@ -302,6 +305,22 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         return user?.[link.permission] === true
     }).map(({ always, permission, industry, compensationFlag, ...link }) => link)
 
+    // OWNER: Retail/Salon store owner - full management access
+    const ownerLinks = [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Briefing', href: '/dashboard/owner/briefing', icon: Bell },
+        { name: 'POS', href: industryType === 'RETAIL' ? '/dashboard/pos/retail' : '/dashboard/pos/salon', icon: CreditCard },
+        { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag },
+        { name: 'Deals', href: '/dashboard/deals', icon: Tag },
+        { name: 'Employees', href: '/dashboard/employees', icon: Users },
+        { name: 'Customers', href: '/dashboard/customers', icon: UserCircle },
+        { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt },
+        { name: 'Reports', href: '/dashboard/reports', icon: FileText },
+        { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+        { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Sparkles },
+        { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones },
+    ]
+
     // SUPPORT_STAFF: Support team members - only see support inbox
     const supportStaffLinks = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -316,8 +335,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             ) :
                 session?.user?.role === Role.FRANCHISEE ? franchiseeLinks :
                     session?.user?.role === Role.MANAGER ? managerLinks :
-                        session?.user?.role === 'SUPPORT_STAFF' ? supportStaffLinks :
-                            employeeLinks
+                        session?.user?.role === 'OWNER' ? ownerLinks :
+                            session?.user?.role === 'SUPPORT_STAFF' ? supportStaffLinks :
+                                employeeLinks
 
     return (
         <>

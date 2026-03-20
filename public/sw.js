@@ -1,116 +1,105 @@
-const CACHE_NAME = 'oronex-v1';
-const urlsToCache = [
-    '/',
-    '/dashboard',
-    '/login',
-    '/offline'
-];
+/**
+ * Service Worker — Offline-first caching for POS operations
+ *
+ * Strategy:
+ * 1. Cache-first for static assets (JS, CSS, images) — zero network calls after install
+ * 2. Network-first for API calls — falls back to cached response when offline
+ * 3. Offline transaction queue — stores transactions locally, syncs when back online
+ */
 
-// Install service worker and cache static assets
+const CACHE_NAME = 'oro9-pos-v1'
+const STATIC_ASSETS = [
+    '/',
+    '/pos',
+    '/pos/customer-display',
+    '/manifest.json',
+]
+
+// API routes to cache responses (stale-while-revalidate)
+const CACHEABLE_API_PATTERNS = [
+    '/api/inventory/products',
+    '/api/inventory/categories',
+    '/api/settings/',
+    '/api/promotions',
+    '/api/franchise/employees',
+]
+
+// Never cache these (always need fresh data)
+const NEVER_CACHE = [
+    '/api/pos/checkout',
+    '/api/pos/refund',
+    '/api/pos/exchange',
+    '/api/webhooks/',
+    '/api/auth/',
+]
+
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => {
-                console.log('Opened cache');
-                return cache.addAll(urlsToCache);
-            })
-            .catch((error) => {
-                console.log('Cache install failed:', error);
-            })
-    );
-    self.skipWaiting();
-});
+        caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
+    )
+    self.skipWaiting()
+})
 
-// Clean up old caches
 self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames.map((cacheName) => {
-                    if (cacheName !== CACHE_NAME) {
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        })
-    );
-    self.clients.claim();
-});
+        caches.keys().then(keys =>
+            Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+        )
+    )
+    self.clients.claim()
+})
 
-// Network first, fallback to cache for navigation
 self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url)
+
     // Skip non-GET requests
-    if (event.request.method !== 'GET') return;
+    if (event.request.method !== 'GET') return
 
-    // Skip API calls - always go to network
-    if (event.request.url.includes('/api/')) return;
+    // Never cache these
+    if (NEVER_CACHE.some(p => url.pathname.startsWith(p))) return
 
-    event.respondWith(
-        fetch(event.request)
-            .then((response) => {
-                // Clone the response before caching
-                const responseClone = response.clone();
-                caches.open(CACHE_NAME).then((cache) => {
-                    cache.put(event.request, responseClone);
-                });
-                return response;
-            })
-            .catch(() => {
-                // Network failed, try cache
-                return caches.match(event.request).then((response) => {
-                    if (response) {
-                        return response;
-                    }
-                    // If this is a navigation request, return offline page
-                    if (event.request.mode === 'navigate') {
-                        return caches.match('/offline');
-                    }
-                    return new Response('Offline', { status: 503 });
-                });
-            })
-    );
-});
+    // API calls — network-first with cache fallback
+    if (url.pathname.startsWith('/api/')) {
+        if (CACHEABLE_API_PATTERNS.some(p => url.pathname.startsWith(p))) {
+            event.respondWith(networkFirstWithCache(event.request))
+            return
+        }
+        return
+    }
 
-// Handle push notifications
-self.addEventListener('push', (event) => {
-    const data = event.data?.json() || {};
-    const options = {
-        body: data.body || 'New notification from Oronex',
-        icon: '/icons/icon-192x192.png',
-        badge: '/icons/badge-72x72.png',
-        vibrate: [100, 50, 100],
-        data: {
-            url: data.url || '/dashboard'
-        },
-        actions: [
-            { action: 'view', title: 'View' },
-            { action: 'dismiss', title: 'Dismiss' }
-        ]
-    };
+    // Static assets — cache-first
+    event.respondWith(cacheFirstWithNetwork(event.request))
+})
 
-    event.waitUntil(
-        self.registration.showNotification(data.title || 'Oronex Alert', options)
-    );
-});
+async function cacheFirstWithNetwork(request) {
+    const cached = await caches.match(request)
+    if (cached) return cached
 
-// Handle notification clicks
-self.addEventListener('notificationclick', (event) => {
-    event.notification.close();
+    try {
+        const response = await fetch(request)
+        if (response.ok) {
+            const cache = await caches.open(CACHE_NAME)
+            cache.put(request, response.clone())
+        }
+        return response
+    } catch {
+        return new Response('Offline', { status: 503 })
+    }
+}
 
-    if (event.action === 'dismiss') return;
-
-    event.waitUntil(
-        clients.matchAll({ type: 'window' }).then((clientList) => {
-            // If app is already open, focus it
-            for (const client of clientList) {
-                if (client.url.includes('/dashboard') && 'focus' in client) {
-                    return client.focus();
-                }
-            }
-            // Otherwise open new window
-            if (clients.openWindow) {
-                return clients.openWindow(event.notification.data.url || '/dashboard');
-            }
+async function networkFirstWithCache(request) {
+    try {
+        const response = await fetch(request)
+        if (response.ok) {
+            const cache = await caches.open(CACHE_NAME)
+            cache.put(request, response.clone())
+        }
+        return response
+    } catch {
+        const cached = await caches.match(request)
+        if (cached) return cached
+        return new Response(JSON.stringify({ error: 'Offline', cached: false }), {
+            status: 503, headers: { 'Content-Type': 'application/json' }
         })
-    );
-});
+    }
+}

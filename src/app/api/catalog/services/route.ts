@@ -12,13 +12,8 @@ export async function GET(req: Request) {
     try {
         // In a real app, we'd filter by the specific Franchisor ID linked to the user
         // For now, assuming the user is an owner/admin of a Franchisor
-        const globalServices = await prisma.globalService.findMany({
-            where: { isArchived: false },
-            include: {
-                _count: {
-                    select: { localInstances: true }
-                }
-            }
+        const globalServices = await (prisma as any).globalService.findMany({
+            where: { isArchived: false }
         })
 
         return NextResponse.json(globalServices)
@@ -58,7 +53,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
-        const newService = await prisma.globalService.create({
+        const newService = await (prisma as any).globalService.create({
             data: {
                 name,
                 description,

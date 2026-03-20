@@ -1,0 +1,52 @@
+﻿   Γû▓ Next.js 15.5.12
+   - Environments: .env
+
+   Creating an optimized production build ...
+ Γ£ô Compiled successfully in 17.1s
+   Skipping linting
+   Checking validity of types ...
+node.exe : Failed to compile.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" 
+"C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (F 
+   ailed to compile.:String) [], RemoteExcept  
+  ion
+    + FullyQualifiedErrorId : NativeCommandErr 
+   or
+ 
+
+.next/types/app/api/admin/franchisors/[id]/fran
+chisees/route.ts:49:7
+Type error: Type '{ __tag__: "GET"; 
+__param_position__: "second"; __param_type__: 
+{ params: { id: string; }; }; }' does not 
+satisfy the constraint 
+'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are 
+incompatible between these types.
+    Type '{ id: string; }' is missing the 
+following properties from type 'Promise<any>': 
+then, catch, finally, [Symbol.toStringTag]
+
+[0m [90m 47 |[39m     
+[33mDiff[39m[33m<[39m
+ [90m 48 |[39m       [33mParamCheck[39m[33
+m<[39m[33mRouteContext[39m[33m>[39m[33m,
+[39m
+[31m[1m>[22m[39m[90m 49 |[39m       {
+ [90m    |[39m       [31m[1m^[22m[39m
+ [90m 50 |[39m         __tag__[33m:[39m 
+[32m'GET'[39m
+ [90m 51 |[39m         
+__param_position__[33m:[39m 
+[32m'second'[39m
+ [90m 52 |[39m         
+__param_type__[33m:[39m [33mSecondArg[39m[
+33m<[39m[33mMaybeField[39m[33m<[39m[33mTE
+ntry[39m[33m,[39m 
+[32m'GET'[39m[33m>>[39m[0m
+Next.js build worker exited with code: 1 and 
+signal: null

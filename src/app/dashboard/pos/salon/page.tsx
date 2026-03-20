@@ -86,7 +86,6 @@ interface Transaction {
     }
     lineItems: any[]
     invoiceNumber?: string
-    // Dual pricing fields (API returns strings, consumers convert as needed)
     totalCash?: number
     totalCard?: number
     chargedMode?: string
@@ -166,6 +165,8 @@ function POSContent() {
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
     const [locationName, setLocationName] = useState<string>('')
+    const [locationAddress, setLocationAddress] = useState<string>('')
+    const [locationPhone, setLocationPhone] = useState<string>('')
     const [franchiseName, setFranchiseName] = useState<string>('')
     const [showPaxModal, setShowPaxModal] = useState(false)
     const [showTransactionModal, setShowTransactionModal] = useState(false)
@@ -552,7 +553,8 @@ function POSContent() {
                 try {
                     const subtotal = cart.reduce((sum, item) => sum + getItemPrice(item), 0)
                     const discountedSubtotal = Math.max(0, subtotal - appliedDiscount)
-                    const tax = discountedSubtotal * 0.08 // Use default 8% tax for display sync
+                    const taxRate = config?.taxRate || 0.08
+                    const tax = discountedSubtotal * taxRate
                     const total = discountedSubtotal + tax
 
                     // Calculate card amounts for dual pricing
@@ -567,7 +569,7 @@ function POSContent() {
                         subtotalCard += cardPrice
                     })
                     const discountedSubtotalCard = Math.max(0, subtotalCard - appliedDiscount)
-                    const taxCard = discountedSubtotalCard * 0.08
+                    const taxCard = discountedSubtotalCard * taxRate
                     const totalCard = isDual
                         ? (pricingSettings.cardSurchargeType === 'PERCENTAGE'
                             ? discountedSubtotalCard + taxCard
@@ -646,6 +648,8 @@ function POSContent() {
                 if (res.ok) {
                     const data = await res.json()
                     setLocationName(data.name)
+                    setLocationAddress(data.address || '')
+                    setLocationPhone(data.phone || '')
                 }
             }
             if (user?.franchiseId) {
@@ -862,10 +866,7 @@ function POSContent() {
         }
     }
 
-    // Load barber list on mount
-    useEffect(() => {
-        fetchBarberList()
-    }, [])
+    // barber list is loaded by initSalonPOS() — no separate call needed
 
     // Load barber services when barber is selected
     useEffect(() => {
@@ -1083,8 +1084,8 @@ function POSContent() {
                     {
                         showDualPricing: pricingSettings.showDualPricing,
                         storeName: franchiseName || locationName || 'Store',
-                        storeAddress: '123 Main St, City, ST 12345', // TODO: Get from franchise settings
-                        storePhone: '(555) 123-4567' // TODO: Get from franchise settings
+                        storeAddress: locationAddress || '',
+                        storePhone: locationPhone || ''
                     },
                     (session?.user as any)?.name || 'Staff'
                 )
@@ -1352,7 +1353,7 @@ function POSContent() {
         // CLOCK_IN_ONLY mode - Simple clock in button without cash counting
         if (shiftRequirement === 'CLOCK_IN_ONLY') {
             return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
                     <div className="p-8 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl w-full max-w-md">
                         <div className="text-center mb-8">
                             <div className="h-20 w-20 bg-emerald-600/20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-emerald-500/50">
@@ -1382,7 +1383,7 @@ function POSContent() {
 
         // CASH_COUNT_ONLY or BOTH mode - Full denomination counting UI
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 overflow-y-auto">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 overflow-y-auto">
                 <div className={`p-6 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl my-8 flex gap-6 ${usesVirtualKeypad ? 'w-full max-w-4xl' : 'w-[600px] flex-col'}`}>
                     <div className="flex-1">
                         <div className="text-center mb-6">
@@ -1609,7 +1610,7 @@ function POSContent() {
         }
 
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 overflow-y-auto">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 overflow-y-auto">
                 <div className="w-full max-w-4xl p-6 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl my-8 flex gap-6">
                     {/* Left: Denominations */}
                     <div className="flex-1">
@@ -1729,7 +1730,7 @@ function POSContent() {
     return (
         <>
             {showDebug && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
                     <div className="bg-stone-900 border-2 border-red-500 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
                         <h3 className="text-xl font-bold text-red-500 flex items-center gap-2">
                             🐞 DEBUG MODE
@@ -1955,12 +1956,17 @@ function POSContent() {
                                                     )}
                                                     <p className="font-semibold text-white text-center text-sm leading-tight line-clamp-2 min-h-[2.5em] flex items-center">{item.name}</p>
                                                     <div className="flex flex-wrap items-center justify-center gap-2 mt-1 w-full font-mono">
-                                                        <div className="bg-emerald-500/20 border border-emerald-500/30 px-2 py-1 rounded-lg shrink-0">
+                                                        <div className={`${pricingSettings.showDualPricing ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-emerald-500/20 border border-emerald-500/30'} px-2 py-1 rounded-lg shrink-0`}>
                                                             <span className="text-xs font-bold text-emerald-400 block">${item.price.toFixed(2)}</span>
                                                         </div>
-                                                        <div className="bg-stone-800 border border-stone-600 px-2 py-1 rounded-lg shrink-0">
-                                                            <span className="text-xs font-medium text-white block">${(item.price * 1.0399).toFixed(2)}</span>
-                                                        </div>
+                                                        {pricingSettings.showDualPricing && (
+                                                            <div className="bg-stone-800 border border-stone-600 px-2 py-1 rounded-lg shrink-0">
+                                                                <span className="text-xs font-medium text-white block">${(pricingSettings.cardSurchargeType === 'PERCENTAGE'
+                                                                    ? item.price * (1 + (pricingSettings.cardSurcharge || 0) / 100)
+                                                                    : item.price + (pricingSettings.cardSurcharge || 0)
+                                                                ).toFixed(2)}</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
@@ -2308,7 +2314,7 @@ function POSContent() {
                                     )}
                                     {/* Tax row - dual pricing shows both cash/card taxes */}
                                     <div className="flex justify-between text-stone-400">
-                                        <span className="font-medium">Tax (8%)</span>
+                                        <span className="font-medium">Tax ({((config?.taxRate || 0.08) * 100).toFixed(1)}%)</span>
                                         {pricingSettings.showDualPricing ? (
                                             <div className="flex gap-4">
                                                 <span className="text-emerald-400">${taxCash.toFixed(2)}</span>
@@ -2433,7 +2439,7 @@ function POSContent() {
 
                     {/* Checkout Modal */}
                     {showCheckoutModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="w-full max-w-2xl bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                                 <div className="p-6 border-b border-stone-800 flex items-center justify-between">
                                     <h2 className="text-2xl font-bold text-white">Payment Method</h2>
@@ -2517,7 +2523,7 @@ function POSContent() {
 
                     {/* Cash Tendering Modal */}
                     {showCashTendering && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
                             <div className="w-full max-w-sm bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                                 <div className="p-3 border-b border-stone-800 flex items-center justify-between shrink-0">
                                     <h2 className="text-lg font-bold text-white">Cash Payment</h2>
@@ -2724,7 +2730,7 @@ function POSContent() {
                         const isValidSplit = cashAmt > 0 && cashAmt < splitTotal && cashReceivedAmt >= cashAmt
 
                         return (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                                 <div className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                                     <div className="p-4 border-b border-stone-800 flex items-center justify-between">
                                         <h2 className="text-xl font-bold text-white">Split Payment</h2>
@@ -2872,7 +2878,7 @@ function POSContent() {
 
                     {/* Discount Modal */}
                     {showDiscountModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
                             <div className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                                 <div className="p-6 border-b border-stone-800 flex justify-between items-center">
                                     <h3 className="text-xl font-bold text-white">Apply Discount</h3>
@@ -2974,7 +2980,7 @@ function POSContent() {
 
                     {/* Tip Waiting Modal */}
                     {showTipWaiting && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="bg-stone-900 rounded-2xl border border-stone-700 p-8 max-w-md w-full text-center">
                                 <div className="mb-6">
                                     <div className="w-16 h-16 mx-auto bg-orange-500/20 rounded-full flex items-center justify-center mb-4">
@@ -3031,7 +3037,7 @@ function POSContent() {
 
                     {/* Clear Cart Confirmation Modal */}
                     {showClearCartConfirm && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="bg-stone-900 rounded-2xl border border-stone-700 p-6 w-[360px] shadow-2xl">
                                 <div className="text-center mb-6">
                                     <div className="h-16 w-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -3068,7 +3074,7 @@ function POSContent() {
 
                     {/* Custom Item Modal with Pin Pad */}
                     {showOpenItemModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="bg-stone-900 rounded-2xl border border-stone-700 p-6 w-[400px] shadow-2xl">
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-xl font-bold text-white">Custom Item</h3>
@@ -3177,7 +3183,7 @@ function POSContent() {
 
                     {/* Customer Discounts Modal */}
                     {showDiscounts && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <CustomerDiscounts
                                 franchiseId={user?.franchiseId || ''}
                                 customerPhone={selectedCustomer?.phone}
@@ -3195,7 +3201,7 @@ function POSContent() {
 
                     {/* Customer Display Modal */}
                     {showDisplayModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-stone-700">
                                 <h2 className="text-xl font-bold text-white text-center mb-2">Customer Display</h2>
                                 <p className="text-stone-400 text-center text-sm mb-6">Open this URL on your second tablet</p>
@@ -3274,7 +3280,7 @@ function POSContent() {
 
                     {/* Customer Selection Modal */}
                     {showCustomerModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
                             <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-stone-700 max-h-[80vh] flex flex-col">
                                 <h2 className="text-xl font-bold text-white text-center mb-2">Select Customer</h2>
                                 <p className="text-stone-400 text-center text-sm mb-4">Choose a customer or search by name/phone</p>
@@ -3413,7 +3419,7 @@ function POSContent() {
             {/* Shift Report Modal - Auto prints */}
             {
                 shiftReport && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 print:bg-white print:p-0">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 print:bg-white print:p-0">
                         <div className="w-full max-w-md bg-white text-black p-6 rounded-xl shadow-2xl print:shadow-none print:max-w-full">
                             <div className="text-center mb-4 border-b pb-4">
                                 <h2 className="text-xl font-bold">SHIFT REPORT</h2>
@@ -3476,77 +3482,7 @@ function POSContent() {
                 )
             }
 
-            {/* Open Item Modal */}
-            {showOpenItemModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-stone-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-                        <h3 className="text-xl font-bold text-white mb-4">Open Item</h3>
-                        <div className="bg-stone-950 rounded-xl p-4 border border-white/5 mb-4">
-                            <div className="text-stone-400 text-sm mb-1">Amount</div>
-                            <div className="text-4xl font-bold text-white flex items-center">
-                                <span className="text-orange-500 mr-2">$</span>
-                                {openItemPrice || '0'}
-                            </div>
-                        </div>
-
-                        {/* Custom Numpad */}
-                        <div className="grid grid-cols-3 gap-2 mb-4">
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0, '⌫'].map((key) => (
-                                <button
-                                    key={key}
-                                    onClick={() => {
-                                        if (key === '⌫') {
-                                            setOpenItemPrice(prev => prev.slice(0, -1))
-                                        } else if (key === '.' && openItemPrice.includes('.')) {
-                                            // Prevent multiple dots
-                                        } else {
-                                            setOpenItemPrice(prev => {
-                                                if (key === '.' && !prev) return '0.'
-                                                if (prev === '0' && key !== '.') return String(key)
-                                                return prev + key
-                                            })
-                                        }
-                                    }}
-                                    className={`p-4 rounded-xl font-bold text-xl transition-all active:scale-95 ${key === '⌫'
-                                        ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                                        : 'bg-stone-800 text-white hover:bg-stone-700 hover:text-orange-200'
-                                        }`}
-                                >
-                                    {key}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowOpenItemModal(false)}
-                                className="flex-1 py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-xl font-bold"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => {
-                                    if (!openItemPrice || parseFloat(openItemPrice) === 0) return
-                                    const amount = parseFloat(openItemPrice)
-                                    const newItem: CartItem = {
-                                        id: `open-${Date.now()}`,
-                                        type: 'PRODUCT',
-                                        name: 'Open Item',
-                                        price: amount,
-                                        quantity: 1
-                                    }
-                                    setCart([...cart, newItem])
-                                    setShowOpenItemModal(false)
-                                    setToast({ message: 'Added Open Item', type: 'success' })
-                                }}
-                                className="flex-1 py-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-xl font-bold shadow-lg shadow-orange-900/20 transition-all"
-                            >
-                                Add Item
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Duplicate Open Item Modal removed — the primary one is rendered above (lines ~3069-3176) */}
 
             {/* Existing Receipt Modal */}
             <ReceiptModal

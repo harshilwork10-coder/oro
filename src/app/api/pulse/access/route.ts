@@ -91,6 +91,18 @@ export async function GET(request: NextRequest) {
             })
         }
 
+        // Auto-grant owner access if Pulse is enabled but they haven't been flagged yet
+        const currentUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { hasPulseAccess: true }
+        })
+        if (currentUser && !currentUser.hasPulseAccess) {
+            await prisma.user.update({
+                where: { id: session.user.id },
+                data: { hasPulseAccess: true }
+            })
+        }
+
         // Franchisor owners automatically get Pulse access if enabled
         return NextResponse.json({
             hasAccess: true,

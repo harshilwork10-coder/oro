@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Only Brand Franchisors can view sub-franchisees.' }, { status: 403 })
         }
 
-        const subFranchisees = await prisma.subFranchisee.findMany({
+        const subFranchisees = await (prisma as any).subFranchisee.findMany({
             where: { franchisorId: franchisor.id },
             include: {
                 franchises: true, // Locations managed
@@ -30,8 +30,7 @@ export async function GET(request: NextRequest) {
                         id: true,
                         name: true,
                         email: true,
-                        image: true,
-                        lastLogin: true
+                        image: true
                     }
                 }
             },

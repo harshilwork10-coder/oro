@@ -19,7 +19,7 @@ export async function runDailyApiRollup(): Promise<{
     const endOfYesterday = new Date(yesterday)
     endOfYesterday.setHours(23, 59, 59, 999)
 
-    console.log(`[ROLLUP] Processing logs from ${yesterday.toISOString()} to ${endOfYesterday.toISOString()}`)
+    console.error(`[ROLLUP] Processing logs from ${yesterday.toISOString()} to ${endOfYesterday.toISOString()}`)
 
     try {
         // Step 1: Get aggregated stats per (date, locationId, route)
@@ -49,11 +49,12 @@ export async function runDailyApiRollup(): Promise<{
             GROUP BY "locationId", route
         `
 
-        console.log(`[ROLLUP] Found ${stats.length} unique (location, route) combinations`)
+        console.error(`[ROLLUP] Found ${stats.length} unique (location, route) combinations`)
 
         // Step 2: Upsert into ApiUsageDaily
         let rolledUp = 0
         for (const stat of stats) {
+            if (!stat.locationId) continue  // locationId required for unique key
             await prisma.apiUsageDaily.upsert({
                 where: {
                     date_locationId_route: {
@@ -97,7 +98,7 @@ export async function runDailyApiRollup(): Promise<{
             }
         })
 
-        console.log(`[ROLLUP] Rolled up ${rolledUp} entries, deleted ${deleteResult.count} old logs`)
+        console.error(`[ROLLUP] Rolled up ${rolledUp} entries, deleted ${deleteResult.count} old logs`)
 
         return { rolledUp, deleted: deleteResult.count }
 

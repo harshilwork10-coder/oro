@@ -61,7 +61,7 @@ export default function EditClientModal({ client, isOpen, onClose, onSuccess }: 
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
             <div className="glass-panel rounded-2xl p-6 w-full max-w-lg border border-stone-700">
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold text-stone-100">Edit Client</h2>

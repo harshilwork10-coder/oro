@@ -11,7 +11,7 @@ const statusSchema = z.object({
 // PATCH /api/appointments/[id]/status - Update appointment status
 export async function PATCH(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.franchiseId) {
@@ -21,7 +21,7 @@ export async function PATCH(
     try {
         const body = await req.json()
         const { status } = statusSchema.parse(body)
-        const appointmentId = params.id
+        const appointmentId = (await params).id
 
         // Verify the appointment belongs to this franchise via location
         const appointment = await prisma.appointment.findUnique({

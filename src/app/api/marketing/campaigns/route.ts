@@ -10,43 +10,26 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(req.url)
-        const franchiseId = searchParams.get('franchiseId')
-
-        if (!franchiseId) {
-            return NextResponse.json({ error: 'Franchise ID required' }, { status: 400 })
+        const user = session.user as any
+        if (!user.franchiseId) {
+            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        // Mock data for demo
-        const campaigns = [
-            {
-                id: '1',
-                name: 'Summer Sale',
-                type: 'EMAIL',
-                status: 'SENT',
-                sentCount: 1250,
-                openRate: 45.2,
-                createdAt: new Date(Date.now() - 86400000 * 5).toISOString()
-            },
-            {
-                id: '2',
-                name: 'Welcome Series',
-                type: 'AUTOMATION',
-                status: 'ACTIVE',
-                sentCount: 342,
-                openRate: 68.5,
-                createdAt: new Date(Date.now() - 86400000 * 30).toISOString()
-            },
-            {
-                id: '3',
-                name: 'Holiday Special',
-                type: 'EMAIL',
-                status: 'DRAFT',
-                sentCount: 0,
-                openRate: 0,
-                createdAt: new Date().toISOString()
+        // Get locations for this franchise, then get campaigns for those locations
+        const locations = await prisma.location.findMany({
+            where: { franchiseId: user.franchiseId },
+            select: { id: true }
+        })
+        const locationIds = locations.map(l => l.id)
+
+        const campaigns = await prisma.dealCampaign.findMany({
+            where: { locationId: { in: locationIds } },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+            include: {
+                location: { select: { name: true } }
             }
-        ]
+        })
 
         return NextResponse.json(campaigns)
     } catch (error) {
@@ -62,16 +45,48 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const user = session.user as any
+        if (!user.franchiseId) {
+            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
+        }
+
+        // Only OWNER, MANAGER can create campaigns
+        if (!['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR'].includes(user.role)) {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+        }
+
         const body = await req.json()
-        const { name, type, subject, content } = body
+        const { messageTemplate, locationId } = body
 
-        // In real app: Create campaign record
-        // Debug log removed`)
+        if (!locationId) {
+            return NextResponse.json({ error: 'Location ID required' }, { status: 400 })
+        }
 
-        return NextResponse.json({ success: true })
+        // Verify location belongs to user's franchise
+        const location = await prisma.location.findFirst({
+            where: { id: locationId, franchiseId: user.franchiseId }
+        })
+        if (!location) {
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+        }
+
+        const templateContent = messageTemplate || ''
+        const templateHash = Buffer.from(templateContent).toString('base64').slice(0, 32)
+
+        const campaign = await (prisma.dealCampaign as any).create({
+            data: {
+                templateHash,
+                messageTemplate: templateContent,
+                locationId,
+                createdById: user.id,
+                scheduledFor: new Date(),
+                status: 'DRAFT',
+            }
+        })
+
+        return NextResponse.json(campaign)
     } catch (error) {
         console.error('Error creating campaign:', error)
         return NextResponse.json({ error: 'Failed to create campaign' }, { status: 500 })
     }
 }
-

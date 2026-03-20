@@ -150,7 +150,7 @@ export async function PATCH(req: NextRequest) {
         })
         const allLocationIds = allFranchises.flatMap(f => f.locations.map(l => l.id))
         if (allLocationIds.length > 0) {
-            console.log(`[BusinessConfig] Settings update - invalidating ${allLocationIds.length} location caches`)
+            console.error(`[BusinessConfig] Settings update - invalidating ${allLocationIds.length} location caches`)
             for (const locId of allLocationIds) {
                 await invalidateLocationCache(locId)
             }

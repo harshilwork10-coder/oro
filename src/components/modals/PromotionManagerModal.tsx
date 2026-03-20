@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import {
     X, Plus, Trash2, Tag, Percent, DollarSign,
     Calendar, Clock, Gift, ShoppingBag, ChevronDown,
-    ChevronUp, Zap, Layers
+    ChevronUp, Zap, Layers, Coffee, Users, Star, Heart
 } from 'lucide-react'
 
 interface Promotion {
@@ -51,10 +51,24 @@ interface PromotionManagerModalProps {
 const DEAL_TYPES = [
     { value: 'MIX_MATCH', label: 'Mix & Match', icon: ShoppingBag, description: 'Any X items for $Y' },
     { value: 'BOGO', label: 'BOGO', icon: Gift, description: 'Buy X Get Y Free/Off' },
+    { value: 'BXGY', label: 'Buy X Get Y', icon: Gift, description: 'Buy drinks, get snack free' },
     { value: 'TIERED', label: 'Volume/Tiered', icon: Layers, description: '2 for $15, 3 for $20...' },
     { value: 'PERCENTAGE', label: 'Percentage Off', icon: Percent, description: 'X% off qualifying items' },
     { value: 'FIXED', label: 'Fixed Amount Off', icon: DollarSign, description: '$X off per item' },
     { value: 'THRESHOLD', label: 'Spend Threshold', icon: Zap, description: 'Spend $X get discount' },
+    { value: 'CART_DISCOUNT', label: '🛍️ Cart Discount', icon: DollarSign, description: '% or $ off entire order' },
+    { value: 'HAPPY_HOUR', label: '⏰ Happy Hour', icon: Coffee, description: 'Time-based auto-pricing' },
+    { value: 'EMPLOYEE_DISCOUNT', label: '👨‍✈️ Employee/Senior/Military', icon: Users, description: 'Tag-based flat discount' },
+    { value: 'COMBO', label: '🍕 Combo Deal', icon: ShoppingBag, description: 'Combo items = combo price' },
+    { value: 'LOYALTY_EXCLUSIVE', label: '🎯 Members Only', icon: Star, description: 'Loyalty members only pricing' },
+    { value: 'GIFT_WITH_PURCHASE', label: '🎁 Gift w/ Purchase', icon: Heart, description: 'Buy X, get free gift item' },
+]
+
+const CUSTOMER_TAGS = [
+    { value: 'EMPLOYEE', label: 'Employee' },
+    { value: 'SENIOR', label: 'Senior (65+)' },
+    { value: 'MILITARY', label: 'Military/Veteran' },
+    { value: 'VIP', label: 'VIP Customer' },
 ]
 
 const DAYS_OF_WEEK = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
@@ -94,7 +108,15 @@ export default function PromotionManagerModal({
         promoCode: '',
         categoryIds: [] as string[],
         productIds: [] as string[],
-        priceTiers: [{ qty: 2, price: 15 }, { qty: 3, price: 20 }] as { qty: number, price: number }[]
+        priceTiers: [{ qty: 2, price: 15 }, { qty: 3, price: 20 }] as { qty: number, price: number }[],
+        customerTag: '',       // EMPLOYEE, SENIOR, MILITARY, VIP
+        loyaltyOnly: false,    // Members-only pricing
+        // ─── Enterprise controls ───
+        evaluationMethod: 'LOWEST_PRICE',  // LOWEST_PRICE | HIGHEST_PRICE
+        exclusionGroup: '',                // Mutual exclusion group name
+        receiptDisplay: 'INLINE',          // INLINE | SEPARATE
+        getProductIds: [] as string[],     // BXGY: "Get" group product IDs
+        getCategoryIds: [] as string[],    // BXGY: "Get" group category IDs
     })
 
     useEffect(() => {
@@ -114,17 +136,17 @@ export default function PromotionManagerModal({
 
             if (promoRes.ok) {
                 const data = await promoRes.json()
-                setPromotions(data.promotions || [])
+                setPromotions(data.data || data.promotions || [])
             }
 
             if (catRes.ok) {
                 const data = await catRes.json()
-                setCategories(data.categories || [])
+                setCategories(data.data || data.categories || [])
             }
 
             if (prodRes.ok) {
                 const data = await prodRes.json()
-                setProducts(data.products || data || [])
+                setProducts(data.data || data.products || [])
             }
         } catch (error) {
             console.error('Failed to load data:', error)
@@ -154,7 +176,14 @@ export default function PromotionManagerModal({
             promoCode: '',
             categoryIds: [],
             productIds: [],
-            priceTiers: [{ qty: 2, price: 15 }, { qty: 3, price: 20 }]
+            priceTiers: [{ qty: 2, price: 15 }, { qty: 3, price: 20 }],
+            customerTag: '',
+            loyaltyOnly: false,
+            evaluationMethod: 'LOWEST_PRICE',
+            exclusionGroup: '',
+            receiptDisplay: 'INLINE',
+            getProductIds: [],
+            getCategoryIds: [],
         })
     }
 
@@ -165,15 +194,27 @@ export default function PromotionManagerModal({
         try {
             // Set discountType based on type
             let discountType = 'PERCENT'
-            if (formData.type === 'MIX_MATCH' || formData.type === 'BUNDLE') {
+            if (formData.type === 'MIX_MATCH' || formData.type === 'BUNDLE' || formData.type === 'COMBO') {
                 discountType = 'FIXED_PRICE'
-            } else if (formData.type === 'BOGO') {
+            } else if (formData.type === 'BOGO' || formData.type === 'GIFT_WITH_PURCHASE' || formData.type === 'BXGY') {
                 discountType = 'FREE_ITEM'
             } else if (formData.type === 'FIXED') {
                 discountType = 'FIXED_AMOUNT'
             } else if (formData.type === 'TIERED') {
                 discountType = 'TIERED'
+            } else if (['HAPPY_HOUR', 'EMPLOYEE_DISCOUNT', 'LOYALTY_EXCLUSIVE', 'PERCENTAGE', 'THRESHOLD', 'CART_DISCOUNT'].includes(formData.type)) {
+                discountType = 'PERCENT'
             }
+
+            // Build qualifying items - for BXGY, include both buy group (isExcluded=false) and get group (isExcluded=true)
+            const qualifyingItems = [
+                ...formData.categoryIds.map(id => ({ categoryId: id, isExcluded: false })),
+                ...formData.productIds.map(id => ({ productId: id, isExcluded: false })),
+                ...(formData.type === 'BXGY' ? [
+                    ...formData.getCategoryIds.map(id => ({ categoryId: id, isExcluded: true })),
+                    ...formData.getProductIds.map(id => ({ productId: id, isExcluded: true })),
+                ] : []),
+            ]
 
             const res = await fetch('/api/promotions', {
                 method: 'POST',
@@ -183,10 +224,7 @@ export default function PromotionManagerModal({
                     discountType,
                     daysOfWeek: formData.daysOfWeek.length > 0 ? formData.daysOfWeek : null,
                     priceTiers: formData.type === 'TIERED' ? JSON.stringify(formData.priceTiers) : null,
-                    qualifyingItems: [
-                        ...formData.categoryIds.map(id => ({ categoryId: id })),
-                        ...formData.productIds.map(id => ({ productId: id }))
-                    ]
+                    qualifyingItems
                 })
             })
 
@@ -252,7 +290,7 @@ export default function PromotionManagerModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
             <div className="bg-stone-900 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-stone-700 shadow-2xl flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-stone-700 bg-gradient-to-r from-purple-600/20 to-pink-600/20">
@@ -442,19 +480,211 @@ export default function PromotionManagerModal({
                                         <div>
                                             <label className="text-sm text-stone-400">
                                                 {formData.type === 'MIX_MATCH' ? 'Deal Price ($)' :
-                                                    formData.type === 'PERCENTAGE' ? 'Discount (%)' :
+                                                    formData.type === 'PERCENTAGE' || formData.type === 'HAPPY_HOUR' || formData.type === 'EMPLOYEE_DISCOUNT' || formData.type === 'LOYALTY_EXCLUSIVE' ? 'Discount (%)' :
                                                         formData.type === 'FIXED' ? 'Amount Off ($)' :
                                                             formData.type === 'THRESHOLD' ? 'Discount (%)' :
-                                                                'Value'}
+                                                                formData.type === 'COMBO' ? 'Combo Price ($)' :
+                                                                    formData.type === 'GIFT_WITH_PURCHASE' ? 'Gift Item Qty (free)' :
+                                                                        'Value'}
                                             </label>
                                             <input
                                                 type="number"
                                                 value={formData.discountValue}
                                                 onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })}
                                                 min="0"
-                                                step={formData.type === 'PERCENTAGE' ? '1' : '0.01'}
+                                                step={['PERCENTAGE', 'HAPPY_HOUR', 'EMPLOYEE_DISCOUNT', 'LOYALTY_EXCLUSIVE'].includes(formData.type) ? '1' : '0.01'}
                                                 className="w-full mt-1 px-3 py-2 bg-stone-900 border border-stone-600 rounded-lg"
                                             />
+                                        </div>
+
+                                        {/* Employee/Senior/Military Tag Selector */}
+                                        {formData.type === 'EMPLOYEE_DISCOUNT' && (
+                                            <div>
+                                                <label className="text-sm text-stone-400">Customer Tag Required</label>
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                                                    {CUSTOMER_TAGS.map(tag => (
+                                                        <button
+                                                            key={tag.value}
+                                                            onClick={() => setFormData({ ...formData, customerTag: tag.value })}
+                                                            className={`px-3 py-2 rounded-lg text-sm font-medium ${formData.customerTag === tag.value
+                                                                ? 'bg-indigo-500 text-white'
+                                                                : 'bg-stone-700 text-stone-300 hover:bg-stone-600'
+                                                                }`}
+                                                        >
+                                                            {tag.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <p className="text-xs text-stone-500 mt-1">Cashier tags customer at POS → discount auto-applies</p>
+                                            </div>
+                                        )}
+
+                                        {/* Loyalty-Only Toggle */}
+                                        {formData.type === 'LOYALTY_EXCLUSIVE' && (
+                                            <div className="p-3 bg-violet-500/10 border border-violet-500/30 rounded-lg">
+                                                <p className="text-sm text-violet-300 font-medium">🎯 Members-Only Pricing</p>
+                                                <p className="text-xs text-stone-400 mt-1">
+                                                    This deal ONLY applies when customer enters their phone # (loyalty ID).
+                                                    Non-members pay full price. Great for driving loyalty enrollments!
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Happy Hour Helper */}
+                                        {formData.type === 'HAPPY_HOUR' && (
+                                            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                                                <p className="text-sm text-amber-300 font-medium">⏰ Set Time Window Below</p>
+                                                <p className="text-xs text-stone-400 mt-1">
+                                                    Set start/end time + active days below. Discount auto-applies
+                                                    ONLY during that window. No cashier action needed.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Combo Helper */}
+                                        {formData.type === 'COMBO' && (
+                                            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg">
+                                                <p className="text-sm text-rose-300 font-medium">🍕 Select combo items below in "Specific Products"</p>
+                                                <p className="text-xs text-stone-400 mt-1">
+                                                    Pick the items that make up the combo. When ALL are scanned,
+                                                    the total becomes the Combo Price above. Example: Hot Dog + Chips + Drink = $4.99
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Gift with Purchase Helper */}
+                                        {formData.type === 'GIFT_WITH_PURCHASE' && (
+                                            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                                                <p className="text-sm text-emerald-300 font-medium">🎁 Buy qualifying items → cheapest item becomes FREE</p>
+                                                <p className="text-xs text-stone-400 mt-1">
+                                                    Set the qualifying items and quantity below. The cheapest item(s)
+                                                    in the qualifying set become free. Example: Buy any 3 energy drinks, cheapest is free.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* BXGY Helper */}
+                                        {formData.type === 'BXGY' && (
+                                            <div className="p-3 bg-sky-500/10 border border-sky-500/30 rounded-lg">
+                                                <p className="text-sm text-sky-300 font-medium">🔄 Buy X Get Y — Two groups needed</p>
+                                                <p className="text-xs text-stone-400 mt-1">
+                                                    Pick "Buy Group" (items customer must buy) and "Get Group" (items customer gets free/discounted).
+                                                    Example: Buy 2 drinks (Buy Group), get 1 snack free (Get Group).
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* CART_DISCOUNT Helper */}
+                                        {formData.type === 'CART_DISCOUNT' && (
+                                            <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                                                <p className="text-sm text-yellow-300 font-medium">🛍️ Whole Order Discount</p>
+                                                <p className="text-xs text-stone-400 mt-1">
+                                                    Applies to the entire cart total. Use for manager overrides (e.g., "10% off entire order"),
+                                                    coupon promotions, or customer recovery. Respects priority + exclusion rules.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* ─── BXGY: Dual Group Pickers ─── */}
+                                        {formData.type === 'BXGY' && (
+                                            <div className="space-y-3">
+                                                <div className="p-3 bg-stone-800/50 rounded-lg border border-stone-700">
+                                                    <label className="text-sm font-medium text-green-400 block mb-2">✅ Buy Group (items customer buys)</label>
+                                                    <p className="text-xs text-stone-500 mb-2">Select in "Applies To" below. These are the X items.</p>
+                                                </div>
+                                                <div className="p-3 bg-stone-800/50 rounded-lg border border-stone-700">
+                                                    <label className="text-sm font-medium text-pink-400 block mb-2">🎁 Get Group (items customer gets free/discounted)</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search products for Get Group..."
+                                                        className="w-full px-3 py-2 bg-stone-900 border border-stone-600 rounded-lg text-sm mb-2"
+                                                        onChange={(e) => {
+                                                            // Filter products for get group search
+                                                            const searchVal = e.target.value.toLowerCase()
+                                                            if (searchVal.length > 0) {
+                                                                setProductSearch(searchVal)
+                                                            }
+                                                        }}
+                                                    />
+                                                    {formData.getProductIds.length > 0 && (
+                                                        <div className="flex flex-wrap gap-2 mb-2">
+                                                            {formData.getProductIds.map(id => {
+                                                                const prod = products.find(p => p.id === id)
+                                                                return prod ? (
+                                                                    <span key={id} className="px-2 py-1 bg-pink-500 text-white rounded-full text-xs flex items-center gap-1">
+                                                                        {prod.name}
+                                                                        <button onClick={() => setFormData(prev => ({
+                                                                            ...prev,
+                                                                            getProductIds: prev.getProductIds.filter(p => p !== id)
+                                                                        }))} className="hover:text-red-300">×</button>
+                                                                    </span>
+                                                                ) : null
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                    <div className="max-h-32 overflow-y-auto space-y-1">
+                                                        {products
+                                                            .filter(p => !formData.getProductIds.includes(p.id))
+                                                            .filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()))
+                                                            .slice(0, 10)
+                                                            .map(prod => (
+                                                                <button
+                                                                    key={prod.id}
+                                                                    onClick={() => setFormData(prev => ({
+                                                                        ...prev,
+                                                                        getProductIds: [...prev.getProductIds, prod.id]
+                                                                    }))}
+                                                                    className="w-full text-left px-3 py-1.5 bg-stone-900 hover:bg-stone-700 rounded text-sm flex justify-between"
+                                                                >
+                                                                    <span>{prod.name}</span>
+                                                                    <span className="text-stone-500">${prod.price}</span>
+                                                                </button>
+                                                            ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* ─── Enterprise Controls ─── */}
+                                        {['BOGO', 'BXGY', 'GIFT_WITH_PURCHASE'].includes(formData.type) && (
+                                            <div>
+                                                <label className="text-sm text-stone-400">Evaluation Method</label>
+                                                <select
+                                                    value={formData.evaluationMethod}
+                                                    onChange={(e) => setFormData({ ...formData, evaluationMethod: e.target.value })}
+                                                    className="w-full mt-1 px-3 py-2 bg-stone-900 border border-stone-600 rounded-lg text-sm"
+                                                >
+                                                    <option value="LOWEST_PRICE">Discount Lowest Price Item (default)</option>
+                                                    <option value="HIGHEST_PRICE">Discount Highest Price Item</option>
+                                                </select>
+                                                <p className="text-xs text-stone-500 mt-1">Which qualifying item gets the free/discount? NRS default = lowest.</p>
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-sm text-stone-400">Exclusion Group (Optional)</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.exclusionGroup}
+                                                    onChange={(e) => setFormData({ ...formData, exclusionGroup: e.target.value })}
+                                                    placeholder="e.g., tobacco_deals"
+                                                    className="w-full mt-1 px-3 py-2 bg-stone-900 border border-stone-600 rounded-lg text-sm"
+                                                />
+                                                <p className="text-xs text-stone-500 mt-1">Promos with same group name won't stack</p>
+                                            </div>
+                                            <div>
+                                                <label className="text-sm text-stone-400">Receipt Display</label>
+                                                <select
+                                                    value={formData.receiptDisplay}
+                                                    onChange={(e) => setFormData({ ...formData, receiptDisplay: e.target.value })}
+                                                    className="w-full mt-1 px-3 py-2 bg-stone-900 border border-stone-600 rounded-lg text-sm"
+                                                >
+                                                    <option value="INLINE">Inline (on item line)</option>
+                                                    <option value="SEPARATE">Separate Line</option>
+                                                </select>
+                                                <p className="text-xs text-stone-500 mt-1">How discount shows on receipt</p>
+                                            </div>
                                         </div>
 
                                         {/* Applies To */}

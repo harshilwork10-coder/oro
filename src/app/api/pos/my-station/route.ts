@@ -47,6 +47,10 @@ export async function GET() {
                 terminalPort: station.dedicatedTerminal.terminalPort,
                 terminalType: station.dedicatedTerminal.terminalType
             } : null
+        },
+        theme: {
+            themeId: station.location.themeId || 'classic_oro',
+            highContrast: station.location.highContrast || false
         }
     })
 }

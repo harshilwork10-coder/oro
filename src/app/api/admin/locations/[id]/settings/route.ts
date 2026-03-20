@@ -1,0 +1,61 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+
+// GET - Fetch location-specific settings
+export async function GET(
+    request: NextRequest,
+    { params }: { params: { id: string } }
+) {
+    try {
+        const session = await getServerSession(authOptions)
+        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const location = await prisma.location.findUnique({
+            where: { id: params.id },
+            select: {
+                id: true,
+                name: true,
+                address: true,
+                phone: true,
+                storeHours: true,
+                settings: true,
+                type: true,
+                isActive: true,
+                franchise: { select: { businessName: true } }
+            }
+        })
+
+        if (!location) {
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+        }
+
+        return NextResponse.json({ settings: location })
+    } catch (error) {
+        console.error('[ADMIN_LOCATION_SETTINGS]', error)
+        return NextResponse.json({ error: 'Failed to fetch location settings' }, { status: 500 })
+    }
+}
+
+// PUT - Update location-specific settings
+export async function PUT(
+    request: NextRequest,
+    { params }: { params: { id: string } }
+) {
+    try {
+        const session = await getServerSession(authOptions)
+        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const body = await request.json()
+        const location = await prisma.location.update({
+            where: { id: params.id },
+            data: body
+        })
+
+        return NextResponse.json({ success: true, location })
+    } catch (error) {
+        console.error('[ADMIN_LOCATION_SETTINGS_UPDATE]', error)
+        return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 })
+    }
+}

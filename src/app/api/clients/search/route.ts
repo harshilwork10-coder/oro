@@ -13,10 +13,18 @@ export async function GET(req: NextRequest) {
 
         const { searchParams } = new URL(req.url)
         const query = searchParams.get('query')
-        const franchiseId = searchParams.get('franchiseId')
+        const requestedFranchiseId = searchParams.get('franchiseId')
 
+        // Use session franchiseId — validate if client-provided differs
+        const user = session.user as any
+        const franchiseId = requestedFranchiseId || user.franchiseId
         if (!franchiseId) {
             return NextResponse.json({ error: 'Franchise ID required' }, { status: 400 })
+        }
+
+        // Security: Only PROVIDER can search across franchises
+        if (franchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         // Build where clause

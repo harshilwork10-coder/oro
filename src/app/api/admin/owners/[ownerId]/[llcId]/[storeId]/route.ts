@@ -17,15 +17,15 @@ export async function GET(
 
         const { ownerId, llcId, storeId } = await params
 
-        // Verify hierarchy
-        const membership = await prisma.franchisorMembership.findFirst({
+        // Verify hierarchy: confirm the franchisor belongs to this owner
+        const llcCheck = await prisma.franchisor.findFirst({
             where: {
-                userId: ownerId,
-                franchisorId: llcId
+                id: llcId,
+                ownerId
             }
         })
 
-        if (!membership) {
+        if (!llcCheck) {
             return NextResponse.json({ error: 'Invalid hierarchy' }, { status: 404 })
         }
 
@@ -82,18 +82,13 @@ export async function GET(
             select: { id: true, name: true, businessType: true }
         })
 
-        // Get employees for this location
-        const employees = await prisma.employee.findMany({
+        // Get employees for this location (users assigned to this location)
+        const employees = await prisma.user.findMany({
             where: { locationId: storeId },
             select: {
                 id: true,
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true
-                    }
-                }
+                name: true,
+                email: true
             }
         })
 
@@ -124,11 +119,11 @@ export async function GET(
                 franchiseSlug: store.franchise?.slug
             },
             stations: store.stations,
-            employees: employees.map((e: { id: string; user: { id: string; name: string | null; email: string } | null }) => ({
+            employees: employees.map(e => ({
                 id: e.id,
-                userId: e.user?.id,
-                name: e.user?.name,
-                email: e.user?.email
+                userId: e.id,
+                name: e.name,
+                email: e.email
             })),
             // Documents would need to be stored separately - placeholder for now
             documents: []

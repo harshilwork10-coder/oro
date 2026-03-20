@@ -145,7 +145,7 @@ export default function MultiStoreDashboard() {
                         <div className="bg-gradient-to-r from-yellow-600/20 to-amber-600/20 border border-yellow-500/30 rounded-xl p-4 mb-8 flex items-center gap-4">
                             <span className="text-3xl">🏆</span>
                             <div>
-                                <p className="text-sm text-stone-400">Today's Top Performer</p>
+                                <p className="text-sm text-stone-400">Today&apos;s Top Performer</p>
                                 <p className="text-xl font-bold text-yellow-400">{data.summary.topLocation}</p>
                             </div>
                         </div>
@@ -233,6 +233,12 @@ export default function MultiStoreDashboard() {
                                     Inventory Management
                                 </h2>
                                 <div className="flex items-center gap-3">
+                                    <Link
+                                        href="/dashboard/multi-store/pricing"
+                                        className="text-green-400 hover:text-green-300 flex items-center gap-1 text-sm"
+                                    >
+                                        Store Pricing <ChevronRight className="h-4 w-4" />
+                                    </Link>
                                     <Link
                                         href="/dashboard/owner/transfers"
                                         className="text-purple-400 hover:text-purple-300 flex items-center gap-1 text-sm"

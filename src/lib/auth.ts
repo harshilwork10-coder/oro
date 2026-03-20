@@ -156,6 +156,21 @@ export const authOptions: NextAuthOptions = {
                             throw new Error(`ACCOUNT_${accountStatus}`)
                         }
                     }
+                } else if ((user.role === 'OWNER' || user.role === 'MANAGER') && user.franchiseId) {
+                    // Owner & Manager — pull industryType from their franchise's franchisor
+                    approvalStatus = 'APPROVED'
+                    if (user.franchiseId) {
+                        const franchise = await prisma.franchise.findUnique({
+                            where: { id: user.franchiseId },
+                            include: { franchisor: { select: { accountStatus: true, industryType: true } } }
+                        })
+                        accountStatus = franchise?.franchisor?.accountStatus || 'ACTIVE'
+                        industryType = franchise?.franchisor?.industryType || 'SERVICE'
+
+                        if (accountStatus === 'SUSPENDED' || accountStatus === 'TERMINATED') {
+                            throw new Error(`ACCOUNT_${accountStatus}`)
+                        }
+                    }
                 } else if (user.role === 'FRANCHISEE' && user.franchiseId) {
                     // For Franchisee Owners linked to a franchise
                     const franchise = await prisma.franchise.findUnique({

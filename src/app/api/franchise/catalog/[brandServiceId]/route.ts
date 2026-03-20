@@ -33,11 +33,11 @@ export async function PUT(
         } = body
 
         if (!locationId) {
-            return ApiResponse.badRequest('locationId is required')
+            return ApiResponse.error('locationId is required', 400)
         }
 
         // Verify the brand service exists
-        const brandService = await prisma.globalService.findUnique({
+        const brandService = await (prisma as any).globalService.findUnique({
             where: { id: brandServiceId }
         })
 
@@ -46,7 +46,7 @@ export async function PUT(
         }
 
         // Check if location has permission to customize pricing
-        const location = await prisma.location.findUnique({
+        const location = await (prisma as any).location.findUnique({
             where: { id: locationId },
             select: { canCustomizePricing: true, franchisorId: true }
         })
@@ -60,7 +60,7 @@ export async function PUT(
         }
 
         // Upsert the override
-        const override = await prisma.locationServiceOverride.upsert({
+        const override = await (prisma as any).locationServiceOverride.upsert({
             where: {
                 globalServiceId_locationId: {
                     globalServiceId: brandServiceId,
@@ -121,11 +121,11 @@ export async function DELETE(
         const locationId = searchParams.get('locationId')
 
         if (!locationId) {
-            return ApiResponse.badRequest('locationId is required')
+            return ApiResponse.error('locationId is required', 400)
         }
 
         // Delete the override (reverts to brand values)
-        await prisma.locationServiceOverride.deleteMany({
+        await (prisma as any).locationServiceOverride.deleteMany({
             where: {
                 globalServiceId: brandServiceId,
                 locationId
