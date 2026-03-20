@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Opt out of bundling native node modules
+  serverExternalPackages: ["ssh2-sftp-client", "ssh2"],
   typescript: {
     // Allow production builds to complete even with type errors
     ignoreBuildErrors: true,
