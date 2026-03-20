@@ -246,9 +246,17 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             ? parseFloat(settings.taxRate.toString())
             : 0.0825  // Default 8.25%
 
+        // Get business config for per-item-type tax flags
+        const businessConfig = await prisma.businessConfig.findFirst({
+            where: { franchisorId: franchise.franchisorId },
+            select: { taxServices: true, taxProducts: true }
+        })
+
         const taxConfig = {
             taxRate,
-            taxIncluded: false
+            taxIncluded: false,
+            taxServices: businessConfig?.taxServices ?? true,  // Salon: usually false
+            taxProducts: businessConfig?.taxProducts ?? true   // Products: usually true
         }
 
         // DUAL PRICING DEBUG - Log entire settings object
