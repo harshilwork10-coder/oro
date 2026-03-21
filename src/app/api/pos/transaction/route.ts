@@ -90,38 +90,8 @@ export async function POST(req: NextRequest) {
         select: { franchisorId: true }
     })
 
-    let shiftSetting: string | null = null
-    if (franchiseRecord?.franchisorId) {
-        try {
-            // BusinessConfig may not exist yet - gracefully default to no shift requirement
-            const businessConfig = await (prisma as any).businessConfig?.findUnique?.({
-                where: { franchisorId: franchiseRecord.franchisorId },
-                select: { shiftRequirement: true }
-            })
-            shiftSetting = businessConfig?.shiftRequirement ?? null
-        } catch {
-            // Model doesn't exist yet - no shift required
-            shiftSetting = null
-        }
-    }
-
-    // Only require shift if:
-    // 1. Owner explicitly set a non-NONE shift requirement AND
-    // 2. This user is NOT an owner/above AND
-    // 3. This user has requiresTimeClock=true (or not set, default behavior)
-    const requiresShift = shiftSetting !== null && shiftSetting !== 'NONE' && !isOwnerOrAbove && !userBypassesShift
-
-    if (requiresShift) {
-        if (!cashDrawerSessionId) {
-            return badRequestResponse('No open shift. Please open a shift before processing transactions.')
-        }
-        const sessionCheck = await prisma.cashDrawerSession.findUnique({
-            where: { id: cashDrawerSessionId }
-        })
-        if (!sessionCheck || sessionCheck.endTime) {
-            return badRequestResponse('Shift is closed or invalid. Cannot process transaction.')
-        }
-    }
+    // NOTE: Shift requirement check disabled — BusinessConfig.shiftRequirement not in schema yet.
+    // When ready, add the field and re-enable shift validation here.
 
     // Determine chargedMode based on payment method
     // CASH payment = use cash prices, CARD payment = use card prices

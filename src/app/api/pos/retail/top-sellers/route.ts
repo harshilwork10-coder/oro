@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
         const limit = parseInt(searchParams.get('limit') || '6')
 
         // Get most frequently sold items from recent transactions
-        const topItems = await prisma.transactionItem.groupBy({
+        const topItems = await prisma.transactionLineItem.groupBy({
             by: ['productId'],
             where: {
                 transaction: {
