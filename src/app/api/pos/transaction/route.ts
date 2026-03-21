@@ -92,11 +92,17 @@ export async function POST(req: NextRequest) {
 
     let shiftSetting: string | null = null
     if (franchiseRecord?.franchisorId) {
-        const businessConfig = await prisma.businessConfig.findUnique({
-            where: { franchisorId: franchiseRecord.franchisorId },
-            select: { shiftRequirement: true }
-        })
-        shiftSetting = businessConfig?.shiftRequirement ?? null
+        try {
+            // BusinessConfig may not exist yet - gracefully default to no shift requirement
+            const businessConfig = await (prisma as any).businessConfig?.findUnique?.({
+                where: { franchisorId: franchiseRecord.franchisorId },
+                select: { shiftRequirement: true }
+            })
+            shiftSetting = businessConfig?.shiftRequirement ?? null
+        } catch {
+            // Model doesn't exist yet - no shift required
+            shiftSetting = null
+        }
     }
 
     // Only require shift if:
