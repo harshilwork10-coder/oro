@@ -222,7 +222,7 @@ function buildUserResponse(employee: any) {
         locationId: employee.locationId,
         role: employee.role
     }
-    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '8h' })
+    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '30d' }) // POS terminals need long-lived tokens
 
     return {
         id: employee.id,
