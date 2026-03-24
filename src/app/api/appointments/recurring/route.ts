@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // GET - List recurring appointments for a location
 export async function GET(request: NextRequest) {
@@ -112,6 +113,17 @@ export async function POST(request: NextRequest) {
             }
         })
 
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role || 'USER',
+            action: 'RECURRING_APPOINTMENT_CREATED',
+            entityType: 'RecurringAppointment',
+            entityId: recurring.id,
+            metadata: { clientId, serviceId, frequency }
+        })
+
         return NextResponse.json(recurring, { status: 201 })
     } catch (error) {
         console.error('Error creating recurring appointment:', error)
@@ -160,6 +172,17 @@ export async function PUT(request: NextRequest) {
             }
         })
 
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role || 'USER',
+            action: 'RECURRING_APPOINTMENT_UPDATED',
+            entityType: 'RecurringAppointment',
+            entityId: id,
+            metadata: { frequency, isActive }
+        })
+
         return NextResponse.json(updated)
     } catch (error) {
         console.error('Error updating recurring appointment:', error)
@@ -197,6 +220,17 @@ export async function DELETE(request: NextRequest) {
         await prisma.recurringAppointment.update({
             where: { id },
             data: { isActive: false }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role || 'USER',
+            action: 'RECURRING_APPOINTMENT_DELETED',
+            entityType: 'RecurringAppointment',
+            entityId: id,
+            metadata: {}
         })
 
         return NextResponse.json({ success: true })

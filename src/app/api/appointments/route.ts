@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { auditLog } from '@/lib/audit'
 
 // GET: Fetch appointments
 export async function GET(req: NextRequest) {
@@ -168,6 +169,17 @@ export async function POST(req: NextRequest) {
                     },
                 },
             },
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role || 'USER',
+            action: 'APPOINTMENT_CREATED',
+            entityType: 'Appointment',
+            entityId: appointment.id,
+            metadata: { clientId, serviceId, employeeId, locationId }
         })
 
         return NextResponse.json(appointment, { status: 201 })

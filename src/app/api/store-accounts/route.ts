@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
+import { auditLog } from '@/lib/audit'
 
 // GET - Get all store accounts with balances and pagination
 export async function GET(request: NextRequest) {
@@ -172,6 +173,17 @@ export async function POST(request: NextRequest) {
                 storeAccountApprovedBy: session.user.id,
                 storeAccountApprovedAt: new Date()
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'USER',
+            action: 'STORE_ACCOUNT_CREATED',
+            entityType: 'Client',
+            entityId: clientId,
+            metadata: { creditLimit: creditLimit || 500 }
         })
 
         return ApiResponse.created({

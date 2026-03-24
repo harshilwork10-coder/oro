@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendWaitlistAddedSMS } from '@/lib/sms'
+import { auditLog } from '@/lib/audit'
 
 // GET - List waitlist entries for today
 export async function GET(request: NextRequest) {
@@ -117,6 +118,17 @@ export async function POST(request: NextRequest) {
             include: {
                 service: { select: { name: true } }
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: (user as any).role || 'USER',
+            action: 'WAITLIST_ENTRY_CREATED',
+            entityType: 'WaitlistEntry',
+            entityId: entry.id,
+            metadata: { customerName, locationId: user.location!.id }
         })
 
         return NextResponse.json(entry)

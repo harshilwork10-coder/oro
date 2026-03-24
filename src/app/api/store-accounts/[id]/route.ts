@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // GET - Get store account details and transactions
 export async function GET(
@@ -201,6 +202,17 @@ export async function POST(
                 data: { storeAccountBalance: newBalance }
             })
         ])
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'USER',
+            action: `STORE_ACCOUNT_${type}`,
+            entityType: 'StoreAccountTransaction',
+            entityId: transaction.id,
+            metadata: { clientId: client.id, amount, type, newBalance }
+        })
 
         return NextResponse.json({
             success: true,
