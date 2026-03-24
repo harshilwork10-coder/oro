@@ -14,6 +14,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
+  try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -78,6 +79,10 @@ export async function POST(request: NextRequest) {
     return new NextResponse(html, {
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
     })
+  } catch (error) {
+    console.error('[GENERATE_PDF_POST]', error)
+    return NextResponse.json({ error: 'Failed to generate document' }, { status: 500 })
+  }
 }
 
 function generateInvoiceHTML(txn: any, store: string, address: string, phone: string): string {

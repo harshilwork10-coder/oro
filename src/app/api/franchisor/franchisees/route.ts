@@ -18,6 +18,7 @@ async function getFranchisorForUser(userId: string) {
 
 // GET /api/franchisor/franchisees - List franchisee LLCs for this HQ
 export async function GET(request: NextRequest) {
+  try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -56,10 +57,15 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json({ data: franchisees });
+  } catch (error) {
+    console.error('[FRANCHISOR_FRANCHISEES_GET]', error);
+    return NextResponse.json({ error: 'Failed to fetch franchisees' }, { status: 500 });
+  }
 }
 
 // POST /api/franchisor/franchisees - Create a new franchisee LLC + owner
 export async function POST(request: NextRequest) {
+  try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -168,4 +174,8 @@ export async function POST(request: NextRequest) {
             createdAt: result.franchise.createdAt
         }
     });
+  } catch (error) {
+    console.error('[FRANCHISOR_FRANCHISEES_POST]', error);
+    return NextResponse.json({ error: 'Failed to create franchisee' }, { status: 500 });
+  }
 }

@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -117,4 +118,8 @@ export async function PUT(request: NextRequest) {
                 : ['SQUARE_ACCESS_TOKEN', 'SQUARE_WEBHOOK_SIGNATURE_KEY', 'SQUARE_WEBHOOK_URL'],
         },
     })
+  } catch (error) {
+    console.error('[PAYMENT_PROCESSORS_PUT]', error)
+    return NextResponse.json({ error: 'Failed to update payment processor config' }, { status: 500 })
+  }
 }

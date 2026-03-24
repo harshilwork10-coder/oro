@@ -46,6 +46,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -85,5 +86,9 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(updatedLocation)
+  } catch (error) {
+    console.error('[LOCATION_SETTINGS_POST]', error)
+    return NextResponse.json({ error: 'Failed to update location settings' }, { status: 500 })
+  }
 }
 

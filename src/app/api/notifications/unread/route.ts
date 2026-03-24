@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 export async function GET() {
+  try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -24,9 +25,14 @@ export async function GET() {
     return NextResponse.json({
         data: { notifications, unreadCount: notifications.length },
     })
+  } catch (error) {
+    console.error('[NOTIFICATIONS_UNREAD_GET]', error)
+    return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 })
+  }
 }
 
 export async function PUT(request: NextRequest) {
+  try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -43,4 +49,8 @@ export async function PUT(request: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Missing id or markAllRead' }, { status: 400 })
+  } catch (error) {
+    console.error('[NOTIFICATIONS_UNREAD_PUT]', error)
+    return NextResponse.json({ error: 'Failed to update notification' }, { status: 500 })
+  }
 }

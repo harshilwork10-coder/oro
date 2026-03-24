@@ -22,6 +22,7 @@ async function getFranchisorForUser(userId: string) {
 
 // GET /api/franchisor/locations - List locations for this HQ
 export async function GET(request: NextRequest) {
+  try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -81,10 +82,15 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json({ data });
+  } catch (error) {
+    console.error('[FRANCHISOR_LOCATIONS_GET]', error);
+    return NextResponse.json({ error: 'Failed to fetch locations' }, { status: 500 });
+  }
 }
 
 // POST /api/franchisor/locations - HQ creates a new location
 export async function POST(request: NextRequest) {
+  try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -165,4 +171,8 @@ export async function POST(request: NextRequest) {
         },
         message: 'Location created. Provider will set up devices.'
     });
+  } catch (error) {
+    console.error('[FRANCHISOR_LOCATIONS_POST]', error);
+    return NextResponse.json({ error: 'Failed to create location' }, { status: 500 });
+  }
 }

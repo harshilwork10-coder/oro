@@ -6,11 +6,13 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { auditLog } from '@/lib/audit';
 
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
     const session = await getServerSession(authOptions);
 
     // Only Provider can reset owner passwords
@@ -48,8 +50,23 @@ export async function PATCH(
         data: { password: hashedPassword }
     });
 
+    // Audit log
+    await auditLog({
+        userId: session.user.id,
+        userEmail: (session.user as any).email,
+        userRole: 'PROVIDER',
+        action: 'PASSWORD_RESET',
+        entityType: 'User',
+        entityId: user.id,
+        metadata: { targetEmail: user.email, targetRole: user.role, resetBy: 'provider' }
+    });
+
     return NextResponse.json({
         success: true,
         message: `Password reset for ${user.email}. Share the new password securely with the owner.`
     });
+  } catch (error) {
+    console.error('[PROVIDER_RESET_PASSWORD]', error);
+    return NextResponse.json({ error: 'Failed to reset password' }, { status: 500 });
+  }
 }

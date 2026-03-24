@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 
 // GET - Fetch audit logs for an entity
 export async function GET(request: NextRequest) {
+  try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -103,10 +104,15 @@ export async function GET(request: NextRequest) {
     }))
 
     return NextResponse.json({ logs: enrichedLogs })
+  } catch (error) {
+    console.error('[AUDIT_LOGS_GET]', error)
+    return NextResponse.json({ error: 'Failed to fetch audit logs' }, { status: 500 })
+  }
 }
 
 // POST - Create a new audit log entry
 export async function POST(request: NextRequest) {
+  try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -132,5 +138,9 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ log })
+  } catch (error) {
+    console.error('[AUDIT_LOGS_POST]', error)
+    return NextResponse.json({ error: 'Failed to create audit log' }, { status: 500 })
+  }
 }
 

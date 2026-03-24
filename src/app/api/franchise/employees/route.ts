@@ -102,6 +102,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
         return ApiResponse.unauthorized()
@@ -252,4 +253,8 @@ export async function POST(request: NextRequest) {
 
     const { password: _, ...employeeWithoutPassword } = result
     return ApiResponse.created(employeeWithoutPassword)
+  } catch (error) {
+    console.error('[FRANCHISE_EMPLOYEES_POST]', error)
+    return ApiResponse.error('Failed to create employee', 500)
+  }
 }

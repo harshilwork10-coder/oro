@@ -20,6 +20,7 @@ export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -81,6 +82,10 @@ export async function POST(
         },
         message: `Station created. Pairing code: ${pairingCode}`
     });
+  } catch (error) {
+    console.error('[PROVIDER_STATIONS_POST]', error);
+    return NextResponse.json({ error: 'Failed to create station' }, { status: 500 });
+  }
 }
 
 // GET /api/provider/locations/:id/stations - List stations for a location
@@ -88,6 +93,7 @@ export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -105,4 +111,8 @@ export async function GET(
     });
 
     return NextResponse.json({ data: stations });
+  } catch (error) {
+    console.error('[PROVIDER_STATIONS_GET]', error);
+    return NextResponse.json({ error: 'Failed to fetch stations' }, { status: 500 });
+  }
 }

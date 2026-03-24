@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { auditLog } from '@/lib/audit';
 
 // Helper to get franchisor for current user
 async function getFranchisorForUser(userId: string) {
@@ -18,6 +19,7 @@ export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -69,8 +71,23 @@ export async function PATCH(
         data: { password: hashedPassword }
     });
 
+    // Audit log
+    await auditLog({
+        userId: session.user.id,
+        userEmail: (session.user as any).email,
+        userRole: 'FRANCHISOR',
+        action: 'PASSWORD_RESET',
+        entityType: 'User',
+        entityId: owner.id,
+        metadata: { targetEmail: owner.email, resetBy: 'franchisor' }
+    });
+
     return NextResponse.json({
         success: true,
         message: `Password reset for ${owner.email}. Share the new password with the owner.`
     });
+  } catch (error) {
+    console.error('[FRANCHISOR_RESET_PASSWORD]', error);
+    return NextResponse.json({ error: 'Failed to reset password' }, { status: 500 });
+  }
 }

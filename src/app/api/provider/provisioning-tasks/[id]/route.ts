@@ -10,6 +10,7 @@ export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -45,6 +46,10 @@ export async function GET(
     }
 
     return NextResponse.json({ data: task });
+  } catch (error) {
+    console.error('[PROVISIONING_TASK_GET]', error);
+    return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });
+  }
 }
 
 // PATCH /api/provider/provisioning-tasks/:id - Update provisioning task status
@@ -52,6 +57,7 @@ export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -119,4 +125,8 @@ export async function PATCH(
         task: updatedTask,
         message: status === 'DONE' ? 'Task completed. Location is now READY_FOR_INSTALL.' : 'Task updated.'
     });
+  } catch (error) {
+    console.error('[PROVISIONING_TASK_PATCH]', error);
+    return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
+  }
 }
