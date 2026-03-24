@@ -373,7 +373,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 {/* Logo Header - Centered on its own row */}
                 <div className="flex h-16 xl:h-24 items-center justify-center border-b border-stone-800/50 bg-gradient-to-r from-stone-900/50 to-transparent">
                     <div className="transition-transform duration-300 hover:scale-105">
-                        <img src="/ORO_9.jpg" alt="ORO 9" className="h-12 xl:h-16 w-auto object-contain" />
+                        <img src="/oro9-gold.png" alt="ORO 9" className="h-12 xl:h-16 w-auto object-contain" />
                     </div>
                 </div>
 

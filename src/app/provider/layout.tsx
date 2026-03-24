@@ -63,7 +63,7 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
                 {/* Logo row - centered */}
                 {!sidebarCollapsed && (
                     <div className="h-20 flex items-center justify-center border-b border-stone-800">
-                        <img src="/ORO_9.jpg" alt="ORO 9" className="h-16 w-auto object-contain" />
+                        <img src="/oro9-gold.png" alt="ORO 9" className="h-16 w-auto object-contain" />
                     </div>
                 )}
 
