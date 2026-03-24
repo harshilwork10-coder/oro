@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcrypt'
 import crypto from 'crypto'
+import { auditLog } from '@/lib/audit'
 
 // Rate limiting: Track creation attempts per user
 const creationAttempts = new Map<string, { count: number; resetAt: number }>()
@@ -151,6 +152,17 @@ export async function POST(request: NextRequest) {
         })
         */
         // Debug log removed
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'FRANCHISOR',
+            action: 'FRANCHISEE_CREATED',
+            entityType: 'User',
+            entityId: user.id,
+            metadata: { franchiseName: sanitizedFranchiseName, franchiseId: franchise.id, email: sanitizedEmail }
+        })
 
         return NextResponse.json({
             success: true,

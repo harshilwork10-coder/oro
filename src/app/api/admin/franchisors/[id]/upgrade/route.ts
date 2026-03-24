@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // POST: Upgrade a franchisor from MULTI_LOCATION_OWNER to BRAND_FRANCHISOR
 export async function POST(
@@ -49,6 +50,17 @@ export async function POST(
                 approvalStatus: true,
                 updatedAt: true
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'FRANCHISOR_UPGRADED',
+            entityType: 'Franchisor',
+            entityId: id,
+            metadata: { from: current.businessType, to: 'BRAND_FRANCHISOR', name: current.name }
         })
 
         return NextResponse.json({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // POST create new location for a franchisor (Provider only)
 // This endpoint accepts franchisorId and auto-creates franchise if needed
@@ -81,6 +82,17 @@ export async function POST(request: NextRequest) {
                     }
                 }
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'LOCATION_CREATED',
+            entityType: 'Location',
+            entityId: location.id,
+            metadata: { name, franchisorId, franchiseId }
         })
 
         return NextResponse.json({

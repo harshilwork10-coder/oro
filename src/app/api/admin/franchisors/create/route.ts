@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { hash } from 'bcrypt'
 import crypto from 'crypto'
 import { sendEmail } from '@/lib/email'
+import { auditLog } from '@/lib/audit'
 
 // Rate limiting
 const creationAttempts = new Map<string, { count: number; resetAt: number }>()
@@ -210,6 +211,17 @@ export async function POST(request: NextRequest) {
                     <p style="margin-top: 20px; font-size: 12px; color: #666;">This link expires in 24 hours.</p>
                 </div>
             `
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'FRANCHISOR_CREATED',
+            entityType: 'Franchisor',
+            entityId: franchisor.id,
+            metadata: { companyName: sanitizedCompanyName, businessType: finalBusinessType, industryType: finalIndustryType, isExistingUser, ownerEmail: sanitizedEmail }
         })
 
         return NextResponse.json({
