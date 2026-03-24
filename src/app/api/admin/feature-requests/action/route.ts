@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // POST: Approve or reject a feature request
 export async function POST(req: NextRequest) {
@@ -61,6 +62,17 @@ export async function POST(req: NextRequest) {
                 })
             }
         }
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: `FEATURE_REQUEST_${action}`,
+            entityType: 'FeatureRequest',
+            entityId: requestId,
+            metadata: { featureKey: featureRequest.featureKey, franchisorId: featureRequest.franchisorId }
+        })
 
         return NextResponse.json({
             success: true,

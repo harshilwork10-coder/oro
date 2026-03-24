@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 /**
  * GET /api/admin/locations/[id]/store-code
@@ -86,6 +87,17 @@ export async function PATCH(
             select: { id: true, name: true, pulseStoreCode: true }
         })
 
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: session.user.role,
+            action: 'STORE_CODE_SET',
+            entityType: 'Location',
+            entityId: id,
+            metadata: { storeCode: code }
+        })
+
         return NextResponse.json({
             success: true,
             message: `Store code set to "${code}"`,
@@ -116,6 +128,17 @@ export async function DELETE(
         await prisma.location.update({
             where: { id },
             data: { pulseStoreCode: null }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: session.user.role,
+            action: 'STORE_CODE_REMOVED',
+            entityType: 'Location',
+            entityId: id,
+            metadata: {}
         })
 
         return NextResponse.json({ success: true, message: 'Store code removed' })

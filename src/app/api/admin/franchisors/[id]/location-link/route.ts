@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
+import { auditLog } from '@/lib/audit'
 
 // POST: Generate magic link for adding a new location
 export async function POST(
@@ -58,6 +59,17 @@ export async function POST(
         const origin = request.headers.get('origin') || request.headers.get('host') || 'http://localhost:3000'
         const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
         const url = `${baseUrl}/onboarding/add-location/${locationToken}?fid=${franchise.id}`
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'LOCATION_MAGIC_LINK_GENERATED',
+            entityType: 'Franchisor',
+            entityId: id,
+            metadata: { ownerEmail: franchisor.owner.email, franchiseId: franchise.id }
+        })
 
         return NextResponse.json({
             success: true,

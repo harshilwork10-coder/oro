@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // Helper to parse integrations JSON string
 function parseIntegrations(integrationsStr: string | null): Record<string, boolean> {
@@ -54,6 +55,17 @@ export async function PATCH(
         })
 
         // Debug log removed
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'INTEGRATIONS_UPDATED',
+            entityType: 'Franchisor',
+            entityId: id,
+            metadata: { changed: Object.keys(updates) }
+        })
 
         return NextResponse.json({
             success: true,
