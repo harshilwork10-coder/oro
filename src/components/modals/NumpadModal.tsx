@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Delete, Check } from 'lucide-react'
 
 interface NumpadModalProps {
@@ -40,50 +40,91 @@ export default function NumpadModal({
         }
     }, [isOpen, initialValue])
 
-    if (!isOpen) return null
+    const handleDigit = useCallback((digit: string) => {
+        setDisplay(prev => {
+            const currentHasDecimal = prev.includes('.')
+            if (currentHasDecimal) {
+                const parts = prev.split('.')
+                if (parts[1] && parts[1].length >= 2) return prev
+            }
+            const newValue = parseFloat(prev + digit) || 0
+            if (newValue > maxValue) return prev
+            return prev + digit
+        })
+    }, [maxValue])
 
-    const handleDigit = (digit: string) => {
-        // Limit decimal places to 2
-        if (hasDecimal) {
-            const parts = display.split('.')
-            if (parts[1] && parts[1].length >= 2) return
-        }
+    const handleDecimal = useCallback(() => {
+        if (!allowDecimal) return
+        setDisplay(prev => {
+            if (prev.includes('.')) return prev
+            setHasDecimal(true)
+            return (prev || '0') + '.'
+        })
+    }, [allowDecimal])
 
-        // Check max value
-        const newValue = parseFloat(display + digit) || 0
-        if (newValue > maxValue) return
+    const handleBackspace = useCallback(() => {
+        setDisplay(prev => {
+            if (prev.endsWith('.')) {
+                setHasDecimal(false)
+            }
+            return prev.slice(0, -1)
+        })
+    }, [])
 
-        setDisplay(prev => prev + digit)
-    }
-
-    const handleDecimal = () => {
-        if (!allowDecimal || hasDecimal) return
-        setHasDecimal(true)
-        setDisplay(prev => (prev || '0') + '.')
-    }
-
-    const handleBackspace = () => {
-        if (display.endsWith('.')) {
-            setHasDecimal(false)
-        }
-        setDisplay(prev => prev.slice(0, -1))
-    }
-
-    const handleClear = () => {
+    const handleClear = useCallback(() => {
         setDisplay('')
         setHasDecimal(false)
-    }
+    }, [])
 
-    const handleSubmit = () => {
-        const value = parseFloat(display) || 0
-        onSubmit(value)
+    const handleSubmit = useCallback(() => {
+        setDisplay(prev => {
+            const value = parseFloat(prev) || 0
+            onSubmit(value)
+            return prev
+        })
         onClose()
-    }
+    }, [onSubmit, onClose])
 
     const handleQuickAmount = (amount: number) => {
         setDisplay(amount.toFixed(2))
         setHasDecimal(true)
     }
+
+    // Keyboard input support — allows physical keyboard to drive the numpad
+    useEffect(() => {
+        if (!isOpen) return
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Digits 0-9
+            if (/^[0-9]$/.test(e.key)) {
+                e.preventDefault()
+                handleDigit(e.key)
+            }
+            // Decimal point
+            if (e.key === '.' || e.key === ',') {
+                e.preventDefault()
+                handleDecimal()
+            }
+            // Backspace / Delete
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+                e.preventDefault()
+                handleBackspace()
+            }
+            // Enter = submit
+            if (e.key === 'Enter') {
+                e.preventDefault()
+                handleSubmit()
+            }
+            // Escape = close
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                onClose()
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [isOpen, onClose, handleDigit, handleDecimal, handleBackspace, handleSubmit])
+
+    if (!isOpen) return null
 
     const displayValue = display || '0'
 
@@ -144,8 +185,7 @@ export default function NumpadModal({
                     {allowDecimal ? (
                         <button
                             onClick={handleDecimal}
-                            disabled={hasDecimal}
-                            className="py-6 bg-stone-800 hover:bg-stone-700 disabled:opacity-50 rounded-lg text-2xl font-bold text-white transition-colors"
+                            className="py-6 bg-stone-800 hover:bg-stone-700 rounded-lg text-2xl font-bold text-white transition-colors"
                         >
                             .
                         </button>
@@ -180,4 +220,3 @@ export default function NumpadModal({
         </div>
     )
 }
-

@@ -775,17 +775,24 @@ export default function RetailPOSPage() {
         localStorage.setItem('retail_customer_display', JSON.stringify(displayData))
     }, [cart, selectedStation, pricingSettings])
 
-    // Keep focus on barcode input
+    // Keep focus on barcode input (only when no modals are open)
+    const anyModalOpen = showDiscountModal || showQuantityModal || showPriceModal || showUniversalSearch
+        || showAgeVerification || showQuickAddModal || showScanQuickAddModal || showPaymentModal
+        || showTransactionDiscountModal || showPriceCheckInputModal || showPriceCheckModal
+        || showCustomerLookup || showCashDropModal || showReceiveStockModal || showRecentTransactions
+        || showEndOfDayWizard || showLotteryModal || showLotteryPayoutModal || showCustomerModal
+        || showQtyNumpad || showCaseBreakModal || showExitModal || showMoreDepts || showQuickSwitch
+        || showPaxModal || showReceiptModal || showStationPairing
     useEffect(() => {
         const focusBarcode = () => {
-            if (!showDiscountModal && !showQuantityModal && !showPriceModal && !showUniversalSearch && !showAgeVerification && !showQuickAddModal) {
+            if (!anyModalOpen) {
                 barcodeInputRef.current?.focus()
             }
         }
         focusBarcode()
         const interval = setInterval(focusBarcode, 1000)
         return () => clearInterval(interval)
-    }, [showDiscountModal, showQuantityModal, showPriceModal, showUniversalSearch, showAgeVerification, showQuickAddModal])
+    }, [anyModalOpen])
 
     // Check for applicable promotions when cart changes
     useEffect(() => {
