@@ -42,22 +42,6 @@ export async function GET(request: NextRequest) {
                         minimumAge: true,
                         isEbtEligible: true
                     }
-                },
-                tagAlongParent: {
-                    where: { isActive: true },
-                    orderBy: { sortOrder: 'asc' },
-                    take: 5,
-                    select: {
-                        child: {
-                            select: {
-                                id: true,
-                                name: true,
-                                price: true,
-                                barcode: true,
-                                sku: true
-                            }
-                        }
-                    }
                 }
             }
         })
@@ -79,8 +63,8 @@ export async function GET(request: NextRequest) {
             minimumAge = product.productCategory.minimumAge
         }
 
-        // Extract tag-along suggestions
-        const tagAlongItems = product.tagAlongParent.map((t: any) => t.child)
+        // Tag-along suggestions (model not yet in schema, return empty)
+        const tagAlongItems: any[] = []
 
         const result = {
             id: product.id,
