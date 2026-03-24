@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(
     req: Request,
@@ -21,18 +22,14 @@ export async function POST(
             return NextResponse.json({ error: 'Reason is required' }, { status: 400 })
         }
 
-        // Find the transaction
-        const transaction = await prisma.transaction.findUnique({
-            where: { id: transactionId },
+        // Find the transaction — scoped to franchise
+        const transaction = await prisma.transaction.findFirst({
+            where: { id: transactionId, franchiseId: session.user.franchiseId },
             include: { lineItems: true }
         })
 
         if (!transaction) {
             return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
-        }
-
-        if (transaction.franchiseId !== session.user.franchiseId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -66,8 +63,17 @@ export async function POST(
             }
         })
 
-        // Log the void for audit purposes
-        console.log(`[TRANSACTION_VOIDED] ID: ${transactionId}, Reason: ${reason}, By: ${session.user.email}`)
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email,
+            userRole: (session.user as any).role,
+            action: 'VOID_TRANSACTION',
+            entityType: 'Transaction',
+            entityId: transactionId,
+            franchiseId: session.user.franchiseId,
+            metadata: { reason, originalStatus: transaction.status, total: Number(transaction.total), via: 'delete-endpoint' }
+        })
 
         return NextResponse.json({
             success: true,

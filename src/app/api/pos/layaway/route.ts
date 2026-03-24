@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
+import { auditLog } from '@/lib/audit'
 
 // POST — Create a layaway
 export async function POST(request: NextRequest) {
@@ -51,6 +52,19 @@ export async function POST(request: NextRequest) {
                 }
             },
             include: { items: true }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'CREATE',
+            entityType: 'Layaway',
+            entityId: layaway.id,
+            franchiseId: user.franchiseId,
+            locationId,
+            metadata: { totalPrice, depositAmount, balance, customerName }
         })
 
         return ApiResponse.success({ layaway })
@@ -123,6 +137,18 @@ export async function PUT(request: NextRequest) {
                 data: { status: 'LAYAWAY_CANCELLED', notes: JSON.stringify(data) }
             })
         }
+
+        // Audit log
+        await auditLog({
+            userId: (session.user as any).id,
+            userEmail: session.user.email,
+            userRole: (session.user as any).role,
+            action: action === 'CANCEL' ? 'CANCEL' : 'UPDATE',
+            entityType: 'Layaway',
+            entityId: id,
+            franchiseId: (session.user as any).franchiseId,
+            metadata: { action, paymentAmount, paymentMethod, balance: data.balance }
+        })
 
         return ApiResponse.success({ updated: true, balance: data.balance })
     } catch (error) {

@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
+import { auditLog } from '@/lib/audit'
 
 // POST — Process split tender payment (multiple payment methods on one transaction)
 export async function POST(request: NextRequest) {
@@ -55,6 +56,19 @@ export async function POST(request: NextRequest) {
                 splitTenders: JSON.stringify(tenderData),
                 status: 'COMPLETED'
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'PAYMENT',
+            entityType: 'Transaction',
+            entityId: transactionId,
+            franchiseId: user.franchiseId,
+            locationId,
+            metadata: { paymentMethod: 'SPLIT', tenders: tenderData, total: txTotal }
         })
 
         return ApiResponse.success({ transaction: updated, tenders: tenderData })

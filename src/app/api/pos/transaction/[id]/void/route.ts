@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(
     req: Request,
@@ -21,18 +22,13 @@ export async function POST(
             return NextResponse.json({ error: 'Reason is required' }, { status: 400 })
         }
 
-        // Find the transaction
-        const transaction = await prisma.transaction.findUnique({
-            where: { id: transactionId }
+        // Find the transaction — scoped to franchise
+        const transaction = await prisma.transaction.findFirst({
+            where: { id: transactionId, franchiseId: session.user.franchiseId }
         })
 
         if (!transaction) {
             return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
-        }
-
-        // Security: Verify transaction belongs to user's franchise
-        if (transaction.franchiseId !== session.user.franchiseId) {
-            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         if (transaction.status !== 'COMPLETED') {
@@ -48,7 +44,20 @@ export async function POST(
                 status: 'VOIDED',
                 voidedById: (session.user as any).id,
                 voidedAt: new Date(),
+                voidReason: reason,
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: (session.user as any).id,
+            userEmail: session.user.email,
+            userRole: (session.user as any).role,
+            action: 'VOID_TRANSACTION',
+            entityType: 'Transaction',
+            entityId: transactionId,
+            franchiseId: session.user.franchiseId,
+            metadata: { reason, originalStatus: transaction.status, total: Number(transaction.total) }
         })
 
         return NextResponse.json({ success: true })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 interface CashPayoutData {
     amount: number
@@ -87,6 +88,19 @@ export async function POST(request: NextRequest) {
             // })
             // Debug log removed
         }
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'CREATE',
+            entityType: 'CashPayout',
+            entityId: payout.id,
+            franchiseId: user.franchiseId,
+            locationId: user.locationId,
+            metadata: { amount, type, ticketNumber, vendorName, invoiceNumber }
+        })
 
         return NextResponse.json({
             success: true,

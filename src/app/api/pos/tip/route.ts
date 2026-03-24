@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+// PUBLIC_OK: Called from customer-facing kiosk/display (no auth by design)
+// This endpoint does NOT persist tip to database — tip is recorded at checkout via transaction route
 // POST: Customer selects a tip amount (from customer display)
-// No auth required - this is called from kiosk
 export async function POST(request: Request) {
     try {
         const body = await request.json()

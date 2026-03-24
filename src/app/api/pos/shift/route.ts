@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(req: NextRequest) {
     // Support both session (web) and Bearer token (mobile)
@@ -65,6 +66,20 @@ export async function POST(req: NextRequest) {
                     notes
                 }
             })
+
+            // Audit log
+            await auditLog({
+                userId: user.id,
+                userEmail: user.email,
+                userRole: user.role,
+                action: 'SHIFT_OPEN',
+                entityType: 'CashDrawerSession',
+                entityId: newSession.id,
+                franchiseId: user.franchiseId,
+                locationId: finalLocationId,
+                metadata: { startingCash: amount }
+            })
+
             return NextResponse.json(newSession)
         }
 
@@ -87,6 +102,20 @@ export async function POST(req: NextRequest) {
                     notes: notes ? `${currentSession.notes || ''}\n${notes}` : currentSession.notes
                 }
             })
+
+            // Audit log
+            await auditLog({
+                userId: user.id,
+                userEmail: user.email,
+                userRole: user.role,
+                action: 'SHIFT_CLOSE',
+                entityType: 'CashDrawerSession',
+                entityId: currentSession.id,
+                franchiseId: user.franchiseId,
+                locationId: locationId || undefined,
+                metadata: { startingCash: Number(currentSession.startingCash), endingCash: amount }
+            })
+
             return NextResponse.json(closedSession)
         }
 

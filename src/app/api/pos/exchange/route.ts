@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
+import { auditLog } from '@/lib/audit'
 
 // POST — Process an exchange (return item A, give item B, charge/refund difference)
 export async function POST(request: NextRequest) {
@@ -99,6 +100,19 @@ export async function POST(request: NextRequest) {
                 data: { stock: { decrement: ni.quantity } }
             })
         }
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'CREATE',
+            entityType: 'Exchange',
+            entityId: exchange.id,
+            franchiseId: user.franchiseId,
+            locationId,
+            metadata: { originalTransactionId, returnTotal, newTotal, difference: Math.round(difference * 100) / 100, reason }
+        })
 
         return ApiResponse.success({
             exchangeId: exchange.id,

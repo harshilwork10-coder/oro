@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
+import { auditLog } from '@/lib/audit'
 
 // POST — Issue store credit (from return, goodwill, rain check)
 export async function POST(request: NextRequest) {
@@ -37,6 +38,18 @@ export async function POST(request: NextRequest) {
                 notes: reason || 'Store credit issued',
                 isActive: true
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'CREATE',
+            entityType: 'StoreCredit',
+            entityId: credit.id,
+            franchiseId: user.franchiseId,
+            metadata: { amount, reason, code, customerId }
         })
 
         return ApiResponse.success({ storeCredit: credit })

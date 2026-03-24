@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 /**
  * No Sale API — Open drawer without a transaction
@@ -24,26 +24,22 @@ export async function POST(request: NextRequest) {
         const reason = body.reason || 'No reason given'
         const stationId = body.stationId
 
-        // Log the no-sale event
-        try {
-            await prisma.activityLog.create({
-                data: {
-                    franchiseId,
-                    action: 'NO_SALE',
-                    details: JSON.stringify({
-                        reason,
-                        stationId,
-                        cashier: user.name || user.email,
-                        userId: user.id,
-                        timestamp: new Date().toISOString(),
-                    }),
-                    userId: user.id,
-                },
-            })
-        } catch (logErr) {
-            // Don't fail the no-sale if logging fails
-            console.warn('No-sale logging failed:', logErr)
-        }
+        // Audit log for loss prevention tracking
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'NO_SALE',
+            entityType: 'CashDrawer',
+            entityId: stationId || 'unknown',
+            franchiseId,
+            locationId: user.locationId,
+            metadata: {
+                reason,
+                stationId,
+                cashier: user.name || user.email,
+            }
+        })
 
         return NextResponse.json({
             success: true,
