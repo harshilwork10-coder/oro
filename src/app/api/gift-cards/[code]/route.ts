@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { authenticatePOSRequest } from '@/lib/posAuth'
+import { auditLog } from '@/lib/audit'
 
 /**
  * Dual auth helper: tries station token first (for Android POS),
@@ -86,6 +87,17 @@ export async function POST(
             data: {
                 currentBalance: currentBalance - amount
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: 'system',
+            userEmail: 'pos',
+            userRole: 'STATION',
+            action: 'GIFT_CARD_REDEEM',
+            entityType: 'GiftCard',
+            entityId: updated.id,
+            metadata: { code, amount, previousBalance: currentBalance, newBalance: currentBalance - amount }
         })
 
         return NextResponse.json(updated)

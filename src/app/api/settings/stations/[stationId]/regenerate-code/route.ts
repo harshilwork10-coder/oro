@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateStationCode } from '@/lib/codeGenerator';
+import { auditLog } from '@/lib/audit';
 
 /**
  * POST /api/settings/stations/[stationId]/regenerate-code
@@ -86,6 +87,17 @@ export async function POST(
         });
 
         console.log(`[regenerate-code] New code for ${station.name} @ ${station.location.name}: ${newCode}`);
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'STATION_REGENERATE_CODE',
+            entityType: 'Station',
+            entityId: stationId,
+            metadata: { stationName: station.name, locationName: station.location.name }
+        });
 
         return NextResponse.json({
             success: true,

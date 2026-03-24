@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
+import { auditLog } from '@/lib/audit'
 
 // POST — Bulk price update for a category or all items
 export async function POST(request: NextRequest) {
@@ -105,6 +106,17 @@ export async function POST(request: NextRequest) {
                 updated++
             }
         }
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'BULK_PRICE_UPDATE',
+            entityType: 'Item',
+            entityId: user.franchiseId,
+            metadata: { adjustmentType, adjustmentValue, categoryId, itemsUpdated: updated }
+        })
 
         return ApiResponse.success({
             applied: true,

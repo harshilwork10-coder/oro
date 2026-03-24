@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(
     request: NextRequest,
@@ -54,6 +55,17 @@ export async function POST(
         })
 
         console.log(`[reset-pairing] Station ${station.name} (${stationId}) reset by user ${session.user.email}`)
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'OWNER',
+            action: 'STATION_RESET_PAIRING',
+            entityType: 'Station',
+            entityId: stationId,
+            metadata: { stationName: station.name, locationFranchiseId: station.location?.franchiseId }
+        })
 
         return NextResponse.json({
             success: true,

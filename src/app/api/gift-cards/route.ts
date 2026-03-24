@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
 import { authenticatePOSRequest } from '@/lib/posAuth'
+import { auditLog } from '@/lib/audit'
 
 /**
  * Dual auth helper: tries station token first (for Android POS),
@@ -124,6 +125,17 @@ export async function POST(req: NextRequest) {
                 purchaserId: purchaserId || null,
                 isActive: true
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: 'system',
+            userEmail: 'pos',
+            userRole: auth.role || 'STATION',
+            action: 'GIFT_CARD_CREATE',
+            entityType: 'GiftCard',
+            entityId: giftCard.id,
+            metadata: { code, initialAmount: parseFloat(initialAmount), franchiseId: targetFranchiseId }
         })
 
         return ApiResponse.created(giftCard)
