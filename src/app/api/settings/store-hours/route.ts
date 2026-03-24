@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
+import { auditLog } from '@/lib/audit'
 
 // GET — Store hours and holiday schedule
 export async function GET() {
@@ -60,6 +61,17 @@ export async function PUT(request: NextRequest) {
         await prisma.location.update({
             where: { id: locationId },
             data
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'STORE_HOURS_UPDATED',
+            entityType: 'Location',
+            entityId: locationId,
+            metadata: { hasStoreHours: !!storeHours, hasHolidays: !!holidays }
         })
 
         return ApiResponse.success({ updated: true })

@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
+import { auditLog } from '@/lib/audit'
 
 // GET — Get current receipt template
 export async function GET() {
@@ -75,6 +76,17 @@ export async function PUT(request: NextRequest) {
         await prisma.franchiseSettings.updateMany({
             where: { franchiseId: user.franchiseId },
             data: { receiptTemplate: JSON.stringify(template) }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'RECEIPT_TEMPLATE_UPDATED',
+            entityType: 'FranchiseSettings',
+            entityId: user.franchiseId,
+            metadata: { sections: Object.keys(template) }
         })
 
         return ApiResponse.success({ updated: true })

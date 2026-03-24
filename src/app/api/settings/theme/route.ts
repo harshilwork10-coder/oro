@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { THEME_PRESETS } from '@/lib/themes'
 import { cacheDelete, CACHE_KEYS } from '@/lib/cache'
+import { auditLog } from '@/lib/audit'
 
 // GET - Fetch current theme settings
 export async function GET() {
@@ -132,6 +133,17 @@ export async function PUT(request: Request) {
             allLocations.map(loc => cacheDelete(CACHE_KEYS.BOOTSTRAP(loc.id)).catch(() => {}))
         )
         console.error(`[THEME] Cache invalidated for ${allLocations.length} location(s) in franchise ${user.franchiseId}`)
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'THEME_UPDATED',
+            entityType: 'Location',
+            entityId: locationId || 'ALL',
+            metadata: { themeId, highContrast, scope: locationId ? 'single' : 'all_locations' }
+        })
 
         return NextResponse.json({
             themeId: themeId || 'classic_oro',

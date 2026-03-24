@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // PATCH - Update waitlist entry status
 export async function PATCH(
@@ -40,6 +41,17 @@ export async function PATCH(
             }
         })
 
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'USER',
+            action: 'WAITLIST_STATUS_CHANGED',
+            entityType: 'WaitlistEntry',
+            entityId: id,
+            metadata: { status }
+        })
+
         return NextResponse.json(entry)
     } catch (error) {
         console.error('Error updating waitlist entry:', error)
@@ -61,6 +73,17 @@ export async function DELETE(
 
         await prisma.waitlistEntry.delete({
             where: { id }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'USER',
+            action: 'WAITLIST_ENTRY_DELETED',
+            entityType: 'WaitlistEntry',
+            entityId: id,
+            metadata: {}
         })
 
         return NextResponse.json({ success: true })

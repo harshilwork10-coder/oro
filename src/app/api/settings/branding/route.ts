@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // GET - Get store branding settings
 export async function GET() {
@@ -131,6 +132,17 @@ export async function PUT(request: Request) {
             // Don't fail the request, just log the error
         }
     }
+
+    // Audit log
+    await auditLog({
+        userId: session.user.id,
+        userEmail: session.user.email!,
+        userRole: 'OWNER',
+        action: 'BRANDING_UPDATED',
+        entityType: 'FranchiseSettings',
+        entityId: user.franchiseId,
+        metadata: { fields: Object.keys(body).filter(k => body[k] !== undefined) }
+    })
 
     return NextResponse.json({
         success: true,
