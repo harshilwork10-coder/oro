@@ -73,6 +73,8 @@ export async function POST(
                 pairingStatus: 'UNPAIRED',  // Reset to allow new pairing
                 pairedDeviceId: null,       // Clear old device binding
                 pairedAt: null,
+                pairingCodeUsedAt: null,    // CRITICAL: Clear so new code isn't rejected as "already used"
+                isTrusted: false,           // Reset trust — new device must re-pair
                 pairingCodeExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
             },
             select: {

@@ -47,8 +47,9 @@ export async function POST(
             data: {
                 pairingStatus: 'UNPAIRED',
                 pairedDeviceId: null,
-                pairedAt: null
-                // Keep stationToken and isTrusted - device just needs to re-pair
+                pairedAt: null,
+                pairingCodeUsedAt: null,    // CRITICAL: Allow the existing code to be used again
+                isTrusted: false            // Reset trust — new device must re-pair
             }
         })
 
