@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { auditLog } from '@/lib/audit';
 
 // POST /api/admin/offboarding/archive - Mark as archived (final stage)
 export async function POST(request: NextRequest) {
@@ -69,6 +70,17 @@ export async function POST(request: NextRequest) {
         // Calculate retention end date
         const retentionEndDate = new Date();
         retentionEndDate.setFullYear(retentionEndDate.getFullYear() + offboardingCase.retentionYears);
+
+        // Audit log — CRITICAL COMPLIANCE
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: 'PROVIDER',
+            action: 'OFFBOARDING_ARCHIVE',
+            entityType: isFranchise ? 'FRANCHISE' : 'FRANCHISOR',
+            entityId: accountId!,
+            metadata: { caseId, retentionYears: offboardingCase.retentionYears, retentionEndDate }
+        });
 
         return NextResponse.json({
             success: true,

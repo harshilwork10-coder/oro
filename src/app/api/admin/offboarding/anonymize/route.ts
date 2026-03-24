@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { auditLog } from '@/lib/audit';
 
 // POST /api/admin/offboarding/anonymize - Anonymize PII (after grace period)
 export async function POST(request: NextRequest) {
@@ -125,6 +126,17 @@ export async function POST(request: NextRequest) {
                     anonymizedAt: new Date()
                 }
             });
+        });
+
+        // Audit log — CRITICAL COMPLIANCE (irreversible action)
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: 'PROVIDER',
+            action: 'OFFBOARDING_ANONYMIZE',
+            entityType: isFranchise ? 'FRANCHISE' : 'FRANCHISOR',
+            entityId: accountId!,
+            metadata: { caseId, forceAnonymize: forceAnonymize || false }
         });
 
         return NextResponse.json({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // POST - Suspend, Activate, or Terminate a franchisor account
 export async function POST(request: NextRequest) {
@@ -76,6 +77,17 @@ export async function POST(request: NextRequest) {
         // Debug log removed
 
         // TODO: Send email notification to the franchisor about account status change
+
+        // Audit log
+        await auditLog({
+            userId: session?.user?.id || 'unknown',
+            userEmail: (session?.user as any)?.email,
+            userRole: 'PROVIDER',
+            action: `ACCOUNT_${action}`,
+            entityType: 'Franchisor',
+            entityId: franchisorId,
+            metadata: { reason, previousStatus: franchisor.accountStatus, newStatus: newStatus }
+        })
 
         return NextResponse.json({
             success: true,

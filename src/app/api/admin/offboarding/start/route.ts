@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { auditLog } from '@/lib/audit';
 
 // POST /api/admin/offboarding/start - Start offboarding (suspend account + create case)
 export async function POST(request: NextRequest) {
@@ -81,6 +82,17 @@ export async function POST(request: NextRequest) {
             }
 
             return offboardingCase;
+        });
+
+        // Audit log — CRITICAL COMPLIANCE
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: 'PROVIDER',
+            action: 'OFFBOARDING_START',
+            entityType: accountType,
+            entityId: accountId,
+            metadata: { reason, graceDays: result.graceDays, retentionYears: result.retentionYears, caseId: result.id }
         });
 
         return NextResponse.json({

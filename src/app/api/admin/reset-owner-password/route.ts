@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { applyRateLimit, RATE_LIMITS, validateCuid } from '@/lib/security'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(request: NextRequest) {
     try {
@@ -62,6 +63,17 @@ export async function POST(request: NextRequest) {
         })
 
         // Debug log removed
+
+        // Audit log — CRITICAL SECURITY EVENT
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: 'PROVIDER',
+            action: 'ADMIN_PASSWORD_RESET',
+            entityType: 'User',
+            entityId: ownerId,
+            metadata: { targetEmail: owner.email, targetRole: 'FRANCHISOR', franchisorId: owner.franchisor?.id }
+        })
 
         return NextResponse.json({ success: true, message: 'Password reset successfully' })
     } catch (error) {

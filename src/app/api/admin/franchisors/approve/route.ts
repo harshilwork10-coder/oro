@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
@@ -67,6 +68,17 @@ export async function POST(req: NextRequest) {
         }
 
         // In production: Send email notification
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: session.user.role || 'PROVIDER',
+            action: `FRANCHISOR_${action}`,
+            entityType: 'Franchisor',
+            entityId: franchisorId,
+            metadata: { franchisorName: existingFranchisor.name, businessType: franchisor.businessType }
+        })
 
         return NextResponse.json({ success: true, franchisor })
 

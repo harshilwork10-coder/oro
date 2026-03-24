@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 /**
  * PATCH /api/admin/franchisors/[id]/status
@@ -61,6 +62,17 @@ export async function PATCH(
                 suspendedAt: true,
                 suspendedReason: true
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: 'PROVIDER',
+            action: 'ACCOUNT_STATUS_CHANGE',
+            entityType: 'Franchisor',
+            entityId: id,
+            metadata: { accountStatus, reason: reason || null }
         })
 
         return NextResponse.json({
