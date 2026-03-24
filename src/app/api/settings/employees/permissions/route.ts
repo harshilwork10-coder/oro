@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // POST: Update employee permission
 export async function POST(request: Request) {
@@ -26,6 +27,17 @@ export async function POST(request: Request) {
             data: {
                 [permission]: value
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'OWNER',
+            action: 'EMPLOYEE_PERMISSION_CHANGE',
+            entityType: 'User',
+            entityId: employeeId,
+            metadata: { permission, value }
         })
 
         return NextResponse.json({ success: true, employee })

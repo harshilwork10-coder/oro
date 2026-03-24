@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 export async function GET(req: Request) {
     try {
@@ -63,6 +64,17 @@ export async function POST(req: Request) {
                 pointsPerDollar: parseFloat(pointsPerDollar),
                 redemptionRatio: parseFloat(redemptionRatio)
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: (session.user as any).email,
+            userRole: user.role,
+            action: 'LOYALTY_SETTINGS_UPDATE',
+            entityType: 'LoyaltyProgram',
+            entityId: franchiseId,
+            metadata: { isEnabled, pointsPerDollar, redemptionRatio }
         })
 
         return NextResponse.json(loyaltyProgram)

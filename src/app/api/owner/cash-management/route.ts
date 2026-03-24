@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // GET - Fetch cash management data (counts, drops, deposits)
 export async function GET(request: NextRequest) {
@@ -265,6 +266,17 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
         }
 
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: `CASH_${type}`,
+            entityType: 'CashManagement',
+            entityId: result.id,
+            metadata: { type, locationId }
+        })
+
         return NextResponse.json({ success: true, data: result })
 
     } catch (error) {
@@ -312,6 +324,17 @@ export async function PUT(request: NextRequest) {
                 }
             })
         }
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: `CASH_${type}_${action}`,
+            entityType: 'CashManagement',
+            entityId: id,
+            metadata: { type, action, note }
+        })
 
         return NextResponse.json({ success: true })
 

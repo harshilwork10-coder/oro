@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { invalidateLocationCache } from '@/lib/cache'
+import { auditLog } from '@/lib/audit'
 
 // GET: Fetch franchise settings
 export async function GET() {
@@ -169,6 +170,17 @@ export async function POST(request: Request) {
                 }
             })
         }
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'OWNER',
+            action: 'FRANCHISE_SETTINGS_UPDATE',
+            entityType: 'FranchiseSettings',
+            entityId: user.franchiseId,
+            metadata: { pricingModel, cardSurchargeType, cardSurcharge, taxRate, tipPromptEnabled }
+        })
 
         return NextResponse.json(settings)
     } catch (error) {

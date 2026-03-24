@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 export async function GET() {
     try {
@@ -79,6 +80,17 @@ export async function PATCH(req: Request) {
             data: {
                 googlePlaceId: googlePlaceId?.trim() || null
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: user.role,
+            action: 'LOCATION_SETTINGS_UPDATE',
+            entityType: 'Location',
+            entityId: user.franchiseId,
+            metadata: { googlePlaceId: googlePlaceId?.trim() || null, locationsUpdated: updated.count }
         })
 
         return NextResponse.json({
