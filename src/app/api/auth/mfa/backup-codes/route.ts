@@ -8,6 +8,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { verifyMFAToken, regenerateBackupCodes } from '@/lib/security/mfa'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(req: Request) {
     try {
@@ -60,6 +61,17 @@ export async function POST(req: Request) {
         })
 
         // Debug log removed
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: (session.user as any).role || 'USER',
+            action: 'MFA_BACKUP_CODES_REGENERATED',
+            entityType: 'User',
+            entityId: session.user.id,
+            metadata: {}
+        })
 
         return NextResponse.json({
             success: true,

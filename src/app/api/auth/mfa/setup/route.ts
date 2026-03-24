@@ -14,6 +14,7 @@ import {
     verifyMFAToken,
     isMFARequiredForRole
 } from '@/lib/security/mfa'
+import { auditLog } from '@/lib/audit'
 
 // GET - Generate MFA setup (QR code + backup codes)
 export async function GET() {
@@ -133,6 +134,17 @@ export async function POST(req: Request) {
             }
         })
 
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: (session.user as any).role || 'USER',
+            action: 'MFA_ENABLED',
+            entityType: 'User',
+            entityId: session.user.id,
+            metadata: {}
+        })
+
         return NextResponse.json({
             success: true,
             message: 'MFA enabled successfully! Your account is now protected.'
@@ -207,6 +219,17 @@ export async function DELETE(req: Request) {
                 mfaBackupCodes: null,
                 mfaSetupAt: null
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: (session.user as any).role || 'USER',
+            action: 'MFA_DISABLED',
+            entityType: 'User',
+            entityId: session.user.id,
+            metadata: {}
         })
 
         return NextResponse.json({

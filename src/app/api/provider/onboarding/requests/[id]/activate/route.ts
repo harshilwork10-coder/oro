@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { auditLog } from '@/lib/audit';
 
 // POST /api/provider/onboarding/requests/[id]/activate - Mark request as active
 export async function POST(
@@ -77,6 +78,17 @@ export async function POST(
                 message: 'Client activated and ready for business',
                 actorUserId,
             },
+        });
+
+        // Audit log
+        await auditLog({
+            userId: actorUserId || 'system',
+            userEmail: 'provider',
+            userRole: 'PROVIDER',
+            action: 'ONBOARDING_ACTIVATED',
+            entityType: 'OnboardingRequest',
+            entityId: id,
+            metadata: { force, franchiseId: onboardingRequest.franchiseId }
         });
 
         return NextResponse.json(updated);

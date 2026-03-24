@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ApiResponse } from '@/lib/api-response'
+import { auditLog } from '@/lib/audit'
 
 /**
  * POST: Diff-based sync of brand catalog to locations
@@ -133,6 +134,17 @@ export async function POST(req: NextRequest) {
 
             stats.locationsProcessed++
         }
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: 'FRANCHISOR',
+            action: 'CATALOG_SYNC',
+            entityType: 'Franchisor',
+            entityId: franchisorId,
+            metadata: { ...stats, applyPriceUpdates }
+        })
 
         return ApiResponse.success({
             message: 'Sync completed',

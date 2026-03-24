@@ -10,6 +10,7 @@ import {
     removeUsedBackupCode
 } from '@/lib/security/mfa'
 import { applyRateLimit, RATE_LIMITS } from '@/lib/security'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(req: Request) {
     try {
@@ -78,6 +79,17 @@ export async function POST(req: Request) {
                 data: { mfaBackupCodes: updatedBackupCodes }
             })
         }
+
+        // Audit log
+        await auditLog({
+            userId,
+            userEmail: 'mfa-login',
+            userRole: 'SYSTEM',
+            action: result.usedBackupCode ? 'MFA_VERIFY_BACKUP' : 'MFA_VERIFY_SUCCESS',
+            entityType: 'User',
+            entityId: userId,
+            metadata: { usedBackupCode: result.usedBackupCode }
+        })
 
         return NextResponse.json({
             success: true,
