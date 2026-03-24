@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
+import { auditLog } from '@/lib/audit'
 
 // POST — Toggle training mode for a station
 export async function POST(request: NextRequest) {
@@ -26,6 +27,18 @@ export async function POST(request: NextRequest) {
         await prisma.station.update({
             where: { id: stationId },
             data: { trainingMode: enabled ?? false }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'CONFIG_CHANGE',
+            entityType: 'Station',
+            entityId: stationId,
+            franchiseId: user.franchiseId,
+            metadata: { trainingMode: enabled ?? false }
         })
 
         return ApiResponse.success({ stationId, trainingMode: enabled })

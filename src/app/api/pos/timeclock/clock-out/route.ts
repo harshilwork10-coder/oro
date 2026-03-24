@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { Decimal } from '@prisma/client/runtime/library'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(request: NextRequest) {
     try {
@@ -49,6 +50,19 @@ export async function POST(request: NextRequest) {
                 status: 'CLOSED',
                 totalHours: new Decimal(Math.max(0, totalHours).toFixed(2))
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'CLOCK_OUT',
+            entityType: 'TimeEntry',
+            entityId: activeSession.id,
+            franchiseId: user.franchiseId,
+            locationId: activeSession.locationId,
+            metadata: { totalHours: totalHours.toFixed(2), breakMinutes: activeSession.breakDuration }
         })
 
         return NextResponse.json({

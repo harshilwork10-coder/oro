@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(request: NextRequest) {
     try {
@@ -65,6 +66,18 @@ export async function POST(request: NextRequest) {
                 status: 'OPEN',
                 breakDuration: 0
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'CLOCK_IN',
+            entityType: 'TimeEntry',
+            entityId: newSession.id,
+            franchiseId: user.franchiseId,
+            locationId,
         })
 
         return NextResponse.json({

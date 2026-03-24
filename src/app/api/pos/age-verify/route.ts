@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 /**
  * POS Age Verification API
@@ -113,31 +114,27 @@ export async function POST(request: NextRequest) {
             }
 
             // Log verification for compliance
-            try {
-                await prisma.activityLog.create({
-                    data: {
-                        franchiseId,
-                        action: 'AGE_VERIFICATION',
-                        details: JSON.stringify({
-                            productId,
-                            productName,
-                            method,
-                            verified,
-                            requiredAge,
-                            customerAge,
-                            verificationDetail,
-                            cashier: user.name || user.email,
-                            userId: user.id,
-                            stationId,
-                            transactionId,
-                            timestamp: new Date().toISOString(),
-                        }),
-                        userId: user.id,
-                    },
-                })
-            } catch (logErr) {
-                console.warn('Age verification logging failed:', logErr)
-            }
+            // Audit log for compliance
+            await auditLog({
+                userId: user.id,
+                userEmail: user.email,
+                userRole: user.role,
+                action: 'AGE_VERIFICATION',
+                entityType: 'Product',
+                entityId: productId,
+                franchiseId,
+                locationId: user.locationId,
+                metadata: {
+                    productName,
+                    method,
+                    verified,
+                    requiredAge,
+                    customerAge,
+                    verificationDetail,
+                    stationId,
+                    transactionId,
+                }
+            })
 
             if (!verified) {
                 return NextResponse.json({

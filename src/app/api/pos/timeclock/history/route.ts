@@ -12,30 +12,30 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const shifts = await prisma.timeClock.findMany({
+        const shifts = await prisma.timeEntry.findMany({
             where: {
                 ...(user.locationId ? { locationId: user.locationId } : {}),
-                ...(user.franchiseId ? { franchiseId: user.franchiseId } : {})
+                // Scope to user's own entries unless manager/owner
+                ...(!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)
+                    ? { userId: user.id } : {}),
             },
             orderBy: { clockIn: 'desc' },
             take: 20,
             include: {
-                employee: { select: { firstName: true, lastName: true } }
+                user: { select: { name: true } }
             }
         })
 
-        const data = shifts.map(shift => ({
+        const data = shifts.map((shift: any) => ({
             id: shift.id,
             clockIn: shift.clockIn,
             clockOut: shift.clockOut,
-            employeeName: shift.employee
-                ? `${shift.employee.firstName} ${shift.employee.lastName}`
-                : 'Unknown'
+            employeeName: shift.user?.name || 'Unknown'
         }))
 
         return NextResponse.json({ data })
     } catch (error) {
         console.error('[TIMECLOCK_HISTORY]', error)
-        return NextResponse.json({ data: [] })
+        return NextResponse.json({ error: 'Failed to fetch timeclock history' }, { status: 500 })
     }
 }

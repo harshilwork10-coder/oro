@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
+import { auditLog } from '@/lib/audit'
 
 // GET — Cashier blind close (expected amount NOT shown to cashier)
 export async function GET(request: NextRequest) {
@@ -95,6 +96,24 @@ export async function POST(request: NextRequest) {
 
         const isOver = variance > 0.01
         const isShort = variance < -0.01
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'BLIND_CLOSE',
+            entityType: 'CashDrawerSession',
+            entityId: shiftId,
+            franchiseId: user.franchiseId,
+            locationId,
+            metadata: {
+                countedAmount,
+                expectedCash: Math.round(expectedCash * 100) / 100,
+                variance: Math.round(variance * 100) / 100,
+                status: isShort ? 'SHORT' : isOver ? 'OVER' : 'BALANCED'
+            }
+        })
 
         return ApiResponse.success({
             shiftId,

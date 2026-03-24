@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // Helper to get user's locationId (direct or via franchise)
 async function getUserLocationId(user: any): Promise<string | null> {
@@ -67,23 +68,39 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'No location assigned' }, { status: 400 })
     }
 
-    const { name, terminalIP, terminalPort, terminalType } = await request.json()
+    try {
+        const { name, terminalIP, terminalPort, terminalType } = await request.json()
 
-    if (!name || !terminalIP) {
-        return NextResponse.json({ error: 'Name and IP address required' }, { status: 400 })
-    }
-
-    const terminal = await prisma.paymentTerminal.create({
-        data: {
-            locationId,
-            name,
-            terminalIP,
-            terminalPort: terminalPort || '10009',
-            terminalType: terminalType || 'PAX'
+        if (!name || !terminalIP) {
+            return NextResponse.json({ error: 'Name and IP address required' }, { status: 400 })
         }
-    })
 
-    return NextResponse.json({ terminal })
+        const terminal = await prisma.paymentTerminal.create({
+            data: {
+                locationId,
+                name,
+                terminalIP,
+                terminalPort: terminalPort || '10009',
+                terminalType: terminalType || 'PAX'
+            }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'CREATE',
+            entityType: 'PaymentTerminal',
+            entityId: terminal.id,
+            metadata: { name, terminalIP, terminalType: terminalType || 'PAX' }
+        })
+
+        return NextResponse.json({ terminal })
+    } catch (error) {
+        console.error('[TERMINALS_POST]', error)
+        return NextResponse.json({ error: 'Failed to create terminal' }, { status: 500 })
+    }
 }
 
 // DELETE - Delete a terminal (PROVIDER only)
@@ -106,10 +123,24 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: 'Terminal ID required' }, { status: 400 })
     }
 
-    await prisma.paymentTerminal.delete({
-        where: { id }
-    })
+    try {
+        await prisma.paymentTerminal.delete({
+            where: { id }
+        })
 
-    return NextResponse.json({ success: true })
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'DELETE',
+            entityType: 'PaymentTerminal',
+            entityId: id,
+        })
+
+        return NextResponse.json({ success: true })
+    } catch (error) {
+        console.error('[TERMINALS_DELETE]', error)
+        return NextResponse.json({ error: 'Failed to delete terminal' }, { status: 500 })
+    }
 }
-

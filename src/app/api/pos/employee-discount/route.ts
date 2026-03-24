@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApiResponse } from '@/lib/api-response'
+import { auditLog } from '@/lib/audit'
 
 // GET — Check if employee discount applies at checkout
 export async function GET(request: NextRequest) {
@@ -62,6 +63,18 @@ export async function PUT(request: NextRequest) {
                 employeeDiscountPct: discountPercent ?? 0,
                 employeeDiscountEnabled: enabled ?? false
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'UPDATE',
+            entityType: 'EmployeeDiscount',
+            entityId: employeeId,
+            franchiseId: user.franchiseId,
+            metadata: { discountPercent, enabled }
         })
 
         return ApiResponse.success({ updated: true })

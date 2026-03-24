@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateStationCode } from '@/lib/codeGenerator'
+import { auditLog } from '@/lib/audit'
 
 // Helper to get user's locationId (direct or via franchise)
 async function getUserLocationId(user: any): Promise<string | null> {
@@ -132,6 +133,18 @@ export async function POST(request: NextRequest) {
         }
     })
 
+    // Audit log
+    await auditLog({
+        userId: user.id,
+        userEmail: user.email,
+        userRole: user.role,
+        action: 'CREATE',
+        entityType: 'Station',
+        entityId: station.id,
+        franchiseId: user.franchiseId,
+        metadata: { name, pairingCode, locationId, paymentMode: paymentMode || 'CASH_ONLY' }
+    })
+
     return NextResponse.json({ station })
 }
 
@@ -168,6 +181,18 @@ export async function DELETE(request: NextRequest) {
 
     await prisma.station.delete({
         where: { id }
+    })
+
+    // Audit log
+    await auditLog({
+        userId: user.id,
+        userEmail: user.email,
+        userRole: user.role,
+        action: 'DELETE',
+        entityType: 'Station',
+        entityId: id,
+        franchiseId: user.franchiseId,
+        metadata: { locationId: station.locationId }
     })
 
     return NextResponse.json({ success: true })
@@ -218,6 +243,18 @@ export async function PATCH(request: NextRequest) {
             ...(paymentMode && { paymentMode }),
             ...(terminalId !== undefined && { dedicatedTerminalId: terminalId || null })
         }
+    })
+
+    // Audit log
+    await auditLog({
+        userId: user.id,
+        userEmail: user.email,
+        userRole: user.role,
+        action: 'UPDATE',
+        entityType: 'Station',
+        entityId: id,
+        franchiseId: user.franchiseId,
+        metadata: { name, paymentMode, terminalId }
     })
 
     return NextResponse.json({ station: updatedStation })
