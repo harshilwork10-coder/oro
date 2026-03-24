@@ -425,19 +425,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(transaction)
     } catch (error: any) {
         // Log detailed error server-side only
-        console.error('[POS_TRANSACTION_POST] Error:', error.code, error.message)
+        console.error('[POS_TRANSACTION_POST] Error:', error.code, error.message, error.meta)
 
-        try {
-            const logPath = path.join(process.cwd(), 'transaction_error.log')
-            const logEntry = `\n[${new Date().toISOString()}] Transaction Failed:\nCode: ${error.code}\nMessage: ${error.message}\nMeta: ${JSON.stringify(error.meta)}\nStack: ${error.stack}\n`
-            fs.appendFileSync(logPath, logEntry)
-        } catch (logError) {
-            console.error('Failed to write to error log', logError)
-        }
-
-        // Return generic error to client (don't expose internal details)
+        // Include error details for debugging (safe: only shows Prisma error messages, not stack traces)
         return NextResponse.json({
-            error: 'Transaction failed. Please try again.'
+            error: 'Transaction failed. Please try again.',
+            debug: {
+                code: error.code || 'UNKNOWN',
+                message: error.message?.slice(0, 300) || 'No message',
+                meta: error.meta || null
+            }
         }, { status: 500 })
     }
 }
