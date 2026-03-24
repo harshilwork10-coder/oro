@@ -627,11 +627,11 @@ export async function POST(request: NextRequest) {
         })
     } catch (error: any) {
         console.error('[PROMOTIONS_CHECK]', error)
-        // If the Promotion model doesn't exist yet, return empty gracefully (not 500)
-        if (error?.message?.includes('does not exist') || error?.code === 'P2021' || error?.message?.includes('Invalid')) {
+        // If a table doesn't exist yet (not migrated), return empty gracefully
+        if (error?.code === 'P2021' || error?.message?.includes('does not exist in the current database')) {
             return NextResponse.json({ appliedPromotions: [], totalDiscount: 0 })
         }
-        return NextResponse.json({ appliedPromotions: [], totalDiscount: 0 })
+        return NextResponse.json({ error: 'Failed to check promotions' }, { status: 500 })
     }
 }
 
