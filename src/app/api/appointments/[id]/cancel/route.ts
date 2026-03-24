@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendBookingCancelledSMS } from '@/lib/sms'
+import { auditLog } from '@/lib/audit'
 
 // PATCH - Cancel an appointment (staff initiated)
 export async function PATCH(
@@ -71,6 +72,17 @@ export async function PATCH(
                 }
             )
         }
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'USER',
+            action: 'APPOINTMENT_CANCELLED',
+            entityType: 'Appointment',
+            entityId: id,
+            metadata: { reason, clientId: appointment.clientId }
+        })
 
         return NextResponse.json({
             success: true,

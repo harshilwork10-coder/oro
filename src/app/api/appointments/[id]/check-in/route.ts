@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // PATCH: Check in a client for their appointment
 export async function PATCH(
@@ -40,6 +41,17 @@ export async function PATCH(
                     }
                 }
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'USER',
+            action: 'APPOINTMENT_CHECKED_IN',
+            entityType: 'Appointment',
+            entityId: params.id,
+            metadata: {}
         })
 
         return NextResponse.json(updated)

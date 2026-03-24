@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateStoreCode, generateStationCode } from '@/lib/codeGenerator'
+import { auditLog } from '@/lib/audit'
 
 /**
  * POST /api/admin/backfill-codes
@@ -82,6 +83,17 @@ export async function POST(request: NextRequest) {
                 stationNumber++
             }
         }
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'CODES_BACKFILLED',
+            entityType: 'System',
+            entityId: 'bulk',
+            metadata: { force, locationsUpdated, stationsUpdated }
+        })
 
         return NextResponse.json({
             success: true,

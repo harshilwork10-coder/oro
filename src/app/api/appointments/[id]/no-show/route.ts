@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { auditLog } from '@/lib/audit'
 
 // POST - Mark appointment as no-show
 export async function POST(
@@ -84,6 +85,17 @@ export async function POST(
             // 2. Charge the no-show fee
             // 3. Create a transaction record
         }
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role || 'USER',
+            action: 'APPOINTMENT_NO_SHOW',
+            entityType: 'Appointment',
+            entityId: id,
+            metadata: { clientId: appointment.clientId, chargeFee, chargeResult }
+        })
 
         return NextResponse.json({
             success: true,

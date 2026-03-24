@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { auditLog } from '@/lib/audit'
 
 const statusSchema = z.object({
     status: z.enum(['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'])
@@ -56,6 +57,17 @@ export async function PATCH(
                     select: { name: true, duration: true }
                 }
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'USER',
+            action: 'APPOINTMENT_STATUS_CHANGED',
+            entityType: 'Appointment',
+            entityId: appointmentId,
+            metadata: { status, previousStatus: appointment.status }
         })
 
         return NextResponse.json({

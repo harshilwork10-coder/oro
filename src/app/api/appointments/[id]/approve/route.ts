@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendBookingApprovedSMS, sendBookingRejectedSMS } from '@/lib/sms'
+import { auditLog } from '@/lib/audit'
 
 // PATCH - Approve or Reject a pending appointment
 export async function PATCH(
@@ -82,6 +83,17 @@ export async function PATCH(
                 await sendBookingRejectedSMS(updated.client.phone, franchiseId, smsData)
             }
         }
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'USER',
+            action: `APPOINTMENT_${action.toUpperCase()}D`,
+            entityType: 'Appointment',
+            entityId: id,
+            metadata: { action, clientId: appointment.clientId }
+        })
 
         return NextResponse.json({
             success: true,
