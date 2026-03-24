@@ -7,6 +7,7 @@ if (process.env.VERCEL_URL && !process.env.NEXTAUTH_URL) {
 }
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['ssh2', 'ssh2-sftp-client'],
   typescript: {
     // Pre-existing schema mismatch TypeScript errors need incremental fixing.
     // Keeping this true so production builds succeed. Track fixes in tech debt backlog.
