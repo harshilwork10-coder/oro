@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // GET: List all memberships for a franchisor (admin only)
 export async function GET(request: NextRequest) {
@@ -115,6 +116,17 @@ export async function POST(request: NextRequest) {
             }
         })
 
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'MEMBERSHIP_CREATED',
+            entityType: 'FranchisorMembership',
+            entityId: membership.id,
+            metadata: { franchisorId, email, role, isPrimary }
+        })
+
         return NextResponse.json(membership, { status: 201 })
     } catch (error) {
         console.error('Error creating membership:', error)
@@ -165,6 +177,17 @@ export async function DELETE(request: NextRequest) {
 
         await prisma.franchisorMembership.delete({
             where: { id: membershipId }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'MEMBERSHIP_DELETED',
+            entityType: 'FranchisorMembership',
+            entityId: membershipId,
+            metadata: { franchisorId: membership.franchisorId, userId: membership.userId }
         })
 
         return NextResponse.json({ success: true })

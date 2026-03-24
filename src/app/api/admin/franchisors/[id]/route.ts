@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // Helper to parse integrations JSON string
 function parseIntegrations(integrationsStr: string | null): Record<string, boolean> {
@@ -139,6 +140,17 @@ export async function PUT(
             }
         })
 
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'FRANCHISOR_UPDATED',
+            entityType: 'Franchisor',
+            entityId: id,
+            metadata: { name, businessType, approvalStatus }
+        })
+
         return NextResponse.json(updated)
     } catch (error) {
         console.error('Error updating franchisor:', error)
@@ -220,6 +232,17 @@ export async function DELETE(
         // 8. Delete the owner user
         await prisma.user.delete({ where: { id: franchisor.ownerId } })
 
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'FRANCHISOR_HARD_DELETED',
+            entityType: 'Franchisor',
+            entityId: id,
+            metadata: { name: franchisor.name, franchiseCount: franchiseIds.length, locationCount: locationIds.length }
+        })
+
         return NextResponse.json({ success: true, message: 'Deleted successfully' })
     } catch (error) {
         console.error('Error deleting franchisor:', error)
@@ -253,6 +276,17 @@ export async function PATCH(
                 approvalStatus: true,
                 updatedAt: true
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'FRANCHISOR_APPROVAL_STATUS_CHANGED',
+            entityType: 'Franchisor',
+            entityId: id,
+            metadata: { approvalStatus }
         })
 
         return NextResponse.json({ success: true, franchisor: updated, message: `Status updated to ${approvalStatus}` })

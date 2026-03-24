@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // GET single location
 export async function GET(
@@ -86,6 +87,17 @@ export async function PUT(
             }
         })
 
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'LOCATION_UPDATED',
+            entityType: 'Location',
+            entityId: params.id,
+            metadata: { name, address }
+        })
+
         return NextResponse.json({ location, message: 'Location updated' })
     } catch (error) {
         console.error('Error updating location:', error)
@@ -133,6 +145,17 @@ export async function DELETE(
         // Delete the location
         await prisma.location.delete({
             where: { id: params.id }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'LOCATION_DELETED',
+            entityType: 'Location',
+            entityId: params.id,
+            metadata: { name: location.name }
         })
 
         return NextResponse.json({ message: 'Location deleted successfully' })

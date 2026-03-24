@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
+import { auditLog } from '@/lib/audit'
 
 // POST - Upload a document for a franchisor
 export async function POST(request: NextRequest) {
@@ -67,6 +68,17 @@ export async function POST(request: NextRequest) {
         })
 
         // Debug log removed
+
+        // Audit log
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: 'PROVIDER',
+            action: 'DOCUMENT_UPLOADED',
+            entityType: 'Franchisor',
+            entityId: franchisorId,
+            metadata: { documentType, fileName: file.name }
+        })
 
         return NextResponse.json({
             success: true,

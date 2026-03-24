@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateCuid, applyRateLimit, logSuccess, logFailure, RATE_LIMITS } from '@/lib/security'
+import { auditLog } from '@/lib/audit'
 
 export async function GET(
     req: Request,
@@ -122,6 +123,17 @@ export async function PUT(
                     select: { franchises: true }
                 }
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'CLIENT_UPDATED',
+            entityType: 'Franchisor',
+            entityId: id,
+            metadata: { name, ownerEmail, brandColorPrimary }
         })
 
         return NextResponse.json(updated)
