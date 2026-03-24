@@ -147,7 +147,6 @@ export async function POST(req: NextRequest) {
             cardLast4: cardLast4 || null,
             cardType: cardType || null,
             tip: (tip || 0).toString(),
-            notes: notes || null,
             status: 'COMPLETED',
             cashDrawerSessionId: cashDrawerSessionId || null,
             lineItems: (() => {
