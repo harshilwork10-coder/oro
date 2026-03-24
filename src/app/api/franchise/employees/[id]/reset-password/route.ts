@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(
     request: NextRequest,
@@ -72,6 +73,17 @@ export async function POST(
         await prisma.user.update({
             where: { id: employeeId },
             data: { password: hashedPassword }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: userRole,
+            action: 'EMPLOYEE_PASSWORD_RESET',
+            entityType: 'User',
+            entityId: employeeId,
+            metadata: { targetEmail: employee.email, resetBy: userRole }
         })
 
         return NextResponse.json({ success: true, message: 'Password reset successfully' })

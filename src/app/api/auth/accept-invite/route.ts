@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(request: NextRequest) {
     try {
@@ -50,6 +51,17 @@ export async function POST(request: NextRequest) {
                     role: 'SUB_FRANCHISEE'
                 }
             })
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: (session.user as any).email,
+            userRole: 'SUB_FRANCHISEE',
+            action: 'INVITE_ACCEPTED',
+            entityType: 'SubFranchisee',
+            entityId: subFranchiseeId,
+            metadata: { previousRole: (session.user as any).role }
         })
 
         return NextResponse.json({ success: true })

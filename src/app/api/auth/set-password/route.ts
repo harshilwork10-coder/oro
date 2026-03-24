@@ -4,6 +4,7 @@ import { hash } from 'bcrypt'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { validatePassword, getPasswordRequirementsText } from '@/lib/security'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(request: NextRequest) {
     try {
@@ -79,6 +80,17 @@ export async function POST(request: NextRequest) {
                 acceptedTermsAt: new Date(),
                 acceptedTermsVersion: '1.0'
             }
+        })
+
+        // Audit log
+        await auditLog({
+            userId: targetUserId,
+            userEmail: 'system',
+            userRole: 'SYSTEM',
+            action: 'PASSWORD_SET',
+            entityType: 'User',
+            entityId: targetUserId,
+            metadata: { method: token ? 'magic_link' : 'session' }
         })
 
         return NextResponse.json({

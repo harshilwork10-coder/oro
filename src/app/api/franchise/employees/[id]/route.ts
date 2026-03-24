@@ -3,11 +3,13 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcryptjs'
+import { auditLog } from '@/lib/audit'
 
 export async function PATCH(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -134,8 +136,23 @@ export async function PATCH(
         }
     }
 
+    // Audit log
+    await auditLog({
+        userId: session.user.id,
+        userEmail: session.user.email!,
+        userRole: user.role,
+        action: 'EMPLOYEE_UPDATE',
+        entityType: 'User',
+        entityId: id,
+        metadata: { updatedFields: Object.keys(updateData).filter(k => updateData[k] !== undefined) }
+    })
+
     const { password: _, ...employeeWithoutPassword } = updatedEmployee
     return NextResponse.json(employeeWithoutPassword)
+  } catch (error) {
+    console.error('[EMPLOYEE_PATCH]', error)
+    return NextResponse.json({ error: 'Failed to update employee' }, { status: 500 })
+  }
 }
 
 export async function DELETE(
@@ -190,6 +207,17 @@ export async function DELETE(
                     franchiseId: user.franchiseId as string
                 }
             })
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: user.role,
+            action: 'EMPLOYEE_DELETE',
+            entityType: 'User',
+            entityId: id,
+            metadata: { action: 'hard_delete' }
         })
 
         return NextResponse.json({ success: true, action: 'deleted' })
