@@ -3927,7 +3927,7 @@ function RecentTransactionsModal({ transactions: initialTransactions, onClose, o
 
                 {/* Footer */}
                 <div className="p-3 border-t border-stone-800 text-center text-xs text-stone-500">
-                    Showing {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
+                    Showing {(transactions || []).length} transaction{(transactions || []).length !== 1 ? 's' : ''}
                 </div>
             </div>
         </div>

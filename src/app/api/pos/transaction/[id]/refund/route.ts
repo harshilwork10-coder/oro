@@ -23,7 +23,8 @@ export async function POST(
     try {
         const { id } = await params
         const transactionId = id
-        const { items } = await req.json()
+        const body = await req.json()
+        const items = body.items || [] // Default to empty = full refund
 
         // Find the transaction
         const transaction = await prisma.transaction.findUnique({
@@ -52,7 +53,7 @@ export async function POST(
             : transaction.lineItems
 
         const refundAmount = itemsToRefund.reduce((sum, item) => sum + Number(item.total), 0)
-        const isFullRefund = items.length === 0 || items.length === transaction.lineItems.length
+        const isFullRefund = !items || items.length === 0 || items.length === transaction.lineItems.length
 
         // ===== ATOMIC TRANSACTION BLOCK =====
         const refundTransaction = await prisma.$transaction(async (tx) => {
