@@ -1,10 +1,8 @@
 /**
  * Scheduled Reports API
  *
- * POST — Save report schedule preferences (stored in user metadata)
+ * POST — Save report schedule preferences (stored in auditLog as config records)
  * GET  — List saved report schedules
- *
- * Note: Notification model doesn't exist. Using UserPreference pattern instead.
  */
 
 import { NextRequest } from 'next/server'
@@ -42,27 +40,26 @@ export async function POST(request: NextRequest) {
             return ApiResponse.badRequest('email, reportType, and frequency required')
         }
 
-        // Store schedule config as JSON in user's metadata
-        // Using activityLog as a lightweight store since Notification model doesn't exist
+        // Store schedule config as JSON in auditLog
         const scheduleKey = `REPORT_SCHEDULE_${reportType}`
         const config = JSON.stringify({ email, reportType, frequency, time: time || '07:00', enabled })
 
-        // Check for existing schedule via activityLog
-        const existing = await prisma.activityLog.findFirst({
+        // Check for existing schedule
+        const existing = await prisma.auditLog.findFirst({
             where: { userId: session.user.id, action: scheduleKey }
         })
 
         if (existing) {
-            await prisma.activityLog.update({
+            await prisma.auditLog.update({
                 where: { id: existing.id },
-                data: { details: config }
+                data: { changes: config }
             })
         } else {
-            await prisma.activityLog.create({
+            await prisma.auditLog.create({
                 data: {
                     userId: session.user.id,
                     action: scheduleKey,
-                    details: config,
+                    changes: config,
                     entityType: 'REPORT_SCHEDULE',
                     entityId: reportType
                 }
@@ -82,7 +79,7 @@ export async function GET() {
         const session = await getServerSession(authOptions)
         if (!session?.user) return ApiResponse.unauthorized()
 
-        const schedules = await prisma.activityLog.findMany({
+        const schedules = await prisma.auditLog.findMany({
             where: {
                 userId: session.user.id,
                 action: { startsWith: 'REPORT_SCHEDULE_' }
@@ -94,7 +91,7 @@ export async function GET() {
             schedules: schedules.map(s => ({
                 id: s.id,
                 type: s.action.replace('REPORT_SCHEDULE_', ''),
-                config: JSON.parse(s.details || '{}'),
+                config: JSON.parse(s.changes || '{}'),
                 createdAt: s.createdAt
             }))
         })
