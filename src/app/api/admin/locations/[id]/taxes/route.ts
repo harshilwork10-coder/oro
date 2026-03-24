@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // GET: Get tax jurisdictions for a location
 export async function GET(
@@ -151,6 +152,18 @@ export async function DELETE(
                 locationId,
                 id: jurisdictionId
             }
+        })
+
+        // Audit log
+        const user = session.user as any
+        await auditLog({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
+            action: 'TAX_JURISDICTION_DELETED',
+            entityType: 'LocationTaxJurisdiction',
+            entityId: locationId,
+            metadata: { jurisdictionId }
         })
 
         return NextResponse.json({ success: true })

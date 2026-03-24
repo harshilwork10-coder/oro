@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import crypto from 'crypto'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
@@ -77,6 +78,17 @@ export async function POST(req: NextRequest) {
         })
 
         // Debug log removed
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: session.user.role,
+            action: 'REMINDER_SENT',
+            entityType: 'Franchisor',
+            entityId: franchisorId,
+            metadata: { ownerEmail: franchisor.owner.email }
+        })
 
         return NextResponse.json({
             success: true,

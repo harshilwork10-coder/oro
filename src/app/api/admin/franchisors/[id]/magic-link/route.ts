@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
+import { auditLog } from '@/lib/audit'
 
 export async function POST(
     request: NextRequest,
@@ -44,6 +45,17 @@ export async function POST(
         const origin = request.headers.get('origin') || request.headers.get('host') || 'http://localhost:3000'
         const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
         const url = `${baseUrl}/auth/magic-link/${token}`
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: 'PROVIDER',
+            action: 'MAGIC_LINK_GENERATED',
+            entityType: 'Franchisor',
+            entityId: id,
+            metadata: { ownerEmail: franchisor.owner.email }
+        })
 
         return NextResponse.json({ success: true, token, url })
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/lib/audit'
 
 // GET - Fetch location-specific settings
 export async function GET(
@@ -23,7 +24,7 @@ export async function GET(
                 settings: true,
                 type: true,
                 isActive: true,
-                franchise: { select: { businessName: true } }
+                franchise: { select: { name: true } }
             }
         })
 
@@ -51,6 +52,17 @@ export async function PUT(
         const location = await prisma.location.update({
             where: { id: params.id },
             data: body
+        })
+
+        // Audit log
+        await auditLog({
+            userId: session.user.id,
+            userEmail: session.user.email!,
+            userRole: (session.user as any).role || 'PROVIDER',
+            action: 'LOCATION_SETTINGS_UPDATE',
+            entityType: 'Location',
+            entityId: params.id,
+            metadata: { fields: Object.keys(body) }
         })
 
         return NextResponse.json({ success: true, location })
