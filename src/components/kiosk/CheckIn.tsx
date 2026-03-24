@@ -183,7 +183,7 @@ export default function CheckIn() {
 
             <div className="p-6 flex items-center justify-center relative z-10">
                 <div className="h-24 w-24 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20 p-2">
-                    <img src="/ORO9.png" alt="Oro Logo" className="w-full h-full object-contain rounded-xl" />
+                    <img src="/oro9-gold.png" alt="Oro Logo" className="w-full h-full object-contain rounded-xl" />
                 </div>
             </div>
 

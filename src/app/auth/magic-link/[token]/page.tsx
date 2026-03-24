@@ -248,7 +248,7 @@ export default function MagicLinkPage({ params }: { params: Promise<{ token: str
             <div className="w-full lg:w-1/2 flex flex-col justify-center p-6 lg:p-12 overflow-y-auto">
                 <div className="max-w-xl mx-auto w-full">
                     <div className="mb-8">
-                        <img src="/ORO9.png" alt="ORO 9" className="h-24 object-contain" />
+                        <img src="/oro9-gold.png" alt="ORO 9" className="h-24 object-contain" />
                     </div>
 
                     <div className="mb-8">

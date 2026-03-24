@@ -109,7 +109,7 @@ export default function PendingApprovalPage() {
     return (
         <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-4">
             <div className="mb-8">
-                <img src="/ORO9.png" alt="ORO 9" className="h-24 object-contain" />
+                <img src="/oro9-gold.png" alt="ORO 9" className="h-24 object-contain" />
             </div>
 
             <div className="bg-white rounded-2xl shadow-xl border border-stone-200 max-w-lg w-full overflow-hidden">

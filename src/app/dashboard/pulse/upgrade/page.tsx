@@ -40,7 +40,7 @@ export default function PulseUpgradePage() {
                 {/* Header */}
                 <div className="text-center mb-8">
                     <div className="flex items-center justify-center gap-2 mb-4">
-                        <img src="/ORO9.png" alt="ORO 9" className="w-12 h-12 object-contain" />
+                        <img src="/oro9-gold.png" alt="ORO 9" className="w-12 h-12 object-contain" />
                         <div>
                             <h1 className="text-2xl font-bold flex items-center gap-2">
                                 <span className="text-gray-300">Pulse</span>

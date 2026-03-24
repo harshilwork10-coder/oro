@@ -39,7 +39,7 @@ export default function CustomerDisplay({
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-4 text-center animate-in fade-in duration-500">
                 <div className="mb-6">
-                    <img src="/ORO9.png" alt="ORO 9" className="h-20 md:h-24 object-contain" />
+                    <img src="/oro9-gold.png" alt="ORO 9" className="h-20 md:h-24 object-contain" />
                 </div>
                 <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-4">Welcome to ORO 9</h1>
                 <p className="text-lg md:text-xl text-gray-500">We're ready when you are.</p>
@@ -60,7 +60,7 @@ export default function CustomerDisplay({
             {/* Header - Fixed at top */}
             <div className="bg-stone-900 py-3 px-4 shadow-sm flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center">
-                    <img src="/ORO9.png" alt="ORO 9" className="h-10 md:h-12 object-contain" />
+                    <img src="/oro9-gold.png" alt="ORO 9" className="h-10 md:h-12 object-contain" />
                 </div>
                 {cart.customerName && (
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-700 rounded-full font-medium text-sm">
