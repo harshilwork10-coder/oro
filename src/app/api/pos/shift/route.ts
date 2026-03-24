@@ -130,22 +130,26 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'User not found' }, { status: 401 })
     }
 
-    // Get shiftRequirement from BusinessConfig
-    let shiftRequirement = 'BOTH' // Default
+    // Get shiftRequirement from BusinessConfig (if the field exists)
+    let shiftRequirement = 'NONE' // Default: no shift required
     if (dbUser.franchiseId) {
-        // Find the franchisor for this franchise
-        const franchise = await prisma.franchise.findUnique({
-            where: { id: dbUser.franchiseId },
-            select: { franchisorId: true }
-        })
-        if (franchise?.franchisorId) {
-            const businessConfig = await prisma.businessConfig.findUnique({
-                where: { franchisorId: franchise.franchisorId },
-                select: { shiftRequirement: true }
+        try {
+            const franchise = await prisma.franchise.findUnique({
+                where: { id: dbUser.franchiseId },
+                select: { franchisorId: true }
             })
-            if (businessConfig?.shiftRequirement) {
-                shiftRequirement = businessConfig.shiftRequirement
+            if (franchise?.franchisorId) {
+                const businessConfig = await prisma.businessConfig.findUnique({
+                    where: { franchisorId: franchise.franchisorId }
+                })
+                // shiftRequirement field may not exist yet in schema
+                if (businessConfig && 'shiftRequirement' in businessConfig) {
+                    shiftRequirement = (businessConfig as any).shiftRequirement || 'NONE'
+                }
             }
+        } catch {
+            // Field doesn't exist in schema yet — default to NONE
+            shiftRequirement = 'NONE'
         }
     }
 

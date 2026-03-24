@@ -128,18 +128,16 @@ export async function POST(req: NextRequest) {
                         createdAt: new Date(tx.createdAt),
                         source: 'ANDROID_POS',
                         lineItems: {
-                            create: tx.items.map((item, index) => ({
+                            create: tx.items.map((item) => ({
                                 type: item.type,
-                                name: item.name,
-                                description: '',
+                                serviceNameSnapshot: item.type === 'SERVICE' ? item.name : null,
+                                productNameSnapshot: item.type === 'PRODUCT' ? item.name : null,
                                 price: item.price,
                                 quantity: item.quantity,
-                                subtotal: item.price * item.quantity,
                                 total: item.price * item.quantity,
                                 serviceId: item.type === 'SERVICE' && item.id !== 'open-item' ? item.id : undefined,
                                 productId: item.type === 'PRODUCT' ? item.id : undefined,
                                 staffId: item.staffId || undefined,
-                                sequence: index
                             }))
                         }
                     }
