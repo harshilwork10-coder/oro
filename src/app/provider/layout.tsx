@@ -3,7 +3,7 @@
 import {
     Home, Users, Ticket, Monitor, HardDrive, FileText,
     CreditCard, Settings, Plus, Bell, Search, Menu, ChevronDown,
-    Building2, Package, LogOut, User, MapPin, ClipboardList
+    Building2, Package, LogOut, User, MapPin, ClipboardList, Upload
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -23,6 +23,7 @@ const PROVIDER_SIDEBAR = [
     { name: 'Audit Logs', href: '/provider/audit-logs', icon: ClipboardList },
     { name: 'Billing', href: '/provider/billing', icon: CreditCard },
     { name: 'UPC Import', href: '/provider/upc-import', icon: Package },
+    { name: 'Data Import', href: '/provider/data-import', icon: Upload },
     { name: 'System', href: '/provider/system', icon: Settings },
 ];
 
