@@ -168,7 +168,6 @@ export default function ProviderHomePage() {
                             value={stats.onboardingPending}
                             icon={FileText}
                             href="/provider/onboarding?status=pending"
-                            trend={{ value: 12, label: 'this week' }}
                         />
                         <KpiCard
                             title="Docs Missing"

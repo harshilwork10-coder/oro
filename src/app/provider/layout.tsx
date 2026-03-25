@@ -97,7 +97,7 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-stone-200 truncate">{user?.name || 'Provider'}</p>
-                                <p className="text-xs text-stone-500 truncate">Platform Admin</p>
+                                <p className="text-xs text-stone-500 truncate">{user?.role || 'Platform Admin'}</p>
                             </div>
                         </div>
                     </div>

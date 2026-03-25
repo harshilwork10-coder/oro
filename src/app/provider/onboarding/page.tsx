@@ -6,6 +6,7 @@ import {
     Search, Filter, Download, Clock, FileText, Package, CheckCircle,
     User, ChevronRight, AlertCircle, Truck, Plus, X, Loader2, MoreHorizontal, Trash2
 } from 'lucide-react';
+import { CARRIERS, DEFAULT_CARRIER, BUSINESS_TYPE_LABELS, getCarrierTrackingUrl } from '@/lib/constants/provider';
 
 type OnboardingTab = 'requests' | 'docs-inbox' | 'shipping';
 type RequestStatus = 'submitted' | 'in-review' | 'waiting-docs' | 'approved' | 'shipped' | 'active' | 'rejected';
@@ -99,7 +100,7 @@ export default function OnboardingPage() {
         carrier: string;
         tracking: string;
         notes: string;
-    }>({ open: false, clientId: '', carrier: 'FedEx', tracking: '', notes: '' });
+    }>({ open: false, clientId: '', carrier: DEFAULT_CARRIER, tracking: '', notes: '' });
 
     // Track active dropdown
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -156,7 +157,7 @@ export default function OnboardingPage() {
 
                         return {
                             id: f.id,
-                            type: f.businessType === 'BRAND_FRANCHISOR' ? 'Brand / Franchisor' : 'Multi-Store Owner',
+                            type: BUSINESS_TYPE_LABELS[f.businessType] || 'Multi-Store Owner',
                             client: f.businessName || f.name || 'Unknown Business',
                             ownerName: f.owner?.name || f.name || 'Unknown',
                             ownerEmail: f.owner?.email || '',
@@ -529,12 +530,7 @@ export default function OnboardingPage() {
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <a
-                                                    href={
-                                                        shipment.carrier === 'FedEx' ? `https://www.fedex.com/fedextrack/?trknbr=${shipment.trackingNumber}` :
-                                                            shipment.carrier === 'UPS' ? `https://www.ups.com/track?tracknum=${shipment.trackingNumber}` :
-                                                                shipment.carrier === 'USPS' ? `https://tools.usps.com/go/TrackConfirmAction?tLabels=${shipment.trackingNumber}` :
-                                                                    shipment.carrier === 'DHL' ? `https://www.dhl.com/en/express/tracking.html?AWB=${shipment.trackingNumber}` : '#'
-                                                    }
+                                                    href={getCarrierTrackingUrl(shipment.carrier, shipment.trackingNumber)}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="px-3 py-1.5 text-xs font-medium text-orange-400 hover:text-orange-300 border border-orange-500/50 hover:border-orange-400 rounded-lg transition-colors"
@@ -728,10 +724,9 @@ export default function OnboardingPage() {
                                         onChange={e => setShipmentModal({ ...shipmentModal, carrier: e.target.value })}
                                         className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                     >
-                                        <option value="FedEx">FedEx</option>
-                                        <option value="UPS">UPS</option>
-                                        <option value="USPS">USPS</option>
-                                        <option value="DHL">DHL</option>
+                                        {CARRIERS.map(c => (
+                                            <option key={c.value} value={c.value}>{c.label}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>

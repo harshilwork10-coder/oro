@@ -7,6 +7,7 @@ import {
     CheckCircle, Clock, XCircle, AlertTriangle, FileX, CreditCard,
     TrendingUp, Plus, RefreshCw, ChevronRight
 } from 'lucide-react';
+import { BUSINESS_TYPE_OPTIONS } from '@/lib/constants/provider';
 
 interface OwnerData {
     id: string;
@@ -217,9 +218,9 @@ export default function OwnersListPage() {
                 </select>
                 <select value={businessTypeFilter} onChange={e => setBusinessTypeFilter(e.target.value)} className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-stone-200">
                     <option value="ALL">All Types</option>
-                    <option value="SALON">Salon</option>
-                    <option value="RETAIL">Retail</option>
-                    <option value="RESTAURANT">Restaurant</option>
+                    {BUSINESS_TYPE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                 </select>
             </div>
 

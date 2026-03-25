@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Download, DollarSign, TrendingUp, FileText } from 'lucide-react';
+import { BILLING_PLANS } from '@/lib/constants/provider';
 
 type BillingTab = 'plans' | 'invoices' | 'past-due' | 'usage';
 
@@ -73,11 +74,7 @@ export default function BillingPage() {
 
             {activeTab === 'plans' && (
                 <div className="grid grid-cols-3 gap-6">
-                    {[
-                        { name: 'Starter', price: '$99', features: ['1 Location', '2 Terminals', 'Basic Support'], clients: 0 },
-                        { name: 'Professional', price: '$199', features: ['3 Locations', '6 Terminals', 'Priority Support'], clients: 0 },
-                        { name: 'Enterprise', price: '$399', features: ['Unlimited', 'Unlimited', '24/7 Support'], clients: 0 },
-                    ].map((plan) => (
+                    {BILLING_PLANS.map((plan) => (
                         <div key={plan.name} className="bg-stone-900/50 rounded-xl border border-stone-800 p-6">
                             <h3 className="text-lg font-semibold text-stone-100">{plan.name}</h3>
                             <p className="text-2xl font-bold text-orange-400 mt-2">{plan.price}<span className="text-sm text-stone-400">/mo</span></p>

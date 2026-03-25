@@ -9,6 +9,7 @@ import {
 import AddTerminalModal from '@/components/modals/AddTerminalModal';
 import TransferTerminalModal from '@/components/modals/TransferTerminalModal';
 import { formatDistanceToNow } from 'date-fns';
+import { DEFAULT_PAX_PORT } from '@/lib/constants/provider';
 
 type DeviceTab = 'accounts' | 'licenses' | 'stations' | 'requests';
 
@@ -61,10 +62,10 @@ export default function DevicesPage() {
 
     // Inline Add Terminal Form State
     const [addingTerminalFor, setAddingTerminalFor] = useState<string | null>(null);
-    const [newTerminalForm, setNewTerminalForm] = useState({ name: '', terminalIP: '', terminalPort: '10009', stationId: '' });
+    const [newTerminalForm, setNewTerminalForm] = useState({ name: '', terminalIP: '', terminalPort: DEFAULT_PAX_PORT, stationId: '' });
     const [savingTerminal, setSavingTerminal] = useState(false);
     const [editingTerminalId, setEditingTerminalId] = useState<string | null>(null);
-    const [editTerminalForm, setEditTerminalForm] = useState({ name: '', terminalIP: '', terminalPort: '10009' });
+    const [editTerminalForm, setEditTerminalForm] = useState({ name: '', terminalIP: '', terminalPort: DEFAULT_PAX_PORT });
 
     // Terminal Status Check
     const [checkingTerminalId, setCheckingTerminalId] = useState<string | null>(null);
@@ -158,7 +159,7 @@ export default function DevicesPage() {
     };
 
     // Terminal Functions
-    const checkTerminalStatus = async (terminalId: string, ipAddress: string, port: string = '10009') => {
+    const checkTerminalStatus = async (terminalId: string, ipAddress: string, port: string = DEFAULT_PAX_PORT) => {
         setCheckingTerminalId(terminalId);
         try {
             const res = await fetch('/api/admin/terminals/discover', {
@@ -195,14 +196,14 @@ export default function DevicesPage() {
                     locationId,
                     name: newTerminalForm.name,
                     terminalIP: newTerminalForm.terminalIP,
-                    terminalPort: newTerminalForm.terminalPort || '10009',
+                    terminalPort: newTerminalForm.terminalPort || DEFAULT_PAX_PORT,
                     stationId: newTerminalForm.stationId || undefined
                 })
             });
             if (res.ok) {
                 await fetchAccounts();
                 setAddingTerminalFor(null);
-                setNewTerminalForm({ name: '', terminalIP: '', terminalPort: '10009', stationId: '' });
+                setNewTerminalForm({ name: '', terminalIP: '', terminalPort: DEFAULT_PAX_PORT, stationId: '' });
                 setToast({ message: 'Terminal added', type: 'success' });
             } else {
                 const err = await res.json();
@@ -444,7 +445,7 @@ export default function DevicesPage() {
                                         <p className="text-sm text-stone-400">{account.franchiseName} · {account.terminals.length} terminal{account.terminals.length !== 1 ? 's' : ''} · {account.stations.length} station{account.stations.length !== 1 ? 's' : ''}</p>
                                     </div>
                                     <button
-                                        onClick={() => { setAddingTerminalFor(addingTerminalFor === account.locationId ? null : account.locationId); setNewTerminalForm({ name: '', terminalIP: '', terminalPort: '10009', stationId: '' }); }}
+                                        onClick={() => { setAddingTerminalFor(addingTerminalFor === account.locationId ? null : account.locationId); setNewTerminalForm({ name: '', terminalIP: '', terminalPort: DEFAULT_PAX_PORT, stationId: '' }); }}
                                         className="flex items-center gap-2 px-3 py-2 bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 rounded-lg text-sm font-medium"
                                     >
                                         <Plus size={14} />

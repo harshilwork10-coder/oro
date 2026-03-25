@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Wifi, WifiOff, Activity, RefreshCw } from 'lucide-react';
+import { MONITORING_SERVICES } from '@/lib/constants/provider';
 
 type MonitoringTab = 'device-health' | 'payments-health' | 'system-health';
 
@@ -133,7 +134,7 @@ export default function MonitoringPage() {
                     <div className="bg-stone-900/50 rounded-xl border border-stone-800 p-4">
                         <h3 className="font-medium text-stone-100 mb-4">Service Status</h3>
                         <div className="grid grid-cols-2 gap-3">
-                            {['POS API', 'Payment Gateway', 'Inventory Sync', 'SMS Service', 'Email Service', 'Reporting'].map((service) => (
+                            {MONITORING_SERVICES.map((service) => (
                                 <div key={service} className="flex items-center justify-between p-3 border border-stone-700 rounded-lg">
                                     <span className="text-stone-200">{service}</span>
                                     <span className="flex items-center gap-2 text-emerald-400 text-sm">

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Settings, Shield, Key, Mail, Users, ToggleLeft, ToggleRight, Save } from 'lucide-react';
+import { SYSTEM_MODULES, SYSTEM_ROLES, SYSTEM_TEMPLATES, SYSTEM_INTEGRATIONS } from '@/lib/constants/provider';
 
 type SystemTab = 'modules' | 'roles' | 'templates' | 'integrations' | 'security';
 
@@ -16,16 +17,7 @@ export default function SystemPage() {
         { id: 'security', label: 'Security', icon: Shield },
     ];
 
-    const modules = [
-        { name: 'Inventory Management', retail: true, salon: false },
-        { name: 'Appointment Scheduling', retail: false, salon: true },
-        { name: 'Lottery', retail: true, salon: false },
-        { name: 'Age Verification', retail: true, salon: false },
-        { name: 'Gift Cards', retail: true, salon: true },
-        { name: 'Loyalty Program', retail: true, salon: true },
-        { name: 'Employee Time Clock', retail: true, salon: true },
-        { name: 'Customer Check-In', retail: false, salon: true },
-    ];
+    const modules = SYSTEM_MODULES;
 
     return (
         <div>
@@ -90,12 +82,7 @@ export default function SystemPage() {
                 <div className="bg-stone-900/50 rounded-xl border border-stone-800 p-6">
                     <h3 className="font-medium text-stone-100 mb-4">Role Templates</h3>
                     <div className="space-y-4">
-                        {[
-                            { name: 'Owner', permissions: 'Full access, manage employees, view reports, settings' },
-                            { name: 'Manager', permissions: 'POS, inventory, employees, limited settings' },
-                            { name: 'Cashier', permissions: 'POS only, time clock' },
-                            { name: 'Stylist', permissions: 'Appointments, check-in, time clock' },
-                        ].map((role) => (
+                        {SYSTEM_ROLES.map((role) => (
                             <div key={role.name} className="flex items-center justify-between p-4 border border-stone-700 rounded-lg">
                                 <div>
                                     <p className="text-stone-100 font-medium">{role.name}</p>
@@ -112,13 +99,7 @@ export default function SystemPage() {
                 <div className="bg-stone-900/50 rounded-xl border border-stone-800 p-6">
                     <h3 className="font-medium text-stone-100 mb-4">Email & SMS Templates</h3>
                     <div className="space-y-4">
-                        {[
-                            { name: 'Welcome Email', type: 'email', description: 'Sent when new owner account is created' },
-                            { name: 'Password Reset', type: 'email', description: 'Password reset link' },
-                            { name: 'Document Request', type: 'email', description: 'Request missing onboarding documents' },
-                            { name: 'Shipment Notification', type: 'sms', description: 'Hardware shipped notification' },
-                            { name: 'Payment Reminder', type: 'email', description: 'Past due invoice reminder' },
-                        ].map((tpl) => (
+                        {SYSTEM_TEMPLATES.map((tpl) => (
                             <div key={tpl.name} className="flex items-center justify-between p-4 border border-stone-700 rounded-lg">
                                 <div className="flex items-center gap-3">
                                     <Mail size={18} className="text-stone-500" />
@@ -141,12 +122,7 @@ export default function SystemPage() {
                 <div className="bg-stone-900/50 rounded-xl border border-stone-800 p-6">
                     <h3 className="font-medium text-stone-100 mb-4">Integration Keys</h3>
                     <div className="space-y-4">
-                        {[
-                            { name: 'PAX Payment Gateway', status: 'connected', lastUsed: '2m ago' },
-                            { name: 'Twilio SMS', status: 'connected', lastUsed: '15m ago' },
-                            { name: 'SendGrid Email', status: 'connected', lastUsed: '1h ago' },
-                            { name: 'QuickBooks', status: 'not-connected', lastUsed: null },
-                        ].map((int) => (
+                        {SYSTEM_INTEGRATIONS.map((int) => (
                             <div key={int.name} className="flex items-center justify-between p-4 border border-stone-700 rounded-lg">
                                 <div className="flex items-center gap-3">
                                     <Key size={18} className="text-stone-500" />
