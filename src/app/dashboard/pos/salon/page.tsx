@@ -882,10 +882,16 @@ function POSContent() {
             // Use override date or current filter date
             const dateStr = dateOverride || txDateFilter
             const res = await fetch(`/api/pos/transaction?dateFrom=${dateStr}&dateTo=${dateStr}`)
+            if (!res.ok) {
+                console.error('Failed to fetch transactions:', res.status)
+                setToast({ message: 'Failed to load transaction history', type: 'error' })
+                return
+            }
             const data = await res.json()
-            setTransactions(data)
+            setTransactions(Array.isArray(data) ? data : [])
         } catch (error) {
             console.error('Failed to fetch transactions:', error)
+            setToast({ message: 'Failed to load transaction history', type: 'error' })
         }
     }
 
@@ -1218,9 +1224,12 @@ function POSContent() {
             if (res.ok) {
                 const transaction = await res.json()
 
-                // Clear state
+                // Clear state — reset ALL transaction-scoped state to prevent leaks
                 setCart([])
                 setPendingTipAmount(0)
+                setSelectedCustomer(null)
+                setAppliedDiscount(0)
+                setAppliedDiscountSource(null)
                 setShowCheckoutModal(false)
                 fetchTransactions()
 
@@ -1254,38 +1263,12 @@ function POSContent() {
         }
     }
 
-    const handleRefund = async (tx: Transaction) => {
-        // Note: This is a legacy refund function. Use TransactionActionsModal for full refund flow
-        try {
-            const res = await fetch('/api/pos/refund', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    originalTransactionId: tx.id,
-                    items: tx.lineItems.map(item => ({
-                        type: item.type,
-                        serviceId: item.serviceId,
-                        productId: item.productId,
-                        quantity: item.quantity,
-                        price: item.price
-                    })),
-                    reason: 'Customer Request'
-                })
-            })
-
-            if (res.ok) {
-                setToast({ message: '✓ Refund Processed Successfully', type: 'success' })
-                setSelectedTx(null)
-                fetchTransactions()
-            } else {
-                const error = await res.json()
-                setToast({ message: error.error || 'Refund failed', type: 'error' })
-            }
-        } catch (error) {
-            console.error('Refund error:', error)
-            setToast({ message: 'Failed to process refund', type: 'error' })
-        }
-    }
+    // Legacy handleRefund removed — all refunds now go through TransactionActionsModal
+    // which uses the correct /api/pos/transaction/[id]/refund endpoint with:
+    // - Atomic inventory restock
+    // - Refund receipt printing
+    // - Confirmation/reason flow
+    // - Proper audit logging
 
 
 
@@ -1586,6 +1569,10 @@ function POSContent() {
             { label: '$10', key: 'tens', mult: 10 },
             { label: '$5', key: 'fives', mult: 5 },
             { label: '$1', key: 'ones', mult: 1 },
+            { label: '25¢', key: 'quarters', mult: 0.25 },
+            { label: '10¢', key: 'dimes', mult: 0.10 },
+            { label: '5¢', key: 'nickels', mult: 0.05 },
+            { label: '1¢', key: 'pennies', mult: 0.01 },
         ]
 
         const handlePinpadKey = (key: string) => {
@@ -2412,8 +2399,8 @@ function POSContent() {
                                     <div className="space-y-4">
                                         {selectedTx.lineItems.map((item: any, idx: number) => (
                                             <div key={idx} className="flex justify-between text-sm">
-                                                <span className="text-stone-300">{item.quantity}x {item.name || 'Item'}</span>
-                                                <span className="text-white">{formatCurrency(item.price * item.quantity)}</span>
+                                                <span className="text-stone-300">{item.quantity}x {item.serviceNameSnapshot || item.productNameSnapshot || item.name || 'Item'}</span>
+                                                <span className="text-white">{formatCurrency(Number(item.priceCharged || item.price || 0) * (item.quantity || 1))}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -2421,11 +2408,15 @@ function POSContent() {
                                 <div className="p-6 border-t border-stone-800">
                                     {selectedTx.status === 'COMPLETED' && (
                                         <button
-                                            onClick={() => handleRefund(selectedTx)}
+                                            onClick={() => {
+                                                setSelectedTxForActions(selectedTx)
+                                                setShowTransactionModal(true)
+                                                setSelectedTx(null)
+                                            }}
                                             className="w-full py-3 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded-xl font-medium transition-all flex items-center justify-center gap-2"
                                         >
                                             <RotateCcw className="h-4 w-4" />
-                                            Refund Order
+                                            Refund / Void
                                         </button>
                                     )}
                                 </div>
@@ -2651,11 +2642,22 @@ function POSContent() {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json' },
                                                     body: JSON.stringify({
-                                                        items: cart,
+                                                        items: cart.map(item => ({
+                                                            ...item,
+                                                            cashPrice: item.cashPrice,
+                                                            cardPrice: item.cardPrice
+                                                        })),
                                                         subtotal: totals.subtotal,
                                                         tax: totals.tax,
                                                         tip: totals.tip,
                                                         total: cashTenderingTotal,
+                                                        // Dual Pricing Totals for receipt
+                                                        subtotalCash: totals.subtotalCash,
+                                                        subtotalCard: totals.subtotalCard,
+                                                        taxCash: totals.taxCash,
+                                                        taxCard: totals.taxCard,
+                                                        totalCash: totals.totalCash,
+                                                        totalCard: totals.totalCard,
                                                         paymentMethod: 'CASH',
                                                         cashDrawerSessionId: shift?.id,
                                                         clientId: selectedCustomer?.id
@@ -2664,9 +2666,12 @@ function POSContent() {
                                                 if (res.ok) {
                                                     const txData = await res.json()
                                                     const changeDue = received - cashTenderingTotal
-                                                    const savedCart = [...cart] // Save cart before clearing
+                                                    // Clear ALL transaction-scoped state to prevent leaks
                                                     setCart([])
                                                     setPendingTipAmount(0)
+                                                    setSelectedCustomer(null)
+                                                    setAppliedDiscount(0)
+                                                    setAppliedDiscountSource(null)
                                                     setShowCashTendering(false)
                                                     setCashReceived('')
                                                     // Clear display sync
@@ -2681,23 +2686,16 @@ function POSContent() {
                                                             })
                                                         })
                                                     }
-                                                    // Store transaction data and show receipt modal
+                                                    // Use DB transaction data for receipt (not cart snapshot)
+                                                    const transaction = txData.transaction || txData
                                                     setLastTransactionData({
-                                                        ...txData.transaction || txData,
-                                                        lineItems: savedCart.map(item => ({
-                                                            name: item.name,
-                                                            quantity: item.quantity,
-                                                            price: item.price,
-                                                            total: item.price * item.quantity
-                                                        })),
-                                                        subtotal: totals.subtotal,
-                                                        tax: totals.tax,
-                                                        total: cashTenderingTotal,
-                                                        paymentMethod: 'CASH',
+                                                        ...transaction,
                                                         change: changeDue,
                                                         locationName: locationName,
                                                         franchiseName: franchiseName
                                                     })
+                                                    // Also print thermal receipt using DB data
+                                                    printReceipt(transaction)
                                                     setShowReceiptModal(true)
                                                     fetchTransactions()
                                                 } else {
