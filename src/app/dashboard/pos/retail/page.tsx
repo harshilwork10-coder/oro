@@ -1193,6 +1193,14 @@ export default function RetailPOSPage() {
         }])
         setCart([])
         setSelectedCustomer(null)
+        setSelectedItemIndex(null)          // BUG-A FIX: Reset item selection
+        setTransactionDiscount(null)        // BUG-A FIX: Clear discount so it doesn't leak to next tx
+        setCustomerNotes('')                // BUG-A FIX: Clear notes
+        setPromoCode('')                    // BUG-A FIX: Clear promo code input
+        setAppliedPromoCode('')             // BUG-A FIX: Clear applied promo code
+        setLoyaltyDiscount(0)               // BUG-A FIX: Clear loyalty
+        setLotteryPayout(0)                 // BUG-A FIX: Clear lottery offset
+        setIdVerifiedForTransaction(false)  // BUG-A FIX: Reset ID verification
         setToast({ message: 'Transaction held', type: 'success' })
     }
 
@@ -1219,6 +1227,10 @@ export default function RetailPOSPage() {
             setAppliedPromotions([])            // ✅ Clear promo list
             setPromoDiscount(0)                 // ✅ Clear promo discount amount
             setLotteryPayout(0)                 // ✅ Clear lottery offset
+            setPromoCode('')                    // BUG-B FIX: Clear promo code input text
+            setAppliedPromoCode('')             // BUG-B FIX: Clear applied promo code
+            setLoyaltyDiscount(0)               // BUG-B FIX: Clear loyalty discount
+            setCustomerNotes('')                // BUG-B FIX: Clear customer notes
             setToast({ message: 'Transaction voided', type: 'success' })
         }
     }
@@ -2182,8 +2194,13 @@ export default function RetailPOSPage() {
                                         if (res.ok) {
                                             const data = await res.json()
                                             setRecentTransactions(data.transactions || [])
+                                        } else {
+                                            setToast({ message: 'Failed to load transactions', type: 'error' }) // BUG-C FIX
                                         }
-                                    } catch (e) { console.error(e) }
+                                    } catch (e) {
+                                        console.error(e)
+                                        setToast({ message: 'Network error loading transactions', type: 'error' }) // BUG-C FIX
+                                    }
                                     setShowRecentTransactions(true)
                                 }}
                                 className="flex flex-col items-center justify-center gap-0.5 py-2 bg-purple-500/30 hover:bg-purple-500/50 rounded text-white transition-colors"
@@ -2975,11 +2992,26 @@ export default function RetailPOSPage() {
                     onSelectTransaction={(tx) => {
                         // tx.id available for future features
                     }}
-                    onReprintReceipt={(tx) => {
+                    onReprintReceipt={async (tx) => {
+                        // BUG-E FIX: Try thermal printer first (matches printLastReceipt behavior)
+                        const printAgentReady = await isPrintAgentAvailable()
+                        if (printAgentReady) {
+                            const thermalReceipt = formatReceiptFromTransaction(
+                                { ...tx, items: tx.lineItems || [] },
+                                { name: (session?.user as any)?.franchiseName || 'Store' },
+                                session?.user?.name || 'Cashier'
+                            )
+                            printReceipt(thermalReceipt).catch(console.error)
+                            setToast({ message: 'Reprinting receipt...', type: 'success' })
+                            return
+                        }
+                        // Fallback: popup receipt
                         const receiptWindow = window.open('', '_blank', 'width=400,height=700')
                         if (receiptWindow) {
                             receiptWindow.document.write(generateReceiptHTML(tx))
                             receiptWindow.document.close()
+                        } else {
+                            setToast({ message: 'Please allow popups to print receipt', type: 'error' })
                         }
                     }}
                 />
@@ -3589,9 +3621,15 @@ function ReceiveStockModal({ onClose, onSuccess }: {
             })
             if (res.ok) {
                 onSuccess()
+            } else {
+                // BUG-D FIX: Surface API errors to user
+                const data = await res.json().catch(() => ({}))
+                alert(data.error || 'Failed to receive stock — check barcode and try again')
             }
         } catch (e) {
             console.error(e)
+            // BUG-D FIX: Surface network errors to user
+            alert('Network error — stock not received')
         }
         setLoading(false)
     }

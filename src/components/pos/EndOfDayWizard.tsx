@@ -125,6 +125,8 @@ export default function EndOfDayWizard({ onClose, onComplete }: EndOfDayWizardPr
             setStep('complete')
         } catch (e) {
             console.error('Failed to close day:', e)
+            // BUG-F FIX: Alert user when day close fails
+            alert('Failed to close day — please check your connection and try again')
         }
         setLoading(false)
     }
