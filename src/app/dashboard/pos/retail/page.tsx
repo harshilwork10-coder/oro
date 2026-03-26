@@ -2950,6 +2950,9 @@ export default function RetailPOSPage() {
                         setShowCashDropModal(false)
                         setToast({ message: '✓ Cash drop recorded', type: 'success' })
                     }}
+                    onError={(msg: string) => setToast({ message: msg, type: 'error' })}
+                    storeName={(session?.user as any)?.franchiseName || 'Store'}
+                    cashierName={session?.user?.name || 'Cashier'}
                 />
             )}
 
@@ -3431,9 +3434,12 @@ function CustomerLookupModal({ onClose, onSelectCustomer }: {
 }
 
 // Cash Drop Modal
-function CashDropModal({ onClose, onSuccess }: {
+function CashDropModal({ onClose, onSuccess, onError, storeName, cashierName }: {
     onClose: () => void
     onSuccess: () => void
+    onError?: (msg: string) => void
+    storeName?: string
+    cashierName?: string
 }) {
     const [amount, setAmount] = useState('')
     const [loading, setLoading] = useState(false)
@@ -3455,6 +3461,8 @@ function CashDropModal({ onClose, onSuccess }: {
                 // Print cash drop receipt slip
                 const dropAmount = parseFloat(amount)
                 printReceipt({
+                    storeName: storeName || undefined,
+                    cashier: cashierName || undefined,
                     header: '*** CASH DROP ***',
                     items: [{ name: 'Cash Drop to Safe', quantity: 1, price: dropAmount, total: dropAmount }],
                     subtotal: dropAmount,
@@ -3465,9 +3473,13 @@ function CashDropModal({ onClose, onSuccess }: {
                     openDrawer: false,
                 }).catch(console.error)
                 onSuccess()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                onError?.(data.error || 'Failed to record cash drop')
             }
         } catch (e) {
-            console.error(e)
+            console.error('Cash drop failed:', e)
+            onError?.('Network error — cash drop not saved')
         }
         setLoading(false)
     }
