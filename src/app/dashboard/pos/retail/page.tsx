@@ -3442,7 +3442,7 @@ function CashDropModal({ onClose, onSuccess }: {
         if (!amount || parseFloat(amount) <= 0) return
         setLoading(true)
         try {
-            await fetch('/api/drawer-activity', {
+            const res = await fetch('/api/drawer-activity', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -3451,12 +3451,27 @@ function CashDropModal({ onClose, onSuccess }: {
                     note: `Cash drop: $${amount}`
                 })
             })
-            onSuccess()
+            if (res.ok) {
+                // Print cash drop receipt slip
+                const dropAmount = parseFloat(amount)
+                printReceipt({
+                    header: '*** CASH DROP ***',
+                    items: [{ name: 'Cash Drop to Safe', quantity: 1, price: dropAmount, total: dropAmount }],
+                    subtotal: dropAmount,
+                    tax: 0,
+                    total: dropAmount,
+                    date: new Date().toLocaleString(),
+                    footer: 'Employee Signature: _______________',
+                    openDrawer: false,
+                }).catch(console.error)
+                onSuccess()
+            }
         } catch (e) {
             console.error(e)
         }
         setLoading(false)
     }
+
 
     return (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">

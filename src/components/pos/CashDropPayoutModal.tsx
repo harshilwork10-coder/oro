@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { X, ArrowDownToLine, ArrowUpFromLine, DollarSign } from 'lucide-react'
+import { printReceipt, ReceiptData } from '@/lib/print-agent'
 
 interface CashDropPayoutModalProps {
     isOpen: boolean
@@ -10,6 +11,8 @@ interface CashDropPayoutModalProps {
     onComplete: () => void
     locationId: string
     shiftId?: string
+    storeName?: string
+    employeeName?: string
 }
 
 export default function CashDropPayoutModal({
@@ -18,7 +21,9 @@ export default function CashDropPayoutModal({
     onClose,
     onComplete,
     locationId,
-    shiftId
+    shiftId,
+    storeName,
+    employeeName
 }: CashDropPayoutModalProps) {
     const [amount, setAmount] = useState('')
     const [note, setNote] = useState('')
@@ -47,6 +52,21 @@ export default function CashDropPayoutModal({
             })
 
             if (res.ok) {
+                // Print receipt slip
+                const label = mode === 'drop' ? 'CASH DROP' : 'PAID OUT'
+                printReceipt({
+                    storeName: storeName || undefined,
+                    header: `*** ${label} ***`,
+                    cashier: employeeName || undefined,
+                    items: [{ name: label, quantity: 1, price: numAmount, total: numAmount }],
+                    subtotal: numAmount,
+                    tax: 0,
+                    total: numAmount,
+                    date: new Date().toLocaleString(),
+                    footer: `Note: ${note || 'N/A'}\nEmployee Signature: _______________`,
+                    openDrawer: false,
+                }).catch(console.error)
+
                 setAmount('')
                 setNote('')
                 onComplete()
@@ -61,6 +81,7 @@ export default function CashDropPayoutModal({
         }
         setIsProcessing(false)
     }
+
 
     const quickAmounts = mode === 'drop' ? [50, 100, 200, 500] : [5, 10, 20, 50]
 
