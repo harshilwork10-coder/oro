@@ -2975,6 +2975,8 @@ function POSContent() {
                             canProcessRefunds={(session?.user as any)?.canProcessRefunds || (session?.user as any)?.role === 'FRANCHISOR'}
                             canVoid={(session?.user as any)?.canProcessRefunds || (session?.user as any)?.role === 'FRANCHISOR'}
                             canDelete={(session?.user as any)?.role === 'FRANCHISOR'}
+                            storeName={(session?.user as any)?.franchiseName || 'Store'}
+                            cashierName={session?.user?.name || 'Cashier'}
                         />
                     )}
 

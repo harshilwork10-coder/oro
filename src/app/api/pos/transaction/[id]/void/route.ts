@@ -38,13 +38,34 @@ export async function POST(
         }
 
         // Mark as voided with who did it and when
-        await prisma.transaction.update({
+        // Also restock inventory for voided items
+        const transaction_with_items = await prisma.transaction.findUnique({
             where: { id: transactionId },
-            data: {
-                status: 'VOIDED',
-                voidedById: (session.user as any).id,
-                voidedAt: new Date(),
-                voidReason: reason,
+            include: { lineItems: true }
+        })
+
+        await prisma.$transaction(async (tx) => {
+            // Update transaction status
+            await tx.transaction.update({
+                where: { id: transactionId },
+                data: {
+                    status: 'VOIDED',
+                    voidedById: (session.user as any).id,
+                    voidedAt: new Date(),
+                    voidReason: reason,
+                }
+            })
+
+            // Restock inventory for voided product items
+            if (transaction_with_items?.lineItems) {
+                for (const item of transaction_with_items.lineItems) {
+                    if (item.type === 'PRODUCT' && item.productId) {
+                        await tx.product.update({
+                            where: { id: item.productId },
+                            data: { stock: { increment: item.quantity } }
+                        })
+                    }
+                }
             }
         })
 

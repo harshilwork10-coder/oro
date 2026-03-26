@@ -45,11 +45,15 @@ interface Props {
     canVoid?: boolean
     canDelete?: boolean
     cashDrawerSessionId?: string | null
+    storeName?: string
+    storeAddress?: string
+    storePhone?: string
+    cashierName?: string
 }
 
 type ActionType = 'none' | 'refund' | 'void' | 'delete' | 'sms'
 
-export default function TransactionActionsModal({ transaction, onClose, onSuccess, cashDrawerSessionId }: Props) {
+export default function TransactionActionsModal({ transaction, onClose, onSuccess, cashDrawerSessionId, storeName, storeAddress, storePhone, cashierName }: Props) {
     const [action, setAction] = useState<ActionType>('none')
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
     const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({})
@@ -141,11 +145,11 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                 {
                     showDualPricing: !!(transaction.totalCash && transaction.totalCard &&
                         Number(transaction.totalCash) !== Number(transaction.totalCard)),
-                    storeName: 'Salon LLC', // TODO: Get from location settings
-                    storeAddress: '123 Main St, City, ST 12345',
-                    storePhone: '(555) 123-4567'
+                    storeName: storeName || 'Store',
+                    storeAddress: storeAddress || undefined,
+                    storePhone: storePhone || undefined
                 },
-                '' // Cashier name not available in this context
+                cashierName || ''
             )
 
             const result = await printReceipt(receiptData)
@@ -206,6 +210,37 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
 
             if (res.ok) {
                 showToast('success', '✓ Refund processed successfully')
+
+                // Print refund receipt
+                try {
+                    const { printReceipt, isPrintAgentAvailable } = await import('@/lib/print-agent')
+                    const agentAvailable = await isPrintAgentAvailable()
+                    if (agentAvailable) {
+                        const refundAmount = calculateRefundAmount()
+                        const refundedItems = Array.from(selectedItems).map(itemId => {
+                            const item = transaction.lineItems.find(i => i.id === itemId)
+                            return {
+                                name: item?.service?.name || item?.product?.name || 'Item',
+                                quantity: itemQuantities[itemId] || item?.quantity || 1,
+                                price: item ? item.total / item.quantity : 0,
+                                total: item ? (item.total / item.quantity) * (itemQuantities[itemId] || item.quantity) : 0
+                            }
+                        })
+                        await printReceipt({
+                            storeName: storeName || undefined,
+                            cashier: cashierName || undefined,
+                            header: '*** REFUND ***',
+                            items: refundedItems,
+                            subtotal: refundAmount,
+                            tax: 0,
+                            total: refundAmount,
+                            date: new Date().toLocaleString(),
+                            footer: `Orig Invoice: #${transaction.invoiceNumber || transaction.id.slice(-8)}\nReason: ${refundReason}\nMethod: ${refundMethod}`,
+                            openDrawer: refundMethod === 'CASH',
+                        }).catch(console.error)
+                    }
+                } catch (e) { console.error('Refund receipt print error:', e) }
+
                 setTimeout(() => { onSuccess(); onClose() }, 1500)
             } else {
                 const error = await res.json()
@@ -255,6 +290,32 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
 
             if (res.ok) {
                 showToast('success', '✓ Transaction voided successfully')
+
+                // Print void receipt slip
+                try {
+                    const { printReceipt, isPrintAgentAvailable } = await import('@/lib/print-agent')
+                    const agentAvailable = await isPrintAgentAvailable()
+                    if (agentAvailable) {
+                        await printReceipt({
+                            storeName: storeName || undefined,
+                            cashier: cashierName || undefined,
+                            header: '*** VOID ***',
+                            items: transaction.lineItems.map(item => ({
+                                name: item.service?.name || item.product?.name || 'Item',
+                                quantity: item.quantity,
+                                price: item.price,
+                                total: item.total
+                            })),
+                            subtotal: transaction.subtotal,
+                            tax: transaction.tax,
+                            total: transaction.total,
+                            date: new Date().toLocaleString(),
+                            footer: `VOIDED Invoice: #${transaction.invoiceNumber || transaction.id.slice(-8)}\nReason: ${voidReason}`,
+                            openDrawer: false,
+                        }).catch(console.error)
+                    }
+                } catch (e) { console.error('Void receipt print error:', e) }
+
                 setTimeout(() => { onSuccess(); onClose() }, 1500)
             } else {
                 const error = await res.json()
