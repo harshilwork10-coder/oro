@@ -3,7 +3,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import OroLogo from '@/components/ui/OronexLogo';
+import OroLogo from '@/components/ui/OroLogo';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import {
     Home, ShoppingCart, Package, Calendar, Users, BarChart3, Settings,

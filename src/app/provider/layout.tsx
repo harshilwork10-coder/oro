@@ -9,7 +9,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
-import OroLogo from '@/components/ui/OroLogo';
 
 // Provider sidebar items
 const PROVIDER_SIDEBAR = [
