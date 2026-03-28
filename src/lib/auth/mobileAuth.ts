@@ -45,14 +45,20 @@ interface JWTPayload {
 export async function getAuthUser(request?: NextRequest | Request): Promise<AuthUser | null> {
     // Try NextAuth session first (web)
     const session = await getServerSession(authOptions)
-    if (session?.user?.id && session?.user?.franchiseId) {
-        return {
-            id: session.user.id,
-            email: session.user.email ?? undefined,
-            name: session.user.name ?? undefined,
-            role: session.user.role ?? 'EMPLOYEE',
-            franchiseId: session.user.franchiseId,
-            locationId: session.user.locationId ?? undefined
+    if (session?.user?.id) {
+        // PROVIDER and ADMIN users operate above the franchise hierarchy — they have no franchiseId
+        const role = session.user.role ?? 'EMPLOYEE'
+        const isSystemRole = role === 'PROVIDER' || role === 'ADMIN'
+        
+        if (isSystemRole || session.user.franchiseId) {
+            return {
+                id: session.user.id,
+                email: session.user.email ?? undefined,
+                name: session.user.name ?? undefined,
+                role,
+                franchiseId: session.user.franchiseId ?? (isSystemRole ? '__SYSTEM__' : ''),
+                locationId: session.user.locationId ?? undefined
+            }
         }
     }
 

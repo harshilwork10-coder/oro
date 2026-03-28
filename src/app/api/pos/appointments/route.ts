@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
             }),
             prisma.service.findMany({
                 where: { id: { in: serviceIds } },
-                select: { id: true, name: true }
+                select: { id: true, name: true, price: true }
             })
         ])
 
@@ -87,6 +87,7 @@ export async function GET(req: NextRequest) {
                 startTime: apt.startTime.getTime(),
                 endTime: apt.endTime?.getTime() || null,
                 services: service ? [service.name] : [],
+                servicePrice: service ? Number(service.price) : 0,
                 status: apt.status,
                 notes: apt.notes
             }
