@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 interface ClientRebookingSuggestion {
     client: {
         id: string
@@ -28,16 +26,15 @@ interface ClientRebookingSuggestion {
 }
 
 // GET - Get clients who are due for rebooking
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const staffId = searchParams.get('staffId') || user.id
         const daysAhead = parseInt(searchParams.get('daysAhead') || '7') // How many days ahead to look
         const limit = parseInt(searchParams.get('limit') || '20')

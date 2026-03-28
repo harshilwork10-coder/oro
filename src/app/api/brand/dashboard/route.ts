@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get franchisor record for this user
         const franchisor = await prisma.franchisor.findFirst({
-            where: { ownerId: session.user.id },
+            where: { ownerId: user.id },
             select: {
                 id: true,
                 name: true,

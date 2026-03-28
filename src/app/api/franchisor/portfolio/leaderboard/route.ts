@@ -6,21 +6,20 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 import { getDateRange, DateRangePreset } from '@/lib/reporting/kpiDefinitions';
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        ;
+        if (!authUser) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-
-        const user = session.user as { id: string; role: string; franchiseId?: string };
-
-        const { searchParams } = new URL(request.url);
+        const { searchParams } = new URL(req.url);
         const rangePreset = (searchParams.get('range') || 'MTD') as DateRangePreset;
         const sortBy = searchParams.get('sortBy') || 'netSales';
         const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
@@ -33,7 +32,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Get locations for this franchise
-        const locations = await (prisma as any).location.findMany({
+        const locations = await prisma.location.findMany({
             where: { franchiseId, provisioningStatus: 'ACTIVE' },
             select: { id: true, name: true, address: true }
         }) as Array<{ id: string; name: string; address: string }>;

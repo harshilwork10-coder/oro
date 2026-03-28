@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 
 /**
  * POST /api/pos/payments/log
@@ -14,14 +13,14 @@ import { prisma } from '@/lib/prisma';
  * - UNKNOWN: TCP dropped, status unclear (needs reconciliation)
  * - ERROR: Terminal error
  */
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.id) {
+        ;
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await request.json();
+        const body = await req.json();
         const {
             transactionId,  // Idempotency key
             status,         // SENT, APPROVED, DECLINED, UNKNOWN, ERROR
@@ -52,10 +51,7 @@ export async function POST(request: NextRequest) {
         // Get user's location if not provided
         let resolvedLocationId = locationId;
         if (!resolvedLocationId) {
-            const user = await prisma.user.findUnique({
-                where: { id: session.user.id },
-                select: { locationId: true }
-            });
+            ;
             resolvedLocationId = user?.locationId;
         }
 
@@ -73,7 +69,7 @@ export async function POST(request: NextRequest) {
                 reason,
                 stationId,
                 locationId: resolvedLocationId,
-                userId: session.user.id,
+                userId: user.id,
                 createdAt: new Date()
             },
             update: {
@@ -125,14 +121,17 @@ export async function POST(request: NextRequest) {
  * GET /api/pos/payments/log
  * Get payment logs for reconciliation (manager/admin only)
  */
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        ;
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { searchParams } = request.nextUrl;
+        const { searchParams } = req.nextUrl;
         const status = searchParams.get('status');  // Filter by status
         const transactionId = searchParams.get('transactionId');
         const limit = parseInt(searchParams.get('limit') || '50');
@@ -149,10 +148,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Get user's location for filtering
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { locationId: true, role: true }
-        });
+        ;
 
         // Non-admin users can only see their location's logs
         if (user?.role !== 'ADMIN' && user?.role !== 'PROVIDER' && user?.locationId) {

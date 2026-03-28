@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -8,13 +7,14 @@ import { prisma } from '@/lib/prisma'
  * Returns all users that belong to franchises under this franchisor
  */
 export async function GET(req: NextRequest) {
-    const session = await getServerSession(authOptions)
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!session?.user) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const franchisorId = (session.user as any).franchisorId
+    const franchisorId = user.franchisorId
 
     if (!franchisorId) {
         return NextResponse.json({ error: 'No franchisor context' }, { status: 403 })

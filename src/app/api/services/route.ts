@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
 
 // GET: Fetch services for a location (via franchise) with pagination
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const searchParams = req.nextUrl.searchParams
@@ -29,16 +29,11 @@ export async function GET(req: NextRequest) {
             })
 
             if (!location) {
-                return ApiResponse.notFound('Location')
+                return NextResponse.json({ error: 'Location' }, { status: 404 })
             }
             franchiseId = location.franchiseId
         } else {
             // If no locationId, get franchiseId from logged-in user
-            const user = await prisma.user.findUnique({
-                where: { id: session.user.id },
-                select: { franchiseId: true }
-            })
-
             if (!user?.franchiseId) {
                 return NextResponse.json({ data: [], pagination: { nextCursor: null, hasMore: false, total: 0 } })
             }
@@ -81,13 +76,13 @@ export async function GET(req: NextRequest) {
         const data = hasMore ? services.slice(0, take || 50) : services
         const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-        return ApiResponse.paginated(data, {
+        return NextResponse.json({ data: data, pagination: {
             nextCursor,
             hasMore,
             total: data.length
-        })
+        } })
     } catch (error) {
         console.error('Error fetching services:', error)
-        return ApiResponse.serverError('Failed to fetch services')
+        return NextResponse.json({ error: 'Failed to fetch services' }, { status: 500 })
     }
 }

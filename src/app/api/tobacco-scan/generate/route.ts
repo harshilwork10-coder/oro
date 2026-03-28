@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 
 // POST /api/tobacco-scan/generate - Generate tobacco scan report for a manufacturer
 export async function POST(request: Request) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
         // Check if submission already exists for this week/manufacturer
         const existingSubmission = await prisma.tobaccoScanSubmission.findFirst({
             where: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 manufacturer,
                 weekStartDate: startOfWeek,
                 weekEndDate: endOfWeek
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
         // Get all tobacco sales this week
         const transactions = await prisma.transaction.findMany({
             where: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 status: 'COMPLETED',
                 createdAt: {
                     gte: startOfWeek,
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
 
         // Get location
         const location = await prisma.location.findFirst({
-            where: { franchise: { id: session.user.franchiseId } }
+            where: { franchise: { id: user.franchiseId } }
         })
 
         if (!location) {
@@ -97,7 +98,7 @@ export async function POST(request: Request) {
         // Create the submission record
         const submission = await prisma.tobaccoScanSubmission.create({
             data: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 locationId: location.id,
                 manufacturer,
                 weekStartDate: startOfWeek,

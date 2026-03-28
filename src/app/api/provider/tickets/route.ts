@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user || session.user.role !== 'PROVIDER') {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user || user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -35,8 +36,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user || session.user.role !== 'PROVIDER') {
+    if (!user || user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
                 severity,
                 category: category || 'OTHER',
                 status: 'OPEN',
-                createdByUserId: session.user.id
+                createdByUserId: user.id
             }
         })
 
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
             data: {
                 ticketId: ticket.id,
                 message: description,
-                authorUserId: session.user.id,
+                authorUserId: user.id,
                 isInternal: false
             }
         })

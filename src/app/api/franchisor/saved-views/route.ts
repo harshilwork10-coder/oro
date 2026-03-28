@@ -7,9 +7,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-
 // Note: This is a simplified implementation
 // In production, add a SavedView model to store these server-side
 
@@ -24,14 +21,17 @@ interface SavedView {
 const viewStore = new Map<string, SavedView[]>();
 
 // GET - List saved views
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        ;
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const userId = (session.user as { id: string }).id;
+        const userId = (user as { id: string }).id;
         const savedViews = viewStore.get(userId) || [];
 
         return NextResponse.json({ savedViews });
@@ -42,15 +42,15 @@ export async function GET() {
 }
 
 // POST - Create saved view
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
+        ;
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const userId = (session.user as { id: string }).id;
-        const body = await request.json();
+        const userId = (user as { id: string }).id;
+        const body = await req.json();
         const { name, filters } = body;
 
         if (!name) {
@@ -77,15 +77,15 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE - Remove saved view
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
+        ;
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const userId = (session.user as { id: string }).id;
-        const { searchParams } = new URL(request.url);
+        const userId = (user as { id: string }).id;
+        const { searchParams } = new URL(req.url);
         const viewId = searchParams.get('id');
 
         if (!viewId) {

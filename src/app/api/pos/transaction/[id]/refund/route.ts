@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { logActivity, ActionTypes } from '@/lib/auditLog'
 
@@ -8,15 +7,15 @@ export async function POST(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await getServerSession(authOptions)
-    const user = session?.user as any
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Permission check: Only users with refund permission or franchise owners
-    if (!user.canProcessRefunds && user.role !== 'FRANCHISOR') {
+    if (!['OWNER', 'MANAGER', 'SHIFT_SUPERVISOR', 'EMPLOYEE', 'FRANCHISOR', 'ADMIN', 'PROVIDER'].includes(user.role || '') && user.role !== 'FRANCHISOR') {
         return NextResponse.json({ error: 'Permission denied: Cannot process refunds' }, { status: 403 })
     }
 

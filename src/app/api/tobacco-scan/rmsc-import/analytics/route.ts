@@ -11,22 +11,15 @@
  * - Multipack vs single
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
         const locations = await prisma.location.findMany({
             where: { franchise: { id: user.franchiseId } },
@@ -92,7 +85,7 @@ export async function GET(request: NextRequest) {
             }
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             totalRecords,
             totalBuydownAmount: buydownAgg._sum.buydownAmount
                 ? Math.round(Number(buydownAgg._sum.buydownAmount) * 100) / 100
@@ -109,6 +102,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[RMSC_ANALYTICS]', error)
-        return ApiResponse.error('Failed to compute analytics', 500)
+        return NextResponse.json({ error: 'Failed to compute analytics' }, { status: 500 })
     }
 }

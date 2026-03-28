@@ -4,24 +4,17 @@
  * GET — Total inventory value at cost and at retail price, grouped by category
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const includeZeroStock = searchParams.get('includeZeroStock') === 'true'
         const categoryId = searchParams.get('categoryId')
 
@@ -90,9 +83,9 @@ export async function GET(request: NextRequest) {
             totalUnits: items.reduce((s, i) => s + i.stock, 0)
         }
 
-        return ApiResponse.success({ items, categoryBreakdown, totals })
+        return NextResponse.json({ items, categoryBreakdown, totals })
     } catch (error) {
         console.error('[INV_VALUATION_GET]', error)
-        return ApiResponse.error('Failed to generate inventory valuation', 500)
+        return NextResponse.json({ error: 'Failed to generate inventory valuation' }, { status: 500 })
     }
 }

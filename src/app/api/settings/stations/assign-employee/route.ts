@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // POST - Assign employee to a station
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        // Only owners/managers can assign employees to stations
+// Only owners/managers can assign employees to stations
         if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER', 'PROVIDER'].includes(user.role)) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
         }
 
-        const { stationId, employeeId } = await request.json()
+        const { stationId, employeeId } = await req.json()
 
         if (!stationId || !employeeId) {
             return NextResponse.json({ error: 'Station ID and Employee ID required' }, { status: 400 })
@@ -45,19 +44,16 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE - Unassign employee from their current station
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER', 'PROVIDER'].includes(user.role)) {
+if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER', 'PROVIDER'].includes(user.role)) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
         }
 
-        const { employeeId } = await request.json()
+        const { employeeId } = await req.json()
 
         if (!employeeId) {
             return NextResponse.json({ error: 'Employee ID required' }, { status: 400 })

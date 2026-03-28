@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // GET: List all memberships for a franchisor (admin only)
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const authUser = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user || session.user.role !== 'PROVIDER') {
+        if (!authUser || authUser.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const franchisorId = searchParams.get('franchisorId')
 
         if (!franchisorId) {
@@ -46,15 +46,13 @@ export async function GET(request: NextRequest) {
 }
 
 // POST: Add a user to a franchisor (admin only)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user || session.user.role !== 'PROVIDER') {
+        if (!authUser || authUser.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { franchisorId, email, role = 'ADMIN', isPrimary = false } = body
 
         if (!franchisorId || !email) {
@@ -117,9 +115,9 @@ export async function POST(request: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'MEMBERSHIP_CREATED',
             entityType: 'FranchisorMembership',
@@ -135,15 +133,13 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE: Remove a membership (admin only)
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user || session.user.role !== 'PROVIDER') {
+        if (!authUser || authUser.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const membershipId = searchParams.get('id')
 
         if (!membershipId) {
@@ -180,9 +176,9 @@ export async function DELETE(request: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'MEMBERSHIP_DELETED',
             entityType: 'FranchisorMembership',

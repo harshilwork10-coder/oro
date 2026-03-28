@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // Helper to check permissions
 async function checkPermission() {
-    const session = await getServerSession(authOptions)
-    if (!session?.user || session.user.role !== 'PROVIDER') {
+    if (!user || user.role !== 'PROVIDER') {
         return null
     }
     return session
@@ -17,6 +15,9 @@ export async function PUT(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const user = await getAuthUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const session = await checkPermission()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
@@ -59,7 +60,7 @@ export async function DELETE(
     try {
         const { id } = await params
 
-        if (id === session.user.id) {
+        if (id === user.id) {
             return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 })
         }
 

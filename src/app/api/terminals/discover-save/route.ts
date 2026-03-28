@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // Called by POS when it discovers a terminal on its local network
 // The POS scans locally and reports here - Provider then sees the IP
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const { discoveredIP, discoveredPort, franchiseId, locationId } = await request.json()
+const { discoveredIP, discoveredPort, franchiseId, locationId } = await req.json()
 
         // Find the location to update
         let targetLocationId = locationId

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Fetch employee's availability from Schedule model
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const schedules = await prisma.schedule.findMany({
@@ -29,13 +28,11 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Update employee's availability via Schedule model
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const body = await request.json()
+        const body = await req.json()
         const { dayOfWeek, startTime, endTime, isAvailable } = body
 
         const schedule = await prisma.schedule.upsert({

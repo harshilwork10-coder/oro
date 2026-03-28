@@ -1,31 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { applyRateLimit, RATE_LIMITS, validateCuid } from '@/lib/security'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Only PROVIDER can reset owner passwords
-        if (session.user.role !== 'PROVIDER') {
+        if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Permission denied - only providers can reset owner passwords' }, { status: 403 })
         }
 
         // Rate limiting - prevent brute force
         const rateLimitResponse = await applyRateLimit(
-            `/api/admin/reset-owner-password:${session.user.id}`,
+            `/api/admin/reset-owner-password:${user.id}`,
             RATE_LIMITS.passwordReset
         )
         if (rateLimitResponse) return rateLimitResponse
 
-        const { ownerId, password } = await request.json()
+        const { ownerId, password } = await req.json()
 
         // Validate inputs
         const ownerIdValidation = validateCuid(ownerId)
@@ -65,9 +66,9 @@ export async function POST(request: NextRequest) {
         // Debug log removed
 
         // Audit log — CRITICAL SECURITY EVENT
-        await auditLog({
-            userId: session.user.id,
-            userEmail: (session.user as any).email,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
             userRole: 'PROVIDER',
             action: 'ADMIN_PASSWORD_RESET',
             entityType: 'User',

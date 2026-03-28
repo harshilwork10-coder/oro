@@ -1,29 +1,22 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { generateSetupCode } from '@/lib/setup-code'
 
 // POST - Generate setup codes for all locations that don't have one
-export async function POST() {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Only OWNER, FRANCHISEE, or PROVIDER can generate codes
         const allowedRoles = ['OWNER', 'FRANCHISEE', 'PROVIDER']
-        if (!allowedRoles.includes(session.user.role)) {
+        if (!allowedRoles.includes(user.role)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
         // Get user's franchise context
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true, role: true }
-        })
-
         // Find locations without setup codes
         const whereClause: any = { setupCode: null }
 
@@ -91,17 +84,14 @@ export async function POST() {
 }
 
 // GET - Get setup code for current user's location(s)
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { locationId: true, franchiseId: true, role: true }
-        })
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 })

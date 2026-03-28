@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(request)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
         const { id } = await params
 
-        if (!session?.user || session.user.role !== 'PROVIDER') {
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -42,14 +43,14 @@ export async function POST(
         })
 
         // Get origin from request
-        const origin = request.headers.get('origin') || request.headers.get('host') || 'http://localhost:3000'
+        const origin = req.headers.get('origin') || req.headers.get('host') || 'http://localhost:3000'
         const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
         const url = `${baseUrl}/auth/magic-link/${token}`
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'MAGIC_LINK_GENERATED',
             entityType: 'Franchisor',

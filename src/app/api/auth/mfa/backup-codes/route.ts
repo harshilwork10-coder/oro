@@ -4,17 +4,17 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { verifyMFAToken, regenerateBackupCodes } from '@/lib/security/mfa'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
@@ -29,11 +29,6 @@ export async function POST(req: Request) {
                 { status: 400 }
             )
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { mfaEnabled: true, mfaSecret: true }
-        })
 
         if (!user?.mfaEnabled || !user.mfaSecret) {
             return NextResponse.json(
@@ -56,20 +51,20 @@ export async function POST(req: Request) {
         const { backupCodes, encryptedBackupCodes } = regenerateBackupCodes()
 
         await prisma.user.update({
-            where: { id: session.user.id },
+            where: { id: user.id },
             data: { mfaBackupCodes: encryptedBackupCodes }
         })
 
         // Debug log removed
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: (session.user as any).email,
-            userRole: (session.user as any).role || 'USER',
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role || 'USER',
             action: 'MFA_BACKUP_CODES_REGENERATED',
             entityType: 'User',
-            entityId: session.user.id,
+            entityId: user.id,
             metadata: {}
         })
 

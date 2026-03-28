@@ -1,25 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { auditLog } from '@/lib/audit';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
+import { logActivity } from '@/lib/auditLog';
 
 // POST /api/admin/offboarding/archive - Mark as archived (final stage)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user || (session.user as any).role !== 'PROVIDER') {
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        ;
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await request.json();
+        const body = await req.json();
         const { caseId } = body;
 
         if (!caseId) {
             return NextResponse.json({ error: 'caseId is required' }, { status: 400 });
         }
 
-        const offboardingCase = await (prisma as any).offboardingCase.findUnique({
+        const offboardingCase = await prisma.offboardingCase.findUnique({
             where: { id: caseId }
         });
 
@@ -72,9 +74,9 @@ export async function POST(request: NextRequest) {
         retentionEndDate.setFullYear(retentionEndDate.getFullYear() + offboardingCase.retentionYears);
 
         // Audit log — CRITICAL COMPLIANCE
-        await auditLog({
-            userId: session.user.id,
-            userEmail: (session.user as any).email,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
             userRole: 'PROVIDER',
             action: 'OFFBOARDING_ARCHIVE',
             entityType: isFranchise ? 'FRANCHISE' : 'FRANCHISOR',

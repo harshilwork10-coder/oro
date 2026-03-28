@@ -4,28 +4,20 @@
  * GET — Flag unusual cashier behavior: high void/refund rates, excess no-sales
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { role: true, franchiseId: true }
-        })
-
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
         if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role || '')) {
-            return ApiResponse.forbidden('Manager+ only')
+            return NextResponse.json({ error: 'Manager+ only' }, { status: 403 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '7')
         const since = new Date(); since.setDate(since.getDate() - days)
 
@@ -71,7 +63,7 @@ export async function GET(request: NextRequest) {
 
         anomalies.sort((a, b) => b.flags.length - a.flags.length)
 
-        return ApiResponse.success({
+        return NextResponse.json({
             anomalies,
             periodDays: days,
             summary: {
@@ -82,6 +74,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[ANOMALY_GET]', error)
-        return ApiResponse.error('Failed to detect anomalies', 500)
+        return NextResponse.json({ error: 'Failed to detect anomalies' }, { status: 500 })
     }
 }

@@ -1,68 +1,65 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 
-// POST — Complete (or update) an end-of-day checklist
+/**
+ * POST /api/pos/eod-checklist — Complete end-of-day checklist
+ * GET /api/pos/eod-checklist — Get default checklist + today's completion
+ */
 export async function POST(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
+    const locationId = dbUser?.locationId
+    if (!locationId) return NextResponse.json({ error: 'No location' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
         const body = await request.json()
         const { items, notes } = body as {
             items: { task: string; completed: boolean; notes?: string }[]
             notes?: string
         }
 
-        if (!items?.length) return ApiResponse.badRequest('Checklist items required')
+        if (!items?.length) return NextResponse.json({ error: 'Checklist items required' }, { status: 400 })
 
-        // Store as audit event
-        await (prisma as any).auditEvent.create({
+        await prisma.auditEvent.create({
             data: {
                 locationId,
-                userId: user.id,
-                type: 'EOD_CHECKLIST',
-                data: JSON.stringify({
-                    completedBy: user.name || user.email,
+                franchiseId: user.franchiseId,
+                employeeId: user.id,
+                employeeName: user.email,
+                eventType: 'EOD_CHECKLIST',
+                severity: 'LOW',
+                details: JSON.stringify({
+                    completedBy: user.email,
                     completedAt: new Date(),
-                    items,
-                    notes,
+                    items, notes,
                     allDone: items.every(i => i.completed)
                 })
             }
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             completed: items.every(i => i.completed),
             totalTasks: items.length,
             doneTasks: items.filter(i => i.completed).length
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[EOD_CHECKLIST_POST]', error)
-        return ApiResponse.error('Failed to save checklist')
+        return NextResponse.json({ error: 'Failed to save checklist' }, { status: 500 })
     }
 }
 
-// GET — Get default checklist + today's completion status
 export async function GET(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
+    const locationId = dbUser?.locationId
+    if (!locationId) return NextResponse.json({ error: 'No location' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
-        // Default retail EOD checklist
         const defaultChecklist = [
             { task: 'Count all cash drawers', category: 'CASH' },
             { task: 'Record safe count', category: 'CASH' },
@@ -76,23 +73,18 @@ export async function GET(request: NextRequest) {
             { task: 'Lock up / set alarm', category: 'STORE' }
         ]
 
-        // Check if today's checklist was already completed
         const today = new Date(); today.setHours(0, 0, 0, 0)
-        const todayCompletion = await (prisma as any).auditEvent.findFirst({
-            where: {
-                locationId,
-                type: 'EOD_CHECKLIST',
-                createdAt: { gte: today }
-            },
+        const todayCompletion = await prisma.auditEvent.findFirst({
+            where: { locationId, eventType: 'EOD_CHECKLIST', createdAt: { gte: today } },
             orderBy: { createdAt: 'desc' }
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             checklist: defaultChecklist,
-            todayCompleted: todayCompletion ? JSON.parse(todayCompletion.data) : null
+            todayCompleted: todayCompletion?.details ? JSON.parse(todayCompletion.details) : null
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[EOD_CHECKLIST_GET]', error)
-        return ApiResponse.error('Failed to fetch checklist')
+        return NextResponse.json({ error: 'Failed to fetch checklist' }, { status: 500 })
     }
 }

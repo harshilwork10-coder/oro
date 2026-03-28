@@ -1,30 +1,30 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
-import { ApiResponse } from '@/lib/api-response'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 import { parsePaginationParams } from '@/lib/pagination'
 
 // GET /api/lottery/packs - List lottery packs with pagination
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
         const status = searchParams.get('status')
         const gameId = searchParams.get('gameId')
 
         // Get location for user
         const location = await prisma.location.findFirst({
-            where: { franchise: { id: session.user.franchiseId } }
+            where: { franchise: { id: user.franchiseId } }
         })
 
         if (!location) {
-            return ApiResponse.success({ packs: [], pagination: { hasMore: false, nextCursor: null } })
+            return NextResponse.json({ packs: [], pagination: { hasMore: false, nextCursor: null } })
         }
 
         // Build where clause
@@ -55,48 +55,47 @@ export async function GET(request: NextRequest) {
         const data = hasMore ? packs.slice(0, take || 50) : packs
         const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-        return ApiResponse.paginated(data, {
+        return NextResponse.json({ data: data, pagination: {
             nextCursor,
             hasMore,
             total: data.length
-        })
+        } })
     } catch (error) {
         console.error('Failed to fetch lottery packs:', error)
-        return ApiResponse.serverError('Failed to fetch packs')
+        return NextResponse.json({ error: 'Failed to fetch packs' }, { status: 500 })
     }
 }
 
 // POST /api/lottery/packs - Create new lottery pack
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
-            return ApiResponse.unauthorized()
+        if (!user?.franchiseId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { gameId, packNumber, ticketCount } = body
 
         if (!gameId || !packNumber) {
-            return ApiResponse.validationError('Game and pack number are required')
+            return NextResponse.json({ error: 'Game and pack number are required' }, { status: 422 })
         }
 
         // Verify game belongs to franchise
         const game = await prisma.lotteryGame.findFirst({
-            where: { id: gameId, franchiseId: session.user.franchiseId }
+            where: { id: gameId, franchiseId: user.franchiseId }
         })
 
         if (!game) {
-            return ApiResponse.notFound('Game')
+            return NextResponse.json({ error: 'Game' }, { status: 404 })
         }
 
         // Get location
         const location = await prisma.location.findFirst({
-            where: { franchise: { id: session.user.franchiseId } }
+            where: { franchise: { id: user.franchiseId } }
         })
 
         if (!location) {
-            return ApiResponse.error('No location found', 400)
+            return NextResponse.json({ error: 'No location found' }, { status: 400 })
         }
 
         const pack = await prisma.lotteryPack.create({
@@ -111,9 +110,9 @@ export async function POST(request: NextRequest) {
             include: { game: true }
         })
 
-        return ApiResponse.created(pack)
+        return NextResponse.json(pack, { status: 201 })
     } catch (error) {
         console.error('Failed to create lottery pack:', error)
-        return ApiResponse.serverError('Failed to create pack')
+        return NextResponse.json({ error: 'Failed to create pack' }, { status: 500 })
     }
 }

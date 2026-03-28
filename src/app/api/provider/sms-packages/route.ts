@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Get SMS packages
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.email) {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!authUser?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -35,22 +36,21 @@ export async function GET(request: NextRequest) {
 }
 
 // PUT - Update SMS packages
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.email) {
+        if (!authUser?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email }
+            where: { email: user.email }
         })
 
         if (user?.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Only providers can update packages' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { packages } = body
 
         if (!packages || packages.length !== 4) {

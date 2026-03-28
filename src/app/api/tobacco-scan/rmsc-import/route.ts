@@ -9,11 +9,9 @@
  *   - replaceExisting: "true" to replace previous import of same file (optional)
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 import {
     parseCsvContent,
     parseExcelContent,
@@ -21,26 +19,22 @@ import {
     type RmscParsedRecord,
 } from '@/lib/rmsc-parser'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { id: true, franchiseId: true }
-        })
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
         // Parse multipart form data
-        const formData = await request.formData()
+        const formData = await req.formData()
         const file = formData.get('file') as File | null
         const locationId = formData.get('locationId') as string | null
         const replaceExisting = formData.get('replaceExisting') === 'true'
 
         // Validation 1: file present
         if (!file) {
-            return ApiResponse.badRequest('No file uploaded')
+            return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
         }
 
         // Validation 2: extension/type allowed
@@ -48,7 +42,7 @@ export async function POST(request: NextRequest) {
         const isCsv = fileName.endsWith('.csv')
         const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls')
         if (!isCsv && !isExcel) {
-            return ApiResponse.badRequest('Only CSV and Excel (.xlsx) files are supported')
+            return NextResponse.json({ error: 'Only CSV and Excel (.xlsx) files are supported' }, { status: 400 })
         }
 
         // Resolve location
@@ -58,7 +52,7 @@ export async function POST(request: NextRequest) {
                 where: { franchise: { id: user.franchiseId } },
                 select: { id: true }
             })
-            if (!location) return ApiResponse.badRequest('No location found for franchise')
+            if (!location) return NextResponse.json({ error: 'No location found for franchise' }, { status: 400 })
             resolvedLocationId = location.id
         }
 
@@ -72,11 +66,11 @@ export async function POST(request: NextRequest) {
         })
 
         if (existingBatch && !replaceExisting) {
-            return ApiResponse.badRequest(
-                `This file was already imported on ${existingBatch.importedAt.toISOString().split('T')[0]} ` +
+            return NextResponse.json({
+                error: `This file was already imported on ${existingBatch.importedAt.toISOString().split('T')[0]} ` +
                 `(batch ${existingBatch.id}, ${existingBatch.importedRows} rows). ` +
                 `Set replaceExisting=true to re-import.`
-            )
+            }, { status: 400 })
         }
 
         // If replacing, delete old batch (cascade deletes records)
@@ -94,7 +88,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (parseResult.records.length === 0 && parseResult.errors.length === 0) {
-            return ApiResponse.badRequest('No RMSC data found in file. Ensure the file contains RMSC 34-field headers (Outlet Name, UPC Code, etc.)')
+            return NextResponse.json({ error: 'No RMSC data found in file. Ensure the file contains RMSC 34-field headers (Outlet Name, UPC Code, etc.)' }, { status: 400 })
         }
 
         // Deduplicate against existing records in this location
@@ -173,7 +167,7 @@ export async function POST(request: NextRequest) {
             })
         }
 
-        return ApiResponse.success({
+        return NextResponse.json({
             batchId: batch.id,
             rowsTotal: parseResult.totalRows,
             rowsImported: newRecords.length,
@@ -184,6 +178,6 @@ export async function POST(request: NextRequest) {
         })
     } catch (error) {
         console.error('[RMSC_IMPORT]', error)
-        return ApiResponse.error('Failed to import RMSC scan data', 500)
+        return NextResponse.json({ error: 'Failed to import RMSC scan data' }, { status: 500 })
     }
 }

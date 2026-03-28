@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - List order templates
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -35,16 +33,13 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create new template
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, supplierId, items, isDefault } = body
 
         if (!name || !items || items.length === 0) {
@@ -83,16 +78,13 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT - Use template (create PO from template)
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { templateId, locationId, adjustedItems } = body
 
         if (!templateId || !locationId) {
@@ -177,16 +169,13 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE - Remove template
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const templateId = searchParams.get('id')
 
         if (!templateId) {

@@ -1,23 +1,18 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // GET - Get all store accounts with balances and pagination
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { id: true, role: true, franchiseId: true }
-        })
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
         let franchiseId = user?.franchiseId
 
@@ -32,10 +27,10 @@ export async function GET(request: NextRequest) {
         }
 
         if (!franchiseId) {
-            return ApiResponse.success({ accounts: [], totals: { totalAccounts: 0, totalOutstanding: 0, accountsWithBalance: 0 } })
+            return NextResponse.json({ accounts: [], totals: { totalAccounts: 0, totalOutstanding: 0, accountsWithBalance: 0 } })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
         const filter = searchParams.get('filter') || 'all'
         const search = searchParams.get('search')
@@ -114,39 +109,33 @@ export async function GET(request: NextRequest) {
 
         const nextCursor = hasMore && accounts.length > 0 ? accounts[accounts.length - 1].id : null
 
-        return ApiResponse.success({
+        return NextResponse.json({
             accounts,
             totals: { totalAccounts: totalCount, totalOutstanding: 0, accountsWithBalance: outstandingCount },
             pagination: { nextCursor, hasMore, total: totalCount }
         })
     } catch (error) {
         console.error('Error:', error)
-        return ApiResponse.serverError('Failed to fetch store accounts')
+        return NextResponse.json({ error: 'Failed to fetch store accounts' }, { status: 500 })
     }
 }
 
 // POST - Create new store account for customer
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
 
         if (!user?.franchiseId) {
-            return ApiResponse.forbidden('No franchise assigned')
+            return NextResponse.json({ error: 'No franchise assigned' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { clientId, creditLimit } = body
 
         if (!clientId) {
-            return ApiResponse.validationError('Client ID required')
+            return NextResponse.json({ error: 'Client ID required' }, { status: 422 })
         }
 
         // SECURITY: Verify client belongs to user's franchise before modifying
@@ -156,12 +145,12 @@ export async function POST(request: NextRequest) {
         })
 
         if (!existingClient) {
-            return ApiResponse.notFound('Client')
+            return NextResponse.json({ error: 'Client' }, { status: 404 })
         }
 
         if (existingClient.franchiseId !== user.franchiseId) {
-            console.error(`[SECURITY] IDOR attempt: User ${session.user.id} tried to modify client ${clientId}`)
-            return ApiResponse.forbidden('Access denied')
+            console.error(`[SECURITY] IDOR attempt: User ${user.id} tried to modify client ${clientId}`)
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
         const client = await prisma.client.update({
@@ -170,29 +159,29 @@ export async function POST(request: NextRequest) {
                 hasStoreAccount: true,
                 storeAccountBalance: 0,
                 storeAccountLimit: creditLimit || 500,
-                storeAccountApprovedBy: session.user.id,
+                storeAccountApprovedBy: user.id,
                 storeAccountApprovedAt: new Date()
             }
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
-            userRole: (session.user as any).role || 'USER',
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
+            userRole: user.role || 'USER',
             action: 'STORE_ACCOUNT_CREATED',
             entityType: 'Client',
             entityId: clientId,
             metadata: { creditLimit: creditLimit || 500 }
         })
 
-        return ApiResponse.created({
+        return NextResponse.json({
             id: client.id,
             name: `${client.firstName} ${client.lastName}`,
-            limit: Number(client.storeAccountLimit)
+            limit: Number(client.storeAccountLimit, { status: 201 })
         })
     } catch (error) {
         console.error('Error:', error)
-        return ApiResponse.serverError('Failed to create store account')
+        return NextResponse.json({ error: 'Failed to create store account' }, { status: 500 })
     }
 }

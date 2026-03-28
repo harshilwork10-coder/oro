@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET: Fetch products for Pulse inventory (RETAIL only)
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Check industry type - inventory is for RETAIL only
-        const industryType = (session.user as any)?.industryType || 'SERVICE'
+        const industryType = (user as any)?.industryType || 'SERVICE'
         if (industryType !== 'RETAIL') {
             return NextResponse.json({
                 error: 'Inventory is for retail businesses only. Use /api/pulse/services for service businesses.',
@@ -21,14 +22,9 @@ export async function GET(request: NextRequest) {
             }, { status: 400 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const search = searchParams.get('search') || ''
         const locationId = searchParams.get('locationId')
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
 
         if (!user?.franchiseId) {
             return NextResponse.json({ products: [] })
@@ -83,14 +79,13 @@ export async function GET(request: NextRequest) {
 }
 
 // PUT: Update product stock/price (supports per-location updates)
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { productId, price, costPrice, stock, locationIds } = body
 
         if (!productId) {
@@ -98,11 +93,6 @@ export async function PUT(request: NextRequest) {
         }
 
         // Verify user owns this product
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'No franchise' }, { status: 400 })
         }
@@ -171,14 +161,13 @@ export async function PUT(request: NextRequest) {
 }
 
 // POST: Add new product (quick add)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, price, costPrice, stock, barcode } = body
 
         if (!name || price === undefined) {
@@ -186,22 +175,6 @@ export async function POST(request: NextRequest) {
         }
 
         // Get user with role and franchise info
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: {
-                role: true,
-                franchiseId: true,
-                franchisor: {
-                    select: {
-                        franchises: {
-                            select: { id: true },
-                            take: 1
-                        }
-                    }
-                }
-            }
-        })
-
         // Provider users cannot add inventory directly
         if (user?.role === 'PROVIDER') {
             return NextResponse.json({

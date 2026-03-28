@@ -1,24 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
 
 // GET - List products with pagination, search, and filters
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = session.user as { franchiseId?: string }
+        if (!authUser) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
         if (!user.franchiseId) {
-            return ApiResponse.error('No franchise associated', 400)
+            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
 
         // Filters
@@ -97,31 +95,28 @@ export async function GET(request: NextRequest) {
         const data = hasMore ? products.slice(0, take) : products
         const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-        return ApiResponse.paginated(data, {
+        return NextResponse.json({ data: data, pagination: {
             nextCursor,
             hasMore,
             total: data.length
-        })
+        } })
     } catch (error) {
         console.error('[INVENTORY_PRODUCTS_GET]', error)
-        return ApiResponse.serverError('Failed to fetch products')
+        return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 })
     }
 }
 
 // POST - Create new product
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!authUser) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!user.franchiseId) {
+if (!user.franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, barcode, sku, price, cashPrice, cost, stock, reorderPoint, categoryId, vendor, unitsPerCase, casePrice, sellByCase } = body
 
         if (!name?.trim()) {

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // AUDIT STANDARD: Proper decimal rounding to prevent penny errors
@@ -12,14 +11,16 @@ function roundCurrency(value: number): number {
 const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
 
 // GET - Generate monthly report as HTML for PDF
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const autoPrint = searchParams.get('print') === 'true'
         const monthParam = searchParams.get('month') // YYYY-MM format
 
@@ -36,11 +37,6 @@ export async function GET(request: NextRequest) {
         const startDate = new Date(year, month, 1)
         const endDate = new Date(year, month + 1, 0, 23, 59, 59)
         const daysInMonth = endDate.getDate()
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true, franchise: { select: { name: true, settings: true } } }
-        })
 
         if (!user?.franchiseId) {
             return new NextResponse('No franchise found.', { headers: { 'Content-Type': 'text/plain' } })

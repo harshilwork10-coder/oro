@@ -6,8 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // Discount bands by service price
@@ -24,14 +23,16 @@ function getDiscountForPrice(avgPrice: number): { value: number; type: string } 
 }
 
 // GET - Get current week's suggestions
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const locationId = searchParams.get('locationId')
 
         if (!locationId) {
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
         weekStart.setHours(0, 0, 0, 0)
 
         // Find existing suggestions for this week
-        let suggestions = await (prisma as any).dealSuggestion.findMany({
+        let suggestions = await prisma.dealSuggestion.findMany({
             where: {
                 locationId,
                 weekOf: { gte: weekStart }
@@ -71,14 +72,13 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Force regenerate suggestions (admin/cron)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { locationId } = body
 
         if (!locationId) {
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
         weekStart.setHours(0, 0, 0, 0)
 
         // Delete old pending suggestions for this week
-        await (prisma as any).dealSuggestion.deleteMany({
+        await prisma.dealSuggestion.deleteMany({
             where: {
                 locationId,
                 weekOf: { gte: weekStart },
@@ -161,7 +161,7 @@ async function generateSuggestions(locationId: string, weekOf: Date) {
 
     // Count inactive customers (35+ days)
     const thirtyFiveDaysAgo = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000)
-    const inactiveCount = await (prisma as any).client.count({
+    const inactiveCount = await prisma.client.count({
         where: {
             franchiseId: location.franchiseId,
             lastVisit: { lt: thirtyFiveDaysAgo },
@@ -172,7 +172,7 @@ async function generateSuggestions(locationId: string, weekOf: Date) {
     // Create 3 suggestions
     const suggestions = await (prisma as any).$transaction([
         // 1. Slow Day Deal
-        (prisma as any).dealSuggestion.create({
+        prisma.dealSuggestion.create({
             data: {
                 locationId,
                 weekOf,
@@ -191,7 +191,7 @@ async function generateSuggestions(locationId: string, weekOf: Date) {
             }
         }),
         // 2. Win-Back Deal
-        (prisma as any).dealSuggestion.create({
+        prisma.dealSuggestion.create({
             data: {
                 locationId,
                 weekOf,
@@ -207,7 +207,7 @@ async function generateSuggestions(locationId: string, weekOf: Date) {
             }
         }),
         // 3. Rebook Deal
-        (prisma as any).dealSuggestion.create({
+        prisma.dealSuggestion.create({
             data: {
                 locationId,
                 weekOf,

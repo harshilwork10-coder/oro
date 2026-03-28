@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // GET: Fetch appointments
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.email) {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!authUser?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get user's franchise/location
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { email: user.email },
             select: { franchiseId: true, locationId: true }
         })
 
@@ -82,9 +83,6 @@ export async function GET(req: NextRequest) {
 // POST: Create new appointment
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -172,7 +170,7 @@ export async function POST(req: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role || 'USER',

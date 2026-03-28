@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 
 // GET /api/tobacco-scan/submissions - List all tobacco scan submissions
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const submissions = await prisma.tobaccoScanSubmission.findMany({
-            where: { franchiseId: session.user.franchiseId },
+            where: { franchiseId: user.franchiseId },
             orderBy: { weekStartDate: 'desc' },
             take: 20
         })

@@ -4,25 +4,17 @@
  * GET — Compare performance across locations (for owners with multiple stores)
  */
 
-import { NextRequest } from 'next/server'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { role: true, franchiseId: true }
-        })
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
-
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '7')
         const since = new Date(); since.setDate(since.getDate() - days)
 
@@ -35,7 +27,7 @@ export async function GET(request: NextRequest) {
         const locations = franchise?.locations || []
 
         if (locations.length === 0) {
-            return ApiResponse.success({ period: `Last ${days} days`, totalRevenue: 0, locationCount: 0, comparison: [] })
+            return NextResponse.json({ period: `Last ${days} days`, totalRevenue: 0, locationCount: 0, comparison: [] })
         }
 
         // Get all completed transactions for this franchise
@@ -77,7 +69,7 @@ export async function GET(request: NextRequest) {
 
         const totalRevenue = comparison.reduce((s, l) => s + l.revenue, 0)
 
-        return ApiResponse.success({
+        return NextResponse.json({
             period: `Last ${days} days`,
             totalRevenue: Math.round(totalRevenue * 100) / 100,
             locationCount: comparison.length,
@@ -85,6 +77,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[MULTI_STORE_GET]', error)
-        return ApiResponse.error('Failed to generate comparison', 500)
+        return NextResponse.json({ error: 'Failed to generate comparison' }, { status: 500 })
     }
 }

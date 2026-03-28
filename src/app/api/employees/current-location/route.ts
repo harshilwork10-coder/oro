@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // PATCH: Update employee's current working location
 export async function PATCH(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -18,11 +16,6 @@ export async function PATCH(req: NextRequest) {
         }
 
         // Verify the location exists and belongs to user's franchise
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
@@ -40,7 +33,7 @@ export async function PATCH(req: NextRequest) {
 
         // Update user's current location
         const updatedUser = await prisma.user.update({
-            where: { id: session.user.id },
+            where: { id: user.id },
             data: { currentLocationId: locationId },
             select: {
                 id: true,
@@ -62,30 +55,14 @@ export async function PATCH(req: NextRequest) {
 }
 
 // GET: Get employee's current working location
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: {
-                currentLocationId: true,
-                currentLocation: {
-                    select: { id: true, name: true, slug: true }
-                },
-                // Also get available locations for dropdown
-                franchise: {
-                    select: {
-                        locations: {
-                            select: { id: true, name: true, slug: true }
-                        }
-                    }
-                }
-            }
-        })
 
         return NextResponse.json({
             currentLocation: user?.currentLocation || null,

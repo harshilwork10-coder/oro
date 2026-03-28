@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // Assign or revoke Pulse seat for a user
 // POST: { userId: string, action: 'assign' | 'revoke' }
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Only PROVIDER or OWNER can manage seats
         const currentUser = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: user.id },
             select: { role: true, franchiseId: true }
         })
 
@@ -22,7 +20,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { userId, action } = body
 
         if (!userId || !['assign', 'revoke'].includes(action)) {
@@ -113,14 +111,16 @@ export async function POST(request: NextRequest) {
 }
 
 // Get seat usage for a business
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const franchisorId = searchParams.get('franchisorId')
 
         if (!franchisorId) {

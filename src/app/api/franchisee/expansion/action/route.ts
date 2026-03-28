@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // POST: Franchisor approves or rejects an expansion request
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user || session.user.role !== 'FRANCHISOR') {
+        if (!user || user.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Unauthorized - Franchisor only' }, { status: 401 })
         }
 
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Verify ownership
-        if (request.franchise.franchisor.ownerId !== session.user.id) {
+        if (request.franchise.franchisor.ownerId !== user.id) {
             return NextResponse.json({
                 error: 'You do not own this franchise'
             }, { status: 403 })

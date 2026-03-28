@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // GET: Search clients
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -16,8 +16,7 @@ export async function GET(req: NextRequest) {
         const requestedFranchiseId = searchParams.get('franchiseId')
 
         // Use session franchiseId — validate if client-provided differs
-        const user = session.user as any
-        const franchiseId = requestedFranchiseId || user.franchiseId
+const franchiseId = requestedFranchiseId || user.franchiseId
         if (!franchiseId) {
             return NextResponse.json({ error: 'Franchise ID required' }, { status: 400 })
         }

@@ -6,26 +6,27 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const currentUser = session.user as any
+        const currentUser = user as any
         const storeId = currentUser.storeId || currentUser.locationId
 
         if (!storeId) {
             return NextResponse.json({ error: 'No store context' }, { status: 400 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { employeeId, pin } = body
 
         if (!employeeId || !pin) {

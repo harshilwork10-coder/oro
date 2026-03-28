@@ -1,30 +1,26 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // Send receipt via email
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as { franchiseId?: string; email?: string }
-
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user?.franchiseId) {
-            return ApiResponse.unauthorized()
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const body = await req.json()
         const { transactionId, email } = body
 
         if (!transactionId || !email) {
-            return ApiResponse.validationError('Transaction ID and email are required')
+            return NextResponse.json({ error: 'Transaction ID and email are required' }, { status: 422 })
         }
 
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if (!emailRegex.test(email)) {
-            return ApiResponse.validationError('Invalid email format')
+            return NextResponse.json({ error: 'Invalid email format' }, { status: 422 })
         }
 
         // Get transaction with line items
@@ -34,7 +30,7 @@ export async function POST(req: NextRequest) {
         })
 
         if (!txRaw) {
-            return ApiResponse.notFound('Transaction not found')
+            return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
         }
 
         // Cast to any to access fields without strict schema validation
@@ -86,7 +82,7 @@ Thank you for your business!
         //     html: generateReceiptHtml(transaction)
         // })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             message: 'Receipt sent successfully',
             email: email,
             transactionId: transactionId
@@ -94,6 +90,6 @@ Thank you for your business!
 
     } catch (error) {
         console.error('Error sending email receipt:', error)
-        return ApiResponse.serverError('Failed to send email receipt')
+        return NextResponse.json({ error: 'Failed to send email receipt' }, { status: 500 })
     }
 }

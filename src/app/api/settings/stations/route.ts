@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { generateStationCode } from '@/lib/codeGenerator'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // Helper to get user's locationId (direct or via franchise)
 async function getUserLocationId(user: any): Promise<string | null> {
@@ -43,16 +42,16 @@ async function verifyLocationAccess(user: any, targetLocationId: string) {
 }
 
 // GET - List all stations for a location
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             console.error('[stations] No session')
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const { searchParams } = new URL(request.url)
+const { searchParams } = new URL(req.url)
         const locationId = searchParams.get('locationId')
 
         console.error('[stations] Request for locationId:', locationId, 'by user:', user.email, 'role:', user.role)
@@ -84,14 +83,11 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create new station
-export async function POST(request: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+export async function POST(req: NextRequest) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const user = session.user as any
-
-    const { locationId, name, pairingCode: providedCode, paymentMode, terminalId } = await request.json()
+const { locationId, name, pairingCode: providedCode, paymentMode, terminalId } = await req.json()
 
     if (!locationId || !name) {
         return NextResponse.json({ error: 'Location and name required' }, { status: 400 })
@@ -134,7 +130,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Audit log
-    await auditLog({
+    await logActivity({
         userId: user.id,
         userEmail: user.email,
         userRole: user.role,
@@ -149,14 +145,11 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE - Delete a station
-export async function DELETE(request: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+export async function DELETE(req: NextRequest) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const user = session.user as any
-
-    const { searchParams } = new URL(request.url)
+const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
     if (!id) {
@@ -184,7 +177,7 @@ export async function DELETE(request: NextRequest) {
     })
 
     // Audit log
-    await auditLog({
+    await logActivity({
         userId: user.id,
         userEmail: user.email,
         userRole: user.role,
@@ -199,21 +192,18 @@ export async function DELETE(request: NextRequest) {
 }
 
 // PATCH - Update station name
-export async function PATCH(request: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+export async function PATCH(req: NextRequest) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const user = session.user as any
-
-    const { searchParams } = new URL(request.url)
+const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
     if (!id) {
         return NextResponse.json({ error: 'Station ID required' }, { status: 400 })
     }
 
-    const { name, paymentMode, terminalId } = await request.json()
+    const { name, paymentMode, terminalId } = await req.json()
 
     // Allow partial updates
     if (!name?.trim() && !paymentMode && terminalId === undefined) {
@@ -246,7 +236,7 @@ export async function PATCH(request: NextRequest) {
     })
 
     // Audit log
-    await auditLog({
+    await logActivity({
         userId: user.id,
         userEmail: user.email,
         userRole: user.role,

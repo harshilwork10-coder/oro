@@ -6,9 +6,8 @@
  * Returns text/csv file with RMSC 34-field format generated from POS transactions.
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import {
     generateRmscCsv,
@@ -18,22 +17,20 @@ import {
     type TobaccoDealMatch,
 } from '@/lib/rmsc-export'
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return new Response('Unauthorized', { status: 401 })
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
         if (!user?.franchiseId) {
             return new Response('No franchise', { status: 400 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const weekStartStr = searchParams.get('weekStart')
         const locationIdParam = searchParams.get('locationId')
 

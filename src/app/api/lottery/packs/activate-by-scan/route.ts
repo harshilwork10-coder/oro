@@ -1,24 +1,23 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // POST /api/lottery/packs/activate-by-scan - Activate pack by scanning barcode
 // This enables the "scan to activate" feature for lottery pack management
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const franchiseId = session.user.franchiseId
-        const body = await request.json()
+        const franchiseId = user.franchiseId
+        const body = await req.json()
         const { barcode, locationId } = body
 
         if (!barcode) {
-            return ApiResponse.validationError('Pack barcode is required')
+            return NextResponse.json({ error: 'Pack barcode is required' }, { status: 422 })
         }
 
         // Parse pack barcode - common formats:
@@ -46,7 +45,7 @@ export async function POST(request: NextRequest) {
 
         if (existingPack) {
             if (existingPack.status === 'ACTIVE' || existingPack.status === 'ACTIVATED') {
-                return ApiResponse.error('Pack already activated', 400)
+                return NextResponse.json({ error: 'Pack already activated' }, { status: 400 })
             }
 
             // Pack exists but not active - activate it
@@ -59,7 +58,7 @@ export async function POST(request: NextRequest) {
                 include: { game: true }
             })
 
-            return ApiResponse.success({
+            return NextResponse.json({
                 pack: activatedPack,
                 message: `Pack #${packNumber} activated`,
                 gameName: activatedPack.game?.gameName || 'Unknown Game'
@@ -90,7 +89,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!targetLocationId) {
-            return ApiResponse.error('No location found', 400)
+            return NextResponse.json({ error: 'No location found' }, { status: 400 })
         }
 
         // If no game found, use any active game or create default
@@ -126,15 +125,15 @@ export async function POST(request: NextRequest) {
             include: { game: true }
         })
 
-        return ApiResponse.created({
+        return NextResponse.json({
             pack: newPack,
             message: `Pack #${packNumber} activated`,
             gameName: newPack.game?.gameName || 'Unknown Game',
             wasCreated: true
-        })
+        }, { status: 201 })
 
     } catch (error) {
         console.error('Failed to activate pack by scan:', error)
-        return ApiResponse.serverError('Failed to activate pack')
+        return NextResponse.json({ error: 'Failed to activate pack' }, { status: 500 })
     }
 }

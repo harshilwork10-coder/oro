@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { auditLog } from '@/lib/audit';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
+import { logActivity } from '@/lib/auditLog';
 
 // POST /api/admin/offboarding/start - Start offboarding (suspend account + create case)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user || (session.user as any).role !== 'PROVIDER') {
+        ;
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await request.json();
+        const body = await req.json();
         const { accountType, accountId, reason, graceDays, retentionYears } = body;
 
         if (!accountType || !accountId) {
@@ -25,7 +24,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if active offboarding case already exists (CRITICAL RULE #2)
-        const existingCase = await (prisma as any).offboardingCase.findFirst({
+        const existingCase = await prisma.offboardingCase.findFirst({
             where: {
                 OR: [
                     { franchisorId: accountType !== 'FRANCHISE' ? accountId : undefined },
@@ -53,7 +52,7 @@ export async function POST(request: NextRequest) {
                     status: 'SUSPENDED',
                     reason: reason || null,
                     requestedByUserId: null, // Provider-initiated
-                    approvedByProviderUserId: session.user.id,
+                    approvedByProviderUserId: user.id,
                     suspendedAt: new Date(),
                     graceDays: graceDays || 30,
                     retentionYears: retentionYears || 7
@@ -85,9 +84,9 @@ export async function POST(request: NextRequest) {
         });
 
         // Audit log — CRITICAL COMPLIANCE
-        await auditLog({
-            userId: session.user.id,
-            userEmail: (session.user as any).email,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
             userRole: 'PROVIDER',
             action: 'OFFBOARDING_START',
             entityType: accountType,
@@ -109,14 +108,17 @@ export async function POST(request: NextRequest) {
 }
 
 // GET /api/admin/offboarding/start?accountType=X&accountId=Y - Get offboarding status
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user || (session.user as any).role !== 'PROVIDER') {
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        ;
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { searchParams } = new URL(request.url);
+        const { searchParams } = new URL(req.url);
         const accountType = searchParams.get('accountType');
         const accountId = searchParams.get('accountId');
 
@@ -124,7 +126,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'accountType and accountId required' }, { status: 400 });
         }
 
-        const offboardingCase = await (prisma as any).offboardingCase.findFirst({
+        const offboardingCase = await prisma.offboardingCase.findFirst({
             where: {
                 OR: [
                     { franchisorId: accountType !== 'FRANCHISE' ? accountId : undefined },

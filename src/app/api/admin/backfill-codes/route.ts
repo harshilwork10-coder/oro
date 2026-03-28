@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { generateStoreCode, generateStationCode } from '@/lib/codeGenerator'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 /**
  * POST /api/admin/backfill-codes
@@ -14,18 +13,20 @@ import { auditLog } from '@/lib/audit'
  * Query params:
  * - force=true: Regenerate ALL codes, not just missing ones
  */
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        if ((session.user as any).role !== 'PROVIDER') {
+        if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const force = searchParams.get('force') === 'true'
 
         // Use raw SQL to get all locations with pulseStoreCode
@@ -85,9 +86,9 @@ export async function POST(request: NextRequest) {
         }
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'CODES_BACKFILLED',
             entityType: 'System',

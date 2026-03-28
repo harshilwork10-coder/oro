@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Lookup product by barcode or SKU
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!user.franchiseId) {
+if (!user.franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const code = searchParams.get('code')
 
         if (!code) {
@@ -101,6 +100,10 @@ export async function GET(request: NextRequest) {
             volumeMl: product.volumeMl || null,
             abvPercent: product.abvPercent ? parseFloat(product.abvPercent.toString()) : null,
             isTobacco: product.isTobacco || false,
+            // Scale/Weight fields
+            isWeighted: product.isWeighted || false,
+            pricePerUnit: product.pricePerUnit ? parseFloat(product.pricePerUnit.toString()) : null,
+            unitOfMeasure: product.unitOfMeasure || 'lb',
             // BUG-7 FIX: Include stock warning in response so POS can alert cashier
             lowStock: product.stock <= 0,
             stockWarning: product.stock <= 0

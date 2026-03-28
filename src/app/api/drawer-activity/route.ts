@@ -1,8 +1,6 @@
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // Drawer Activity Types
 type DrawerActivityType =
     | 'SALE_OPEN'           // Normal sale - drawer opened for transaction
@@ -26,16 +24,13 @@ const NO_SALE_REASONS = [
 ]
 
 // POST - Log drawer activity
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const {
             type,           // Activity type
             reason,         // Reason code (for NO_SALE)
@@ -118,14 +113,16 @@ export async function POST(request: NextRequest) {
 }
 
 // GET - Get drawer activity for a shift/location/date
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const locationId = searchParams.get('locationId')
         const shiftId = searchParams.get('shiftId')
         const date = searchParams.get('date')

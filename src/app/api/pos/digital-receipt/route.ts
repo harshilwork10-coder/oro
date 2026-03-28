@@ -1,7 +1,5 @@
-// @ts-nocheck
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -9,23 +7,14 @@ import { prisma } from '@/lib/prisma'
  * 
  * POST /api/pos/digital-receipt — Send receipt via email or SMS
  * GET  /api/pos/digital-receipt — Get receipt delivery settings + stats
- * 
- * Features:
- *   - Email receipt with formatted HTML
- *   - SMS receipt with compact text
- *   - Customer preference tracking (always email, always print, ask)
- *   - Receipt lookup by transaction ID or phone
- *   - Stats: digital vs paper ratio
  */
 
 export async function GET(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const franchiseId = user.franchiseId
-        if (!franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
         const { searchParams } = new URL(request.url)
         const txId = searchParams.get('txId')
@@ -101,12 +90,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const franchiseId = user.franchiseId
-        if (!franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
         const body = await request.json()
         const { action, txId, method, email, phone, customerName } = body

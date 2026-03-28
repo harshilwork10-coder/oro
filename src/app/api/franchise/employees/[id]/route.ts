@@ -1,20 +1,21 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcryptjs'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 export async function PATCH(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const authUser = await getAuthUser(request)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!authUser?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
+        where: { email: user.email },
         include: { franchise: true }
     })
 
@@ -137,9 +138,9 @@ export async function PATCH(
     }
 
     // Audit log
-    await auditLog({
-        userId: session.user.id,
-        userEmail: session.user.email!,
+    await logActivity({
+        userId: user.id,
+        userEmail: user.email!,
         userRole: user.role,
         action: 'EMPLOYEE_UPDATE',
         entityType: 'User',
@@ -159,11 +160,10 @@ export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!authUser?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
+        where: { email: user.email },
         include: { franchise: true }
     })
 
@@ -210,9 +210,9 @@ export async function DELETE(
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: user.role,
             action: 'EMPLOYEE_DELETE',
             entityType: 'User',

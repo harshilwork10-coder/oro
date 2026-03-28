@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Lookup client by phone number
 export async function GET(request: Request) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

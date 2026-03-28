@@ -4,8 +4,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import {
     isMFARequiredForRole,
@@ -13,26 +12,17 @@ import {
     getBackupCodesCount
 } from '@/lib/security/mfa'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
             )
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: {
-                role: true,
-                mfaEnabled: true,
-                mfaBackupCodes: true,
-                mfaSetupAt: true
-            }
-        })
 
         if (!user) {
             return NextResponse.json(

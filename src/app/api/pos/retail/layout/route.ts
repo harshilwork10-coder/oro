@@ -1,18 +1,14 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET — Return POS register layout config for current user's location
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = session.user as any
         if (!user.locationId && !user.franchiseId) {
-            return ApiResponse.error('No location associated', 400)
+            return NextResponse.json({ error: 'No location associated' }, { status: 400 })
         }
 
         // Get locationId from user's session or their franchise's first location
@@ -26,33 +22,29 @@ export async function GET() {
         }
 
         if (!locationId) {
-            return ApiResponse.success({ config: null })
+            return NextResponse.json({ config: null })
         }
 
-        const layout = await (prisma as any).posRegisterLayout.findUnique({
+        const layout = await prisma.posRegisterLayout.findUnique({
             where: { locationId }
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             config: layout?.config || null,
             locationId
         })
     } catch (error) {
         console.error('[POS_LAYOUT_GET]', error)
-        return ApiResponse.serverError('Failed to fetch layout')
+        return NextResponse.json({ error: 'Failed to fetch layout' }, { status: 500 })
     }
 }
 
 // PUT — Save POS register layout config (manager/owner/franchisor only)
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
         // Only managers+ can modify layout
         if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
-            return ApiResponse.forbidden('Only owners can modify POS layout')
+            return NextResponse.json({ error: 'Only owners can modify POS layout' }, { status: 403 })
         }
 
         let locationId = user.locationId
@@ -65,14 +57,14 @@ export async function PUT(request: NextRequest) {
         }
 
         if (!locationId) {
-            return ApiResponse.error('No location found', 400)
+            return NextResponse.json({ error: 'No location found' }, { status: 400 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { pinnedCategoryIds, categoryOverrides, quickFilters } = body
 
         if (!pinnedCategoryIds || !Array.isArray(pinnedCategoryIds)) {
-            return ApiResponse.error('pinnedCategoryIds array is required', 400)
+            return NextResponse.json({ error: 'pinnedCategoryIds array is required' }, { status: 400 })
         }
 
         const config = {
@@ -81,15 +73,15 @@ export async function PUT(request: NextRequest) {
             quickFilters: quickFilters || {}
         }
 
-        const layout = await (prisma as any).posRegisterLayout.upsert({
+        const layout = await prisma.posRegisterLayout.upsert({
             where: { locationId },
             update: { config },
             create: { locationId, config }
         })
 
-        return ApiResponse.success({ config: layout.config, locationId })
+        return NextResponse.json({ config: layout.config, locationId })
     } catch (error) {
         console.error('[POS_LAYOUT_PUT]', error)
-        return ApiResponse.serverError('Failed to save layout')
+        return NextResponse.json({ error: 'Failed to save layout' }, { status: 500 })
     }
 }

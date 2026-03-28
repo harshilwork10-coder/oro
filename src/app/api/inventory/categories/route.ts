@@ -1,24 +1,22 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
 
 // GET - List all product categories for franchise with pagination
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = session.user as { franchiseId?: string }
+        if (!authUser) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
         if (!user.franchiseId) {
-            return ApiResponse.error('No franchise associated', 400)
+            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
         const search = searchParams.get('search')
         const departmentId = searchParams.get('departmentId')
@@ -104,35 +102,32 @@ export async function GET(request: NextRequest) {
         const data = hasMore ? categories.slice(0, take || 50) : categories
         const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-        return ApiResponse.paginated(data, {
+        return NextResponse.json({ data: data, pagination: {
             nextCursor,
             hasMore,
             total: data.length
-        })
+        } })
     } catch (error) {
         console.error('[CATEGORIES_GET]', error)
-        return ApiResponse.serverError('Failed to fetch categories')
+        return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 })
     }
 }
 
 // POST - Create new product category
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
+        if (!authUser) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as { franchiseId?: string }
         if (!user.franchiseId) {
-            return ApiResponse.error('No franchise associated', 400)
+            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, description, ageRestricted, minimumAge, departmentId, isEbtEligible } = body
 
         if (!name?.trim()) {
-            return ApiResponse.validationError('Name is required')
+            return NextResponse.json({ error: 'Name is required' }, { status: 422 })
         }
 
         const maxSort = await prisma.productCategory.aggregate({
@@ -153,9 +148,9 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        return ApiResponse.created(category)
+        return NextResponse.json(category, { status: 201 })
     } catch (error) {
         console.error('[CATEGORIES_POST]', error)
-        return ApiResponse.serverError('Failed to create category')
+        return NextResponse.json({ error: 'Failed to create category' }, { status: 500 })
     }
 }

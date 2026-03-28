@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // POST create new location for a franchisor (Provider only)
 // This endpoint accepts franchisorId and auto-creates franchise if needed
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user || session.user.role !== 'PROVIDER') {
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { franchisorId, name, address } = body
 
         if (!name || !franchisorId) {
@@ -85,9 +85,9 @@ export async function POST(request: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'LOCATION_CREATED',
             entityType: 'Location',

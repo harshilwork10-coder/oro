@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET: List all printers for the franchise
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!user.franchiseId) {
+if (!user.franchiseId) {
             return NextResponse.json({ error: 'No franchise assigned' }, { status: 400 })
         }
 
@@ -29,15 +28,12 @@ export async function GET(request: NextRequest) {
 }
 
 // POST: Add a new printer
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!['PROVIDER', 'ADMIN', 'FRANCHISOR', 'OWNER', 'MANAGER'].includes(user.role)) {
+if (!['PROVIDER', 'ADMIN', 'FRANCHISOR', 'OWNER', 'MANAGER'].includes(user.role)) {
             return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
         }
 
@@ -45,7 +41,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'No franchise assigned' }, { status: 400 })
         }
 
-        const { name, type, printerLang, agentUrl, stationId, labelWidth, isDefault } = await request.json()
+        const { name, type, printerLang, agentUrl, stationId, labelWidth, isDefault } = await req.json()
 
         if (!name || !type || !agentUrl) {
             return NextResponse.json({ error: 'Name, type, and agentUrl required' }, { status: 400 })
@@ -91,19 +87,16 @@ export async function POST(request: NextRequest) {
 }
 
 // PATCH: Update a printer
-export async function PATCH(request: NextRequest) {
+export async function PATCH(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!['PROVIDER', 'ADMIN', 'FRANCHISOR', 'OWNER', 'MANAGER'].includes(user.role)) {
+if (!['PROVIDER', 'ADMIN', 'FRANCHISOR', 'OWNER', 'MANAGER'].includes(user.role)) {
             return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
         }
 
-        const { id, name, type, printerLang, agentUrl, stationId, labelWidth, isDefault, isActive } = await request.json()
+        const { id, name, type, printerLang, agentUrl, stationId, labelWidth, isDefault, isActive } = await req.json()
 
         if (!id) {
             return NextResponse.json({ error: 'Printer ID required' }, { status: 400 })
@@ -152,19 +145,16 @@ export async function PATCH(request: NextRequest) {
 }
 
 // DELETE: Remove a printer
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!['PROVIDER', 'ADMIN', 'FRANCHISOR', 'OWNER', 'MANAGER'].includes(user.role)) {
+if (!['PROVIDER', 'ADMIN', 'FRANCHISOR', 'OWNER', 'MANAGER'].includes(user.role)) {
             return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
 
         if (!id) {

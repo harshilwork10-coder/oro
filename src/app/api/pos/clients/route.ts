@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 // GET /api/pos/clients - Fetch all clients for the franchise (mobile + web ready)
 export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     // Try mobile auth first, then fall back to web session
     let franchiseId: string | null = null
 
@@ -14,10 +15,9 @@ export async function GET(req: NextRequest) {
         franchiseId = mobileUser.franchiseId
     } else {
         // Try web session
-        const session = await getServerSession(authOptions)
-        if (session?.user?.email) {
+        if (user?.email) {
             const webUser = await prisma.user.findUnique({
-                where: { email: session.user.email },
+                where: { email: user.email },
                 select: { franchiseId: true }
             })
             franchiseId = webUser?.franchiseId || null

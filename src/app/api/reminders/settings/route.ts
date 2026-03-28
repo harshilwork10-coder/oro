@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { encryptField, decryptField } from '@/lib/security'
 
 // GET - Get reminder settings
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.email) {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!authUser?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { email: user.email },
             select: { franchiseId: true }
         })
 
@@ -21,13 +22,13 @@ export async function GET() {
             return NextResponse.json({ error: 'No franchise' }, { status: 400 })
         }
 
-        let settings = await (prisma as any).reminderSettings.findUnique({
+        let settings = await prisma.reminderSettings.findUnique({
             where: { franchiseId: user.franchiseId }
         })
 
         // Create default settings if none exist
         if (!settings) {
-            settings = await (prisma as any).reminderSettings.create({
+            settings = await prisma.reminderSettings.create({
                 data: { franchiseId: user.franchiseId }
             })
         }
@@ -45,15 +46,14 @@ export async function GET() {
 }
 
 // PUT - Update reminder settings
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.email) {
+        if (!authUser?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { email: user.email },
             select: { franchiseId: true, role: true }
         })
 
@@ -66,7 +66,7 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
 
         // Don't update credentials if masked (user didn't change them)
         if (body.twilioAccountSid === '••••••••') {
@@ -84,7 +84,7 @@ export async function PUT(request: NextRequest) {
             body.twilioAuthToken = encryptField(body.twilioAuthToken)
         }
 
-        const settings = await (prisma as any).reminderSettings.upsert({
+        const settings = await prisma.reminderSettings.upsert({
             where: { franchiseId: user.franchiseId },
             update: body,
             create: { franchiseId: user.franchiseId, ...body }
@@ -111,7 +111,7 @@ async function getTwilioCredentials(franchiseId: string): Promise<{
     phoneNumber: string | null
 } | null> {
     try {
-        const settings = await (prisma as any).reminderSettings.findUnique({
+        const settings = await prisma.reminderSettings.findUnique({
             where: { franchiseId },
             select: {
                 twilioAccountSid: true,

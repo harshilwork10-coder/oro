@@ -1,15 +1,16 @@
 'use server'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Lookup item by barcode or SKU (for POS scanning)
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
         if (barcode) {
             const item = await prisma.item.findFirst({
                 where: {
-                    franchiseId: session.user.franchiseId,
+                    franchiseId: user.franchiseId,
                     barcode,
                     isActive: true
                 },
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
         if (sku) {
             const item = await prisma.item.findFirst({
                 where: {
-                    franchiseId: session.user.franchiseId,
+                    franchiseId: user.franchiseId,
                     sku,
                     isActive: true
                 },
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
         if (query && query.length >= 2) {
             const items = await prisma.item.findMany({
                 where: {
-                    franchiseId: session.user.franchiseId,
+                    franchiseId: user.franchiseId,
                     isActive: true,
                     OR: [
                         { name: { contains: query } },

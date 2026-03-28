@@ -6,32 +6,27 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import {
     generateMFASetup,
     verifyMFAToken,
     isMFARequiredForRole
 } from '@/lib/security/mfa'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // GET - Generate MFA setup (QR code + backup codes)
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
             )
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { email: true, mfaEnabled: true }
-        })
 
         if (!user) {
             return NextResponse.json(
@@ -53,7 +48,7 @@ export async function GET() {
 
         // Store the encrypted secret temporarily (not enabled until verified)
         await prisma.user.update({
-            where: { id: session.user.id },
+            where: { id: user.id },
             data: {
                 mfaSecret: setup.secret,
                 mfaBackupCodes: setup.encryptedBackupCodes
@@ -78,9 +73,7 @@ export async function GET() {
 // POST - Verify and enable MFA
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
@@ -95,11 +88,6 @@ export async function POST(req: Request) {
                 { status: 400 }
             )
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { mfaSecret: true, mfaEnabled: true }
-        })
 
         if (!user?.mfaSecret) {
             return NextResponse.json(
@@ -127,7 +115,7 @@ export async function POST(req: Request) {
 
         // Enable MFA
         await prisma.user.update({
-            where: { id: session.user.id },
+            where: { id: user.id },
             data: {
                 mfaEnabled: true,
                 mfaSetupAt: new Date()
@@ -135,13 +123,13 @@ export async function POST(req: Request) {
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: (session.user as any).email,
-            userRole: (session.user as any).role || 'USER',
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role || 'USER',
             action: 'MFA_ENABLED',
             entityType: 'User',
-            entityId: session.user.id,
+            entityId: user.id,
             metadata: {}
         })
 
@@ -162,9 +150,7 @@ export async function POST(req: Request) {
 // DELETE - Disable MFA (requires current MFA code)
 export async function DELETE(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
@@ -179,11 +165,6 @@ export async function DELETE(req: Request) {
                 { status: 400 }
             )
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { mfaSecret: true, mfaEnabled: true, role: true }
-        })
 
         if (!user?.mfaEnabled) {
             return NextResponse.json(
@@ -212,7 +193,7 @@ export async function DELETE(req: Request) {
 
         // Disable MFA
         await prisma.user.update({
-            where: { id: session.user.id },
+            where: { id: user.id },
             data: {
                 mfaEnabled: false,
                 mfaSecret: null,
@@ -222,13 +203,13 @@ export async function DELETE(req: Request) {
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: (session.user as any).email,
-            userRole: (session.user as any).role || 'USER',
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role || 'USER',
             action: 'MFA_DISABLED',
             entityType: 'User',
-            entityId: session.user.id,
+            entityId: user.id,
             metadata: {}
         })
 

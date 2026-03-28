@@ -1,25 +1,20 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
-import { ApiResponse } from '@/lib/api-response'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 import { parsePaginationParams } from '@/lib/pagination'
 
 // GET /api/inventory/suppliers - List all suppliers with pagination
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
-            return ApiResponse.unauthorized()
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
         const search = searchParams.get('search')
 
-        // Build where clause
         const whereClause: Record<string, unknown> = {
-            franchiseId: session.user.franchiseId
+            franchiseId: user.franchiseId
         }
 
         if (search) {
@@ -30,12 +25,11 @@ export async function GET(request: NextRequest) {
             ]
         }
 
-        // Build query with pagination
         const queryArgs: Record<string, unknown> = {
             where: whereClause,
             take: (take || 50) + 1,
             include: {
-                _count: { select: { purchaseOrders: true } }
+                _count: { select: { purchaseOrders: true, products: true } }
             },
             orderBy: orderBy || { name: 'asc' }
         }
@@ -53,35 +47,35 @@ export async function GET(request: NextRequest) {
         const data = hasMore ? suppliers.slice(0, take || 50) : suppliers
         const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-        return ApiResponse.paginated(data, {
+        return NextResponse.json({ data, pagination: {
             nextCursor,
             hasMore,
             total: data.length
-        })
+        } })
     } catch (error) {
         console.error('Failed to fetch suppliers:', error)
-        return ApiResponse.serverError('Failed to fetch suppliers')
+        return NextResponse.json({ error: 'Failed to fetch suppliers' }, { status: 500 })
     }
 }
 
 // POST /api/inventory/suppliers - Create new supplier
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, email, phone, contactName, address } = body
 
         if (!name) {
-            return ApiResponse.validationError('Supplier name is required')
+            return NextResponse.json({ error: 'Supplier name is required' }, { status: 422 })
         }
 
         const supplier = await prisma.supplier.create({
             data: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 name,
                 email: email || null,
                 phone: phone || null,
@@ -90,9 +84,9 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        return ApiResponse.created(supplier)
+        return NextResponse.json(supplier, { status: 201 })
     } catch (error) {
         console.error('Failed to create supplier:', error)
-        return ApiResponse.serverError('Failed to create supplier')
+        return NextResponse.json({ error: 'Failed to create supplier' }, { status: 500 })
     }
 }

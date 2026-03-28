@@ -1,87 +1,81 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-// GET — Cashier blind close (expected amount NOT shown to cashier)
+/**
+ * GET /api/pos/blind-close — Get blind close prompt (hides expected cash)
+ * POST /api/pos/blind-close — Submit counted amount, reveals variance
+ */
 export async function GET(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
+    const locationId = dbUser?.locationId
+    if (!locationId) return NextResponse.json({ error: 'No location' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
-        // Get current open shift
         const shift = await prisma.cashDrawerSession.findFirst({
             where: { locationId, employeeId: user.id, status: 'OPEN' },
             include: { employee: { select: { name: true } } }
         })
 
-        if (!shift) return ApiResponse.notFound('No open shift')
+        if (!shift) return NextResponse.json({ error: 'No open shift' }, { status: 404 })
 
-        // Return just the shift ID + open time (NOT the expected cash — that's the "blind" part)
-        return ApiResponse.success({
+        return NextResponse.json({
             shiftId: shift.id,
             employee: shift.employee?.name,
             openedAt: shift.startTime,
             startingCash: Number(shift.startingCash),
-            // Expected cash is intentionally NOT returned
-            // Cashier counts first, then system reveals the expected amount
             message: 'Count your drawer and enter the total amount'
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[BLIND_CLOSE_GET]', error)
-        return ApiResponse.error('Failed')
+        return NextResponse.json({ error: 'Failed' }, { status: 500 })
     }
 }
 
-// POST — Submit blind count (then reveal expected and variance)
 export async function POST(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
+    const locationId = dbUser?.locationId
+    if (!locationId) return NextResponse.json({ error: 'No location' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
         const body = await request.json()
         const { shiftId, countedAmount, denominations } = body
 
         if (!shiftId || countedAmount == null) {
-            return ApiResponse.badRequest('shiftId and countedAmount required')
+            return NextResponse.json({ error: 'shiftId and countedAmount required' }, { status: 400 })
         }
 
         const shift = await prisma.cashDrawerSession.findFirst({
             where: { id: shiftId, locationId, status: 'OPEN' }
         })
-        if (!shift) return ApiResponse.notFound('Shift not found')
+        if (!shift) return NextResponse.json({ error: 'Shift not found' }, { status: 404 })
 
-        // NOW calculate expected cash
+        // Calculate expected cash from transactions
         const cashTx = await prisma.transaction.findMany({
             where: { cashDrawerSessionId: shiftId, status: 'COMPLETED', paymentMethod: 'CASH' },
             select: { total: true }
         })
         const cashSales = cashTx.reduce((s, t) => s + Number(t.total || 0), 0)
 
-        const drops = await (prisma as any).cashDrop.findMany({
+        // Get cash drops for this shift
+        const drops = await prisma.cashDrop.findMany({
             where: { sessionId: shiftId },
             select: { amount: true }
         })
-        const totalDrops = drops.reduce((s: number, d: any) => s + Number(d.amount || 0), 0)
+        const totalDrops = drops.reduce((s, d) => s + Number(d.amount || 0), 0)
 
         const startingCash = Number(shift.startingCash || 0)
         const expectedCash = startingCash + cashSales - totalDrops
         const variance = countedAmount - expectedCash
 
-        // Close the shift with the blind count data
+        // Close the shift
         await prisma.cashDrawerSession.update({
             where: { id: shiftId },
             data: {
@@ -97,17 +91,11 @@ export async function POST(request: NextRequest) {
         const isOver = variance > 0.01
         const isShort = variance < -0.01
 
-        // Audit log
-        await auditLog({
-            userId: user.id,
-            userEmail: user.email,
-            userRole: user.role,
-            action: 'BLIND_CLOSE',
-            entityType: 'CashDrawerSession',
-            entityId: shiftId,
+        await logActivity({
+            userId: user.id, userEmail: user.email, userRole: user.role,
             franchiseId: user.franchiseId,
-            locationId,
-            metadata: {
+            action: 'BLIND_CLOSE', entityType: 'CashDrawerSession', entityId: shiftId,
+            details: {
                 countedAmount,
                 expectedCash: Math.round(expectedCash * 100) / 100,
                 variance: Math.round(variance * 100) / 100,
@@ -115,7 +103,7 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             shiftId,
             countedAmount,
             expectedCash: Math.round(expectedCash * 100) / 100,
@@ -125,8 +113,8 @@ export async function POST(request: NextRequest) {
             totalDrops: Math.round(totalDrops * 100) / 100,
             alert: Math.abs(variance) > 5 ? `⚠️ Variance of $${Math.abs(variance).toFixed(2)} — review required` : null
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[BLIND_CLOSE_POST]', error)
-        return ApiResponse.error('Failed to close shift')
+        return NextResponse.json({ error: 'Failed to close shift' }, { status: 500 })
     }
 }

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // AUDIT STANDARD: Proper decimal rounding to prevent penny errors
@@ -12,16 +11,16 @@ function roundCurrency(value: number): number {
 const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
 
 // GET - Tips report by employee and date range
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const franchiseId = user.franchiseId
-        const { searchParams } = new URL(request.url)
+const franchiseId = user.franchiseId
+        const { searchParams } = new URL(req.url)
 
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')

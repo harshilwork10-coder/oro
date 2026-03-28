@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -11,16 +10,18 @@ export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await getServerSession(authOptions)
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const locationId = (await params).id
 
-    if (!session?.user?.email) {
+    if (!user?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
         // Get location with related data (cast as any for provisioningTasks not in schema)
-        const location = await (prisma as any).location.findUnique({
+        const location = await prisma.location.findUnique({
             where: { id: locationId },
             include: {
                 franchise: { select: { id: true, name: true } },
@@ -58,7 +59,7 @@ export async function GET(
         })
 
         // Today's transactions (cast as any — Transaction.locationId not in schema)
-        const todayTransactions = await (prisma as any).transaction.findMany({
+        const todayTransactions = await prisma.transaction.findMany({
             where: {
                 locationId,
                 createdAt: { gte: todayStart, lte: todayEnd },
@@ -74,7 +75,7 @@ export async function GET(
         }) as any[]
 
         // Month transactions for customer analysis (cast as any[])
-        const monthTransactions = await (prisma as any).transaction.findMany({
+        const monthTransactions = await prisma.transaction.findMany({
             where: {
                 locationId,
                 createdAt: { gte: monthStart },

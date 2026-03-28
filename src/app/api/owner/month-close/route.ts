@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Generate month-end close report
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const month = parseInt(searchParams.get('month') || String(new Date().getMonth()))
         const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
 
@@ -197,11 +195,8 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Mark month as closed (for accounting)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -210,7 +205,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Only owners can close months' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { month, year, notes } = body
 
         // In production, create a MonthClose record

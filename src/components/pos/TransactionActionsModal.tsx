@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, RotateCcw, Ban, Trash2, CheckSquare, Square, Printer, CreditCard, Banknote, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react'
+import { X, RotateCcw, Ban, Trash2, CheckSquare, Square, Printer, CreditCard, Banknote, CheckCircle, AlertCircle, MessageSquare, ArrowLeftRight, Wallet } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { generateReceipt } from '@/lib/receipt-generator'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
@@ -51,7 +51,7 @@ interface Props {
     cashierName?: string
 }
 
-type ActionType = 'none' | 'refund' | 'void' | 'delete' | 'sms'
+type ActionType = 'none' | 'refund' | 'void' | 'delete' | 'sms' | 'exchange'
 
 export default function TransactionActionsModal({ transaction, onClose, onSuccess, cashDrawerSessionId, storeName, storeAddress, storePhone, cashierName }: Props) {
     const [action, setAction] = useState<ActionType>('none')
@@ -65,6 +65,9 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
     const [voidReason, setVoidReason] = useState<string>('')
     const [refundReason, setRefundReason] = useState<string>('')
     const [phoneNumber, setPhoneNumber] = useState<string>('')
+    const [managerPinVerified, setManagerPinVerified] = useState(false)
+    const [showManagerPinPrompt, setShowManagerPinPrompt] = useState(false)
+    const [managerPin, setManagerPin] = useState('')
     const { logoUrl, primaryColor } = useBranding()
 
     useEffect(() => {
@@ -204,12 +207,15 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                     reason: refundReason,
                     refundMethod,
                     cardLast4: paxResponse?.cardLast4,
-                    cashDrawerSessionId
+                    cashDrawerSessionId,
+                    managerPinVerified
                 })
             })
 
             if (res.ok) {
-                showToast('success', '✓ Refund processed successfully')
+                const data = await res.json()
+                const creditMsg = data.storeCreditCode ? ` — Store Credit: ${data.storeCreditCode}` : ''
+                showToast('success', `✓ Refund processed${creditMsg}`)
 
                 // Print refund receipt
                 try {
@@ -226,16 +232,17 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                                 total: item ? (item.total / item.quantity) * (itemQuantities[itemId] || item.quantity) : 0
                             }
                         })
+                        const creditFooter = data.storeCreditCode ? `\nStore Credit Code: ${data.storeCreditCode}` : ''
                         await printReceipt({
                             storeName: storeName || undefined,
                             cashier: cashierName || undefined,
-                            header: '*** REFUND ***',
+                            header: refundMethod === 'STORE_CREDIT' ? '*** STORE CREDIT ISSUED ***' : '*** REFUND ***',
                             items: refundedItems,
                             subtotal: refundAmount,
                             tax: 0,
                             total: refundAmount,
                             date: new Date().toLocaleString(),
-                            footer: `Orig Invoice: #${transaction.invoiceNumber || transaction.id.slice(-8)}\nReason: ${refundReason}\nMethod: ${refundMethod}`,
+                            footer: `Orig Invoice: #${transaction.invoiceNumber || transaction.id.slice(-8)}\nReason: ${refundReason}\nMethod: ${refundMethod}${creditFooter}`,
                             openDrawer: refundMethod === 'CASH',
                         }).catch(console.error)
                     }
@@ -244,7 +251,11 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                 setTimeout(() => { onSuccess(); onClose() }, 1500)
             } else {
                 const error = await res.json()
-                showToast('error', `Refund failed: ${error.error || 'Unknown error'}`)
+                if (error.requiresManagerPin) {
+                    setShowManagerPinPrompt(true)
+                } else {
+                    showToast('error', `Refund failed: ${error.error || 'Unknown error'}`)
+                }
             }
         } catch (error) {
             console.error('Refund error:', error)
@@ -460,11 +471,20 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
 
                                 <button
                                     onClick={() => setAction('refund')}
-                                    disabled={transaction.status !== 'COMPLETED'}
+                                    disabled={transaction.status !== 'COMPLETED' && transaction.status !== 'PARTIALLY_REFUNDED'}
                                     className="flex flex-col items-center gap-2 p-4 bg-emerald-900/20 hover:bg-emerald-900/30 border border-emerald-500/30 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <RotateCcw className="h-6 w-6 text-emerald-400" />
                                     <span className="text-emerald-400 font-medium">Refund</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setAction('exchange')}
+                                    disabled={transaction.status !== 'COMPLETED' && transaction.status !== 'PARTIALLY_REFUNDED'}
+                                    className="flex flex-col items-center gap-2 p-4 bg-cyan-900/20 hover:bg-cyan-900/30 border border-cyan-500/30 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ArrowLeftRight className="h-6 w-6 text-cyan-400" />
+                                    <span className="text-cyan-400 font-medium">Exchange</span>
                                 </button>
 
                                 <button
@@ -585,7 +605,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                             {/* Refund Method Selection */}
                             <div className="bg-stone-950 rounded-xl p-4 border border-stone-800">
                                 <h4 className="text-white font-medium mb-3">Refund Method</h4>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-3 gap-3">
                                     <button
                                         onClick={() => setRefundMethod('CASH')}
                                         className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${refundMethod === 'CASH'
@@ -605,6 +625,16 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                                     >
                                         <CreditCard className="h-5 w-5" />
                                         <span className="font-medium">Card</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setRefundMethod('STORE_CREDIT')}
+                                        className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${refundMethod === 'STORE_CREDIT'
+                                            ? 'bg-amber-900/20 border-amber-500 text-amber-400'
+                                            : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-700'
+                                            }`}
+                                    >
+                                        <Wallet className="h-5 w-5" />
+                                        <span className="font-medium">Store Credit</span>
                                     </button>
                                 </div>
                             </div>
@@ -719,6 +749,73 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                         </div>
                     )}
 
+                    {action === 'exchange' && (
+                        <div className="space-y-4">
+                            <div className="text-center">
+                                <div className="w-16 h-16 rounded-full bg-cyan-500/20 mx-auto flex items-center justify-center">
+                                    <ArrowLeftRight className="h-8 w-8 text-cyan-400" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mt-3">Exchange Items</h3>
+                                <p className="text-stone-400 text-sm mt-1">
+                                    Select items to return from this transaction. The customer can pick new items at the register — any price difference will be calculated.
+                                </p>
+                            </div>
+
+                            {/* Select Return Items */}
+                            <div className="space-y-2">
+                                <p className="text-stone-400 text-sm font-medium">Items to return:</p>
+                                {transaction.lineItems.map((item) => {
+                                    const isSelected = selectedItems.has(item.id)
+                                    const itemName = item.service?.name || item.product?.name || 'Item'
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            className={`p-3 rounded-xl border cursor-pointer transition-all ${isSelected
+                                                ? 'bg-cyan-900/20 border-cyan-500/50'
+                                                : 'bg-stone-950 border-stone-800 hover:border-stone-700'
+                                                }`}
+                                            onClick={() => toggleItemSelection(item.id, item.quantity)}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    {isSelected ? (
+                                                        <CheckSquare className="h-5 w-5 text-cyan-400" />
+                                                    ) : (
+                                                        <Square className="h-5 w-5 text-stone-600" />
+                                                    )}
+                                                    <div>
+                                                        <p className="text-white font-medium">{itemName}</p>
+                                                        <p className="text-stone-500 text-sm">
+                                                            {item.quantity} x {formatCurrency(item.price)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-white font-bold">
+                                                    {formatCurrency(item.total)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+
+                            {/* Exchange Value Summary */}
+                            {selectedItems.size > 0 && (
+                                <div className="bg-stone-950 rounded-xl p-4 border border-cyan-500/30">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-stone-400">Return Credit Value</span>
+                                        <span className="text-2xl font-bold text-cyan-400">
+                                            {formatCurrency(calculateRefundAmount())}
+                                        </span>
+                                    </div>
+                                    <p className="text-stone-500 text-xs mt-2">
+                                        New items will be added at the register. Customer pays the difference or receives store credit for overpayment.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {action === 'delete' && (
                         <div className="space-y-4 text-center">
                             <div className="w-16 h-16 rounded-full bg-red-500/20 mx-auto flex items-center justify-center">
@@ -788,6 +885,89 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                     </div>
                 </div>
             </div>
+
+            {/* Manager PIN Prompt Overlay */}
+            {showManagerPinPrompt && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 rounded-2xl">
+                    <div className="bg-stone-900 border border-amber-500/30 rounded-xl p-6 w-80 space-y-4">
+                        <div className="text-center">
+                            <div className="w-12 h-12 rounded-full bg-amber-500/20 mx-auto flex items-center justify-center mb-3">
+                                <AlertCircle className="h-6 w-6 text-amber-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-white">Manager PIN Required</h3>
+                            <p className="text-stone-400 text-sm mt-1">This refund exceeds the threshold. Enter a manager PIN to authorize.</p>
+                        </div>
+                        <input
+                            type="password"
+                            value={managerPin}
+                            onChange={(e) => setManagerPin(e.target.value)}
+                            onKeyDown={async (e) => {
+                                if (e.key === 'Enter' && managerPin.length >= 4) {
+                                    // Verify PIN via API
+                                    try {
+                                        const res = await fetch('/api/pos/verify-pin', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ pin: managerPin, requiredRole: 'MANAGER' })
+                                        })
+                                        if (res.ok) {
+                                            setManagerPinVerified(true)
+                                            setShowManagerPinPrompt(false)
+                                            setManagerPin('')
+                                            // Re-submit refund with manager approval
+                                            processRefund()
+                                        } else {
+                                            showToast('error', 'Invalid manager PIN')
+                                            setManagerPin('')
+                                        }
+                                    } catch {
+                                        showToast('error', 'PIN verification failed')
+                                    }
+                                }
+                            }}
+                            placeholder="Enter 4+ digit PIN"
+                            className="w-full bg-stone-800 border border-stone-700 rounded-xl px-4 py-3 text-white text-center text-2xl tracking-[0.5em] font-mono focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            autoFocus
+                        />
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => { setShowManagerPinPrompt(false); setManagerPin('') }}
+                                className="flex-1 px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white rounded-xl font-medium transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (managerPin.length >= 4) {
+                                        try {
+                                            const res = await fetch('/api/pos/verify-pin', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ pin: managerPin, requiredRole: 'MANAGER' })
+                                            })
+                                            if (res.ok) {
+                                                setManagerPinVerified(true)
+                                                setShowManagerPinPrompt(false)
+                                                setManagerPin('')
+                                                processRefund()
+                                            } else {
+                                                showToast('error', 'Invalid manager PIN')
+                                                setManagerPin('')
+                                            }
+                                        } catch {
+                                            showToast('error', 'PIN verification failed')
+                                        }
+                                    }
+                                }}
+                                disabled={managerPin.length < 4}
+                                className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-xl font-bold transition-colors"
+                            >
+                                Authorize
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* PAX Card Verification Modal */}
             {showPaxModal && (

@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import Papa from 'papaparse'
 
 // POST - Parse uploaded CSV file
 // SECURITY: Only CSV supported (xlsx removed due to security vulnerability)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user?.id || !user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -19,7 +16,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Permission denied. Only providers can import inventory.' }, { status: 403 })
         }
 
-        const formData = await request.formData()
+        const formData = await req.formData()
         const file = formData.get('file') as File
 
         if (!file) {

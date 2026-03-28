@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
@@ -15,21 +14,19 @@ const payoutSchema = z.object({
 
 // POST /api/owner/payouts - Record a payout to a barber
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Only owners/franchisors can record payouts
-    const user = session.user as any
-    if (!['FRANCHISOR', 'OWNER'].includes(user.role || '')) {
+if (!['FRANCHISOR', 'OWNER'].includes(user.role || '')) {
         return NextResponse.json({ error: 'Only owners can record payouts' }, { status: 403 })
     }
 
     try {
         const body = await req.json()
         const data = payoutSchema.parse(body)
-        const franchiseId = session.user.franchiseId
+        const franchiseId = user.franchiseId
 
         // Verify the barber belongs to this franchise
         const barber = await prisma.user.findUnique({
@@ -77,8 +74,10 @@ export async function POST(req: Request) {
 
 // GET /api/owner/payouts - Get payout history
 export async function GET(req: Request) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -89,7 +88,7 @@ export async function GET(req: Request) {
         const dateTo = searchParams.get('dateTo')
 
         const where: any = {
-            franchiseId: session.user.franchiseId,
+            franchiseId: user.franchiseId,
             type: 'COMMISSION'
         }
 

@@ -11,10 +11,14 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "lint": "next lint",
+    "lint:guards": "node scripts/lint-guards.js",
     "test": "jest",
+    "test:contracts": "jest src/__tests__/contracts/ --ci",
     "test:watch": "jest --watch",
+    "ci": "npm run lint:guards && npx prisma generate && npx next build && npm test -- --ci",
     "verify": "ts-node --compiler-options {\"module\":\"CommonJS\"} verify-login.ts"
   },
+
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
     "@aws-sdk/s3-request-presigner": "^3.940.0",

@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // POST - Enrich items using UPC database lookup
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -17,7 +13,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
-        const { items } = await request.json()
+        const { items } = await req.json()
 
         if (!items || !Array.isArray(items)) {
             return NextResponse.json({ error: 'Items array required' }, { status: 400 })

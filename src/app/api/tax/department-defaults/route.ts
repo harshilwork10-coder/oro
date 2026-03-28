@@ -1,99 +1,69 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 
-// GET — List all department → tax group mappings for current location
-export async function GET() {
+/**
+ * Department Tax Defaults — Map categories → tax groups
+ * GET /api/tax/department-defaults
+ * PUT /api/tax/department-defaults — Bulk save mappings (Owner+)
+ * DELETE /api/tax/department-defaults?categoryId=xxx (Owner+)
+ *
+ * Note: departmentTaxDefault accessed via (prisma as any) — model may not be generated.
+ */
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.locationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-
-        if (!locationId) {
-            return ApiResponse.badRequest('No location associated')
-        }
-
-        const defaults = await (prisma as any).departmentTaxDefault.findMany({
-            where: { locationId },
+        const defaults = await prisma.departmentTaxDefault.findMany({
+            where: { locationId: user.locationId },
             include: {
-                category: {
-                    select: { id: true, name: true, departmentId: true }
-                },
-                taxGroup: {
-                    select: { id: true, name: true, isDefault: true }
-                }
+                category: { select: { id: true, name: true, departmentId: true } },
+                taxGroup: { select: { id: true, name: true, isDefault: true } }
             },
             orderBy: { category: { name: 'asc' } }
         })
 
-        return ApiResponse.success({ defaults })
-    } catch (error) {
+        return NextResponse.json({ defaults })
+    } catch (error: any) {
         console.error('[DEPT_TAX_DEFAULTS_GET]', error)
-        return ApiResponse.error('Failed to fetch department tax defaults')
+        return NextResponse.json({ error: 'Failed to fetch department tax defaults' }, { status: 500 })
     }
 }
 
-// PUT — Bulk-save department → tax group mappings
-// Body: { mappings: [{ categoryId, taxGroupId }] }
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.locationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
+        return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
+    }
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
-            return ApiResponse.forbidden('Only owners can manage department tax defaults')
-        }
-
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location associated')
-
-        const body = await request.json()
-        const { mappings } = body as {
-            mappings: { categoryId: string; taxGroupId: string }[]
-        }
+        const { mappings } = await req.json() as { mappings: { categoryId: string; taxGroupId: string }[] }
 
         if (!mappings || !Array.isArray(mappings)) {
-            return ApiResponse.badRequest('mappings array is required')
+            return NextResponse.json({ error: 'mappings array required' }, { status: 400 })
         }
 
-        // Validate all tax groups belong to this location
         const taxGroupIds = [...new Set(mappings.map(m => m.taxGroupId))]
-        const validGroups = await (prisma as any).taxGroup.findMany({
-            where: { id: { in: taxGroupIds }, locationId },
+        const validGroups = await prisma.taxGroup.findMany({
+            where: { id: { in: taxGroupIds }, locationId: user.locationId },
             select: { id: true }
         })
-        const validGroupIds = new Set(validGroups.map((g: any) => g.id))
-
-        const invalidGroups = taxGroupIds.filter(id => !validGroupIds.has(id))
-        if (invalidGroups.length > 0) {
-            return ApiResponse.badRequest(`Invalid tax group IDs: ${invalidGroups.join(', ')}`)
+        const validSet = new Set(validGroups.map((g: any) => g.id))
+        const invalid = taxGroupIds.filter(id => !validSet.has(id))
+        if (invalid.length > 0) {
+            return NextResponse.json({ error: `Invalid tax group IDs: ${invalid.join(', ')}` }, { status: 400 })
         }
 
-        // Upsert each mapping (delete old + create new for each category)
         const results = await prisma.$transaction(async (tx: any) => {
             const upserted = []
             for (const mapping of mappings) {
                 const result = await tx.departmentTaxDefault.upsert({
-                    where: {
-                        locationId_categoryId: {
-                            locationId,
-                            categoryId: mapping.categoryId
-                        }
-                    },
+                    where: { locationId_categoryId: { locationId: user.locationId, categoryId: mapping.categoryId } },
                     update: { taxGroupId: mapping.taxGroupId },
-                    create: {
-                        locationId,
-                        categoryId: mapping.categoryId,
-                        taxGroupId: mapping.taxGroupId
-                    },
+                    create: { locationId: user.locationId, categoryId: mapping.categoryId, taxGroupId: mapping.taxGroupId },
                     include: {
                         category: { select: { id: true, name: true } },
                         taxGroup: { select: { id: true, name: true } }
@@ -104,38 +74,32 @@ export async function PUT(request: NextRequest) {
             return upserted
         })
 
-        return ApiResponse.success({ defaults: results, count: results.length })
-    } catch (error) {
+        return NextResponse.json({ defaults: results, count: results.length })
+    } catch (error: any) {
         console.error('[DEPT_TAX_DEFAULTS_PUT]', error)
-        return ApiResponse.error('Failed to save department tax defaults')
+        return NextResponse.json({ error: 'Failed to save department tax defaults' }, { status: 500 })
     }
 }
 
-// DELETE — Remove a department → tax group mapping
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.locationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
+        return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const categoryId = searchParams.get('categoryId')
+    if (!categoryId) return NextResponse.json({ error: 'categoryId required' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
-            return ApiResponse.forbidden('Only owners can manage department tax defaults')
-        }
-
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location associated')
-
-        const { searchParams } = new URL(request.url)
-        const categoryId = searchParams.get('categoryId')
-        if (!categoryId) return ApiResponse.badRequest('categoryId is required')
-
-        await (prisma as any).departmentTaxDefault.deleteMany({
-            where: { locationId, categoryId }
+        await prisma.departmentTaxDefault.deleteMany({
+            where: { locationId: user.locationId, categoryId }
         })
-
-        return ApiResponse.success({ deleted: true })
-    } catch (error) {
+        return NextResponse.json({ deleted: true })
+    } catch (error: any) {
         console.error('[DEPT_TAX_DEFAULTS_DELETE]', error)
-        return ApiResponse.error('Failed to delete department tax default')
+        return NextResponse.json({ error: 'Failed to delete department tax default' }, { status: 500 })
     }
 }

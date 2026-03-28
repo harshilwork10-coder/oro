@@ -1,7 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // In-memory store for active carts by STATION (not location)
 // In production, use Redis for persistence across server restarts
 const stationCartsStore = new Map<string, any>()
@@ -20,9 +17,6 @@ export async function POST(request: Request) {
         }
 
         // SECURITY: Validate the request comes from an authenticated POS session
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         // POS employees can update cart for their station
         const isPosRequest = user?.franchiseId && user.role !== 'CLIENT'
 
@@ -50,6 +44,9 @@ export async function POST(request: Request) {
 // GET - Get cart for a specific station (for customer display polling)
 export async function GET(request: Request) {
     try {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
         const { searchParams } = new URL(request.url)
         const stationId = searchParams.get('stationId')
         const locationId = searchParams.get('locationId') // Legacy fallback

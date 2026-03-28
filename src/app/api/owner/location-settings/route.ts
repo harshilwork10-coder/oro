@@ -8,24 +8,20 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get user with franchise → locations
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true, role: true }
-        })
-
         if (!user?.franchiseId || !['OWNER', 'MANAGER'].includes(user.role)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
@@ -53,15 +49,9 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true, role: true }
-        })
 
         if (!user?.franchiseId || !['OWNER', 'MANAGER'].includes(user.role)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -83,9 +73,9 @@ export async function PATCH(req: Request) {
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: (session.user as any).email,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
             userRole: user.role,
             action: 'LOCATION_SETTINGS_UPDATE',
             entityType: 'Location',

@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // POST: Update employee permission
 export async function POST(request: Request) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -30,10 +31,10 @@ export async function POST(request: Request) {
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
-            userRole: (session.user as any).role || 'OWNER',
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
+            userRole: user.role || 'OWNER',
             action: 'EMPLOYEE_PERMISSION_CHANGE',
             entityType: 'User',
             entityId: employeeId,

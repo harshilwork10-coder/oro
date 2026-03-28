@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcrypt'
 import { logActivity, ActionTypes } from '@/lib/auditLog'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const authUser = await getAuthUser(request)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session || !['PROVIDER', 'FRANCHISOR', 'OWNER', 'MANAGER'].includes(session.user.role)) {
+        if (!session || !['PROVIDER', 'FRANCHISOR', 'OWNER', 'MANAGER'].includes(authUser.role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -21,16 +21,16 @@ export async function GET() {
             role: 'EMPLOYEE'  // Only show actual stylists, not owners/managers
         }
 
-        if (session.user.role === 'OWNER' || session.user.role === 'MANAGER') {
+        if (authUser.role === 'OWNER' || authUser.role === 'MANAGER') {
             // OWNER/MANAGER: scope to their own franchise
-            if (!session.user.franchiseId) {
+            if (!authUser.franchiseId) {
                 return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
             }
-            whereClause.franchiseId = session.user.franchiseId
-        } else if (session.user.role === 'FRANCHISOR') {
+            whereClause.franchiseId = authUser.franchiseId
+        } else if (authUser.role === 'FRANCHISOR') {
             // Get the franchisor record for this user
             const franchisor = await prisma.franchisor.findUnique({
-                where: { ownerId: session.user.id },
+                where: { ownerId: user.id },
                 select: {
                     franchises: {
                         select: { id: true }
@@ -75,9 +75,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session || session.user.role !== 'PROVIDER') {
+        if (!session || authUser.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -131,9 +129,9 @@ export async function POST(request: Request) {
 
         // Audit log
         await logActivity({
-            userId: session.user.id,
-            userEmail: session.user.email || '',
-            userRole: session.user.role,
+            userId: user.id,
+            userEmail: user.email || '',
+            userRole: authUser.role,
             franchiseId: franchiseId || undefined,
             action: ActionTypes.EMPLOYEE_ADDED,
             entityType: 'USER',

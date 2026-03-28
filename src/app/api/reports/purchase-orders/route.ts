@@ -4,24 +4,17 @@
  * GET — Track purchase orders by status, supplier, and spend
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const status = searchParams.get('status') // DRAFT, ORDERED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED
         const supplierId = searchParams.get('supplierId')
         const days = parseInt(searchParams.get('days') || '90')
@@ -85,9 +78,9 @@ export async function GET(request: NextRequest) {
             byStatus: statusGroups
         }
 
-        return ApiResponse.success({ orders: results, summary, periodDays: days })
+        return NextResponse.json({ orders: results, summary, periodDays: days })
     } catch (error) {
         console.error('[PO_REPORT_GET]', error)
-        return ApiResponse.error('Failed to generate purchase order report', 500)
+        return NextResponse.json({ error: 'Failed to generate purchase order report' }, { status: 500 })
     }
 }

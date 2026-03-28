@@ -5,24 +5,17 @@
  *        (PaymentLog model doesn't exist — uses Transaction payment data instead)
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '30')
         const paymentMethod = searchParams.get('paymentMethod')
         const since = new Date(); since.setDate(since.getDate() - days)
@@ -66,7 +59,7 @@ export async function GET(request: NextRequest) {
             dailyTrend[date][method] = (dailyTrend[date][method] || 0) + Number(tx.total || 0)
         }
 
-        return ApiResponse.success({
+        return NextResponse.json({
             summary: {
                 totalPayments: completed.length,
                 paymentVolume: Math.round(completed.reduce((s, t) => s + Number(t.total || 0), 0) * 100) / 100,
@@ -79,6 +72,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[PAYMENT_ACTIVITY_GET]', error)
-        return ApiResponse.error('Failed to fetch payment activity', 500)
+        return NextResponse.json({ error: 'Failed to fetch payment activity' }, { status: 500 })
     }
 }

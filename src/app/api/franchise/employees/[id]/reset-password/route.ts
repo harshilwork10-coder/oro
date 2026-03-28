@@ -1,24 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
         const { id: employeeId } = await params
 
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Only owners/managers can reset passwords
-        const userRole = session.user.role
+        const userRole = user.role
         if (!['FRANCHISOR', 'MANAGER', 'PROVIDER', 'ADMIN'].includes(userRole)) {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
@@ -51,7 +52,7 @@ export async function POST(
         // Verify the user has permission to reset this employee's password
         if (userRole === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findFirst({
-                where: { ownerId: session.user.id },
+                where: { ownerId: user.id },
                 include: { franchises: true }
             })
 
@@ -76,9 +77,9 @@ export async function POST(
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: (session.user as any).email,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
             userRole: userRole,
             action: 'EMPLOYEE_PASSWORD_RESET',
             entityType: 'User',

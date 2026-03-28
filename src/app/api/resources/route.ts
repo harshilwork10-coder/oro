@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - List resources for a location
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const { searchParams } = new URL(request.url)
+const { searchParams } = new URL(req.url)
         const type = searchParams.get('type') // CHAIR, ROOM, EQUIPMENT
         const queryLocationId = searchParams.get('locationId')
 
@@ -41,15 +40,12 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create a new resource
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const locationId = user.locationId
+const locationId = user.locationId
 
         // Check permissions - need to be manager/owner
         if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role)) {
@@ -60,7 +56,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'No location associated' }, { status: 400 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, type, description, capacity, allowedServiceIds, sortOrder } = body
 
         if (!name) {
@@ -87,21 +83,18 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT - Update a resource
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const locationId = user.locationId
+const locationId = user.locationId
 
         if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role)) {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { id, name, type, description, capacity, allowedServiceIds, sortOrder, isActive } = body
 
         if (!id) {
@@ -138,16 +131,13 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE - Remove a resource
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const locationId = user.locationId
-        const { searchParams } = new URL(request.url)
+const locationId = user.locationId
+        const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
 
         if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role)) {

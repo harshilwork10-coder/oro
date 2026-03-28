@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - List conversations (for staff dashboard)
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-
-        // PROVIDER role doesn't have franchiseId - return empty for now
+// PROVIDER role doesn't have franchiseId - return empty for now
         if (!user.franchiseId || user.role === 'PROVIDER') {
             return NextResponse.json([])
         }
@@ -55,9 +53,9 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Start a new conversation (from customer widget)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const body = await request.json()
+        const body = await req.json()
         const { franchiseId, customerName, customerEmail, customerPhone, message } = body
 
         if (!franchiseId || !message) {

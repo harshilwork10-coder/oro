@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET: Get notifications for current user
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const { searchParams } = new URL(request.url)
+const { searchParams } = new URL(req.url)
         const unreadOnly = searchParams.get('unread') === 'true'
         const limit = parseInt(searchParams.get('limit') || '20')
 
@@ -50,20 +49,17 @@ export async function GET(request: NextRequest) {
 }
 
 // POST: Create a new notification (internal use / triggers)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        // Only managers+ can create notifications
+// Only managers+ can create notifications
         if (!['PROVIDER', 'FRANCHISOR', 'ADMIN', 'MANAGER'].includes(user.role)) {
             return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
         }
 
-        const { type, title, message, targetUserId, data } = await request.json()
+        const { type, title, message, targetUserId, data } = await req.json()
 
         if (!type || !title || !message) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -89,15 +85,12 @@ export async function POST(request: NextRequest) {
 }
 
 // PATCH: Mark notification(s) as read
-export async function PATCH(request: NextRequest) {
+export async function PATCH(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const { notificationId, markAllRead } = await request.json()
+const { notificationId, markAllRead } = await req.json()
 
         if (markAllRead) {
             // Mark all unread notifications as read

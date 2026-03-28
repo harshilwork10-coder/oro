@@ -1,28 +1,22 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-// POST — Issue store credit (from return, goodwill, rain check)
+/**
+ * POST /api/pos/store-credit — Issue store credit (from return, goodwill, rain check)
+ * GET /api/pos/store-credit — Lookup store credit by code or customer
+ */
 export async function POST(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!user.franchiseId) return ApiResponse.badRequest('No franchise')
-
         const body = await request.json()
         const { customerId, amount, reason, expiresInDays } = body
 
-        if (!amount || amount <= 0) return ApiResponse.badRequest('Amount required')
+        if (!amount || amount <= 0) return NextResponse.json({ error: 'Amount required' }, { status: 400 })
 
-        // Create a gift card as store credit
         const code = 'SC-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase()
 
         const credit = await prisma.giftCard.create({
@@ -40,38 +34,29 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        // Audit log
-        await auditLog({
-            userId: user.id,
-            userEmail: user.email,
-            userRole: user.role,
-            action: 'CREATE',
-            entityType: 'StoreCredit',
-            entityId: credit.id,
+        await logActivity({
+            userId: user.id, userEmail: user.email, userRole: user.role,
             franchiseId: user.franchiseId,
-            metadata: { amount, reason, code, customerId }
+            action: 'STORE_CREDIT_ISSUED', entityType: 'GiftCard', entityId: credit.id,
+            details: { amount, reason, code, customerId }
         })
 
-        return ApiResponse.success({ storeCredit: credit })
-    } catch (error) {
+        return NextResponse.json({ storeCredit: credit }, { status: 201 })
+    } catch (error: any) {
         console.error('[STORE_CREDIT_POST]', error)
-        return ApiResponse.error('Failed to issue store credit')
+        return NextResponse.json({ error: error.message || 'Failed to issue store credit' }, { status: 500 })
     }
 }
 
-// GET — Lookup store credit balance by code or customer
 export async function GET(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { searchParams } = new URL(request.url)
+    const code = searchParams.get('code')
+    const customerId = searchParams.get('customerId')
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!user.franchiseId) return ApiResponse.badRequest('No franchise')
-
-        const { searchParams } = new URL(request.url)
-        const code = searchParams.get('code')
-        const customerId = searchParams.get('customerId')
-
         const where: any = { franchiseId: user.franchiseId, type: 'STORE_CREDIT' }
         if (code) where.code = code
         if (customerId) where.customerId = customerId
@@ -84,9 +69,9 @@ export async function GET(request: NextRequest) {
 
         const totalBalance = credits.reduce((s, c) => s + Number(c.currentBalance || 0), 0)
 
-        return ApiResponse.success({ credits, totalBalance })
-    } catch (error) {
+        return NextResponse.json({ credits, totalBalance })
+    } catch (error: any) {
         console.error('[STORE_CREDIT_GET]', error)
-        return ApiResponse.error('Failed to fetch store credits')
+        return NextResponse.json({ error: 'Failed to fetch store credits' }, { status: 500 })
     }
 }

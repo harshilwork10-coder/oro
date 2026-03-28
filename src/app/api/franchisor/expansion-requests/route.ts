@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const authUser = await getAuthUser(request)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session || session.user.role !== 'FRANCHISOR') {
+        if (!session || authUser.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get franchisor's ID
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email! },
+            where: { email: user.email! },
             include: { franchisor: true }
         })
 
@@ -57,9 +57,7 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session || session.user.role !== 'FRANCHISOR') {
+        if (!session || authUser.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -118,7 +116,7 @@ export async function PATCH(request: Request) {
                     data: {
                         status: 'APPROVED',
                         reviewedAt: new Date(),
-                        reviewedBy: session.user.email, // Using email as ID proxy for now
+                        reviewedBy: user.email, // Using email as ID proxy for now
                         createdLocationId: newLocation.id
                     },
                     include: { createdLocation: true }
@@ -131,7 +129,7 @@ export async function PATCH(request: Request) {
                 data: {
                     status: 'REJECTED',
                     reviewedAt: new Date(),
-                    reviewedBy: session.user.email,
+                    reviewedBy: user.email,
                     rejectionReason: rejectionReason || 'No reason provided'
                 }
             })

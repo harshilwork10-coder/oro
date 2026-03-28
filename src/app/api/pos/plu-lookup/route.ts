@@ -1,75 +1,49 @@
-// @ts-nocheck
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 /**
- * PLU Lookup API
- * 
- * Used at POS when cashier types a PLU number (4-5 digits)
- * Common PLU codes: 4011 = Banana, 4065 = Pepper, 4225 = Avocado
- * 
- * Also handles internal PLU from price-embedded barcodes (prefix-2)
+ * PLU Lookup — Product lookup by PLU number, barcode, SKU, or name
+ * GET /api/pos/plu-lookup?plu=4011 or ?q=banana
  */
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-export async function GET(request: NextRequest) {
+    const { searchParams } = new URL(req.url)
+    const plu = searchParams.get('plu')?.trim()
+    const q = searchParams.get('q')?.trim()
+
+    if (!plu && !q) return NextResponse.json({ error: 'plu or q param required' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        const franchiseId = user.franchiseId
-        if (!franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
-
-        const { searchParams } = new URL(request.url)
-        const plu = searchParams.get('plu')?.trim()
-        const q = searchParams.get('q')?.trim()  // general search
-
-        if (!plu && !q) {
-            return NextResponse.json({ error: 'plu or q param required' }, { status: 400 })
-        }
-
-        // Search by PLU, barcode, sku, or name
         const products = await prisma.product.findMany({
             where: {
-                franchiseId,
+                franchiseId: user.franchiseId,
                 isActive: true,
                 OR: [
                     ...(plu ? [
                         { plu: plu },
                         { barcode: plu },
-                        { sku: plu },
+                        { sku: plu }
                     ] : []),
                     ...(q ? [
                         { plu: { contains: q } },
                         { barcode: { contains: q } },
                         { name: { contains: q, mode: 'insensitive' as any } },
-                        { sku: { contains: q } },
-                    ] : []),
-                ],
+                        { sku: { contains: q } }
+                    ] : [])
+                ]
             },
             select: {
-                id: true,
-                name: true,
-                price: true,
-                cost: true,
-                barcode: true,
-                sku: true,
-                plu: true,
-                category: true,
-                stock: true,
-                soldByWeight: true,
-                pricePerUnit: true,
-                unitOfMeasure: true,
-                ageRestricted: true,
-                minimumAge: true,
-                wicEligible: true,
-                ebtEligible: true,
-                isActive: true,
+                id: true, name: true, price: true, cost: true,
+                barcode: true, sku: true, plu: true, category: true,
+                stock: true, soldByWeight: true, pricePerUnit: true,
+                unitOfMeasure: true, ageRestricted: true, minimumAge: true,
+                wicEligible: true, ebtEligible: true, isActive: true
             },
             take: 20,
-            orderBy: { name: 'asc' },
+            orderBy: { name: 'asc' }
         })
 
         return NextResponse.json({
@@ -79,14 +53,13 @@ export async function GET(request: NextRequest) {
                 cost: p.cost ? Number(p.cost) : null,
                 pricePerUnit: p.pricePerUnit ? Number(p.pricePerUnit) : null,
                 requiresScale: p.soldByWeight || false,
-                requiresAgeCheck: p.ageRestricted || false,
+                requiresAgeCheck: p.ageRestricted || false
             })),
             count: products.length,
-            query: plu || q,
+            query: plu || q
         })
-
-    } catch (error) {
-        console.error('PLU Lookup error:', error)
+    } catch (error: any) {
+        console.error('[PLU_LOOKUP_GET]', error)
         return NextResponse.json({ error: 'Server error' }, { status: 500 })
     }
 }

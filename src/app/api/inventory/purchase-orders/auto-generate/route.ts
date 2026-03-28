@@ -1,21 +1,22 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 
 // POST /api/inventory/purchase-orders/auto-generate
 // Automatically creates purchase orders for products below minStock level
-export async function POST() {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get all products that are below their minStock level
         const lowStockProducts = await prisma.product.findMany({
             where: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 isActive: true,
                 minStock: { not: null },
                 stock: { lte: prisma.product.fields.minStock }
@@ -32,7 +33,7 @@ export async function POST() {
         if (productsToOrder.length === 0) {
             const reorderProducts = await prisma.product.findMany({
                 where: {
-                    franchiseId: session.user.franchiseId,
+                    franchiseId: user.franchiseId,
                     isActive: true,
                     reorderPoint: { not: null }
                 },
@@ -58,7 +59,7 @@ export async function POST() {
         // Get default location for the franchise
         const location = await prisma.location.findFirst({
             where: {
-                franchise: { id: session.user.franchiseId }
+                franchise: { id: user.franchiseId }
             }
         })
 
@@ -89,7 +90,7 @@ export async function POST() {
                 // Get or create a default supplier
                 let defaultSupplier = await prisma.supplier.findFirst({
                     where: {
-                        franchiseId: session.user.franchiseId,
+                        franchiseId: user.franchiseId,
                         name: 'General Supplier'
                     }
                 })
@@ -97,7 +98,7 @@ export async function POST() {
                 if (!defaultSupplier) {
                     defaultSupplier = await prisma.supplier.create({
                         data: {
-                            franchiseId: session.user.franchiseId,
+                            franchiseId: user.franchiseId,
                             name: 'General Supplier'
                         }
                     })
@@ -115,7 +116,7 @@ export async function POST() {
 
                 const po = await prisma.purchaseOrder.create({
                     data: {
-                        franchiseId: session.user.franchiseId,
+                        franchiseId: user.franchiseId,
                         supplierId: defaultSupplier.id,
                         locationId: location.id,
                         status: 'DRAFT',
@@ -145,7 +146,7 @@ export async function POST() {
 
                 const po = await prisma.purchaseOrder.create({
                     data: {
-                        franchiseId: session.user.franchiseId,
+                        franchiseId: user.franchiseId,
                         supplierId,
                         locationId: location.id,
                         status: 'DRAFT',

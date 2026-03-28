@@ -5,25 +5,17 @@
  *        that had recent sales (indicating potential theft, damage, or counting errors)
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
-
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const categoryId = searchParams.get('categoryId')
         const days = parseInt(searchParams.get('days') || '30')
 
@@ -103,9 +95,9 @@ export async function GET(request: NextRequest) {
             warning: report.filter(r => r.status === 'WARNING').length
         }
 
-        return ApiResponse.success({ report, summary, periodDays: days })
+        return NextResponse.json({ report, summary, periodDays: days })
     } catch (error) {
         console.error('[SHRINKAGE_GET]', error)
-        return ApiResponse.error('Failed to generate shrinkage report', 500)
+        return NextResponse.json({ error: 'Failed to generate shrinkage report' }, { status: 500 })
     }
 }

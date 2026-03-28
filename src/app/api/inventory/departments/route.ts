@@ -1,24 +1,22 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
 
 // GET - List all departments for franchise with pagination
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = session.user as { franchiseId?: string }
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
         if (!user.franchiseId) {
-            return ApiResponse.error('No franchise associated', 400)
+            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
         const search = searchParams.get('search')
         const includeInactive = searchParams.get('includeInactive') === 'true'
@@ -69,39 +67,36 @@ export async function GET(request: NextRequest) {
         const data = hasMore ? departments.slice(0, take || 50) : departments
         const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-        return ApiResponse.paginated(data, {
+        return NextResponse.json({ data: data, pagination: {
             nextCursor,
             hasMore,
             total: data.length
-        })
+        } })
     } catch (error) {
         console.error('[DEPARTMENTS_GET]', error)
-        return ApiResponse.serverError('Failed to fetch departments')
+        return NextResponse.json({ error: 'Failed to fetch departments' }, { status: 500 })
     }
 }
 
 // POST - Create new department
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as { franchiseId?: string; role?: string; canManageInventory?: boolean }
         if (!user.franchiseId) {
-            return ApiResponse.error('No franchise associated', 400)
+            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
         if (user.role === 'EMPLOYEE' && !user.canManageInventory) {
-            return ApiResponse.forbidden('Permission denied')
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, description, icon, color } = body
 
         if (!name?.trim()) {
-            return ApiResponse.validationError('Name is required')
+            return NextResponse.json({ error: 'Name is required' }, { status: 422 })
         }
 
         const maxSort = await prisma.department.aggregate({
@@ -121,35 +116,32 @@ export async function POST(request: NextRequest) {
             include: { categories: true }
         })
 
-        return ApiResponse.created(department)
+        return NextResponse.json(department, { status: 201 })
     } catch (error) {
         console.error('[DEPARTMENTS_POST]', error)
-        return ApiResponse.serverError('Failed to create department')
+        return NextResponse.json({ error: 'Failed to create department' }, { status: 500 })
     }
 }
 
 // DELETE - Delete department (soft delete)
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as { franchiseId?: string; role?: string; canManageInventory?: boolean }
         if (!user.franchiseId) {
-            return ApiResponse.error('No franchise associated', 400)
+            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
         if (user.role === 'EMPLOYEE' && !user.canManageInventory) {
-            return ApiResponse.forbidden('Permission denied')
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const id = searchParams.get('id')
 
         if (!id) {
-            return ApiResponse.validationError('Department ID required')
+            return NextResponse.json({ error: 'Department ID required' }, { status: 422 })
         }
 
         const department = await prisma.department.findFirst({
@@ -157,7 +149,7 @@ export async function DELETE(request: NextRequest) {
         })
 
         if (!department) {
-            return ApiResponse.notFound('Department')
+            return NextResponse.json({ error: 'Department' }, { status: 404 })
         }
 
         await prisma.department.update({
@@ -165,9 +157,9 @@ export async function DELETE(request: NextRequest) {
             data: { isActive: false }
         })
 
-        return ApiResponse.success({ deleted: true })
+        return NextResponse.json({ deleted: true })
     } catch (error) {
         console.error('[DEPARTMENTS_DELETE]', error)
-        return ApiResponse.serverError('Failed to delete department')
+        return NextResponse.json({ error: 'Failed to delete department' }, { status: 500 })
     }
 }

@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET /api/barber/my-appointments - Get today's appointments for the logged-in barber
-export async function GET() {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
-        const userId = session.user.id
+        const userId = user.id
 
         // Get today's date range
         const startOfDay = new Date()

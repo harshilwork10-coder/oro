@@ -6,9 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 import { canAccessLocation, UserRole } from '@/lib/reporting/scopeEnforcement';
 import { getDateRange, DateRangePreset } from '@/lib/reporting/kpiDefinitions';
 
@@ -18,12 +17,8 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const user = session.user as { id: string; role: string; franchiseId?: string };
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         const { id: locationId } = await params;
 
         // Scope check

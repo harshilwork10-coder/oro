@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
 // GET - List support team members
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-
-        // Get all users with SUPPORT_STAFF role for this franchise
+// Get all users with SUPPORT_STAFF role for this franchise
         const teamMembers = await prisma.user.findMany({
             where: {
                 franchiseId: user.franchiseId,
@@ -41,15 +39,12 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Add a new support team member
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const body = await request.json()
+const body = await req.json()
         const { name, email, phone, password } = body
 
         if (!name || !email || !password) {

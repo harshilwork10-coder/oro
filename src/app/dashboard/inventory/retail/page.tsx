@@ -8,13 +8,16 @@ import {
     Search, Plus, Save, Copy, Trash2, Package,
     ChevronLeft, ChevronRight, Barcode, DollarSign,
     Percent, AlertTriangle, Check, X, ArrowLeft, Folder, Tag, Gift,
-    Brain, Sparkles, Loader2, TrendingUp, Clock, ShoppingBag, Zap
+    Brain, Sparkles, Loader2, TrendingUp, Clock, ShoppingBag, Zap,
+    PackagePlus, History as HistoryIcon, Printer, ClipboardList
 } from 'lucide-react'
 import Toast from '@/components/ui/Toast'
 import DepartmentManagerModal from '@/components/modals/DepartmentManagerModal'
 import PromotionManagerModal from '@/components/modals/PromotionManagerModal'
 import NumpadModal from '@/components/modals/NumpadModal'
 import OnScreenKeyboard from '@/components/ui/OnScreenKeyboard'
+import QuickReceiveModal from '@/components/modals/QuickReceiveModal'
+import ProductHistoryModal from '@/components/modals/ProductHistoryModal'
 
 interface Product {
     id: string
@@ -97,6 +100,10 @@ export default function RetailInventoryPage() {
     // Product insights state
     const [insights, setInsights] = useState<any>(null)
     const [loadingInsights, setLoadingInsights] = useState(false)
+
+    // Quick action modal states
+    const [showReceiveModal, setShowReceiveModal] = useState(false)
+    const [showHistoryModal, setShowHistoryModal] = useState(false)
 
     // Load products and categories
     const loadData = useCallback(async () => {
@@ -868,6 +875,56 @@ export default function RetailInventoryPage() {
                         </div>
                     </div>
 
+                    {/* Quick Actions Bar */}
+                    {editProduct && editProduct.id !== 'new' && (
+                        <div className="bg-stone-900 border border-stone-700 rounded-lg p-3 mb-3">
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                                <button
+                                    onClick={() => router.push(`/dashboard/inventory/adjustments`)}
+                                    className="flex items-center gap-2 px-3 py-2 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 rounded-lg text-amber-400 text-sm font-medium whitespace-nowrap transition-colors"
+                                >
+                                    <ClipboardList className="h-4 w-4" />
+                                    Adjust Stock
+                                </button>
+                                <button
+                                    onClick={() => setShowReceiveModal(true)}
+                                    className="flex items-center gap-2 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm font-medium whitespace-nowrap transition-colors"
+                                >
+                                    <PackagePlus className="h-4 w-4" />
+                                    Receive Stock
+                                </button>
+                                <button
+                                    onClick={() => { setNumpadField('price'); setShowNumpad(true) }}
+                                    className="flex items-center gap-2 px-3 py-2 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded-lg text-green-400 text-sm font-medium whitespace-nowrap transition-colors"
+                                >
+                                    <DollarSign className="h-4 w-4" />
+                                    Change Price
+                                </button>
+                                <button
+                                    onClick={() => setShowPromoModal(true)}
+                                    className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 rounded-lg text-purple-400 text-sm font-medium whitespace-nowrap transition-colors"
+                                >
+                                    <Gift className="h-4 w-4" />
+                                    Create Deal
+                                </button>
+                                <button
+                                    onClick={() => window.open(`/dashboard/labels?search=${encodeURIComponent(editProduct.barcode || editProduct.name)}`, '_blank')}
+                                    className="flex items-center gap-2 px-3 py-2 bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/30 rounded-lg text-sky-400 text-sm font-medium whitespace-nowrap transition-colors"
+                                >
+                                    <Printer className="h-4 w-4" />
+                                    Print Label
+                                </button>
+                                <button
+                                    onClick={() => setShowHistoryModal(true)}
+                                    className="flex items-center gap-2 px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 rounded-lg text-blue-400 text-sm font-medium whitespace-nowrap transition-colors"
+                                >
+                                    <HistoryIcon className="h-4 w-4" />
+                                    View History
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Action Buttons Footer */}
                     <div className="bg-stone-900 border border-stone-700 rounded-lg p-4">
                         <div className="flex items-center justify-between">
@@ -986,6 +1043,8 @@ export default function RetailInventoryPage() {
                 isOpen={showPromoModal}
                 onClose={() => setShowPromoModal(false)}
                 onUpdate={loadData}
+                preSelectedProductId={editProduct?.id !== 'new' ? editProduct?.id : undefined}
+                preSelectedProductName={editProduct?.name}
             />
 
             {/* Numpad Modal for Cost/Price/Stock entry */}
@@ -1046,6 +1105,24 @@ export default function RetailInventoryPage() {
                                     keyboardField === 'vendor' ? 'e.g., Southern Glazers' : ''
                 }
                 type="alphanumeric"
+            />
+
+            {/* Quick Receive Modal */}
+            <QuickReceiveModal
+                isOpen={showReceiveModal}
+                onClose={() => setShowReceiveModal(false)}
+                productId={editProduct?.id !== 'new' ? editProduct?.id : undefined}
+                productName={editProduct?.name}
+                currentStock={editProduct?.stock}
+                onReceived={() => { loadData(); setShowReceiveModal(false) }}
+            />
+
+            {/* Product History Modal */}
+            <ProductHistoryModal
+                isOpen={showHistoryModal}
+                onClose={() => setShowHistoryModal(false)}
+                productId={editProduct?.id || ''}
+                productName={editProduct?.name || ''}
             />
         </div>
     )

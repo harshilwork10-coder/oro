@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // GET single location
 export async function GET(
@@ -10,8 +9,10 @@ export async function GET(
     props: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user || session.user.role !== 'PROVIDER') {
+        const user = await getAuthUser(request)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
@@ -56,8 +57,7 @@ export async function PUT(
     props: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user || session.user.role !== 'PROVIDER') {
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
@@ -88,9 +88,9 @@ export async function PUT(
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'LOCATION_UPDATED',
             entityType: 'Location',
@@ -111,8 +111,7 @@ export async function DELETE(
     props: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user || session.user.role !== 'PROVIDER') {
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
@@ -148,9 +147,9 @@ export async function DELETE(
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'LOCATION_DELETED',
             entityType: 'Location',

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // POST - Send a message
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const body = await request.json()
+        const body = await req.json()
         const { conversationId, content, senderType } = body
 
         if (!conversationId || !content) {
@@ -19,11 +18,10 @@ export async function POST(request: NextRequest) {
         // Get sender info if staff
         let senderId = null
         if (senderType === 'STAFF') {
-            const session = await getServerSession(authOptions)
-            if (!session?.user) {
+            if (!user) {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
             }
-            senderId = (session.user as any).id
+            senderId = user.id
         }
 
         // Create the message
@@ -59,9 +57,12 @@ export async function POST(request: NextRequest) {
 }
 
 // GET - Get messages for a conversation (for customer widget polling)
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const { searchParams } = new URL(request.url)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const { searchParams } = new URL(req.url)
         const conversationId = searchParams.get('conversationId')
         const after = searchParams.get('after') // Timestamp for polling new messages
 

@@ -1,9 +1,6 @@
-import { NextRequest } from 'next/server'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { ApiResponse } from '@/lib/api-response'
-
 /**
  * Resolve service values: brand + override
  * Returns the effective values for a location
@@ -62,30 +59,32 @@ function resolveService(
 // GET: Fetch resolved services for a franchise location
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const searchParams = req.nextUrl.searchParams
         const locationId = searchParams.get('locationId')
 
         if (!locationId) {
-            return ApiResponse.error('locationId is required', 400)
+            return NextResponse.json({ error: 'locationId is required' }, { status: 400 })
         }
 
         // Get location and its franchisor (cast as any — schema may differ)
-        const location = await (prisma as any).location.findUnique({
+        const location = await prisma.location.findUnique({
             where: { id: locationId },
             select: { franchisorId: true, canCustomizePricing: true }
         })
 
         if (!location?.franchisorId) {
-            return ApiResponse.notFound('Location or franchisor not found')
+            return NextResponse.json({ error: 'Location or franchisor not found' }, { status: 404 })
         }
 
         // Get brand services (globalService not in main schema — any-cast)
-        const brandServices = await (prisma as any).globalService.findMany({
+        const brandServices = await prisma.globalService.findMany({
             where: {
                 franchisorId: location.franchisorId,
                 isActive: true,
@@ -98,7 +97,7 @@ export async function GET(req: NextRequest) {
         })
 
         // Get overrides for this location (locationServiceOverride not in main schema)
-        const overrides = await (prisma as any).locationServiceOverride.findMany({
+        const overrides = await prisma.locationServiceOverride.findMany({
             where: { locationId }
         })
 
@@ -115,7 +114,7 @@ export async function GET(req: NextRequest) {
         // Filter out disabled services
         const enabledServices = resolvedServices.filter((s: any) => s.isEnabled)
 
-        return ApiResponse.success({
+        return NextResponse.json({
             services: enabledServices,
             totalBrandServices: brandServices.length,
             totalOverrides: overrides.length,
@@ -124,6 +123,6 @@ export async function GET(req: NextRequest) {
 
     } catch (error) {
         console.error('Error fetching franchise catalog:', error)
-        return ApiResponse.serverError('Failed to fetch franchise catalog')
+        return NextResponse.json({ error: 'Failed to fetch franchise catalog' }, { status: 500 })
     }
 }

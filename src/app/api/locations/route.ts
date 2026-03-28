@@ -1,20 +1,16 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { generateSetupCode } from '@/lib/setup-code'
-import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session) {
-            return ApiResponse.unauthorized()
-        }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
         const search = searchParams.get('search')
 
@@ -22,43 +18,39 @@ export async function GET(request: NextRequest) {
 
         // Handle different roles
         const dashboardRoles = ['OWNER', 'MANAGER', 'EMPLOYEE', 'FRANCHISEE']
-        if (dashboardRoles.includes(session.user.role as string)) {
+        if (dashboardRoles.includes(user.role as string)) {
             // For dashboard users: use session data first, then query if needed
-            if (session.user.franchiseId) {
-                whereClause = { franchiseId: session.user.franchiseId }
-            } else if (session.user.locationId) {
+            if (user.franchiseId) {
+                whereClause = { franchiseId: user.franchiseId }
+            } else if (user.locationId) {
                 // Get location to find its franchise
                 const location = await prisma.location.findUnique({
-                    where: { id: session.user.locationId as string },
+                    where: { id: user.locationId as string },
                     select: { franchiseId: true }
                 })
                 if (location?.franchiseId) {
                     whereClause = { franchiseId: location.franchiseId }
                 } else {
-                    whereClause = { id: session.user.locationId as string }
+                    whereClause = { id: user.locationId as string }
                 }
             } else {
                 // Fallback: query user record for franchiseId
-                const user = await prisma.user.findUnique({
-                    where: { id: session.user.id },
-                    select: { franchiseId: true, locationId: true }
-                })
                 if (user?.franchiseId) {
                     whereClause = { franchiseId: user.franchiseId }
                 } else if (user?.locationId) {
                     whereClause = { id: user.locationId }
                 } else {
-                    return ApiResponse.success({ data: [], pagination: { hasMore: false, nextCursor: null } })
+                    return NextResponse.json({ data: [], pagination: { hasMore: false, nextCursor: null } })
                 }
             }
-        } else if (session.user.role === 'FRANCHISOR') {
+        } else if (user.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({
-                where: { ownerId: session.user.id },
+                where: { ownerId: user.id },
                 include: { franchises: true }
             })
 
             if (!franchisor) {
-                return ApiResponse.success({ data: [], pagination: { hasMore: false, nextCursor: null } })
+                return NextResponse.json({ data: [], pagination: { hasMore: false, nextCursor: null } })
             }
 
             // Auto-create a default "store brand" if owner doesn't have any franchises yet
@@ -102,9 +94,9 @@ export async function GET(request: NextRequest) {
             }
 
             whereClause = { franchise: { franchisorId: franchisor.id } }
-        } else if (session.user.role !== 'PROVIDER') {
+        } else if (user.role !== 'PROVIDER') {
             // Any other role that isn't PROVIDER can't access
-            return ApiResponse.unauthorized()
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Add search filter
@@ -139,30 +131,31 @@ export async function GET(request: NextRequest) {
         const data = hasMore ? locations.slice(0, take || 50) : locations
         const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-        return ApiResponse.paginated(data, {
+        return NextResponse.json({ data: data, pagination: {
             nextCursor,
             hasMore,
             total: data.length
-        })
+        } })
     } catch (error) {
         console.error('Error fetching locations:', error)
-        return ApiResponse.serverError('Failed to fetch locations')
+        return NextResponse.json({ error: 'Failed to fetch locations' }, { status: 500 })
     }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session || (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR')) {
-            return ApiResponse.unauthorized()
+        if (user.role !== 'PROVIDER' && user.role !== 'FRANCHISOR') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, address, franchiseId } = body
 
         if (!name || !address) {
-            return ApiResponse.validationError('Name and address are required')
+            return NextResponse.json({ error: 'Name and address are required' }, { status: 422 })
         }
 
         // Generate slug
@@ -184,9 +177,9 @@ export async function POST(request: NextRequest) {
         let finalFranchiseId = franchiseId
 
         // For Franchisors, validate ownership or auto-assign
-        if (session.user.role === 'FRANCHISOR') {
+        if (user.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({
-                where: { ownerId: session.user.id },
+                where: { ownerId: user.id },
                 include: {
                     franchises: true,
                     config: { select: { maxLocations: true, subscriptionTier: true } }
@@ -194,7 +187,7 @@ export async function POST(request: NextRequest) {
             })
 
             if (!franchisor) {
-                return ApiResponse.forbidden('Franchisor profile not found')
+                return NextResponse.json({ error: 'Franchisor profile not found' }, { status: 403 })
             }
 
             // Check location limit based on subscription (default to 10 for development)
@@ -204,25 +197,24 @@ export async function POST(request: NextRequest) {
             const maxLocations = franchisor.config?.maxLocations || 10
 
             if (currentLocationCount >= maxLocations) {
-                return ApiResponse.error(
-                    `Location limit reached (${currentLocationCount}/${maxLocations}). Your ${franchisor.config?.subscriptionTier || 'STARTER'} plan allows ${maxLocations} store(s). Contact support to upgrade.`,
-                    403,
-                    { code: 'LIMIT_REACHED', details: { current: currentLocationCount, limit: maxLocations } }
+                return NextResponse.json(
+                    { error: `Location limit reached (${currentLocationCount}/${maxLocations}). Your ${franchisor.config?.subscriptionTier || 'STARTER'} plan allows ${maxLocations} store(s). Contact support to upgrade.` },
+                    { status: 403 }
                 )
             }
 
             if (franchiseId) {
                 const ownsFranchise = franchisor.franchises.some(f => f.id === franchiseId)
                 if (!ownsFranchise) {
-                    return ApiResponse.forbidden('You do not own this franchise')
+                    return NextResponse.json({ error: 'You do not own this franchise' }, { status: 403 })
                 }
             } else {
                 if (franchisor.franchises.length === 1) {
                     finalFranchiseId = franchisor.franchises[0].id
                 } else if (franchisor.franchises.length > 1) {
-                    return ApiResponse.validationError('Please select a franchise')
+                    return NextResponse.json({ error: 'Please select a franchise' }, { status: 422 })
                 } else {
-                    return ApiResponse.validationError('You do not have any franchises created yet')
+                    return NextResponse.json({ error: 'You do not have any franchises created yet' }, { status: 422 })
                 }
             }
         }
@@ -240,9 +232,9 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        return ApiResponse.created(location)
+        return NextResponse.json(location, { status: 201 })
     } catch (error) {
         console.error('Error creating location:', error)
-        return ApiResponse.serverError('Failed to create location')
+        return NextResponse.json({ error: 'Failed to create location' }, { status: 500 })
     }
 }

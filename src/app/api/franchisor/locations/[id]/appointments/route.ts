@@ -8,9 +8,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 import { getDateRange, DateRangePreset } from '@/lib/reporting/kpiDefinitions';
 
 export async function GET(
@@ -18,8 +17,11 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        ;
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -29,7 +31,7 @@ export async function GET(
         const dateRange = getDateRange(rangePreset);
 
         // Verify access (cast as any — Location.franchiseId not in schema)
-        const location = await (prisma as any).location.findUnique({
+        const location = await prisma.location.findUnique({
             where: { id: locationId },
             select: { id: true, name: true, franchiseId: true }
         }) as any;
@@ -39,7 +41,7 @@ export async function GET(
         }
 
         // Get appointments (cast as any[] for Appointment.price + Client.name access)
-        const appointments = await (prisma as any).appointment.findMany({
+        const appointments = await prisma.appointment.findMany({
             where: {
                 locationId,
                 startTime: { gte: dateRange.from, lte: dateRange.to }

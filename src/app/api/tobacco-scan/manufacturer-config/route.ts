@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 
 // GET /api/tobacco-scan/manufacturer-config - Get manufacturer configs
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const configs = await prisma.manufacturerConfig.findMany({
-            where: { franchiseId: session.user.franchiseId }
+            where: { franchiseId: user.franchiseId }
         })
 
         // Return configs with masked API keys
@@ -32,8 +33,7 @@ export async function GET() {
 // POST /api/tobacco-scan/manufacturer-config - Create or update manufacturer config
 export async function POST(request: Request) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
         const config = await prisma.manufacturerConfig.upsert({
             where: {
                 franchiseId_manufacturer: {
-                    franchiseId: session.user.franchiseId,
+                    franchiseId: user.franchiseId,
                     manufacturer
                 }
             },
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
                 loyaltyBonus: loyaltyBonus ?? 0
             },
             create: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 manufacturer,
                 storeId: storeId || null,
                 accountNumber: accountNumber || null,

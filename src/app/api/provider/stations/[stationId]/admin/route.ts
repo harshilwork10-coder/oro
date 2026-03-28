@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -26,10 +25,11 @@ export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ stationId: string }> }
 ) {
-    const session = await getServerSession(authOptions)
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Only Provider can manage stations
-    if (!session?.user || session.user.role !== 'PROVIDER') {
+    if (!user || user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Provider access required' }, { status: 403 })
     }
 

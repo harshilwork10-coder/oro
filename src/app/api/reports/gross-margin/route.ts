@@ -4,24 +4,17 @@
  * GET — Per-item margin analysis: revenue vs COGS per product sold
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '30')
         const categoryId = searchParams.get('categoryId')
         const sortBy = searchParams.get('sortBy') || 'grossProfit' // grossProfit, marginPct, revenue
@@ -108,9 +101,9 @@ export async function GET(request: NextRequest) {
             negativeMarginsCount: items.filter(i => i.marginPct < 0).length
         }
 
-        return ApiResponse.success({ items, summary, periodDays: days })
+        return NextResponse.json({ items, summary, periodDays: days })
     } catch (error) {
         console.error('[GROSS_MARGIN_GET]', error)
-        return ApiResponse.error('Failed to generate gross margin report', 500)
+        return NextResponse.json({ error: 'Failed to generate gross margin report' }, { status: 500 })
     }
 }

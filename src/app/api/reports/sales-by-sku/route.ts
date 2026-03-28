@@ -4,24 +4,17 @@
  * GET — Item-level sales detail, searchable by barcode/SKU (essential for c-stores)
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '7')
         const search = searchParams.get('search') // Barcode or SKU search
         const categoryId = searchParams.get('categoryId')
@@ -93,13 +86,13 @@ export async function GET(request: NextRequest) {
         const start = (page - 1) * limit
         const paged = items.slice(start, start + limit)
 
-        return ApiResponse.success({
+        return NextResponse.json({
             items: paged,
             pagination: { page, pages: Math.ceil(items.length / limit), total: items.length },
             periodDays: days
         })
     } catch (error) {
         console.error('[SALES_SKU_GET]', error)
-        return ApiResponse.error('Failed to generate sales by SKU', 500)
+        return NextResponse.json({ error: 'Failed to generate sales by SKU' }, { status: 500 })
     }
 }

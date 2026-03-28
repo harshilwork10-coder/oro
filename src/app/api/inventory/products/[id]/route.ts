@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Get single product
@@ -9,12 +8,9 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = session.user as any
         const { id } = await params
 
         const product = await prisma.product.findFirst({
@@ -51,12 +47,9 @@ export async function PUT(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = session.user as any
         const { id } = await params
         const body = await request.json()
 
@@ -112,17 +105,26 @@ export async function PUT(
             calculatedCardPrice = baseCashPrice * (1 + percentage / 100)
         }
 
+        // Determine new cost value
+        const newCost = body.cost !== undefined ? (body.cost ? parseFloat(body.cost) : null) : existing.cost
+
+        // Detect price/cost changes for audit trail
+        const oldPrice = Number(existing.price)
+        const priceChanged = Math.abs(baseCashPrice - oldPrice) >= 0.01
+        const oldCost = existing.cost ? Number(existing.cost) : null
+        const costChanged = (oldCost !== null || newCost !== null) &&
+            Math.abs((newCost || 0) - (oldCost || 0)) >= 0.01
+
         const product = await prisma.product.update({
             where: { id },
-            // Cast data as any since Prisma types may be stale after schema changes
             data: {
                 name: body.name?.trim() || existing.name,
                 barcode: body.barcode?.trim() || null,
                 sku: body.sku?.trim() || null,
-                price: baseCashPrice, // Legacy field - keep in sync with cashPrice
+                price: baseCashPrice,
                 cashPrice: baseCashPrice,
                 cardPrice: calculatedCardPrice,
-                cost: body.cost !== undefined ? (body.cost ? parseFloat(body.cost) : null) : existing.cost,
+                cost: newCost,
                 stock: body.stock !== undefined ? parseInt(body.stock) : Number(existing.stock),
                 reorderPoint: body.reorderPoint !== undefined ? (body.reorderPoint ? parseInt(body.reorderPoint) : null) : existing.reorderPoint,
                 categoryId: body.categoryId !== undefined ? (body.categoryId || null) : existing.categoryId,
@@ -141,6 +143,40 @@ export async function PUT(
             }
         })
 
+        // Log price/cost change for audit trail
+        if (priceChanged || costChanged) {
+            await (prisma as any).priceChangeLog.create({
+                data: {
+                    productId: id,
+                    oldPrice: oldPrice,
+                    newPrice: baseCashPrice,
+                    oldCost: oldCost,
+                    newCost: newCost,
+                    reason: 'Manual override',
+                    source: 'MANUAL',
+                    changedBy: user.id,
+                    changedByName: user.name || user.email || null
+                }
+            })
+        }
+
+        // Log cost change in ProductCostHistory if cost changed
+        if (costChanged && newCost !== null) {
+            const changePct = oldCost && oldCost > 0
+                ? ((newCost - oldCost) / oldCost * 100)
+                : 0
+            await (prisma as any).productCostHistory.create({
+                data: {
+                    productId: id,
+                    oldCost: oldCost || 0,
+                    newCost: newCost,
+                    changePct: changePct,
+                    sourceType: 'MANUAL',
+                    changedBy: user.id
+                }
+            })
+        }
+
         return NextResponse.json({ product })
     } catch (error) {
         console.error('[PRODUCT_PUT]', error)
@@ -154,12 +190,9 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = session.user as any
         const { id } = await params
 
         // Verify product belongs to franchise

@@ -1,82 +1,60 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-// GET — Store hours and holiday schedule
-export async function GET() {
+/**
+ * Store Hours — Get/update store hours and holiday schedule
+ * GET /api/settings/store-hours
+ * PUT /api/settings/store-hours (Owner+ only)
+ */
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.locationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
         const location = await prisma.location.findUnique({
-            where: { id: locationId },
+            where: { id: user.locationId },
             select: { storeHours: true, holidays: true, name: true }
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             locationName: location?.name,
             storeHours: location?.storeHours ? JSON.parse(location.storeHours as string) : null,
             holidays: location?.holidays ? JSON.parse(location.holidays as string) : []
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[STORE_HOURS_GET]', error)
-        return ApiResponse.error('Failed to fetch store hours')
+        return NextResponse.json({ error: 'Failed to fetch store hours' }, { status: 500 })
     }
 }
 
-// PUT — Update store hours or holidays
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.locationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
+        return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
+    }
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
-            return ApiResponse.forbidden('Owner+ only')
-        }
-
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
-        const body = await request.json()
-        const { storeHours, holidays } = body
-
-        // storeHours: { monday: { open: "06:00", close: "22:00" }, ... }
-        // holidays: [{ date: "2026-12-25", name: "Christmas", closed: true }]
-
+        const { storeHours, holidays } = await req.json()
         const data: any = {}
         if (storeHours) data.storeHours = JSON.stringify(storeHours)
         if (holidays) data.holidays = JSON.stringify(holidays)
 
-        await prisma.location.update({
-            where: { id: locationId },
-            data
+        await prisma.location.update({ where: { id: user.locationId }, data })
+
+        await logActivity({
+            userId: user.id, userEmail: user.email, userRole: user.role,
+            franchiseId: user.franchiseId,
+            action: 'STORE_HOURS_UPDATED', entityType: 'Location', entityId: user.locationId,
+            details: { hasStoreHours: !!storeHours, hasHolidays: !!holidays }
         })
 
-        // Audit log
-        await auditLog({
-            userId: user.id,
-            userEmail: user.email,
-            userRole: user.role,
-            action: 'STORE_HOURS_UPDATED',
-            entityType: 'Location',
-            entityId: locationId,
-            metadata: { hasStoreHours: !!storeHours, hasHolidays: !!holidays }
-        })
-
-        return ApiResponse.success({ updated: true })
-    } catch (error) {
+        return NextResponse.json({ updated: true })
+    } catch (error: any) {
         console.error('[STORE_HOURS_PUT]', error)
-        return ApiResponse.error('Failed to update store hours')
+        return NextResponse.json({ error: 'Failed to update store hours' }, { status: 500 })
     }
 }

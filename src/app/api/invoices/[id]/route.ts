@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { postInvoice, voidInvoice } from '@/lib/invoice-poster'
 
 /**
@@ -13,13 +12,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { id } = await params
-    const franchiseId = (session.user as { franchiseId?: string }).franchiseId
+    const franchiseId = (user as { franchiseId?: string }).franchiseId
 
     const invoice = await prisma.vendorInvoice.findFirst({
       where: { id, franchiseId },
@@ -104,18 +105,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const role = (session.user as { role?: string }).role
+    const role = (user as { role?: string }).role
     if (!role || !['OWNER', 'PROVIDER'].includes(role)) {
       return NextResponse.json({ error: 'Only OWNER can approve/void invoices' }, { status: 403 })
     }
 
     const { id } = await params
-    const franchiseId = (session.user as { franchiseId?: string }).franchiseId
+    const franchiseId = (user as { franchiseId?: string }).franchiseId
     if (!franchiseId) {
       return NextResponse.json({ error: 'No franchise context' }, { status: 400 })
     }
@@ -131,7 +131,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
 
-    const userId = session.user.id || session.user.email || 'unknown'
+    const userId = user.id || user.email || 'unknown'
     const loc = locationId || invoice.locationId
 
     if (!loc) {

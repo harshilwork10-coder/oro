@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // POST: Franchisee requests a new location (expansion)
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user || session.user.role !== 'FRANCHISEE') {
+        if (!user || user.role !== 'FRANCHISEE') {
             return NextResponse.json({ error: 'Unauthorized - Franchisee only' }, { status: 401 })
         }
 
@@ -21,11 +18,6 @@ export async function POST(req: NextRequest) {
         }
 
         // Get the franchisee's franchise
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            include: { franchise: true }
-        })
-
         if (!user?.franchiseId) {
             return NextResponse.json({
                 error: 'You are not associated with a franchise'
@@ -35,7 +27,7 @@ export async function POST(req: NextRequest) {
         // Check if there's already a pending request for same name
         const existing = await prisma.expansionRequest.findFirst({
             where: {
-                franchiseeId: session.user.id,
+                franchiseeId: user.id,
                 proposedName,
                 status: 'PENDING'
             }
@@ -50,7 +42,7 @@ export async function POST(req: NextRequest) {
         // Create expansion request
         const request = await prisma.expansionRequest.create({
             data: {
-                franchiseeId: session.user.id,
+                franchiseeId: user.id,
                 franchiseId: user.franchiseId,
                 proposedName,
                 proposedAddress,
@@ -79,16 +71,17 @@ export async function POST(req: NextRequest) {
 // - Franchisor: gets all requests for their franchise(s)
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        if (session.user.role === 'FRANCHISEE') {
+        if (user.role === 'FRANCHISEE') {
             // Franchisee sees their own requests
             const requests = await prisma.expansionRequest.findMany({
-                where: { franchiseeId: session.user.id },
+                where: { franchiseeId: user.id },
                 include: {
                     franchise: { select: { name: true } }
                 },
@@ -97,10 +90,10 @@ export async function GET(req: NextRequest) {
             return NextResponse.json(requests)
         }
 
-        if (session.user.role === 'FRANCHISOR') {
+        if (user.role === 'FRANCHISOR') {
             // Franchisor sees requests for their franchises
             const franchisor = await prisma.franchisor.findUnique({
-                where: { ownerId: session.user.id },
+                where: { ownerId: user.id },
                 include: { franchises: { select: { id: true } } }
             })
 

@@ -1,15 +1,16 @@
 'use server'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - List all items with filtering
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
 
         const items = await prisma.item.findMany({
             where: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 ...(type && { type }),
                 ...(categoryId && { categoryId }),
                 ...(activeOnly && { isActive: true }),
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
         // Get total count for pagination
         const total = await prisma.item.count({
             where: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 ...(type && { type }),
                 ...(categoryId && { categoryId }),
                 ...(activeOnly && { isActive: true })
@@ -80,8 +81,7 @@ export async function GET(req: NextRequest) {
 // POST - Create a new item
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
 
         const item = await prisma.item.create({
             data: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 name,
                 price,
                 type,

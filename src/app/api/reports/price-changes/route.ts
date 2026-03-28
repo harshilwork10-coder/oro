@@ -4,24 +4,17 @@
  * GET — Track all price modifications with before/after values
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '30')
         const page = parseInt(searchParams.get('page') || '1')
         const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200)
@@ -65,7 +58,7 @@ export async function GET(request: NextRequest) {
         const increases = items.filter(i => i.changeAmount > 0)
         const decreases = items.filter(i => i.changeAmount < 0)
 
-        return ApiResponse.success({
+        return NextResponse.json({
             changes: items,
             summary: {
                 totalChanges: total,
@@ -83,6 +76,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[PRICE_CHANGES_GET]', error)
-        return ApiResponse.error('Failed to generate price changes report', 500)
+        return NextResponse.json({ error: 'Failed to generate price changes report' }, { status: 500 })
     }
 }

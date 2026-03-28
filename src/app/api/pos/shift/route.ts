@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/lib/audit'
 
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json()
-        const { action, amount, notes } = body
+        const { action, amount, notes, stationId, stationName } = body
 
         if (action === 'OPEN') {
             // Get locationId - either from user or from franchise's first location
@@ -57,13 +57,30 @@ export async function POST(req: NextRequest) {
             })
             if (existing) return NextResponse.json({ error: 'Shift already open' }, { status: 400 })
 
+            // S2-5: Check if station already has an open shift (by another employee)
+            if (stationId) {
+                const stationShift = await prisma.cashDrawerSession.findFirst({
+                    where: {
+                        locationId: finalLocationId,
+                        status: 'OPEN',
+                        notes: { contains: `[STATION:${stationId}]` }
+                    }
+                })
+                if (stationShift) {
+                    return NextResponse.json({
+                        error: `Station "${stationName || stationId}" already has an open shift`
+                    }, { status: 400 })
+                }
+            }
+
+            const stationTag = stationId ? `[STATION:${stationId}] ${stationName || 'Unknown Station'}` : ''
             const newSession = await prisma.cashDrawerSession.create({
                 data: {
                     locationId: finalLocationId,
                     employeeId: user.id,
                     startingCash: amount,
                     status: 'OPEN',
-                    notes
+                    notes: stationTag ? `${stationTag}${notes ? `\n${notes}` : ''}` : notes
                 }
             })
 

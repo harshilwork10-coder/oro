@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 
 /**
  * GET /api/provider/dealers
  * List all dealers (Provider only)
  */
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        ;
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         // Only Provider can access
-        if (session.user.role !== 'PROVIDER') {
+        if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
@@ -52,18 +54,18 @@ export async function GET(request: NextRequest) {
  * POST /api/provider/dealers
  * Create a new dealer (Provider only)
  */
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.id) {
+        ;
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        if (session.user.role !== 'PROVIDER') {
+        if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
-        const body = await request.json();
+        const body = await req.json();
         const { dealerName, logoUrl, supportPhone, supportEmail, supportUrl } = body;
 
         if (!dealerName) {

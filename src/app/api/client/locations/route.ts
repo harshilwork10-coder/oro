@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { generateStoreCode } from '@/lib/codeGenerator'
 
 // Get all locations for a client
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get the franchisor ID for this user
         const franchisor = await prisma.franchisor.findUnique({
-            where: { ownerId: session.user.id },
+            where: { ownerId: user.id },
             select: { id: true }
         })
 
@@ -60,14 +61,13 @@ export async function GET(request: NextRequest) {
 }
 
 // Create new location
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { name, address, phone, city, state, zip } = await request.json()
+        const { name, address, phone, city, state, zip } = await req.json()
 
         if (!name || !address) {
             return NextResponse.json({ error: 'Name and address required' }, { status: 400 })
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
         // Get the franchisor
         const franchisor = await prisma.franchisor.findUnique({
-            where: { ownerId: session.user.id },
+            where: { ownerId: user.id },
             select: { id: true, name: true }
         })
 

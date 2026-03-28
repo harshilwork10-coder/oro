@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -8,15 +7,17 @@ import { prisma } from '@/lib/prisma'
  * Fetch services for Pulse app (SERVICE/SALON mode only)
  * Returns service list, categories, and pricing
  */
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Check industry type - services are for SERVICE/SALON only
-        const industryType = (session.user as any)?.industryType || 'SERVICE'
+        const industryType = (user as any)?.industryType || 'SERVICE'
         if (industryType === 'RETAIL') {
             return NextResponse.json({
                 error: 'Services are for service-based businesses only. Use /api/pulse/inventory for retail businesses.',
@@ -25,29 +26,24 @@ export async function GET(request: NextRequest) {
             }, { status: 400 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const search = searchParams.get('search') || ''
         const categoryId = searchParams.get('categoryId')
 
         // Get user's franchise
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-
         if (!user?.franchiseId) {
             return NextResponse.json({ services: [], categories: [] })
         }
 
         // Fetch service categories
-        const categories = await (prisma as any).serviceCategory.findMany({
+        const categories = await prisma.serviceCategory.findMany({
             where: { franchiseId: user.franchiseId },
             select: { id: true, name: true, order: true },
             orderBy: { order: 'asc' }
         }).catch(() => [])
 
         // Fetch services
-        const services = await (prisma as any).service.findMany({
+        const services = await prisma.service.findMany({
             where: {
                 franchiseId: user.franchiseId,
                 isActive: true,
@@ -95,14 +91,13 @@ export async function GET(request: NextRequest) {
  * PUT /api/pulse/services
  * Update service price/duration
  */
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { serviceId, price, duration } = body
 
         if (!serviceId) {
@@ -110,16 +105,11 @@ export async function PUT(request: NextRequest) {
         }
 
         // Verify user owns this service
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'No franchise' }, { status: 400 })
         }
 
-        const service = await (prisma as any).service.findFirst({
+        const service = await prisma.service.findFirst({
             where: { id: serviceId, franchiseId: user.franchiseId }
         })
 
@@ -128,7 +118,7 @@ export async function PUT(request: NextRequest) {
         }
 
         // Update service
-        const updated = await (prisma as any).service.update({
+        const updated = await prisma.service.update({
             where: { id: serviceId },
             data: {
                 ...(price !== undefined ? { price } : {}),

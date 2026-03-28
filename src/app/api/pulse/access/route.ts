@@ -1,30 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // Check if user has access to Oro 9 Pulse
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ hasAccess: false, reason: 'not_authenticated' })
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            include: {
-                franchise: {
-                    include: {
-                        franchisor: {
-                            include: {
-                                config: true
-                            }
-                        }
-                    }
-                }
-            }
-        })
 
         if (!user) {
             return NextResponse.json({ hasAccess: false, reason: 'user_not_found' })
@@ -69,7 +55,7 @@ export async function GET(request: NextRequest) {
         // If no config found, check if this user IS the franchisor owner directly
         if (!config) {
             const franchisor = await prisma.franchisor.findFirst({
-                where: { ownerId: session.user.id },
+                where: { ownerId: user.id },
                 include: { config: true }
             })
             config = franchisor?.config ?? null
@@ -93,12 +79,12 @@ export async function GET(request: NextRequest) {
 
         // Auto-grant owner access if Pulse is enabled but they haven't been flagged yet
         const currentUser = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: user.id },
             select: { hasPulseAccess: true }
         })
         if (currentUser && !currentUser.hasPulseAccess) {
             await prisma.user.update({
-                where: { id: session.user.id },
+                where: { id: user.id },
                 data: { hasPulseAccess: true }
             })
         }

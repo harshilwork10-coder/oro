@@ -1,54 +1,36 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 
-// POST — Generate barcode labels for items
-export async function POST(request: NextRequest) {
+/**
+ * Labels — Generate barcode labels for items
+ * POST /api/inventory/labels
+ */
+export async function POST(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!user.franchiseId) return ApiResponse.badRequest('No franchise')
-
-        const body = await request.json()
-        const { itemIds, labelSize, showPrice, showBarcode, copies } = body as {
-            itemIds: string[]
-            labelSize?: string // 'SMALL' (1x1), 'MEDIUM' (2x1), 'SHELF' (3x1.5)
-            showPrice?: boolean
-            showBarcode?: boolean
-            copies?: number
+        const { itemIds, labelSize, showPrice, showBarcode, copies } = await req.json() as {
+            itemIds: string[]; labelSize?: string; showPrice?: boolean; showBarcode?: boolean; copies?: number
         }
-
-        if (!itemIds?.length) return ApiResponse.badRequest('itemIds required')
+        if (!itemIds?.length) return NextResponse.json({ error: 'itemIds required' }, { status: 400 })
 
         const items = await prisma.item.findMany({
             where: { id: { in: itemIds }, franchiseId: user.franchiseId },
-            select: {
-                id: true, name: true, barcode: true, sku: true,
-                price: true, cost: true,
-                category: { select: { name: true } }
-            }
+            select: { id: true, name: true, barcode: true, sku: true, price: true, cost: true, category: { select: { name: true } } }
         })
 
         const labels = items.map(item => ({
-            itemId: item.id,
-            name: item.name,
+            itemId: item.id, name: item.name,
             barcode: item.barcode || item.sku || item.id,
             price: showPrice !== false ? `$${Number(item.price).toFixed(2)}` : null,
-            category: item.category?.name || '',
-            copies: copies || 1,
-            size: labelSize || 'MEDIUM'
+            category: item.category?.name || '', copies: copies || 1, size: labelSize || 'MEDIUM'
         }))
 
-        return ApiResponse.success({ labels, totalLabels: labels.reduce((s, l) => s + l.copies, 0) })
-    } catch (error) {
+        return NextResponse.json({ labels, totalLabels: labels.reduce((s, l) => s + l.copies, 0) })
+    } catch (error: any) {
         console.error('[LABELS_POST]', error)
-        return ApiResponse.error('Failed to generate labels')
+        return NextResponse.json({ error: 'Failed to generate labels' }, { status: 500 })
     }
 }

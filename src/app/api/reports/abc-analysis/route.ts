@@ -5,25 +5,17 @@
  *        A = top 80% revenue, B = next 15%, C = bottom 5%
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
-
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '90')
 
         const since = new Date()
@@ -93,7 +85,7 @@ export async function GET(request: NextRequest) {
             C: { count: classified.filter(c => c.grade === 'C').length, revenue: Math.round(classified.filter(c => c.grade === 'C').reduce((s, c) => s + c.revenue, 0) * 100) / 100 }
         }
 
-        return ApiResponse.success({
+        return NextResponse.json({
             items: classified,
             summary,
             totalRevenue: Math.round(totalRevenue * 100) / 100,
@@ -101,6 +93,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[ABC_GET]', error)
-        return ApiResponse.error('Failed to generate ABC analysis', 500)
+        return NextResponse.json({ error: 'Failed to generate ABC analysis' }, { status: 500 })
     }
 }

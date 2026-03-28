@@ -1,27 +1,22 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET: Client Retention Report
 // Tracks returning clients and rebooking rates
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id }
-        })
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
         if (!user) {
-            return ApiResponse.notFound('User')
+            return NextResponse.json({ error: 'User' }, { status: 404 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
 
@@ -47,7 +42,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (!franchiseId) {
-            return ApiResponse.error('Franchise not found', 404)
+            return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
         }
 
         // Get all transactions in period
@@ -202,7 +197,7 @@ export async function GET(request: NextRequest) {
             }))
             .sort((a, b) => b.retentionRate - a.retentionRate)
 
-        return ApiResponse.success({
+        return NextResponse.json({
             summary: {
                 totalClients,
                 newClients,
@@ -222,6 +217,6 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
         console.error('Error generating retention report:', error)
-        return ApiResponse.serverError('Failed to generate retention report')
+        return NextResponse.json({ error: 'Failed to generate retention report' }, { status: 500 })
     }
 }

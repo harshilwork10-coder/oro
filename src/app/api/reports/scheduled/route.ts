@@ -5,29 +5,18 @@
  * GET  — List saved report schedules
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // POST — Save a scheduled report preference
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { role: true, franchiseId: true }
-        })
-
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
         if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role || '')) {
-            return ApiResponse.forbidden('Owner+ only')
+            return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { email, reportType, frequency, time, enabled } = body as {
             email: string
             reportType: string
@@ -37,7 +26,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!email || !reportType || !frequency) {
-            return ApiResponse.badRequest('email, reportType, and frequency required')
+            return NextResponse.json({ error: 'email, reportType, and frequency required' }, { status: 400 })
         }
 
         // Store schedule config as JSON in auditLog
@@ -46,7 +35,7 @@ export async function POST(request: NextRequest) {
 
         // Check for existing schedule
         const existing = await prisma.auditLog.findFirst({
-            where: { userId: session.user.id, action: scheduleKey }
+            where: { userId: user.id, action: scheduleKey }
         })
 
         if (existing) {
@@ -57,7 +46,7 @@ export async function POST(request: NextRequest) {
         } else {
             await prisma.auditLog.create({
                 data: {
-                    userId: session.user.id,
+                    userId: user.id,
                     action: scheduleKey,
                     changes: config,
                     entityType: 'REPORT_SCHEDULE',
@@ -66,28 +55,28 @@ export async function POST(request: NextRequest) {
             })
         }
 
-        return ApiResponse.success({ message: `${reportType} report scheduled ${frequency} to ${email}` })
+        return NextResponse.json({ message: `${reportType} report scheduled ${frequency} to ${email}` })
     } catch (error) {
         console.error('[SCHEDULED_REPORT_POST]', error)
-        return ApiResponse.error('Failed to schedule report', 500)
+        return NextResponse.json({ error: 'Failed to schedule report' }, { status: 500 })
     }
 }
 
 // GET — List user's scheduled reports
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const schedules = await prisma.auditLog.findMany({
             where: {
-                userId: session.user.id,
+                userId: user.id,
                 action: { startsWith: 'REPORT_SCHEDULE_' }
             },
             orderBy: { createdAt: 'desc' }
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             schedules: schedules.map(s => ({
                 id: s.id,
                 type: s.action.replace('REPORT_SCHEDULE_', ''),
@@ -97,6 +86,6 @@ export async function GET() {
         })
     } catch (error) {
         console.error('[SCHEDULED_REPORT_GET]', error)
-        return ApiResponse.error('Failed to fetch schedules', 500)
+        return NextResponse.json({ error: 'Failed to fetch schedules' }, { status: 500 })
     }
 }

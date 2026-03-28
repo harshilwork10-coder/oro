@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { hashPin, validatePin } from '@/lib/pinUtils'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 export async function POST(request: Request) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -25,18 +26,18 @@ export async function POST(request: Request) {
 
         // Update user's PIN
         await prisma.user.update({
-            where: { email: session.user.email },
+            where: { email: user.email },
             data: { pin: hashedPin }
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
-            userRole: (session.user as any).role || 'USER',
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
+            userRole: user.role || 'USER',
             action: 'PIN_SET',
             entityType: 'User',
-            entityId: session.user.id,
+            entityId: user.id,
             metadata: {}
         })
 

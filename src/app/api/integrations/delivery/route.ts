@@ -1,12 +1,10 @@
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // GET - Fetch delivery integration settings
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // TODO: Integrate with delivery platforms (DoorDash, UberEats, etc.)
         return NextResponse.json({
@@ -21,12 +19,9 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Update delivery integration settings
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        const body = await request.json()
+        const body = await req.json()
         console.log('[INTEGRATIONS_DELIVERY] Update:', body)
 
         return NextResponse.json({ success: true })

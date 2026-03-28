@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Get centralized inventory view across all locations
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -18,7 +16,7 @@ export async function GET(request: NextRequest) {
 
         // For Provider, get a default franchise or require query param
         if (user.role === 'PROVIDER') {
-            const { searchParams } = new URL(request.url)
+            const { searchParams } = new URL(req.url)
             franchiseId = searchParams.get('franchiseId')
             if (!franchiseId) {
                 // Get first franchise

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // POST: Generate magic link for adding a new location
 export async function POST(
@@ -11,10 +10,12 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(request)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
         const { id } = await params
 
-        if (!session?.user || session.user.role !== 'PROVIDER') {
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -56,14 +57,14 @@ export async function POST(
 
         // Store the franchise ID in a separate record so we know which franchise to add to
         // We'll use metadata in the URL itself
-        const origin = request.headers.get('origin') || request.headers.get('host') || 'http://localhost:3000'
+        const origin = req.headers.get('origin') || req.headers.get('host') || 'http://localhost:3000'
         const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
         const url = `${baseUrl}/onboarding/add-location/${locationToken}?fid=${franchise.id}`
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'LOCATION_MAGIC_LINK_GENERATED',
             entityType: 'Franchisor',

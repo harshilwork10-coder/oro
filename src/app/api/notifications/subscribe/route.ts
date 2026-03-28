@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // POST - Subscribe to push notifications
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { subscription, deviceName } = body
 
         if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
@@ -25,15 +23,15 @@ export async function POST(request: NextRequest) {
                 p256dh: subscription.keys.p256dh,
                 auth: subscription.keys.auth,
                 deviceName,
-                userAgent: request.headers.get('user-agent') || undefined,
+                userAgent: req.headers.get('user-agent') || undefined,
             },
             create: {
-                userId: session.user.id,
+                userId: user.id,
                 endpoint: subscription.endpoint,
                 p256dh: subscription.keys.p256dh,
                 auth: subscription.keys.auth,
                 deviceName,
-                userAgent: request.headers.get('user-agent') || undefined,
+                userAgent: req.headers.get('user-agent') || undefined,
             }
         })
 
@@ -46,14 +44,13 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE - Unsubscribe from push notifications
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { endpoint } = body
 
         if (!endpoint) {
@@ -62,7 +59,7 @@ export async function DELETE(request: NextRequest) {
 
         await prisma.pushSubscription.deleteMany({
             where: {
-                userId: session.user.id,
+                userId: user.id,
                 endpoint
             }
         })
@@ -76,16 +73,18 @@ export async function DELETE(request: NextRequest) {
 }
 
 // GET - Get subscription status and VAPID key
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get user's subscriptions
         const subscriptions = await prisma.pushSubscription.findMany({
-            where: { userId: session.user.id },
+            where: { userId: user.id },
             select: { id: true, deviceName: true, createdAt: true }
         })
 

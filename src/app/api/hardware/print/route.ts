@@ -1,14 +1,12 @@
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // POST - Send print job to hardware printer (labels, receipts, etc.)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const { printerType, data, copies } = await request.json()
+        const { printerType, data, copies } = await req.json()
 
         // TODO: Forward print job to local print agent or network printer
         console.log('[HARDWARE_PRINT]', { printerType, copies })

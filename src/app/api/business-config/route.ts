@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { invalidateLocationCache } from '@/lib/cache'
 
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user?.email) {
+        if (!authUser?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
         // Get user with all possible relationships to find config
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { email: user.email },
             include: {
                 // Direct franchisor ownership (for owners)
                 franchisor: {
@@ -108,14 +108,12 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user?.email) {
+        if (!authUser?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Only PROVIDER role can update business config
-        if (session.user.role !== 'PROVIDER') {
+        if (authUser.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Forbidden - Only Provider can configure business settings' }, { status: 403 })
         }
 
@@ -123,7 +121,7 @@ export async function PATCH(req: NextRequest) {
 
         // Get user's franchisor record
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { email: user.email },
             include: {
                 franchisor: true
             }

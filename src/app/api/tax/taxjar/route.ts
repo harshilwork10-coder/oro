@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // TaxJar API Integration
 // Docs: https://developers.taxjar.com/api/reference/
 
@@ -212,14 +209,16 @@ const TAXJAR_PRODUCT_CODES = {
 }
 
 // GET - Get tax rate by ZIP
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const zip = searchParams.get('zip')?.replace(/\D/g, '').substring(0, 5)
         const city = searchParams.get('city') || undefined
         const street = searchParams.get('street') || undefined
@@ -264,14 +263,13 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Calculate tax for a transaction
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { fromZip, toZip, toCity, toStreet, amount, shipping, lineItems } = body
 
         if (!toZip || !amount) {

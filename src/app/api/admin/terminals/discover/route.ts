@@ -1,22 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // API to discover PAX terminal on network and get its MID
 // Provider only - helps support when IP changes
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (user.role !== 'PROVIDER') {
+if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Provider only' }, { status: 403 })
         }
 
-        const { ipAddress, port = '10009' } = await request.json()
+        const { ipAddress, port = '10009' } = await req.json()
 
         if (!ipAddress) {
             return NextResponse.json({ error: 'IP address required' }, { status: 400 })
@@ -85,19 +82,16 @@ export async function POST(request: NextRequest) {
 }
 
 // Scan a range of IPs to find PAX terminals
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (user.role !== 'PROVIDER') {
+if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Provider only' }, { status: 403 })
         }
 
-        const { baseIp, startRange = 1, endRange = 254, port = '10009' } = await request.json()
+        const { baseIp, startRange = 1, endRange = 254, port = '10009' } = await req.json()
 
         if (!baseIp) {
             // Default to common local network range

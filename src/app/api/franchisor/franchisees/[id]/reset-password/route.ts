@@ -1,11 +1,10 @@
 // Reset password for franchisee owner - Franchisor can reset
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs';
-import { auditLog } from '@/lib/audit';
+import { logActivity } from '@/lib/auditLog';
 
 // Helper to get franchisor for current user
 async function getFranchisorForUser(userId: string) {
@@ -20,12 +19,15 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    ;
+    if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const franchisor = await getFranchisorForUser(session.user.id);
+    const franchisor = await getFranchisorForUser(user.id);
     if (!franchisor) {
         return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 });
     }
@@ -72,9 +74,9 @@ export async function PATCH(
     });
 
     // Audit log
-    await auditLog({
-        userId: session.user.id,
-        userEmail: (session.user as any).email,
+    await logActivity({
+        userId: user.id,
+        userEmail: user.email,
         userRole: 'FRANCHISOR',
         action: 'PASSWORD_RESET',
         entityType: 'User',

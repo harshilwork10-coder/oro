@@ -1,41 +1,70 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-// GET /api/owner/today-stats - Get today's revenue, clients, tips for salon owner
-export async function GET() {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
+// GET /api/owner/today-stats - Get today's revenue, clients, tips for owner dashboard
+// Supports: ?locationId=xxx to scope by location, ?period=today|week|month
+export async function GET(req: Request) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
-        const franchiseId = session.user.franchiseId
+        const { searchParams } = new URL(req.url)
+        const locationId = searchParams.get('locationId')
+        const period = searchParams.get('period') || 'today'
 
-        // Get today's date range
-        const startOfDay = new Date()
+        // Resolve franchiseId scope: if locationId provided, use that location's franchiseId
+        let franchiseId = user.franchiseId
+        if (locationId) {
+            const location = await prisma.location.findFirst({
+                where: { id: locationId },
+                select: { franchiseId: true }
+            })
+            if (location?.franchiseId) {
+                franchiseId = location.franchiseId
+            }
+        }
+
+        // Calculate date ranges based on period
+        const now = new Date()
+        const startOfDay = new Date(now)
         startOfDay.setHours(0, 0, 0, 0)
-
-        const endOfDay = new Date()
+        const endOfDay = new Date(now)
         endOfDay.setHours(23, 59, 59, 999)
 
-        // Get yesterday's date range for comparison
-        const startOfYesterday = new Date(startOfDay)
-        startOfYesterday.setDate(startOfYesterday.getDate() - 1)
+        let rangeStart: Date
+        let comparisonStart: Date
+        let comparisonEnd: Date
 
-        const endOfYesterday = new Date(endOfDay)
-        endOfYesterday.setDate(endOfYesterday.getDate() - 1)
+        if (period === 'week') {
+            rangeStart = new Date(startOfDay)
+            rangeStart.setDate(rangeStart.getDate() - 6) // Last 7 days
+            comparisonStart = new Date(rangeStart)
+            comparisonStart.setDate(comparisonStart.getDate() - 7)
+            comparisonEnd = new Date(rangeStart)
+            comparisonEnd.setMilliseconds(-1)
+        } else if (period === 'month') {
+            rangeStart = new Date(now.getFullYear(), now.getMonth(), 1) // First of current month
+            comparisonStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+            comparisonEnd = new Date(rangeStart)
+            comparisonEnd.setMilliseconds(-1)
+        } else {
+            // today (default)
+            rangeStart = startOfDay
+            comparisonStart = new Date(startOfDay)
+            comparisonStart.setDate(comparisonStart.getDate() - 1)
+            comparisonEnd = new Date(endOfDay)
+            comparisonEnd.setDate(comparisonEnd.getDate() - 1)
+        }
 
-        // Get today's completed transactions
-        const todayTransactions = await prisma.transaction.findMany({
+        // Get current period transactions
+        const currentTransactions = await prisma.transaction.findMany({
             where: {
                 franchiseId,
                 status: 'COMPLETED',
-                createdAt: {
-                    gte: startOfDay,
-                    lte: endOfDay
-                }
+                createdAt: { gte: rangeStart, lte: endOfDay }
             },
             select: {
                 total: true,
@@ -45,54 +74,44 @@ export async function GET() {
             }
         })
 
-        // Get yesterday's transactions for comparison
-        const yesterdayTransactions = await prisma.transaction.findMany({
+        // Get comparison period transactions
+        const comparisonTransactions = await prisma.transaction.findMany({
             where: {
                 franchiseId,
                 status: 'COMPLETED',
-                createdAt: {
-                    gte: startOfYesterday,
-                    lte: endOfYesterday
-                }
+                createdAt: { gte: comparisonStart, lte: comparisonEnd }
             },
-            select: {
-                total: true
-            }
+            select: { total: true }
         })
 
-        // Calculate today's stats
-        const totalRevenueToday = todayTransactions.reduce((sum, tx) => sum + Number(tx.total || 0), 0)
-        const totalTipsToday = todayTransactions.reduce((sum, tx) => sum + Number(tx.tip || 0), 0)
-        const totalClients = new Set(todayTransactions.filter(tx => tx.clientId).map(tx => tx.clientId)).size
-        const totalTransactions = todayTransactions.length
+        // Calculate stats
+        const totalRevenueToday = currentTransactions.reduce((sum, tx) => sum + Number(tx.total || 0), 0)
+        const totalTipsToday = currentTransactions.reduce((sum, tx) => sum + Number(tx.tip || 0), 0)
+        const totalClients = new Set(currentTransactions.filter(tx => tx.clientId).map(tx => tx.clientId)).size
+        const totalTransactions = currentTransactions.length
+        const walkIns = currentTransactions.filter(tx => !tx.clientId).length
 
-        // Walk-ins = transactions without clientId
-        const walkIns = todayTransactions.filter(tx => !tx.clientId).length
-
-        // Yesterday's revenue for comparison
-        const yesterdayRevenue = yesterdayTransactions.reduce((sum, tx) => sum + Number(tx.total || 0), 0)
-
-        // Calculate change percentage
-        const changePercent = yesterdayRevenue > 0
-            ? ((totalRevenueToday - yesterdayRevenue) / yesterdayRevenue) * 100
+        // Comparison revenue
+        const comparisonRevenue = comparisonTransactions.reduce((sum, tx) => sum + Number(tx.total || 0), 0)
+        const changePercent = comparisonRevenue > 0
+            ? ((totalRevenueToday - comparisonRevenue) / comparisonRevenue) * 100
             : 0
 
-        // Get franchise/shop name
-        const franchise = await prisma.franchise.findUnique({
-            where: { id: franchiseId },
-            select: { name: true }
-        })
+        const comparisonLabel = period === 'week' ? 'vs prev week'
+            : period === 'month' ? 'vs prev month'
+            : 'vs yesterday'
 
         return NextResponse.json({
-            shopName: franchise?.name || 'My Salon',
             totalRevenueToday,
             totalTipsToday,
             totalServiceRevenue: totalRevenueToday - totalTipsToday,
             totalClients,
             totalTransactions,
             walkIns,
-            yesterdayRevenue,
-            changePercent
+            yesterdayRevenue: comparisonRevenue,
+            changePercent,
+            comparisonLabel,
+            period
         })
 
     } catch (error) {

@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Returns the current user's assigned station (set by Owner)
-export async function GET() {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+export async function GET(req: NextRequest) {
+    const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!authUser) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const user = session.user as { id: string }
-
     // Get user with their assigned station
     const userData = await prisma.user.findUnique({
         where: { id: user.id },

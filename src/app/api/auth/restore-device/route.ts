@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
         // 1. Look up the device in the trustedDevice table
         // Cast to any for schema-flexible relation traversal
-        const trustedDeviceRaw = await (prisma as any).trustedDevice.findUnique({
+        const trustedDeviceRaw = await prisma.trustedDevice.findUnique({
             where: { deviceId },
             include: {
                 station: {
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Update stats (Cockroach heartbeat)
-        await (prisma as any).trustedDevice.update({
+        await prisma.trustedDevice.update({
             where: { id: trustedDevice.id },
             data: {
                 lastSeenAt: new Date(),
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
         const config = {
             business: {
                 id: trustedDevice.station.location.franchise.franchisor.id, // Assuming relation exists, might need traversal
-                name: trustedDevice.station.location.franchise.franchisor.brandName || "Oronex", // Using brandName
+                name: trustedDevice.station.location.franchise.franchisor.brandName || "ORO 9", // Using brandName
                 industryType: trustedDevice.station.location.franchise.franchisor.industryType,
                 logo: trustedDevice.station.location.franchise.franchisor.logoUrl
             },

@@ -4,8 +4,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import {
     recordConsent,
     getUserConsents,
@@ -25,18 +23,19 @@ const VALID_CONSENT_TYPES: ConsentType[] = [
 ]
 
 // GET - Get all consent preferences for current user
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
             )
         }
 
-        const consents = getUserConsents(session.user.id)
+        const consents = getUserConsents(user.id)
 
         // Build a complete preference map
         const preferences: Record<ConsentType, boolean> = {} as Record<ConsentType, boolean>
@@ -46,7 +45,7 @@ export async function GET() {
         }
 
         return NextResponse.json({
-            userId: session.user.id,
+            userId: user.id,
             preferences,
             consents: consents.map(c => ({
                 type: c.consentType,
@@ -73,18 +72,16 @@ export async function GET() {
 }
 
 // PUT - Update consent preferences
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
             )
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { preferences } = body
 
         if (!preferences || typeof preferences !== 'object') {
@@ -94,8 +91,8 @@ export async function PUT(request: NextRequest) {
             )
         }
 
-        const userId = session.user.id
-        const ip = request.headers.get('x-forwarded-for') || 'unknown'
+        const userId = user.id
+        const ip = req.headers.get('x-forwarded-for') || 'unknown'
         const updatedConsents = []
 
         for (const [type, granted] of Object.entries(preferences)) {
@@ -146,18 +143,16 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE - Revoke all consents (opt-out of everything)
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
             )
         }
 
-        const userId = session.user.id
+        const userId = user.id
         const revokedCount = revokeAllConsents(userId, 'WEB')
 
         // Log consent revocation

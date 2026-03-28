@@ -9,9 +9,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 import { getDateRange, DateRangePreset } from '@/lib/reporting/kpiDefinitions';
 
 export async function GET(
@@ -19,8 +18,11 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        ;
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -30,7 +32,7 @@ export async function GET(
         const dateRange = getDateRange(rangePreset);
 
         // Get location with devices (cast as any — Station.status not in schema)
-        const location = await (prisma as any).location.findUnique({
+        const location = await prisma.location.findUnique({
             where: { id: locationId },
             include: {
                 stations: { select: { id: true, name: true, status: true } }
@@ -42,7 +44,7 @@ export async function GET(
         }
 
         // Get cash drawer sessions (not in main schema — any-cast)
-        const drawerSessions = await (prisma as any).cashDrawerSession.findMany({
+        const drawerSessions = await prisma.cashDrawerSession.findMany({
             where: {
                 locationId,
                 openedAt: { gte: dateRange.from, lte: dateRange.to }
@@ -71,7 +73,7 @@ export async function GET(
         const offlineDevices = devices.filter((d: any) => d.status === 'OFFLINE').length;
 
         // Get time entries for utilization (not in main schema — any-cast)
-        const timeEntries = await (prisma as any).timeEntry.findMany({
+        const timeEntries = await prisma.timeEntry.findMany({
             where: {
                 locationId,
                 clockIn: { gte: dateRange.from, lte: dateRange.to }

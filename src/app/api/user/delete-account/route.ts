@@ -4,24 +4,23 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { deleteUserData, getPrivacyDashboard } from '@/lib/security/gdpr'
 import { logActivity } from '@/lib/auditLog'
 
 // GET - Check deletion eligibility and get privacy dashboard
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
             )
         }
 
-        const userId = session.user.id
+        const userId = user.id
         const dashboard = await getPrivacyDashboard(userId)
 
         return NextResponse.json({
@@ -39,19 +38,17 @@ export async function GET() {
 }
 
 // POST - Request account deletion
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
             )
         }
 
-        const userId = session.user.id
-        const body = await request.json()
+        const userId = user.id
+        const body = await req.json()
 
         // Require confirmation
         if (body.confirmation !== 'DELETE_MY_ACCOUNT') {

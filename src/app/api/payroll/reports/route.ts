@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { calculateCommission, CommissionBreakdown } from '@/lib/commissionCalculator'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET /api/payroll/reports - Get payout report for all staff
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -19,7 +17,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
         const format = searchParams.get('format') // 'json' or 'csv'

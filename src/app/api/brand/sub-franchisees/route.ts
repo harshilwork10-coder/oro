@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Verify Brand Franchisor
         const franchisor = await prisma.franchisor.findFirst({
-            where: { ownerId: session.user.id },
+            where: { ownerId: user.id },
             select: { id: true, businessType: true }
         })
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Only Brand Franchisors can view sub-franchisees.' }, { status: 403 })
         }
 
-        const subFranchisees = await (prisma as any).subFranchisee.findMany({
+        const subFranchisees = await prisma.subFranchisee.findMany({
             where: { franchisorId: franchisor.id },
             include: {
                 franchises: true, // Locations managed

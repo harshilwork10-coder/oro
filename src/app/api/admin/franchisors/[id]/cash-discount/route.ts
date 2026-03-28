@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // STUB: Cash discount feature not yet implemented in current schema
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = await params
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+        const { id } = await params
         // ONLY PROVIDER ROLE
-        if (session?.user?.role !== 'PROVIDER') {
+        if (user?.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized - Provider only' }, { status: 403 })
         }
 

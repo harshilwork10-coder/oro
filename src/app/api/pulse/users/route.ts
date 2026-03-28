@@ -1,24 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET: List all employees + their Pulse access status (Provider manages on behalf of owner)
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Only PROVIDER can manage Pulse users (owner requests changes through Provider)
-        if (session.user.role !== 'PROVIDER') {
+        if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Only Provider can manage Pulse access' }, { status: 403 })
         }
 
         // Get the franchisor for this owner
         const franchisor = await prisma.franchisor.findFirst({
-            where: { ownerId: session.user.id },
+            where: { ownerId: user.id },
             include: {
                 config: true,
                 franchises: {
@@ -54,7 +55,7 @@ export async function GET() {
 
         // Include the owner themselves (they may not be in franchise users)
         const ownerUser = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: user.id },
             select: {
                 id: true,
                 name: true,
@@ -99,18 +100,17 @@ export async function GET() {
 }
 
 // POST: Toggle Pulse access for a user (Provider manages on behalf of owner)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        if (session.user.role !== 'PROVIDER') {
+        if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Only Provider can manage Pulse access' }, { status: 403 })
         }
 
-        const { userId, grantAccess, locationIds } = await request.json()
+        const { userId, grantAccess, locationIds } = await req.json()
 
         if (!userId) {
             return NextResponse.json({ error: 'User ID required' }, { status: 400 })
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
 
         // Get franchisor config to check seat limit
         const franchisor = await prisma.franchisor.findFirst({
-            where: { ownerId: session.user.id },
+            where: { ownerId: user.id },
             include: { config: true, franchises: { select: { id: true } } }
         })
 
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Prevent removing owner's own access
-        if (userId === session.user.id && !grantAccess) {
+        if (userId === user.id && !grantAccess) {
             return NextResponse.json({ error: 'Cannot remove your own Pulse access' }, { status: 400 })
         }
 
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
             const currentSeats = await prisma.user.count({
                 where: {
                     hasPulseAccess: true,
-                    id: { not: session.user.id }, // Owner doesn't count
+                    id: { not: user.id }, // Owner doesn't count
                     franchiseId: { in: franchiseIds }
                 }
             })

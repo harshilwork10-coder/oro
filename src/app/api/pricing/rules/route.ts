@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Fetch pricing rules for the franchise
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const rules = await prisma.pricingRule.findMany({
@@ -23,13 +22,11 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create a new pricing rule
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const body = await request.json()
+        const body = await req.json()
         const rule = await prisma.pricingRule.create({
             data: {
                 ...body,
@@ -45,17 +42,15 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT - Update a pricing rule
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
         if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
 
-        const body = await request.json()
+        const body = await req.json()
         const rule = await prisma.pricingRule.update({
             where: { id, franchiseId: user.franchiseId },
             data: body
@@ -69,13 +64,11 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE - Delete a pricing rule
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
         if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
 

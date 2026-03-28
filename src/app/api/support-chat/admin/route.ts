@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 // Canned responses for quick replies
@@ -39,7 +37,6 @@ const CANNED_RESPONSES = [
 
 // GET - Fetch all support chats for admin dashboard
 export async function GET(req: Request) {
-    const session = await getServerSession(authOptions)
     const user = session?.user as any
 
     if (!user?.id) {
@@ -152,7 +149,6 @@ export async function GET(req: Request) {
 
 // POST - Send a reply as support
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
     const user = session?.user as any
 
     if (!user?.id) {
@@ -195,7 +191,6 @@ export async function POST(req: Request) {
 
 // PUT - Update chat status, priority, or assignee
 export async function PUT(req: Request) {
-    const session = await getServerSession(authOptions)
     const user = session?.user as any
 
     if (!user?.id) {

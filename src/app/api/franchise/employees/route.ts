@@ -1,23 +1,20 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcryptjs'
-import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
 
-export async function GET(request: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) return ApiResponse.unauthorized()
+export async function GET(req: NextRequest) {
+    if (!authUser?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
+        where: { email: user.email },
         include: { franchise: true }
     })
 
-    if (!user) return ApiResponse.notFound('User')
+    if (!user) return NextResponse.json({ error: 'User' }, { status: 404 })
 
-    const searchParams = request.nextUrl.searchParams
+    const searchParams = req.nextUrl.searchParams
     const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
     const search = searchParams.get('search')
     const locationId = searchParams.get('locationId')
@@ -32,13 +29,13 @@ export async function GET(request: NextRequest) {
         const franchisor = await prisma.franchisor.findUnique({
             where: { ownerId: user.id }
         })
-        if (!franchisor) return ApiResponse.success({ data: [], pagination: { hasMore: false, nextCursor: null } })
+        if (!franchisor) return NextResponse.json({ data: [], pagination: { hasMore: false, nextCursor: null } })
 
         whereClause.franchise = { franchisorId: franchisor.id }
     } else if (user.franchiseId) {
         whereClause.franchiseId = user.franchiseId
     } else {
-        return ApiResponse.forbidden()
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Search filter
@@ -94,33 +91,35 @@ export async function GET(request: NextRequest) {
     const data = hasMore ? employees.slice(0, take || 50) : employees
     const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-    return ApiResponse.paginated(data, {
+    return NextResponse.json({ data: data, pagination: {
         nextCursor,
         hasMore,
         total: data.length
-    })
+    } })
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-        return ApiResponse.unauthorized()
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!authUser?.email) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
+        where: { email: user.email },
         include: { franchise: true }
     })
 
-    if (!user) return ApiResponse.notFound('User')
+    if (!user) return NextResponse.json({ error: 'User' }, { status: 404 })
 
     // Only owners/managers can add employees
     if (user.role !== 'FRANCHISOR' && user.role !== 'FRANCHISEE' && !user.canManageEmployees) {
-        return ApiResponse.forbidden('Permission denied to manage employees')
+        return NextResponse.json({ error: 'Permission denied to manage employees' }, { status: 403 })
     }
 
-    const body = await request.json()
+    const body = await req.json()
     const {
         name,
         email,
@@ -143,7 +142,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     if (!name || !email || !password) {
-        return ApiResponse.validationError('Name, email, and password are required')
+        return NextResponse.json({ error: 'Name, email, and password are required' }, { status: 422 })
     }
 
     // Validate Location if provided
@@ -156,28 +155,28 @@ export async function POST(request: NextRequest) {
         })
 
         if (!location) {
-            return ApiResponse.notFound('Location')
+            return NextResponse.json({ error: 'Location' }, { status: 404 })
         }
 
         // Verify Access to this Location
         if (user.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({ where: { ownerId: user.id } })
             if (!franchisor || location.franchise?.franchisorId !== franchisor.id) {
-                return ApiResponse.forbidden('You do not own this location')
+                return NextResponse.json({ error: 'You do not own this location' }, { status: 403 })
             }
         } else if (user.franchiseId && location.franchiseId !== user.franchiseId) {
-            return ApiResponse.forbidden('Location does not belong to your franchise')
+            return NextResponse.json({ error: 'Location does not belong to your franchise' }, { status: 403 })
         }
 
         finalFranchiseId = location.franchiseId
     } else if (user.role === 'FRANCHISOR') {
-        return ApiResponse.validationError('Location is required for Franchisors')
+        return NextResponse.json({ error: 'Location is required for Franchisors' }, { status: 422 })
     }
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({ where: { email } })
     if (existingUser) {
-        return ApiResponse.conflict('User with this email already exists')
+        return NextResponse.json({ error: 'User with this email already exists' }, { status: 409 })
     }
 
     // NOTE: maxUsers limit is for Oro 9 Plus customer app, not for employee management
@@ -252,9 +251,9 @@ export async function POST(request: NextRequest) {
     })
 
     const { password: _, ...employeeWithoutPassword } = result
-    return ApiResponse.created(employeeWithoutPassword)
+    return NextResponse.json(employeeWithoutPassword, { status: 201 })
   } catch (error) {
     console.error('[FRANCHISE_EMPLOYEES_POST]', error)
-    return ApiResponse.error('Failed to create employee', 500)
+    return NextResponse.json({ error: 'Failed to create employee' }, { status: 500 })
   }
 }

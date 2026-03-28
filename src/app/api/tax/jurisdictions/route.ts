@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - List all tax jurisdictions for franchise
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!user.franchiseId) {
+if (!user.franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
@@ -41,19 +40,16 @@ export async function GET() {
 }
 
 // POST - Create new tax jurisdiction
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!user.franchiseId) {
+if (!user.franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, type, code, salesTaxRate, description, priority, exciseTaxRules } = body
 
         if (!name?.trim()) {

@@ -1,26 +1,21 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET: No-Show & Cancellation Report
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id }
-        })
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
         if (!user) {
-            return ApiResponse.notFound('User')
+            return NextResponse.json({ error: 'User' }, { status: 404 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
 
@@ -46,7 +41,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (!franchiseId) {
-            return ApiResponse.error('Franchise not found', 404)
+            return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
         }
 
         // Get location IDs for this franchise
@@ -57,7 +52,7 @@ export async function GET(request: NextRequest) {
         const locationIds = locations.map(l => l.id)
 
         if (locationIds.length === 0) {
-            return ApiResponse.success({
+            return NextResponse.json({
                 summary: { totalAppointments: 0, totalNoShows: 0, totalCancellations: 0, noShowRate: 0, cancellationRate: 0, estimatedLostRevenue: 0 },
                 byBarber: [],
                 byDayOfWeek: [],
@@ -210,7 +205,7 @@ export async function GET(request: NextRequest) {
             .filter(c => c.total > 1)
             .sort((a, b) => b.total - a.total)
 
-        return ApiResponse.success({
+        return NextResponse.json({
             summary: {
                 totalAppointments,
                 totalNoShows,
@@ -247,6 +242,6 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
         console.error('Error generating no-show report:', error)
-        return ApiResponse.serverError('Failed to generate no-show report')
+        return NextResponse.json({ error: 'Failed to generate no-show report' }, { status: 500 })
     }
 }

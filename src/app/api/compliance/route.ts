@@ -1,26 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Allow PROVIDER and FRANCHISOR roles
-        if (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR') {
+        if (user.role !== 'PROVIDER' && user.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
         // Get franchisor ID if user is a franchisor
         let franchisorId: string | null = null
-        if (session.user.role === 'FRANCHISOR') {
+        if (user.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findFirst({
-                where: { ownerId: session.user.id }
+                where: { ownerId: user.id }
             })
             if (!franchisor) {
                 return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })

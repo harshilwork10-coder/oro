@@ -1,9 +1,8 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 
 // Generate a unique 8-char pairing code for security (32^8 = ~1 trillion combinations)
 function generatePairingCode(): string {
@@ -21,12 +20,12 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    ;
+    if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (session.user.role !== 'PROVIDER') {
+    if (user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Provider access required' }, { status: 403 });
     }
 
@@ -94,12 +93,15 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    ;
+    if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (session.user.role !== 'PROVIDER') {
+    if (user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Provider access required' }, { status: 403 });
     }
 

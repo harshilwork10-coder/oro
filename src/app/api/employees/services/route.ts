@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET: Get employee's services with their custom prices
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const searchParams = req.nextUrl.searchParams
-        const employeeId = searchParams.get('employeeId') || session.user.id
+        const employeeId = searchParams.get('employeeId') || user.id
 
         // Get employee's custom service pricing
         const employeeServices = await prisma.employeeService.findMany({
@@ -58,8 +59,7 @@ export async function GET(req: NextRequest) {
 // POST: Set employee's custom price for a service
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -70,20 +70,6 @@ export async function POST(req: NextRequest) {
         }
 
         // Check if user's franchise allows per-barber pricing
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: {
-                franchiseId: true,
-                franchise: {
-                    select: {
-                        franchisor: {
-                            select: { businessType: true }
-                        }
-                    }
-                }
-            }
-        })
-
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
@@ -112,7 +98,7 @@ export async function POST(req: NextRequest) {
         const employeeService = await prisma.employeeService.upsert({
             where: {
                 employeeId_serviceId: {
-                    employeeId: session.user.id,
+                    employeeId: user.id,
                     serviceId: serviceId
                 }
             },
@@ -122,7 +108,7 @@ export async function POST(req: NextRequest) {
                 isActive: true
             },
             create: {
-                employeeId: session.user.id,
+                employeeId: user.id,
                 serviceId: serviceId,
                 price: price,
                 duration: duration || null,
@@ -148,8 +134,7 @@ export async function POST(req: NextRequest) {
 // DELETE: Remove employee's custom pricing (use base price instead)
 export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -161,7 +146,7 @@ export async function DELETE(req: NextRequest) {
 
         await prisma.employeeService.deleteMany({
             where: {
-                employeeId: session.user.id,
+                employeeId: user.id,
                 serviceId: serviceId
             }
         })

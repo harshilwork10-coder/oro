@@ -1,30 +1,29 @@
-import { NextRequest } from 'next/server'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { ApiResponse } from '@/lib/api-response'
-
 // PUT: Update brand service
 export async function PUT(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const { id: serviceId } = await params
 
         // Verify ownership - check both role assignments AND direct ownership
-        const service = await (prisma as any).globalService.findUnique({
+        const service = await prisma.globalService.findUnique({
             where: { id: serviceId },
             include: {
                 franchisor: {
                     include: {
                         roleAssignments: {
-                            where: { userId: session.user.id }
+                            where: { userId: user.id }
                         }
                     }
                 }
@@ -33,10 +32,10 @@ export async function PUT(
 
         // Check if user has access via role assignment OR is direct owner
         const hasRoleAssignment = service?.franchisor?.roleAssignments?.length > 0
-        const isDirectOwner = service?.franchisor?.ownerId === session.user.id
+        const isDirectOwner = service?.franchisor?.ownerId === user.id
 
         if (!service || (!hasRoleAssignment && !isDirectOwner)) {
-            return ApiResponse.forbidden('Not authorized to edit this service')
+            return NextResponse.json({ error: 'Not authorized to edit this service' }, { status: 403 })
         }
 
         const body = await req.json()
@@ -56,7 +55,7 @@ export async function PUT(
             isActive
         } = body
 
-        const updated = await (prisma as any).globalService.update({
+        const updated = await prisma.globalService.update({
             where: { id: serviceId },
             data: {
                 name,
@@ -75,11 +74,11 @@ export async function PUT(
             }
         })
 
-        return ApiResponse.success({ service: updated })
+        return NextResponse.json({ service: updated })
 
     } catch (error) {
         console.error('Error updating brand service:', error)
-        return ApiResponse.serverError('Failed to update brand service')
+        return NextResponse.json({ error: 'Failed to update brand service' }, { status: 500 })
     }
 }
 
@@ -89,21 +88,20 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const { id: serviceId } = await params
 
         // Verify ownership - check both role assignments AND direct ownership
-        const service = await (prisma as any).globalService.findUnique({
+        const service = await prisma.globalService.findUnique({
             where: { id: serviceId },
             include: {
                 franchisor: {
                     include: {
                         roleAssignments: {
-                            where: { userId: session.user.id }
+                            where: { userId: user.id }
                         }
                     }
                 }
@@ -112,14 +110,14 @@ export async function DELETE(
 
         // Check if user has access via role assignment OR is direct owner
         const hasRoleAssignment = service?.franchisor?.roleAssignments?.length > 0
-        const isDirectOwner = service?.franchisor?.ownerId === session.user.id
+        const isDirectOwner = service?.franchisor?.ownerId === user.id
 
         if (!service || (!hasRoleAssignment && !isDirectOwner)) {
-            return ApiResponse.forbidden('Not authorized to delete this service')
+            return NextResponse.json({ error: 'Not authorized to delete this service' }, { status: 403 })
         }
 
         // Soft delete - archive instead of hard delete
-        await (prisma as any).globalService.update({
+        await prisma.globalService.update({
             where: { id: serviceId },
             data: {
                 isArchived: true,
@@ -127,10 +125,10 @@ export async function DELETE(
             }
         })
 
-        return ApiResponse.success({ message: 'Service archived' })
+        return NextResponse.json({ message: 'Service archived' })
 
     } catch (error) {
         console.error('Error deleting brand service:', error)
-        return ApiResponse.serverError('Failed to delete brand service')
+        return NextResponse.json({ error: 'Failed to delete brand service' }, { status: 500 })
     }
 }

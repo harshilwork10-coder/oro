@@ -4,24 +4,17 @@
  * GET — Analyze performance of active and past promotions
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '30')
         const status = searchParams.get('status') // ACTIVE, EXPIRED, SCHEDULED
         const since = new Date(); since.setDate(since.getDate() - days)
@@ -102,7 +95,7 @@ export async function GET(request: NextRequest) {
             }
         }))
 
-        return ApiResponse.success({
+        return NextResponse.json({
             promotions: results,
             summary: {
                 total: results.length,
@@ -114,6 +107,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[PROMO_EFFECT_GET]', error)
-        return ApiResponse.error('Failed to generate promo effectiveness report', 500)
+        return NextResponse.json({ error: 'Failed to generate promo effectiveness report' }, { status: 500 })
     }
 }

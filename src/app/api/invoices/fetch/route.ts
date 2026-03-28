@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { fetchInvoiceFiles, testFtpConnection } from '@/lib/ftp-client'
 import { parseInvoiceCsv, computeBaseUnits } from '@/lib/fintech-invoice-parser'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { matchInvoiceItem } from '@/lib/invoice-matcher'
 
 /**
@@ -17,17 +16,19 @@ import { matchInvoiceItem } from '@/lib/invoice-matcher'
  */
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const franchiseId = (session.user as { franchiseId?: string }).franchiseId
+    const franchiseId = (user as { franchiseId?: string }).franchiseId
     if (!franchiseId) {
       return NextResponse.json({ error: 'No franchise context' }, { status: 400 })
     }
 
-    const role = (session.user as { role?: string }).role
+    const role = (user as { role?: string }).role
     if (!role || !['PROVIDER'].includes(role)) {
       return NextResponse.json({ error: 'Only PROVIDER can trigger FTP fetch' }, { status: 403 })
     }
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
 
     // Process each downloaded file
     const costAlertPct = Number(ftpConfig.costAlertPct) || 10
-    const userId = session.user.id || session.user.email || 'system'
+    const userId = user.id || user.email || 'system'
     const allInvoiceResults = []
     let totalInvoicesCreated = 0
 

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { uploadToS3 } from '@/lib/s3'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // Route segment config - Allow larger body size for file uploads
@@ -19,17 +18,17 @@ export const maxDuration = 60 // 60 seconds timeout for large files
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB (increased from 5MB)
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        // Security: Require authentication
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+        // Security: Require authentication
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const formData = await request.formData()
+        const formData = await req.formData()
         const file = formData.get('file') as File
         const franchisorId = formData.get('franchisorId') as string
         const documentType = formData.get('documentType') as string // 'dl', 'voidedCheck', etc.

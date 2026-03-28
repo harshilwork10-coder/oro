@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: Request) {
-    const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== 'FRANCHISOR' && session.user.role !== 'PROVIDER')) {
+    const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!session || (user.role !== 'FRANCHISOR' && user.role !== 'PROVIDER')) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
         // In a real app, we'd filter by the specific Franchisor ID linked to the user
         // For now, assuming the user is an owner/admin of a Franchisor
-        const globalServices = await (prisma as any).globalService.findMany({
+        const globalServices = await prisma.globalService.findMany({
             where: { isArchived: false }
         })
 
@@ -24,9 +25,6 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
-    const user = session?.user as any
-
     if (!user?.id || (user.role !== 'FRANCHISOR' && user.role !== 'PROVIDER')) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -53,7 +51,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
-        const newService = await (prisma as any).globalService.create({
+        const newService = await prisma.globalService.create({
             data: {
                 name,
                 description,

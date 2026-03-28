@@ -5,8 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import {
     generateTemplateHash,
@@ -14,14 +13,16 @@ import {
     validateMessageFooter
 } from '@/lib/sms/compliance'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const {
             dealSuggestionId,
             locationId,
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
                 messageTemplate,
                 scheduledFor: new Date(scheduledFor),
                 status: 'SCHEDULED',
-                createdById: session.user.id
+                createdById: user.id
             }
         })
 

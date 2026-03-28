@@ -1,34 +1,33 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 
-// POST — Suspend current cart (save to DB for later recall)
+/**
+ * POST /api/pos/transactions/suspended — Suspend cart (save for later recall)
+ * GET /api/pos/transactions/suspended — List active suspended transactions
+ * PUT /api/pos/transactions/suspended — Recall a suspended transaction
+ * DELETE /api/pos/transactions/suspended — Void a suspended transaction
+ */
 export async function POST(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
+    const locationId = dbUser?.locationId
+    if (!locationId) return NextResponse.json({ error: 'No location' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
         const body = await request.json()
         const { cartData, label } = body
 
-        if (!cartData || !cartData.items || cartData.items.length === 0) {
-            return ApiResponse.badRequest('Cart must have at least one item')
+        if (!cartData?.items?.length) {
+            return NextResponse.json({ error: 'Cart must have at least one item' }, { status: 400 })
         }
 
-        // Auto-expire after 24 hours
         const expiresAt = new Date()
         expiresAt.setHours(expiresAt.getHours() + 24)
 
-        const suspended = await (prisma as any).suspendedTransaction.create({
+        const suspended = await prisma.suspendedTransaction.create({
             data: {
                 locationId,
                 employeeId: user.id,
@@ -37,115 +36,99 @@ export async function POST(request: NextRequest) {
                 expiresAt,
                 status: 'ACTIVE'
             },
-            include: {
-                employee: { select: { name: true } }
-            }
+            include: { employee: { select: { name: true } } }
         })
 
-        return ApiResponse.success({ suspended })
-    } catch (error) {
+        return NextResponse.json({ suspended }, { status: 201 })
+    } catch (error: any) {
         console.error('[SUSPEND_POST]', error)
-        return ApiResponse.error('Failed to suspend transaction')
+        return NextResponse.json({ error: error.message || 'Failed to suspend' }, { status: 500 })
     }
 }
 
-// GET — List all active suspended transactions for this location
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
+    const locationId = dbUser?.locationId
+    if (!locationId) return NextResponse.json({ error: 'No location' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
-        // Auto-expire old ones first
-        await (prisma as any).suspendedTransaction.updateMany({
-            where: {
-                locationId,
-                status: 'ACTIVE',
-                expiresAt: { lt: new Date() }
-            },
+        // Auto-expire old ones
+        await prisma.suspendedTransaction.updateMany({
+            where: { locationId, status: 'ACTIVE', expiresAt: { lt: new Date() } },
             data: { status: 'EXPIRED' }
         })
 
-        const suspended = await (prisma as any).suspendedTransaction.findMany({
-            where: {
-                locationId,
-                status: 'ACTIVE'
-            },
-            include: {
-                employee: { select: { name: true } }
-            },
+        const suspended = await prisma.suspendedTransaction.findMany({
+            where: { locationId, status: 'ACTIVE' },
+            include: { employee: { select: { name: true } } },
             orderBy: { createdAt: 'desc' }
         })
 
-        return ApiResponse.success({ suspended })
-    } catch (error) {
+        return NextResponse.json({ suspended })
+    } catch (error: any) {
         console.error('[SUSPEND_GET]', error)
-        return ApiResponse.error('Failed to fetch suspended transactions')
+        return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
     }
 }
 
-// PUT — Recall a suspended transaction (mark as RECALLED)
 export async function PUT(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
+    const locationId = dbUser?.locationId
+    if (!locationId) return NextResponse.json({ error: 'No location' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
         const body = await request.json()
         const { id } = body
 
-        if (!id) return ApiResponse.badRequest('Suspended transaction ID required')
+        if (!id) return NextResponse.json({ error: 'Suspended transaction ID required' }, { status: 400 })
 
-        const existing = await (prisma as any).suspendedTransaction.findFirst({
+        const existing = await prisma.suspendedTransaction.findFirst({
             where: { id, locationId, status: 'ACTIVE' }
         })
-        if (!existing) return ApiResponse.notFound('Suspended transaction not found or already recalled')
+        if (!existing) return NextResponse.json({ error: 'Not found or already recalled' }, { status: 404 })
 
-        const recalled = await (prisma as any).suspendedTransaction.update({
+        const recalled = await prisma.suspendedTransaction.update({
             where: { id },
             data: { status: 'RECALLED' }
         })
 
-        return ApiResponse.success({ recalled, cartData: existing.cartData })
-    } catch (error) {
+        return NextResponse.json({ recalled, cartData: existing.cartData })
+    } catch (error: any) {
         console.error('[SUSPEND_PUT]', error)
-        return ApiResponse.error('Failed to recall transaction')
+        return NextResponse.json({ error: 'Failed to recall' }, { status: 500 })
     }
 }
 
-// DELETE — Void a suspended transaction
 export async function DELETE(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
+    const locationId = dbUser?.locationId
+    if (!locationId) return NextResponse.json({ error: 'No location' }, { status: 400 })
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const existing = await prisma.suspendedTransaction.findFirst({ where: { id, locationId } })
+        if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
-        const { searchParams } = new URL(request.url)
-        const id = searchParams.get('id')
-        if (!id) return ApiResponse.badRequest('ID required')
-
-        const existing = await (prisma as any).suspendedTransaction.findFirst({
-            where: { id, locationId }
-        })
-        if (!existing) return ApiResponse.notFound('Not found')
-
-        await (prisma as any).suspendedTransaction.update({
+        await prisma.suspendedTransaction.update({
             where: { id },
             data: { status: 'VOIDED' }
         })
 
-        return ApiResponse.success({ deleted: true })
-    } catch (error) {
+        return NextResponse.json({ deleted: true })
+    } catch (error: any) {
         console.error('[SUSPEND_DELETE]', error)
-        return ApiResponse.error('Failed to void')
+        return NextResponse.json({ error: 'Failed to void' }, { status: 500 })
     }
 }

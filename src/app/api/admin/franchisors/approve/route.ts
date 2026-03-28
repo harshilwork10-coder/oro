@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 export async function POST(req: NextRequest) {
-    const session = await getServerSession(authOptions)
+    const user = await getAuthUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!session?.user?.email || (session.user.role !== 'ADMIN' && session.user.role !== 'PROVIDER')) {
+    if (!user?.email || (user.role !== 'ADMIN' && user.role !== 'PROVIDER')) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -70,10 +70,10 @@ export async function POST(req: NextRequest) {
         // In production: Send email notification
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
-            userRole: session.user.role || 'PROVIDER',
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
+            userRole: user.role || 'PROVIDER',
             action: `FRANCHISOR_${action}`,
             entityType: 'Franchisor',
             entityId: franchisorId,

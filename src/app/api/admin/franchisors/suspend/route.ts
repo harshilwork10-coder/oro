@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // POST - Suspend, Activate, or Terminate a franchisor account
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as { role?: string }
-
         // Only PROVIDER can manage account status
         if (user?.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Only providers can manage account status' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { franchisorId, action, reason } = body
 
         if (!franchisorId) {
@@ -79,9 +75,9 @@ export async function POST(request: NextRequest) {
         // TODO: Send email notification to the franchisor about account status change
 
         // Audit log
-        await auditLog({
-            userId: session?.user?.id || 'unknown',
-            userEmail: (session?.user as any)?.email,
+        await logActivity({
+            userId: authUser?.id || 'unknown',
+            userEmail: (authUser as any)?.email,
             userRole: 'PROVIDER',
             action: `ACCOUNT_${action}`,
             entityType: 'Franchisor',
@@ -105,16 +101,15 @@ export async function POST(request: NextRequest) {
 }
 
 // GET - Get all suspended/terminated accounts
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as { role?: string }
-
+        const authUser = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (user?.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Only providers can view this' }, { status: 403 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const status = searchParams.get('status') // SUSPENDED, TERMINATED, or null for all
 
         // Build where clause — use status param if provided, otherwise show all non-active

@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import net from 'net'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     // SECURITY: Require authentication - PAX terminal communication is sensitive
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
-        const body = await request.json()
+        const body = await req.json()
         const { ip, port, payload } = body
 
         if (!ip || !port || !payload) {

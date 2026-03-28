@@ -1,32 +1,31 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET: Fetch brand settings for the current brand owner
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get franchisor details for the current user
         const franchisor = await prisma.franchisor.findFirst({
-            where: { ownerId: session.user.id }
+            where: { ownerId: user.id }
         })
 
         if (!franchisor) {
-            return ApiResponse.forbidden("No franchisor account found")
+            return NextResponse.json({ error: 'No franchisor account found' }, { status: 403 })
         }
 
         // Only BRAND_FRANCHISOR can access this
         if (franchisor.businessType !== 'BRAND_FRANCHISOR') {
-            return ApiResponse.forbidden("Only Brand Franchisors can access these settings")
+            return NextResponse.json({ error: 'Only Brand Franchisors can access these settings' }, { status: 403 })
         }
 
-        return ApiResponse.success({
+        return NextResponse.json({
             brandCode: franchisor.brandCode,
             brandSettings: franchisor.brandSettings ? JSON.parse(franchisor.brandSettings) : null,
             locks: {
@@ -38,36 +37,35 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('Error fetching brand settings:', error)
-        return ApiResponse.serverError()
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }
 
 // PUT: Update brand settings
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const data = await request.json()
+        const data = await req.json()
 
         // Validation: Brand Code (simple check)
         if (data.brandCode && data.brandCode.length < 3) {
-            return ApiResponse.error('Brand code must be at least 3 characters', 400)
+            return NextResponse.json({ error: 'Brand code must be at least 3 characters' }, { status: 400 })
         }
 
         // Get franchisor details
         const franchisor = await prisma.franchisor.findFirst({
-            where: { ownerId: session.user.id }
+            where: { ownerId: user.id }
         })
 
         if (!franchisor) {
-            return ApiResponse.forbidden("No franchisor account found")
+            return NextResponse.json({ error: 'No franchisor account found' }, { status: 403 })
         }
 
         if (franchisor.businessType !== 'BRAND_FRANCHISOR') {
-            return ApiResponse.forbidden("Only Brand Franchisors can update these settings")
+            return NextResponse.json({ error: 'Only Brand Franchisors can update these settings' }, { status: 403 })
         }
 
         // Check if brand code is unique (if changing)
@@ -76,7 +74,7 @@ export async function PUT(request: NextRequest) {
                 where: { brandCode: data.brandCode }
             })
             if (existing) {
-                return ApiResponse.error('Brand code is already taken', 400)
+                return NextResponse.json({ error: 'Brand code is already taken' }, { status: 400 })
             }
         }
 
@@ -97,7 +95,7 @@ export async function PUT(request: NextRequest) {
             data: updateData
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             brandCode: updated.brandCode,
             brandSettings: updated.brandSettings ? JSON.parse(updated.brandSettings) : null,
             locks: {
@@ -110,6 +108,6 @@ export async function PUT(request: NextRequest) {
 
     } catch (error) {
         console.error('Error updating brand settings:', error)
-        return ApiResponse.serverError()
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }

@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 export async function GET(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -31,13 +32,10 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        // Use session franchiseId — NEVER trust client-provided franchiseId for writes
+// Use session franchiseId — NEVER trust client-provided franchiseId for writes
         const franchiseId = user.franchiseId
         if (!franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
@@ -67,9 +65,9 @@ export async function POST(req: Request) {
         })
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: user.id,
-            userEmail: (session.user as any).email,
+            userEmail: user.email,
             userRole: user.role,
             action: 'LOYALTY_SETTINGS_UPDATE',
             entityType: 'LoyaltyProgram',

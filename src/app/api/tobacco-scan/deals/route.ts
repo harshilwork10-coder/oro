@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 
 // GET /api/tobacco-scan/deals - List all tobacco deals
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const deals = await prisma.tobaccoDeal.findMany({
-            where: { franchiseId: session.user.franchiseId },
+            where: { franchiseId: user.franchiseId },
             orderBy: [{ isActive: 'desc' }, { startDate: 'desc' }]
         })
 
@@ -26,8 +27,7 @@ export async function GET() {
 // POST /api/tobacco-scan/deals - Create new tobacco deal
 export async function POST(request: Request) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
         const deal = await prisma.tobaccoDeal.create({
             data: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 manufacturer: manufacturer || 'ALL',
                 dealName,
                 dealType,

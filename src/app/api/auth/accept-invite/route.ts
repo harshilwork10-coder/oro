@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { subFranchiseeId } = body
 
         if (!subFranchiseeId) {
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
             await tx.subFranchisee.update({
                 where: { id: subFranchiseeId },
                 data: {
-                    userId: session.user.id,
+                    userId: user.id,
                     status: 'ACTIVE',
                     acceptedAt: new Date()
                 }
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
             // 2. Update User Role
             await tx.user.update({
-                where: { id: session.user.id },
+                where: { id: user.id },
                 data: {
                     role: 'SUB_FRANCHISEE'
                 }
@@ -54,14 +54,14 @@ export async function POST(request: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: (session.user as any).email,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
             userRole: 'SUB_FRANCHISEE',
             action: 'INVITE_ACCEPTED',
             entityType: 'SubFranchisee',
             entityId: subFranchiseeId,
-            metadata: { previousRole: (session.user as any).role }
+            metadata: { previousRole: user.role }
         })
 
         return NextResponse.json({ success: true })

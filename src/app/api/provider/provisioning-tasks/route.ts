@@ -1,23 +1,25 @@
 // Route Handler for provider provisioning tasks
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 
 // GET /api/provider/provisioning-tasks - List provisioning tasks for Provider
-export async function GET(request: NextRequest) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    ;
+    if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Verify user is PROVIDER
-    if (session.user.role !== 'PROVIDER') {
+    if (user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Provider access required' }, { status: 403 });
     }
 
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(req.url);
     const statusFilter = searchParams.get('status'); // e.g., "OPEN,IN_PROGRESS"
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

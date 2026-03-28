@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 
 // GET - Get PAX settings for current user's location
 // Supports both Web (session) and Android (getAuthUser) authentication
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
         let userId: string | null = null
         let userEmail: string | null = null
 
@@ -19,10 +20,9 @@ export async function GET(request: NextRequest) {
             console.error('[PAX Settings] Mobile auth:', mobileUser.email)
         } else {
             // Fall back to web session auth
-            const session = await getServerSession(authOptions)
-            if (session?.user?.email) {
-                userEmail = session.user.email
-                console.error('[PAX Settings] Session auth:', session.user.email)
+            if (authUser?.email) {
+                userEmail = user.email
+                console.error('[PAX Settings] Session auth:', user.email)
             }
         }
 

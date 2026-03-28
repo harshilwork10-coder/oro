@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // GET - Fetch cash management data (counts, drops, deposits)
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const locationId = searchParams.get('locationId')
         const type = searchParams.get('type') // 'counts', 'drops', 'deposits', or null for all
 
@@ -177,16 +175,13 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create cash count, safe drop, or deposit log
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { type, locationId, ...data } = body
 
         if (!type || !locationId) {
@@ -267,7 +262,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role,
@@ -286,11 +281,8 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT - Reconcile deposit or approve variance
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -300,7 +292,7 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { type, id, action, note } = body
 
         if (type === 'DEPOSIT' && action === 'RECONCILE') {
@@ -326,7 +318,7 @@ export async function PUT(request: NextRequest) {
         }
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role,

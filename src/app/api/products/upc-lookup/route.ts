@@ -1,21 +1,19 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { ApiResponse } from '@/lib/api-response'
-
+import {NextRequest, NextResponse } from 'next/server'
 // Lookup product info from UPC barcode using free APIs
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const barcode = searchParams.get('barcode')
 
         if (!barcode) {
-            return ApiResponse.validationError('Barcode is required')
+            return NextResponse.json({ error: 'Barcode is required' }, { status: 422 })
         }
 
         // Try Open Food Facts first (free, no API key required)
@@ -45,7 +43,7 @@ export async function GET(request: NextRequest) {
                         source: 'openfoodfacts'
                     }
 
-                    return ApiResponse.success(productInfo)
+                    return NextResponse.json(productInfo)
                 }
             }
         } catch {
@@ -65,7 +63,7 @@ export async function GET(request: NextRequest) {
                 if (data.items && data.items.length > 0) {
                     const item = data.items[0]
 
-                    return ApiResponse.success({
+                    return NextResponse.json({
                         found: true,
                         barcode,
                         name: item.title || null,
@@ -82,7 +80,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Neither API found the product
-        return ApiResponse.success({
+        return NextResponse.json({
             found: false,
             barcode,
             name: null,
@@ -95,7 +93,7 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
         console.error('[UPC_LOOKUP] Error:', error)
-        return ApiResponse.serverError('Failed to lookup UPC')
+        return NextResponse.json({ error: 'Failed to lookup UPC' }, { status: 500 })
     }
 }
 

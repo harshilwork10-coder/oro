@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // AUDIT STANDARD: Proper decimal rounding to prevent penny errors
@@ -12,20 +11,20 @@ function roundCurrency(value: number): number {
 const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
 
 // GET - Generate quarterly report
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const requestedFranchiseId = searchParams.get('franchiseId')
         const quarter = parseInt(searchParams.get('quarter') || '0') // 1-4
         const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString())
-
-        const user = session.user as any
-        const franchiseId = requestedFranchiseId || user.franchiseId
+const franchiseId = requestedFranchiseId || user.franchiseId
 
         if (!franchiseId) {
             return NextResponse.json({ error: 'franchiseId required' }, { status: 400 })

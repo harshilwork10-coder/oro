@@ -1,27 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { sendSMS } from '@/lib/sms'
 
 // POST - Send store link via SMS using existing Twilio infrastructure
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true, locationId: true }
-        })
 
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'No franchise assigned' }, { status: 400 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { phone, customerName } = body
 
         if (!phone) {

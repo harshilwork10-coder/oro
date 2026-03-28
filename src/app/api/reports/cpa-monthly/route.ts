@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // AUDIT STANDARD: Proper decimal rounding to prevent penny errors
@@ -13,14 +12,16 @@ const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
 const VOIDED_STATUSES = ['VOIDED', 'REFUNDED', 'CANCELLED'] as const
 
 // GET - Generate CPA Monthly Tax Report
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const monthStr = searchParams.get('month') // e.g., "2026-01" 
         const format = searchParams.get('format') || 'html'
         const autoPrint = searchParams.get('print') === 'true'
@@ -38,11 +39,6 @@ export async function GET(request: NextRequest) {
         const startOfMonth = new Date(year, month, 1)
         const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59)
         const monthName = startOfMonth.toLocaleString('default', { month: 'long', year: 'numeric' })
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
 
         if (!user?.franchiseId) {
             return new NextResponse('No franchise found for this user.', {

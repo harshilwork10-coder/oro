@@ -1,29 +1,25 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 
-// GET — Generate X/Z report for current or specified shift
-// X report = mid-shift snapshot (shift stays open)
-// Z report = end-of-shift final (shift closes)
+/**
+ * GET /api/pos/shift/xz-report — Generate X or Z report
+ * X = mid-shift snapshot, Z = end-of-shift final
+ * Query: ?shiftId=xxx&type=X|Z
+ */
 export async function GET(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
+    const locationId = dbUser?.locationId
+    if (!locationId) return NextResponse.json({ error: 'No location' }, { status: 400 })
+
+    const { searchParams } = new URL(request.url)
+    const shiftId = searchParams.get('shiftId')
+    const reportType = searchParams.get('type') || 'X'
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
-        const { searchParams } = new URL(request.url)
-        const shiftId = searchParams.get('shiftId')
-        const reportType = searchParams.get('type') || 'X' // X or Z
-
-        // Find the shift
         let shift: any
         if (shiftId) {
             shift = await prisma.cashDrawerSession.findFirst({
@@ -31,97 +27,84 @@ export async function GET(request: NextRequest) {
                 include: { employee: { select: { name: true } } }
             })
         } else {
-            // Get current open shift for this employee
             shift = await prisma.cashDrawerSession.findFirst({
                 where: { locationId, employeeId: user.id, status: 'OPEN' },
                 include: { employee: { select: { name: true } } }
             })
         }
 
-        if (!shift) return ApiResponse.notFound('No shift found')
+        if (!shift) return NextResponse.json({ error: 'No shift found' }, { status: 404 })
 
-        // Get all transactions for this shift
+        // Get transactions
         const transactions = await prisma.transaction.findMany({
-            where: {
-                cashDrawerSessionId: shift.id,
-                status: 'COMPLETED'
-            },
-            select: {
-                total: true,
-                subtotal: true,
-                taxAmount: true,
-                paymentMethod: true,
-                createdAt: true
-            }
+            where: { cashDrawerSessionId: shift.id, status: 'COMPLETED' },
+            select: { total: true, subtotal: true, tax: true, paymentMethod: true, createdAt: true }
         })
 
-        // Get cash drops for this shift
-        const cashDrops = await (prisma as any).cashDrop.findMany({
+        // Get cash drops
+        const cashDrops = await prisma.cashDrop.findMany({
             where: { sessionId: shift.id },
             select: { amount: true, reason: true, createdAt: true }
         })
 
-        // Get drawer activities for this shift
-        const activities = await (prisma as any).drawerActivity.findMany({
+        // Get drawer activities
+        const activities = await prisma.drawerActivity.findMany({
             where: { shiftId: shift.id },
             select: { type: true, amount: true, reason: true, timestamp: true }
         })
 
         // Calculate payment breakdown
-        const paymentBreakdown = {
+        const paymentBreakdown: Record<string, { count: number, total: number }> = {
             CASH: { count: 0, total: 0 },
-            CARD: { count: 0, total: 0 },
+            CREDIT_CARD: { count: 0, total: 0 },
+            DEBIT_CARD: { count: 0, total: 0 },
+            SPLIT: { count: 0, total: 0 },
             EBT: { count: 0, total: 0 },
             OTHER: { count: 0, total: 0 }
         }
 
         let totalSales = 0
         let totalTax = 0
-        let transactionCount = 0
 
         for (const tx of transactions) {
             const total = Number(tx.total || 0)
-            const tax = Number(tx.taxAmount || 0)
+            const tax = Number(tx.tax || 0)
             totalSales += total
             totalTax += tax
-            transactionCount++
 
-            const method = (tx.paymentMethod || 'OTHER').toUpperCase()
+            const method = tx.paymentMethod || 'OTHER'
             if (method in paymentBreakdown) {
-                (paymentBreakdown as any)[method].count++
-                    ; (paymentBreakdown as any)[method].total += total
+                paymentBreakdown[method].count++
+                paymentBreakdown[method].total += total
             } else {
                 paymentBreakdown.OTHER.count++
                 paymentBreakdown.OTHER.total += total
             }
         }
 
-        // Cash calculations
+        // Cash accountability
         const startingCash = Number(shift.startingCash || 0)
-        const totalCashDrops = cashDrops.reduce((s: number, d: any) => s + Number(d.amount || 0), 0)
+        const totalCashDrops = cashDrops.reduce((s, d) => s + Number(d.amount || 0), 0)
         const cashPayments = paymentBreakdown.CASH.total
         const expectedCash = startingCash + cashPayments - totalCashDrops
         const endingCash = shift.endingCash ? Number(shift.endingCash) : null
         const variance = endingCash !== null ? endingCash - expectedCash : null
 
-        // No-sale count
         const noSaleCount = activities.filter((a: any) => a.type === 'NO_SALE').length
 
         const report = {
-            reportType, // X or Z
+            reportType,
             shiftId: shift.id,
             employee: shift.employee?.name || 'Unknown',
             status: shift.status,
             openedAt: shift.startTime,
             closedAt: shift.endTime,
 
-            // Sales Summary
-            transactionCount,
+            transactionCount: transactions.length,
             totalSales: Math.round(totalSales * 100) / 100,
             totalTax: Math.round(totalTax * 100) / 100,
             netSales: Math.round((totalSales - totalTax) * 100) / 100,
 
-            // Payment Breakdown
             paymentBreakdown: Object.fromEntries(
                 Object.entries(paymentBreakdown).map(([k, v]) => [k, {
                     count: v.count,
@@ -129,7 +112,6 @@ export async function GET(request: NextRequest) {
                 }])
             ),
 
-            // Cash Accountability
             startingCash,
             cashPayments: Math.round(cashPayments * 100) / 100,
             totalCashDrops: Math.round(totalCashDrops * 100) / 100,
@@ -138,14 +120,13 @@ export async function GET(request: NextRequest) {
             endingCash,
             variance: variance !== null ? Math.round(variance * 100) / 100 : null,
 
-            // Activity
             noSaleCount,
             drawerActivities: activities
         }
 
-        return ApiResponse.success({ report })
-    } catch (error) {
+        return NextResponse.json({ report })
+    } catch (error: any) {
         console.error('[XZ_REPORT_GET]', error)
-        return ApiResponse.error('Failed to generate report')
+        return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 })
     }
 }

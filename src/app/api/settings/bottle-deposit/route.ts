@@ -1,93 +1,66 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 
-// GET — Get bottle deposit config for current location
-export async function GET() {
+/**
+ * Bottle Deposit / CRV Configuration
+ * GET /api/settings/bottle-deposit — Current config + state info
+ * PUT /api/settings/bottle-deposit — Update (Owner+ only)
+ */
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.locationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
         const location = await prisma.location.findUnique({
-            where: { id: locationId },
-            select: {
-                bottleDepositEnabled: true,
-                bottleDepositAmount: true,
-                state: true
-            }
+            where: { id: user.locationId },
+            select: { bottleDepositEnabled: true, bottleDepositAmount: true, state: true }
         })
+        if (!location) return NextResponse.json({ error: 'Location not found' }, { status: 404 })
 
-        if (!location) return ApiResponse.notFound('Location not found')
-
-        // Bottle bill states (as of 2026)
         const bottleBillStates = ['CA', 'CT', 'HI', 'IA', 'MA', 'ME', 'MI', 'NY', 'OR', 'VT']
-        const stateHasBottleBill = bottleBillStates.includes((location.state || '').toUpperCase())
-
-        // Standard deposit rates by state
+        const stateCode = (location.state || '').toUpperCase()
         const stateRates: Record<string, number> = {
-            CA: 0.05, // $0.05 for <24oz, $0.10 for 24oz+
-            CT: 0.05,
-            HI: 0.05,
-            IA: 0.05,
-            MA: 0.05,
-            ME: 0.05, // $0.15 for wine/liquor
-            MI: 0.10, // Highest in the US
-            NY: 0.05,
-            OR: 0.10,
-            VT: 0.05  // $0.15 for liquor
+            CA: 0.05, CT: 0.05, HI: 0.05, IA: 0.05, MA: 0.05,
+            ME: 0.05, MI: 0.10, NY: 0.05, OR: 0.10, VT: 0.05
         }
 
-        return ApiResponse.success({
+        return NextResponse.json({
             enabled: location.bottleDepositEnabled,
             amount: location.bottleDepositAmount ? Number(location.bottleDepositAmount) : null,
-            stateHasBottleBill,
+            stateHasBottleBill: bottleBillStates.includes(stateCode),
             state: location.state,
-            suggestedRate: stateRates[(location.state || '').toUpperCase()] || 0.05,
+            suggestedRate: stateRates[stateCode] || 0.05,
             bottleBillStates
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[BOTTLE_DEPOSIT_GET]', error)
-        return ApiResponse.error('Failed to fetch bottle deposit config')
+        return NextResponse.json({ error: 'Failed to fetch bottle deposit config' }, { status: 500 })
     }
 }
 
-// PUT — Update bottle deposit config
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.locationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
+        return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
+    }
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
-            return ApiResponse.forbidden('Owner+ only')
-        }
-
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
-        const body = await request.json()
-        const { enabled, amount } = body
+        const { enabled, amount } = await req.json()
 
         await prisma.location.update({
-            where: { id: locationId },
+            where: { id: user.locationId },
             data: {
                 bottleDepositEnabled: enabled ?? false,
                 bottleDepositAmount: amount != null ? amount : null
             }
         })
 
-        return ApiResponse.success({ updated: true })
-    } catch (error) {
+        return NextResponse.json({ updated: true })
+    } catch (error: any) {
         console.error('[BOTTLE_DEPOSIT_PUT]', error)
-        return ApiResponse.error('Failed to update bottle deposit config')
+        return NextResponse.json({ error: 'Failed to update bottle deposit config' }, { status: 500 })
     }
 }

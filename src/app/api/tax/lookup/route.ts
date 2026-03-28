@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // US Sales Tax Rates by State (base rates)
 // Source: Tax Foundation, January 2024
 const STATE_TAX_RATES: Record<string, { state: string; rate: number; hasLocalTax: boolean }> = {
@@ -595,14 +592,16 @@ function getTaxRateByZip(zip: string): {
 }
 
 // GET - Lookup tax rate by ZIP code
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const zip = searchParams.get('zip')?.replace(/\D/g, '').substring(0, 5)
 
         if (!zip || zip.length !== 5) {

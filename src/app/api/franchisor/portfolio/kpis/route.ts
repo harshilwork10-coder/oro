@@ -8,20 +8,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 import { getDateRange, DateRangePreset } from '@/lib/reporting/kpiDefinitions';
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const user = session.user as { id: string; role: string; franchiseId?: string };
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         // PROVIDER should use /provider/reports, not franchisor endpoints
         if (user.role === 'PROVIDER') {
             return NextResponse.json({ error: 'Use /api/provider/reports for platform admin access' }, { status: 403 });
@@ -32,7 +26,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Franchisor or Owner access required' }, { status: 403 });
         }
 
-        const { searchParams } = new URL(request.url);
+        const { searchParams } = new URL(req.url);
         const rangePreset = (searchParams.get('range') || 'TODAY') as DateRangePreset;
         const dateRange = getDateRange(rangePreset);
 

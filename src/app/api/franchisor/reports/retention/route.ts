@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -8,17 +7,19 @@ import { prisma } from '@/lib/prisma'
  * Returns customer growth and retention metrics
  */
 export async function GET(req: NextRequest) {
-    const session = await getServerSession(authOptions)
+    const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { searchParams } = new URL(req.url)
     const locationId = searchParams.get('locationId') // Optional filter
 
-    if (!session?.user?.email) {
+    if (!authUser?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { email: user.email },
             include: {
                 franchisorMemberships: {
                     include: { franchisor: true }

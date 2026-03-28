@@ -4,25 +4,17 @@
  * GET — Audit trail and compliance metrics from AuditLog model
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { role: true, franchiseId: true }
-        })
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        if (!user?.franchiseId) return ApiResponse.error('No franchise', 400)
-
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '30')
         const since = new Date(); since.setDate(since.getDate() - days)
         const franchiseId = user.franchiseId
@@ -63,7 +55,7 @@ export async function GET(request: NextRequest) {
         const highRiskCount = auditLogs.filter(l => highRiskActions.includes(l.action)).length
         const failedCount = auditLogs.filter(l => l.status === 'FAILURE' || l.status === 'BLOCKED').length
 
-        return ApiResponse.success({
+        return NextResponse.json({
             summary: {
                 totalEvents: totalCount,
                 highRiskEvents: highRiskCount,
@@ -99,6 +91,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[COMPLIANCE_REPORT]', error)
-        return ApiResponse.error('Failed to generate compliance report', 500)
+        return NextResponse.json({ error: 'Failed to generate compliance report' }, { status: 500 })
     }
 }

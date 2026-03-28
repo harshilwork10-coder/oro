@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { invalidateLocationCache } from '@/lib/cache'
 
@@ -8,17 +7,18 @@ export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ franchisorId: string }> }
 ) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { franchisorId } = await params
 
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user?.email) {
+        if (!user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Only PROVIDER can access other franchisors' configs
-        if (session.user.role !== 'PROVIDER') {
+        if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
@@ -82,14 +82,12 @@ export async function PATCH(
     const { franchisorId } = await params
 
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user?.email) {
+        if (!user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Only PROVIDER can update franchisors' configs
-        if (session.user.role !== 'PROVIDER') {
+        if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Forbidden - Only Provider can configure business settings' }, { status: 403 })
         }
 

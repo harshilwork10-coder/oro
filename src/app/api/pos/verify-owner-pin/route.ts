@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { checkRateLimit, getClientIP, PIN_RATE_LIMIT } from '@/lib/security/rateLimit'
@@ -12,8 +11,11 @@ import { checkRateLimit, getClientIP, PIN_RATE_LIMIT } from '@/lib/security/rate
  * Allowed roles: OWNER, FRANCHISOR, MANAGER, PROVIDER (support team)
  * SECURITY: Rate limited to prevent brute force
  */
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
         // SECURITY: Rate limiting to prevent PIN brute force
         const clientIP = getClientIP(request)
         const rateLimit = checkRateLimit(`pin:${clientIP}`, PIN_RATE_LIMIT)
@@ -26,12 +28,11 @@ export async function POST(request: NextRequest) {
             }, { status: 429 })
         }
 
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 })
         }
 
-        const { pin } = await request.json()
+        const { pin } = await req.json()
 
         if (!pin || pin.length < 4) {
             return NextResponse.json({ success: false, error: 'PIN required (min 4 digits)' }, { status: 400 })
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
 
         // Get current user's franchise/location context
         const currentUser = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: user.id },
             select: { franchiseId: true, locationId: true }
         })
 

@@ -1,9 +1,10 @@
-import { NextResponse, NextRequest } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextResponse, NextRequest } from 'next/server'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateInvoiceNumber } from '@/lib/invoice'
 import { logActivity, ActionTypes } from '@/lib/auditLog'
+import { checkStockAvailable } from '@/lib/inventory/stock-guard'
 import { checkIdempotency, storeIdempotencyKey, getIdempotencyKey } from '@/lib/api/idempotency'
 import { z } from 'zod'
 import {
@@ -26,10 +27,11 @@ const transactionRequestSchema = z.object({
         // Dual pricing line item fields
         cashPrice: z.union([z.number(), z.string()]).optional().transform(v => v !== undefined ? Number(v) : undefined),
         cardPrice: z.union([z.number(), z.string()]).optional().transform(v => v !== undefined ? Number(v) : undefined),
-        quantity: z.union([z.number(), z.string()]).transform(v => Number(v)),
+        quantity: z.union([z.number(), z.string()]).transform(v => Number(v)).refine(v => v > 0, { message: 'Quantity must be greater than 0' }),
         discount: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
         barberId: z.string().optional().nullable(), // ID of barber who performed the service
         promotionId: z.string().optional().nullable(), // For validating auto-applied system deals
+        itemDescription: z.string().optional().nullable(), // S4-5: Custom description for open ring items
     })).min(1, 'At least one item required'),
     subtotal: z.union([z.number(), z.string()]).transform(v => Number(v)),
     tax: z.union([z.number(), z.string()]).transform(v => Number(v)),
@@ -329,6 +331,21 @@ export async function POST(req: NextRequest) {
             }
         }
         // ===== END SECURITY CHECK =====
+
+        // ===== STOCK GUARD CHECK =====
+        // Check stock availability for all products before proceeding
+        for (const item of items) {
+            if (item.type === 'PRODUCT' && item.id && !item.id.startsWith('custom') && !item.id.startsWith('open')) {
+                const product = productMap.get(item.id)
+                if (product && product.stock !== null && product.stock !== undefined) {
+                    const stockCheck = await checkStockAvailable(item.id, item.quantity, user.franchiseId)
+                    if (!stockCheck.allowed) {
+                        return badRequestResponse(`Stock unavailable: ${item.name}. ${stockCheck.error}`)
+                    }
+                }
+            }
+        }
+        // ===== END STOCK GUARD CHECK =====
 
         // ===== ATOMIC TRANSACTION BLOCK =====
         // All sale operations wrapped for rollback safety

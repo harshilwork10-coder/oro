@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // Get today's checked-in customers
-export async function GET() {
-    const session = await getServerSession(authOptions)
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!session?.user) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
-        const franchiseId = session.user.franchiseId
-        const locationId = session.user.locationId
+        const franchiseId = user.franchiseId
+        const locationId = user.locationId
 
         // Get today's date range
         const today = new Date()

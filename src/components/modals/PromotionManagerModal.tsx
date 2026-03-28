@@ -46,6 +46,8 @@ interface PromotionManagerModalProps {
     isOpen: boolean
     onClose: () => void
     onUpdate?: () => void
+    preSelectedProductId?: string
+    preSelectedProductName?: string
 }
 
 const DEAL_TYPES = [
@@ -76,7 +78,9 @@ const DAYS_OF_WEEK = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 export default function PromotionManagerModal({
     isOpen,
     onClose,
-    onUpdate
+    onUpdate,
+    preSelectedProductId,
+    preSelectedProductName
 }: PromotionManagerModalProps) {
     const [promotions, setPromotions] = useState<Promotion[]>([])
     const [categories, setCategories] = useState<Category[]>([])
@@ -122,8 +126,17 @@ export default function PromotionManagerModal({
     useEffect(() => {
         if (isOpen) {
             loadData()
+            // Auto-fill product context if provided
+            if (preSelectedProductId) {
+                setFormData(prev => ({
+                    ...prev,
+                    appliesTo: 'PRODUCTS',
+                    productIds: [preSelectedProductId]
+                }))
+                setShowForm(true)
+            }
         }
-    }, [isOpen])
+    }, [isOpen, preSelectedProductId])
 
     const loadData = async () => {
         setLoading(true)

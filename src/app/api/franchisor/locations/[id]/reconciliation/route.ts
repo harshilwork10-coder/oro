@@ -6,9 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 import { canAccessLocation, UserRole } from '@/lib/reporting/scopeEnforcement';
 import { calculateReconciliation } from '@/lib/reporting/ledgerRules';
 import { REPORT_VERSION, createExportMetadata, formatExportHeader } from '@/lib/reporting/kpiDefinitions';
@@ -19,12 +18,8 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const user = session.user as { id: string; role: string; franchiseId?: string };
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         const { id: locationId } = await params;
 
         // Scope check
@@ -46,7 +41,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         const toDate = new Date(to);
 
         // Fetch all transactions for the period (cast as any — storeId/tipAmount not in schema)
-        const transactions = await (prisma as any).transaction.findMany({
+        const transactions = await prisma.transaction.findMany({
             where: {
                 storeId: locationId,
                 createdAt: { gte: fromDate, lte: toDate }
@@ -75,7 +70,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         const reconciliation = calculateReconciliation(txData);
 
         // Check for open shifts (timeEntry not in main schema — any-cast)
-        const openShifts = await (prisma as any).timeEntry.count({
+        const openShifts = await prisma.timeEntry.count({
             where: {
                 locationId,
                 clockIn: { gte: fromDate, lte: toDate },

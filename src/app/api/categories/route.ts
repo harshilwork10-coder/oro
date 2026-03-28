@@ -1,15 +1,16 @@
 'use server'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - List all categories with hierarchy
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
 
         const categories = await prisma.unifiedCategory.findMany({
             where: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 isActive: true,
                 ...(type && { type }),
                 ...(parentId !== undefined && { parentId: parentId || null })
@@ -58,8 +59,7 @@ export async function GET(req: NextRequest) {
 // POST - Create a new category
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
             const parent = await prisma.unifiedCategory.findFirst({
                 where: {
                     id: parentId,
-                    franchiseId: session.user.franchiseId
+                    franchiseId: user.franchiseId
                 }
             })
             if (!parent) {
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
 
         const category = await prisma.unifiedCategory.create({
             data: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 name,
                 description,
                 color,
@@ -119,8 +119,7 @@ export async function POST(req: NextRequest) {
 // PUT - Update a category
 export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -135,7 +134,7 @@ export async function PUT(req: NextRequest) {
         const existing = await prisma.unifiedCategory.findFirst({
             where: {
                 id,
-                franchiseId: session.user.franchiseId
+                franchiseId: user.franchiseId
             }
         })
 
@@ -168,8 +167,7 @@ export async function PUT(req: NextRequest) {
 // DELETE - Delete a category (soft delete)
 export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -184,7 +182,7 @@ export async function DELETE(req: NextRequest) {
         const existing = await prisma.unifiedCategory.findFirst({
             where: {
                 id,
-                franchiseId: session.user.franchiseId
+                franchiseId: user.franchiseId
             },
             include: {
                 _count: { select: { items: true, children: true } }

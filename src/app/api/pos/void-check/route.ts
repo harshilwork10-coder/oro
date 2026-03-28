@@ -1,51 +1,43 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 
-// POST — Pre-check if cashier can void/refund (against daily limits)
-export async function POST(request: NextRequest) {
+/**
+ * Void Check — Pre-check if cashier can void/refund (daily limits)
+ * POST /api/pos/void-check
+ */
+export async function POST(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const body = await req.json()
+        const { amount, type } = body as { amount: number; type: 'VOID' | 'REFUND' }
 
-        const user = session.user as any
-        if (!user.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!amount || !type) return NextResponse.json({ error: 'amount and type required' }, { status: 400 })
 
-        const body = await request.json()
-        const { amount, type } = body // type: "VOID" or "REFUND"
-
-        if (!amount || !type) return ApiResponse.badRequest('amount and type required')
-
-        // Get franchise settings
         const settings = await prisma.franchiseSettings.findUnique({
             where: { franchiseId: user.franchiseId }
         })
 
-        if (!settings) return ApiResponse.success({ allowed: true, reason: 'No limits set' })
+        if (!settings) return NextResponse.json({ allowed: true, reason: 'No limits set' })
 
         const limit = type === 'VOID'
-            ? settings.voidLimitPerDay ? Number(settings.voidLimitPerDay) : null
-            : settings.refundLimitPerDay ? Number(settings.refundLimitPerDay) : null
+            ? (settings as any).voidLimitPerDay ? Number((settings as any).voidLimitPerDay) : null
+            : (settings as any).refundLimitPerDay ? Number((settings as any).refundLimitPerDay) : null
 
-        const requirePin = settings.requireManagerPinAbove
-            ? Number(settings.requireManagerPinAbove)
+        const requirePin = (settings as any).requireManagerPinAbove
+            ? Number((settings as any).requireManagerPinAbove)
             : null
 
-        // If no limits set, allow
         if (!limit && !requirePin) {
-            return ApiResponse.success({ allowed: true, reason: 'No limits configured' })
+            return NextResponse.json({ allowed: true, reason: 'No limits configured' })
         }
 
-        // Check today's totals for this user
         const today = new Date()
         today.setHours(0, 0, 0, 0)
 
-        const todayTransactions = await prisma.transaction.findMany({
+        const todayTx = await prisma.transaction.findMany({
             where: {
                 employeeId: user.id,
                 status: type === 'VOID' ? 'VOIDED' : 'REFUNDED',
@@ -54,29 +46,25 @@ export async function POST(request: NextRequest) {
             select: { total: true }
         })
 
-        const todayTotal = todayTransactions.reduce((s, t) => s + Number(t.total || 0), 0)
-
-        // Check if this void/refund would exceed daily limit
+        const todayTotal = todayTx.reduce((s, t) => s + Number(t.total || 0), 0)
         const newTotal = todayTotal + Number(amount)
         const exceedsLimit = limit !== null && newTotal > limit
-
-        // Check if amount requires manager PIN
         const needsPin = requirePin !== null && Number(amount) > requirePin
 
-        return ApiResponse.success({
+        return NextResponse.json({
             allowed: !exceedsLimit,
             needsManagerPin: needsPin,
             todayTotal: Math.round(todayTotal * 100) / 100,
             dailyLimit: limit,
             remaining: limit !== null ? Math.max(0, limit - todayTotal) : null,
             reason: exceedsLimit
-                ? `Daily ${type.toLowerCase()} limit exceeded ($${limit?.toFixed(2)}). Already used: $${todayTotal.toFixed(2)}`
+                ? `Daily ${type.toLowerCase()} limit exceeded ($${limit?.toFixed(2)})`
                 : needsPin
                     ? `Amount exceeds $${requirePin?.toFixed(2)} — manager PIN required`
                     : 'Allowed'
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[VOID_CHECK_POST]', error)
-        return ApiResponse.error('Failed to check void limits')
+        return NextResponse.json({ error: 'Failed to check void limits' }, { status: 500 })
     }
 }

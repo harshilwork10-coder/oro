@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Lookup member by phone, show all linked programs and pooled balance
 export async function GET(req: Request) {
-    const session = await getServerSession(authOptions)
     const user = session?.user as any
 
     if (!user?.id) {
@@ -112,7 +109,6 @@ export async function GET(req: Request) {
 
 // POST - Enroll customer in program
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
     const user = session?.user as any
 
     if (!user?.id) {

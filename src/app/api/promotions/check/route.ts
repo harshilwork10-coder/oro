@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 interface CartItem {
@@ -21,19 +20,19 @@ interface AppliedPromotion {
 }
 
 // POST - Check cart items for applicable promotions
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!user.franchiseId) {
+if (!user.franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const { items, promoCode, loyaltyId, customerTag } = await request.json() as {
+        const { items, promoCode, loyaltyId, customerTag } = await req.json() as {
             items: CartItem[],
             promoCode?: string,
             loyaltyId?: string,

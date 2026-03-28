@@ -1,20 +1,19 @@
-import { NextRequest } from 'next/server'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET: Fetch brand catalog (categories + services) for franchisor
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!authUser?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get user's franchisor (via role, franchise ownership, or direct franchisor ownership)
-        const user = await (prisma as any).user.findUnique({
-            where: { id: session.user.id },
+        const user = await prisma.user.findUnique({
+            where: { id: user.id },
             include: {
                 franchises: {
                     select: {
@@ -31,11 +30,11 @@ export async function GET(req: NextRequest) {
         const franchisorId = user?.franchises?.[0]?.franchisorId
 
         if (!franchiseId) {
-            return ApiResponse.forbidden('No franchise found for user')
+            return NextResponse.json({ error: 'No franchise found for user' }, { status: 403 })
         }
 
         // Fetch services for this franchise with their categories
-        const services = await (prisma as any).service.findMany({
+        const services = await prisma.service.findMany({
             where: {
                 franchiseId,
                 isActive: true
@@ -49,7 +48,7 @@ export async function GET(req: NextRequest) {
         }) as any[]
 
         // Fetch categories for this franchise
-        const categories = await (prisma as any).serviceCategory.findMany({
+        const categories = await prisma.serviceCategory.findMany({
             where: { franchiseId },
             include: {
                 services: {
@@ -63,7 +62,7 @@ export async function GET(req: NextRequest) {
         // Get uncategorized services
         const uncategorizedServices = services.filter(s => !s.serviceCategoryId)
 
-        return ApiResponse.success({
+        return NextResponse.json({
             categories,
             uncategorizedServices: uncategorizedServices.map(s => ({
                 id: s.id,
@@ -82,21 +81,20 @@ export async function GET(req: NextRequest) {
 
     } catch (error) {
         console.error('Error fetching brand catalog:', error)
-        return ApiResponse.serverError('Failed to fetch brand catalog')
+        return NextResponse.json({ error: 'Failed to fetch brand catalog' }, { status: 500 })
     }
 }
 
 // POST: Create new brand service
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
+        if (!authUser?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get user's franchise
-        const user = await (prisma as any).user.findUnique({
-            where: { id: session.user.id },
+        const user = await prisma.user.findUnique({
+            where: { id: user.id },
             include: {
                 franchises: {
                     select: { id: true },
@@ -107,7 +105,7 @@ export async function POST(req: NextRequest) {
 
         const franchiseId = user?.franchises?.[0]?.id
         if (!franchiseId) {
-            return ApiResponse.forbidden('No franchise found')
+            return NextResponse.json({ error: 'No franchise found' }, { status: 403 })
         }
 
         const body = await req.json()
@@ -122,10 +120,10 @@ export async function POST(req: NextRequest) {
         } = body
 
         if (!name || !duration || basePrice === undefined) {
-            return ApiResponse.error('Name, duration, and basePrice are required', 400)
+            return NextResponse.json({ error: 'Name, duration, and basePrice are required' }, { status: 400 })
         }
 
-        const service = await (prisma as any).service.create({
+        const service = await prisma.service.create({
             data: {
                 franchiseId,
                 name,
@@ -138,10 +136,10 @@ export async function POST(req: NextRequest) {
             }
         })
 
-        return ApiResponse.success({ service }, 201)
+        return NextResponse.json({ service }, 201)
 
     } catch (error) {
         console.error('Error creating brand service:', error)
-        return ApiResponse.serverError('Failed to create brand service')
+        return NextResponse.json({ error: 'Failed to create brand service' }, { status: 500 })
     }
 }

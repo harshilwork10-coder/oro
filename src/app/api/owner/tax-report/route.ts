@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // AUDIT STANDARD: Proper decimal rounding to prevent penny errors
@@ -12,16 +11,15 @@ function roundCurrency(value: number): number {
 const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
 
 // GET - Generate Sales Tax Report
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user || !['OWNER', 'PROVIDER'].includes(user.role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const period = searchParams.get('period') || 'monthly' // monthly, quarterly, yearly
         const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString())
         const month = parseInt(searchParams.get('month') || (new Date().getMonth() + 1).toString())

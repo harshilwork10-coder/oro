@@ -1,27 +1,21 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 
-// POST — Validate and apply coupon to transaction
-export async function POST(request: NextRequest) {
+/**
+ * Coupon Validation — Validate and apply coupon code at POS
+ * POST /api/pos/coupon
+ */
+export async function POST(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!user.franchiseId) return ApiResponse.badRequest('No franchise')
-
-        const body = await request.json()
+        const body = await req.json()
         const { code, cartItems } = body
 
-        if (!code?.trim()) return ApiResponse.badRequest('Coupon code required')
+        if (!code?.trim()) return NextResponse.json({ error: 'Coupon code required' }, { status: 400 })
 
-        // Look up coupon in promotions (using promoCode field)
         const promo = await prisma.promotion.findFirst({
             where: {
                 franchiseId: user.franchiseId,
@@ -31,26 +25,23 @@ export async function POST(request: NextRequest) {
             include: { qualifyingItems: true }
         })
 
-        if (!promo) return ApiResponse.notFound('Invalid or expired coupon code')
+        if (!promo) return NextResponse.json({ error: 'Invalid or expired coupon code' }, { status: 404 })
 
-        // Check date validity
         const now = new Date()
         if (promo.startDate && new Date(promo.startDate) > now) {
-            return ApiResponse.badRequest('Coupon is not yet active')
+            return NextResponse.json({ error: 'Coupon is not yet active' }, { status: 400 })
         }
         if (promo.endDate && new Date(promo.endDate) < now) {
-            return ApiResponse.badRequest('Coupon has expired')
+            return NextResponse.json({ error: 'Coupon has expired' }, { status: 400 })
         }
 
-        // Check min spend
         if (promo.minSpend && cartItems) {
             const cartTotal = cartItems.reduce((s: number, i: any) => s + (i.price * (i.quantity || 1)), 0)
             if (cartTotal < Number(promo.minSpend)) {
-                return ApiResponse.badRequest(`Minimum spend of $${Number(promo.minSpend).toFixed(2)} required`)
+                return NextResponse.json({ error: `Minimum spend of $${Number(promo.minSpend).toFixed(2)} required` }, { status: 400 })
             }
         }
 
-        // Calculate discount
         let discount = 0
         const value = Number(promo.discountValue || 0)
 
@@ -63,17 +54,14 @@ export async function POST(request: NextRequest) {
             discount = value
         }
 
-        return ApiResponse.success({
-            valid: true,
-            couponId: promo.id,
-            name: promo.name,
-            discountType: promo.discountType,
-            discountValue: value,
+        return NextResponse.json({
+            valid: true, couponId: promo.id, name: promo.name,
+            discountType: promo.discountType, discountValue: value,
             calculatedDiscount: Math.round(discount * 100) / 100,
             description: promo.description
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[COUPON_POST]', error)
-        return ApiResponse.error('Failed to validate coupon')
+        return NextResponse.json({ error: 'Failed to validate coupon' }, { status: 500 })
     }
 }

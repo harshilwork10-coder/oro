@@ -1,85 +1,66 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-// GET — Check if employee discount applies at checkout
-export async function GET(request: NextRequest) {
+/**
+ * Employee Discount — Check and set employee discount rates
+ * GET /api/pos/employee-discount?employeeId=xxx
+ * PUT /api/pos/employee-discount — Set discount rate (Owner+ only)
+ */
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { searchParams } = new URL(req.url)
+    const employeeId = searchParams.get('employeeId')
+    if (!employeeId) return NextResponse.json({ error: 'employeeId required' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!user.franchiseId) return ApiResponse.badRequest('No franchise')
-
-        const { searchParams } = new URL(request.url)
-        const employeeId = searchParams.get('employeeId')
-
-        if (!employeeId) return ApiResponse.badRequest('employeeId required')
-
         const employee = await prisma.user.findFirst({
             where: { id: employeeId, franchiseId: user.franchiseId },
             select: { id: true, name: true, role: true, employeeDiscountPct: true, employeeDiscountEnabled: true }
         })
+        if (!employee) return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
 
-        if (!employee) return ApiResponse.notFound('Employee not found')
-
-        return ApiResponse.success({
-            employeeId: employee.id,
-            name: employee.name,
+        return NextResponse.json({
+            employeeId: employee.id, name: employee.name,
             discountEnabled: employee.employeeDiscountEnabled || false,
             discountPercent: employee.employeeDiscountPct ? Number(employee.employeeDiscountPct) : 0
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[EMP_DISCOUNT_GET]', error)
-        return ApiResponse.error('Failed to check employee discount')
+        return NextResponse.json({ error: 'Failed to check employee discount' }, { status: 500 })
     }
 }
 
-// PUT — Set employee discount rate
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
+        return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
+    }
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
-            return ApiResponse.forbidden('Owner+ only')
-        }
-
-        const body = await request.json()
-        const { employeeId, discountPercent, enabled } = body
-
-        if (!employeeId) return ApiResponse.badRequest('employeeId required')
+        const { employeeId, discountPercent, enabled } = await req.json()
+        if (!employeeId) return NextResponse.json({ error: 'employeeId required' }, { status: 400 })
 
         await prisma.user.update({
             where: { id: employeeId },
-            data: {
-                employeeDiscountPct: discountPercent ?? 0,
-                employeeDiscountEnabled: enabled ?? false
-            }
+            data: { employeeDiscountPct: discountPercent ?? 0, employeeDiscountEnabled: enabled ?? false }
         })
 
-        // Audit log
-        await auditLog({
-            userId: user.id,
-            userEmail: user.email,
-            userRole: user.role,
-            action: 'UPDATE',
-            entityType: 'EmployeeDiscount',
-            entityId: employeeId,
+        await logActivity({
+            userId: user.id, userEmail: user.email, userRole: user.role,
             franchiseId: user.franchiseId,
-            metadata: { discountPercent, enabled }
+            action: 'EMPLOYEE_DISCOUNT_SET', entityType: 'EmployeeDiscount', entityId: employeeId,
+            details: { discountPercent, enabled }
         })
 
-        return ApiResponse.success({ updated: true })
-    } catch (error) {
+        return NextResponse.json({ updated: true })
+    } catch (error: any) {
         console.error('[EMP_DISCOUNT_PUT]', error)
-        return ApiResponse.error('Failed to update employee discount')
+        return NextResponse.json({ error: 'Failed to update employee discount' }, { status: 500 })
     }
 }

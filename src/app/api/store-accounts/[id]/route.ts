@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // GET - Get store account details and transactions
 export async function GET(
@@ -10,17 +9,14 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // SECURITY: Get user's franchiseId
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { id: true, role: true, franchiseId: true }
-        })
-
         let franchiseId = user?.franchiseId
 
         if (user?.role === 'FRANCHISOR' && !franchiseId) {
@@ -63,7 +59,7 @@ export async function GET(
 
         // SECURITY: Verify client belongs to user's franchise
         if (client.franchiseId !== franchiseId) {
-            console.error(`[SECURITY] IDOR attempt: User ${session.user.id} tried to access client ${(await params).id}`)
+            console.error(`[SECURITY] IDOR attempt: User ${user.id} tried to access client ${(await params).id}`)
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
@@ -101,17 +97,11 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // SECURITY: Get user's franchiseId
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { id: true, role: true, franchiseId: true }
-        })
-
         let franchiseId = user?.franchiseId
 
         if (user?.role === 'FRANCHISOR' && !franchiseId) {
@@ -155,7 +145,7 @@ export async function POST(
 
         // SECURITY: Verify client belongs to user's franchise
         if (client.franchiseId !== franchiseId) {
-            console.error(`[SECURITY] IDOR attempt: User ${session.user.id} tried to modify client ${(await params).id}`)
+            console.error(`[SECURITY] IDOR attempt: User ${user.id} tried to modify client ${(await params).id}`)
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
@@ -193,8 +183,8 @@ export async function POST(
                     paymentMethod,
                     checkNumber,
                     note,
-                    employeeId: session.user.id,
-                    employeeName: session.user.name || 'Unknown'
+                    employeeId: user.id,
+                    employeeName: user.name || 'Unknown'
                 }
             }),
             prisma.client.update({
@@ -204,10 +194,10 @@ export async function POST(
         ])
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
-            userRole: (session.user as any).role || 'USER',
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
+            userRole: user.role || 'USER',
             action: `STORE_ACCOUNT_${type}`,
             entityType: 'StoreAccountTransaction',
             entityId: transaction.id,

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // GET: Get tax jurisdictions for a location
 export async function GET(
@@ -10,8 +9,10 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(request)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -38,8 +39,7 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user || session.user.role !== 'PROVIDER') {
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -105,8 +105,7 @@ export async function POST(
         })
 
         // Audit log
-        const user = session.user as any
-        const auditData: Record<string, unknown> = {
+const auditData: Record<string, unknown> = {
             action: 'CREATED',
             entityType: 'LOCATION_TAX',
             ...(user.id ? { userId: user.id } : {}),
@@ -133,8 +132,7 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user || session.user.role !== 'PROVIDER') {
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -155,8 +153,7 @@ export async function DELETE(
         })
 
         // Audit log
-        const user = session.user as any
-        await auditLog({
+await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role,

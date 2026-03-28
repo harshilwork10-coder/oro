@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // API for POS to report terminal connection status
 // This gets called when POS successfully connects to PAX terminal
 // Stores the IP so Provider can see it in their admin panel
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const { terminalIP, terminalPort, status, mid } = await request.json()
+const { terminalIP, terminalPort, status, mid } = await req.json()
 
         if (!user.locationId) {
             // Try to get location from user record
@@ -60,19 +56,19 @@ export async function POST(request: NextRequest) {
 }
 
 // GET - Provider can fetch terminal status for a specific location
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (user.role !== 'PROVIDER') {
+if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Provider only' }, { status: 403 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const locationId = searchParams.get('locationId')
 
         if (!locationId) {

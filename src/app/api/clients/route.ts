@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // GET: Fetch all clients for the franchise
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id }
-        })
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -75,8 +71,7 @@ export async function GET(req: NextRequest) {
 // POST: Create new client
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -91,10 +86,6 @@ export async function POST(req: NextRequest) {
         }
 
         // Get franchiseId from request body or from session user
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id }
-        })
-
         let franchiseId = bodyFranchiseId || user?.franchiseId
 
         // Handle FRANCHISOR users
@@ -135,8 +126,7 @@ export async function POST(req: NextRequest) {
 // DELETE: Delete client
 export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -146,10 +136,6 @@ export async function DELETE(req: NextRequest) {
         if (!id) {
             return NextResponse.json({ error: 'Client ID is required' }, { status: 400 })
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id }
-        })
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 })

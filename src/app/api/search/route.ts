@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const query = searchParams.get('q') || ''
 
         if (query.length < 2) {
@@ -18,8 +19,6 @@ export async function GET(request: NextRequest) {
         }
 
         const results: { title: string | null; description: string | null | undefined; type: string; href: string }[] = []
-        const user = session.user as { role?: string }
-
         // Search clients
         if (user.role === 'PROVIDER') {
             const clients = await prisma.franchisor.findMany({

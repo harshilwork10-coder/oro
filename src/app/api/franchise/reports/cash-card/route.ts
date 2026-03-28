@@ -1,27 +1,22 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET: Cash vs Card Breakdown Report
 // Critical for detecting cash leakage in barbershops
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id }
-        })
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
         if (!user) {
-            return ApiResponse.notFound('User')
+            return NextResponse.json({ error: 'User' }, { status: 404 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
 
@@ -47,7 +42,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (!franchiseId) {
-            return ApiResponse.error('Franchise not found', 404)
+            return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
         }
 
         // Get all completed transactions
@@ -182,7 +177,7 @@ export async function GET(request: NextRequest) {
         const cashTipsPercent = totalTips > 0 ? (totalCashTips / totalTips) * 100 : 0
         const cardTipsPercent = totalTips > 0 ? (totalCardTips / totalTips) * 100 : 0
 
-        return ApiResponse.success({
+        return NextResponse.json({
             summary: {
                 totalRevenue,
                 cash: {
@@ -216,6 +211,6 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
         console.error('Error generating cash vs card report:', error)
-        return ApiResponse.serverError('Failed to generate cash vs card report')
+        return NextResponse.json({ error: 'Failed to generate cash vs card report' }, { status: 500 })
     }
 }

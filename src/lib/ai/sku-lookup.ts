@@ -361,7 +361,7 @@ async function lookupOpenFoodFacts(barcode: string): Promise<SKULookupResult> {
 
     const response = await fetchWithTimeout(url, {
         headers: {
-            'User-Agent': 'OroPOS/1.0 (contact@oronex.com)'
+            'User-Agent': 'OroPOS/1.0 (contact@oro9.com)'
         }
     }, 5000)
 

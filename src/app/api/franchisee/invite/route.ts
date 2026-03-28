@@ -1,21 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
 // POST: Brand Franchisor invites a new franchisee
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user || session.user.role !== 'FRANCHISOR') {
+        if (!authUser || authUser.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Unauthorized - Brand Franchisor only' }, { status: 401 })
         }
 
         // Verify this is a BRAND_FRANCHISOR (not a multi-store owner)
         const franchisor = await prisma.franchisor.findUnique({
-            where: { ownerId: session.user.id },
+            where: { ownerId: user.id },
             include: { franchises: true }
         })
 
@@ -114,14 +111,15 @@ export async function POST(req: NextRequest) {
 // GET: Get all franchisees for this franchisor
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user || session.user.role !== 'FRANCHISOR') {
+        if (!authUser || authUser.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const franchisor = await prisma.franchisor.findUnique({
-            where: { ownerId: session.user.id },
+            where: { ownerId: user.id },
             include: { franchises: { select: { id: true } } }
         })
 

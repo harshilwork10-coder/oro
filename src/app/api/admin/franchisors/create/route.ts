@@ -1,11 +1,10 @@
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcrypt'
 import crypto from 'crypto'
 import { sendEmail } from '@/lib/email'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // Rate limiting
 const creationAttempts = new Map<string, { count: number; resetAt: number }>()
@@ -37,24 +36,21 @@ function sanitizeInput(input: string): string {
     return input.trim().replace(/[<>"']/g, '')
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // Only PROVIDER can create franchisors
-        if (session.user.role !== 'PROVIDER') {
+        if (authUser.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Forbidden - Only providers can create franchisors' }, { status: 403 })
         }
 
-        if (!checkRateLimit(session.user.id)) {
+        if (!checkRateLimit(authUser.id)) {
             return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, email, phone, companyName, storeName, supportFee, type, businessType, industryType, processingType, billingMethod, enableCommission, dealerBrandingId } = body
 
         if (!name || !email || !companyName) {
@@ -214,9 +210,9 @@ export async function POST(request: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'FRANCHISOR_CREATED',
             entityType: 'Franchisor',

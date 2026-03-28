@@ -1,21 +1,21 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session || (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR')) {
+        if (!session || (user.role !== 'PROVIDER' && user.role !== 'FRANCHISOR')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         let whereClause = {}
 
-        if (session.user.role === 'FRANCHISOR') {
+        if (user.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({
-                where: { ownerId: session.user.id }
+                where: { ownerId: user.id }
             })
 
             if (!franchisor) {
@@ -49,9 +49,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session || (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR')) {
+        if (!session || (user.role !== 'PROVIDER' && user.role !== 'FRANCHISOR')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -59,9 +57,9 @@ export async function POST(request: Request) {
         let { name, franchisorId } = body
 
         // If Franchisor, force their own ID
-        if (session.user.role === 'FRANCHISOR') {
+        if (user.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({
-                where: { ownerId: session.user.id }
+                where: { ownerId: user.id }
             })
             if (!franchisor) return NextResponse.json({ error: 'Franchisor profile not found' }, { status: 404 })
             franchisorId = franchisor.id

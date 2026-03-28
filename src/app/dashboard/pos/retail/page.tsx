@@ -53,6 +53,7 @@ import ScanQuickAddModal from '@/components/modals/ScanQuickAddModal'
 import TransactionDiscountModal from '@/components/modals/TransactionDiscountModal'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 import EndOfDayWizard from '@/components/pos/EndOfDayWizard'
+import PaidInOutModal from '@/components/pos/PaidInOutModal'
 import LotteryModal from '@/components/pos/LotteryModal'
 import LotteryPayoutModal from '@/components/pos/LotteryPayoutModal'
 import ReceiptModal from '@/components/pos/ReceiptModal'
@@ -67,6 +68,10 @@ import {
 import { useOfflineMode } from '@/lib/use-offline-mode'
 import { OfflineStatusIndicator } from '@/components/pos/OfflineStatusIndicator'
 import QuickSwitchModal from '@/components/pos/QuickSwitchModal'
+import { DisplaySetupDialog } from '@/components/pos/DisplaySetupDialog'
+import { CustomerDisplayManager } from '@/lib/display/CustomerDisplayManager'
+import { ScaleIntegration } from '@/lib/hardware/scale-integration'
+import { parseEmbeddedBarcode, calculateWeightPrice, isEmbeddedBarcode } from '@/lib/barcode/embedded-price-parser'
 
 // Multi-Tax Jurisdiction types
 interface TaxJurisdiction {
@@ -219,6 +224,7 @@ export default function RetailPOSPage() {
     // Quick Life Features
     const [showCustomerLookup, setShowCustomerLookup] = useState(false)
     const [showCashDropModal, setShowCashDropModal] = useState(false)
+    const [showPaidInOutModal, setShowPaidInOutModal] = useState(false)
     const [showReceiveStockModal, setShowReceiveStockModal] = useState(false)
     const [showRecentTransactions, setShowRecentTransactions] = useState(false)
     const [recentTransactions, setRecentTransactions] = useState<any[]>([])
@@ -279,6 +285,92 @@ export default function RetailPOSPage() {
 
     // Quick Switch (Toast POS style employee switching)
     const [showQuickSwitch, setShowQuickSwitch] = useState(false)
+
+    // Transaction Recovery State (Ticket 7)
+    const [recoveryTransactions, setRecoveryTransactions] = useState<any[]>([])
+    const [showRecoveryBanner, setShowRecoveryBanner] = useState(false)
+    const [recoveringTxId, setRecoveringTxId] = useState<string | null>(null)
+
+    // Check for interrupted transactions on POS startup
+    useEffect(() => {
+        async function checkRecovery() {
+            try {
+                const params = new URLSearchParams()
+                if (selectedStation?.id) params.set('stationId', selectedStation.id)
+                const res = await fetch('/api/pos/recover-transaction?' + params.toString())
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.count > 0) {
+                        setRecoveryTransactions(data.transactions)
+                        setShowRecoveryBanner(true)
+                    }
+                }
+            } catch { /* startup check non-critical */ }
+        }
+        checkRecovery()
+    }, [selectedStation?.id])
+
+    const handleRecoveryAction = async (txId: string, action: 'RESUME' | 'VOID') => {
+        setRecoveringTxId(txId)
+        try {
+            const res = await fetch('/api/pos/recover-transaction', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ transactionId: txId, action, reason: action === 'VOID' ? 'Voided on POS startup' : undefined })
+            })
+            if (res.ok) {
+                setRecoveryTransactions(prev => prev.filter(t => t.id !== txId))
+                if (recoveryTransactions.length <= 1) setShowRecoveryBanner(false)
+                setToast({ message: action === 'VOID' ? 'Transaction voided' : 'Transaction resumed', type: 'success' })
+            }
+        } catch { setToast({ message: 'Recovery action failed', type: 'error' }) }
+        setRecoveringTxId(null)
+    }
+
+    // Customer Display Setup
+    const [showDisplaySetup, setShowDisplaySetup] = useState(false)
+    const [displayCandidates, setDisplayCandidates] = useState<any[]>([])
+    const [displayStatus, setDisplayStatus] = useState<any>({ connected: false, driverName: null, mode: null, hardwareId: null, lastError: null })
+    const [displayManager] = useState(() => typeof window !== 'undefined' ? new CustomerDisplayManager() : null)
+
+    // Scale Integration State (Ticket 10)
+    const [scaleConnected, setScaleConnected] = useState(false)
+    const [lastScaleReading, setLastScaleReading] = useState<{ weight: number; unit: string; stable: boolean } | null>(null)
+    const [scaleInstance] = useState(() => typeof window !== 'undefined' && ScaleIntegration.isSupported() ? new ScaleIntegration() : null)
+
+    // Stale weight protection: clear reading after 60 seconds of no change
+    const [scaleReadingAge, setScaleReadingAge] = useState(0)
+    const scaleStaleTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+    useEffect(() => {
+        if (lastScaleReading && scaleConnected) {
+            // Reset stale timer on new reading
+            if (scaleStaleTimerRef.current) clearTimeout(scaleStaleTimerRef.current)
+            setScaleReadingAge(0)
+            scaleStaleTimerRef.current = setTimeout(() => {
+                setScaleReadingAge(60)
+                setToast({ message: 'Scale reading is stale — re-weigh item', type: 'error' })
+            }, 60000) // 60 second stale threshold
+        }
+        return () => { if (scaleStaleTimerRef.current) clearTimeout(scaleStaleTimerRef.current) }
+    }, [lastScaleReading?.weight])
+
+    // Scale connect handler
+    const handleScaleConnect = async () => {
+        if (!scaleInstance) return
+        try {
+            await scaleInstance.connect()
+            await scaleInstance.startReading((reading) => {
+                setLastScaleReading({ weight: reading.weight, unit: reading.unit, stable: reading.stable })
+            })
+            setScaleConnected(true)
+            setToast({ message: 'Scale connected', type: 'success' })
+        } catch (err) {
+            setScaleConnected(false)
+            setLastScaleReading(null)
+            setToast({ message: 'Scale connection failed — use manual weight entry', type: 'error' })
+        }
+    }
 
     // Auto-detect screen size for responsive POS layout
     // Small screens (< 800px height) = compact mode
@@ -782,7 +874,7 @@ export default function RetailPOSPage() {
         || showCustomerLookup || showCashDropModal || showReceiveStockModal || showRecentTransactions
         || showEndOfDayWizard || showLotteryModal || showLotteryPayoutModal || showCustomerModal
         || showQtyNumpad || showCaseBreakModal || showExitModal || showMoreDepts || showQuickSwitch
-        || showPaxModal || showReceiptModal || showStationPairing
+        || showPaxModal || showReceiptModal || showStationPairing || showDisplaySetup
     useEffect(() => {
         const focusBarcode = () => {
             if (!anyModalOpen) {
@@ -843,13 +935,34 @@ export default function RetailPOSPage() {
         }
     }
 
-    // Lookup product by barcode/SKU
+    // Lookup product by barcode/SKU (with price-embedded barcode support)
     const lookupAndAddProduct = async (code: string) => {
         setIsLoading(true)
         try {
-            const res = await fetch(`/api/pos/retail/lookup?code=${encodeURIComponent(code)}`)
+            // Check for price/weight-embedded barcode (prefix 2x)
+            const embedded = parseEmbeddedBarcode(code)
+            let lookupCode = code
+            if (embedded.isEmbedded && embedded.plu) {
+                // Use PLU for product lookup instead of full barcode
+                lookupCode = embedded.plu
+            }
+
+            const res = await fetch(`/api/pos/retail/lookup?code=${encodeURIComponent(lookupCode)}`)
             if (res.ok) {
                 const product = await res.json()
+
+                // Apply embedded price/weight data from barcode
+                if (embedded.isEmbedded) {
+                    if (embedded.type === 'PRICE_EMBEDDED' && embedded.embeddedPrice) {
+                        product.price = embedded.embeddedPrice
+                        product.name = product.name + ` (${embedded.embeddedPrice.toFixed(2)})`
+                    } else if (embedded.type === 'WEIGHT_EMBEDDED' && embedded.embeddedWeight && product.pricePerUnit) {
+                        const calcPrice = calculateWeightPrice(embedded.embeddedWeight, product.pricePerUnit)
+                        product.price = calcPrice
+                        product.isWeighted = true
+                        product.name = product.name + ` (${embedded.embeddedWeight.toFixed(3)} lb)`
+                    }
+                }
 
                 // Check if age restricted
                 if (product.ageRestricted) {
@@ -912,9 +1025,25 @@ export default function RetailPOSPage() {
         }
     }
 
-    // Add product to cart
+    // Add product to cart (with weighted item support)
     const addToCart = (product: any) => {
-        const qty = parseInt(quantityInput) || 1
+        let qty = parseInt(quantityInput) || 1
+
+        // Weighted item: auto-apply scale reading instead of integer quantity
+        if (product.isWeighted && lastScaleReading && scaleConnected) {
+            if (scaleReadingAge >= 60) {
+                setToast({ message: 'Scale reading is stale — re-weigh item before scanning', type: 'error' })
+                return
+            }
+            if (!lastScaleReading.stable) {
+                setToast({ message: 'Scale not stable — wait for reading to settle', type: 'error' })
+                return
+            }
+            if (lastScaleReading.weight <= 0) {
+                setToast({ message: 'Place item on scale before scanning', type: 'error' })
+                return
+            }
+        }
         // Get EBT eligibility from product's category
         const isEbtEligible = product.productCategory?.isEbtEligible || product.isEbtEligible || false
 
@@ -936,15 +1065,23 @@ export default function RetailPOSPage() {
                 // Dual Pricing - use cashPrice/cardPrice from product if available
                 cashPrice: product.cashPrice ? parseFloat(product.cashPrice) : parseFloat(product.price),
                 cardPrice: product.cardPrice ? parseFloat(product.cardPrice) : undefined,
-                quantity: qty,
+                quantity: (product.isWeighted && lastScaleReading && scaleConnected) ? lastScaleReading.weight : qty,
                 ageRestricted: product.ageRestricted,
                 isEbtEligible,
+                isWeighted: product.isWeighted || false,
+                pricePerUnit: product.pricePerUnit || null,
+                unitOfMeasure: product.unitOfMeasure || 'lb',
+                weight: (product.isWeighted && lastScaleReading && scaleConnected) ? lastScaleReading.weight : null,
                 taxRate: product.taxRate, // Pass through taxRate if provided (e.g., from Quick Add)
                 category: product.category // Pass through category if provided (e.g., from Quick Add)
             }]
         })
         setQuantityInput('1')
-        setToast({ message: `Added: ${product.name}`, type: 'success' })
+        if (product.isWeighted && lastScaleReading && scaleConnected) {
+            setToast({ message: `Added: ${product.name} (${lastScaleReading.weight.toFixed(3)} ${lastScaleReading.unit})`, type: 'success' })
+        } else {
+            setToast({ message: `Added: ${product.name}`, type: 'success' })
+        }
     }
 
     // Confirm age verification (ID was scanned and verified)
@@ -1545,6 +1682,34 @@ export default function RetailPOSPage() {
                 />
             )}
 
+            {/* Transaction Recovery Banner */}
+            {showRecoveryBanner && recoveryTransactions.length > 0 && (
+                <div className="bg-amber-900/30 border-b border-amber-700 px-4 py-2">
+                    <div className="flex items-center justify-between">
+                        <span className="text-amber-400 text-sm font-medium">
+                            âš  {recoveryTransactions.length} interrupted transaction{recoveryTransactions.length > 1 ? 's' : ''} found
+                        </span>
+                        <button onClick={() => setShowRecoveryBanner(false)} className="text-amber-600 hover:text-amber-400 text-xs">Dismiss</button>
+                    </div>
+                    <div className="mt-1 space-y-1">
+                        {recoveryTransactions.slice(0, 3).map((tx: any) => (
+                            <div key={tx.id} className="flex items-center justify-between text-xs">
+                                <span className="text-stone-400">
+                                     Â· {tx.itemCount} items Â· {tx.employee || 'unknown'}
+                                </span>
+                                <div className="flex gap-1">
+                                    <button
+                                        onClick={() => handleRecoveryAction(tx.id, 'VOID')}
+                                        disabled={recoveringTxId === tx.id}
+                                        className="px-2 py-0.5 bg-red-900/30 text-red-400 rounded text-xs hover:bg-red-900/50"
+                                    >Void</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* ===== KIOSK MODE UI ===== */}
             {/* Fullscreen Prompt Banner - shown when not fullscreen and not installed */}
             {!isFullscreen && !isInstalled && (
@@ -1843,6 +2008,58 @@ export default function RetailPOSPage() {
                     <Monitor className="h-5 w-5" />
                     <span className="hidden xl:inline">Customer Display</span>
                 </button>
+
+                {/* Display Setup Button */}
+                <button
+                    onClick={async () => {
+                        if (displayManager) {
+                            const candidates = await displayManager.detectAvailableDisplays()
+                            setDisplayCandidates(candidates)
+                            setDisplayStatus(displayManager.getStatus())
+                        }
+                        setShowDisplaySetup(true)
+                    }}
+                    className="px-3 py-2 bg-stone-800 hover:bg-stone-700 rounded-lg flex items-center gap-2 transition-colors flex-shrink-0"
+                    title="Display Setup"
+                >
+                    <Monitor className="h-4 w-4" />
+                    <span className="text-xs">Setup</span>
+                </button>
+
+                {/* Scale Integration */}
+                {ScaleIntegration.isSupported() && (
+                    <button
+                        onClick={handleScaleConnect}
+                        className={`px-3 py-2 rounded-lg flex items-center gap-1 transition-colors flex-shrink-0 text-xs ${scaleConnected ? 'bg-green-900/30 border border-green-700/50 text-green-400' : 'bg-stone-800 hover:bg-stone-700 text-stone-400'}`}
+                        title={scaleConnected ? `Scale: ${lastScaleReading?.weight || 0} ${lastScaleReading?.unit || 'lb'}` : 'Connect Scale'}
+                    >
+                        ⚖️ {scaleConnected ? `${lastScaleReading?.weight?.toFixed(2) || '0.00'} ${lastScaleReading?.unit || 'lb'}` : 'Scale'}
+                    </button>
+                )}
+
+                {/* Display Setup Dialog */}
+                {showDisplaySetup && displayManager && (
+                    <DisplaySetupDialog
+                        isOpen={showDisplaySetup}
+                        onClose={() => setShowDisplaySetup(false)}
+                        candidates={displayCandidates}
+                        status={displayStatus}
+                        onSelect={async (candidate) => {
+                            await displayManager.connectDisplay(candidate)
+                            if (selectedStation) await displayManager.saveProfile(selectedStation.id, candidate)
+                            setDisplayStatus(displayManager.getStatus())
+                        }}
+                        onTest={async () => displayManager.runTestPattern()}
+                        onRefresh={async () => {
+                            const c = await displayManager.detectAvailableDisplays()
+                            setDisplayCandidates(c)
+                        }}
+                        onDisconnect={() => {
+                            displayManager.disconnectDisplay()
+                            setDisplayStatus(displayManager.getStatus())
+                        }}
+                    />
+                )}
 
                 {/* 5. Logout Button */}
                 <button
@@ -2224,14 +2441,23 @@ export default function RetailPOSPage() {
                             </button>
                         </div>
 
-                        {/* Row 3: End of Day */}
-                        <button
-                            onClick={() => setShowEndOfDayWizard(true)}
-                            className="flex items-center justify-center gap-2 py-2 bg-indigo-500/30 hover:bg-indigo-500/50 rounded text-white transition-colors"
-                        >
-                            <Moon className="h-4 w-4" />
-                            <span className="text-xs font-medium">End of Day / Close</span>
-                        </button>
+                        {/* Row 3: Paid In/Out + End of Day */}
+                        <div className="grid grid-cols-2 gap-1">
+                            <button
+                                onClick={() => setShowPaidInOutModal(true)}
+                                className="flex items-center justify-center gap-2 py-2 bg-teal-500/30 hover:bg-teal-500/50 rounded text-white transition-colors"
+                            >
+                                <Banknote className="h-4 w-4" />
+                                <span className="text-xs font-medium">Paid In / Out</span>
+                            </button>
+                            <button
+                                onClick={() => setShowEndOfDayWizard(true)}
+                                className="flex items-center justify-center gap-2 py-2 bg-indigo-500/30 hover:bg-indigo-500/50 rounded text-white transition-colors"
+                            >
+                                <Moon className="h-4 w-4" />
+                                <span className="text-xs font-medium">End of Day / Close</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -2972,6 +3198,19 @@ export default function RetailPOSPage() {
                     cashierName={session?.user?.name || 'Cashier'}
                 />
             )}
+
+            {/* Paid In/Out Modal */}
+            <PaidInOutModal
+                isOpen={showPaidInOutModal}
+                onClose={() => setShowPaidInOutModal(false)}
+                onSuccess={() => {
+                    setShowPaidInOutModal(false)
+                    fetchShiftSummary()
+                }}
+                cashDrawerSessionId={currentShiftId || ''}
+                storeName={(session?.user as any)?.franchiseName || 'Store'}
+                cashierName={session?.user?.name || 'Cashier'}
+            />
 
             {/* Receive Stock Modal */}
             {showReceiveStockModal && (

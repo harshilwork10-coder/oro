@@ -1,9 +1,6 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
@@ -14,13 +11,15 @@ export const revalidate = 0
  * Returns: menu, employees, pricingSettings, activeShift
  */
 export async function GET(req: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
-        return ApiResponse.unauthorized()
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user?.franchiseId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const franchiseId = session.user.franchiseId
-    const userId = session.user.id
+    const franchiseId = user.franchiseId
+    const userId = user.id
 
     try {
         // Debug log removed
@@ -116,7 +115,7 @@ export async function GET(req: NextRequest) {
             value: Number(d.value)
         }))
 
-        return ApiResponse.success({
+        return NextResponse.json({
             menu: {
                 services: formattedServices,
                 products: formattedProducts,
@@ -145,6 +144,6 @@ export async function GET(req: NextRequest) {
 
     } catch (error) {
         console.error('[SALON_POS_INIT]', error)
-        return ApiResponse.serverError('Failed to initialize Salon POS')
+        return NextResponse.json({ error: 'Failed to initialize Salon POS' }, { status: 500 })
     }
 }

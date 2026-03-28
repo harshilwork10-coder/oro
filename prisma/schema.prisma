@@ -114,6 +114,16 @@ enum TrustedDeviceStatus {
   REVOKED
 }
 
+enum DisplayMode {
+  SECOND_SCREEN      // HDMI/secondary browser window
+  POLE_DISPLAY       // Serial/USB 2x20 VFD
+  REMOTE_BROWSER     // Separate device polling via HTTP
+  ANDROID_DISPLAY    // Android WebView on PAX/integrated
+  VENDOR_INTEGRATED  // Vendor SDK (PAX S-series, etc.)
+  NONE               // No display configured
+}
+
+
 enum TerminalType {
   PAX
   CLOVER
@@ -1158,11 +1168,33 @@ model Station {
   trustedDevices TrustedDevice[]
   paymentLogs    PaymentLog[]
 
+  // Customer Display Profile
+  displayProfile StationDisplayProfile?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([locationId])
   @@index([pairedDeviceId])
+}
+
+// Customer Display Profile — saved per station for auto-reconnect
+model StationDisplayProfile {
+  id        String   @id @default(cuid())
+  stationId String   @unique
+  station   Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  displayMode         DisplayMode @default(NONE)
+  hardwareIdentifier  String?     // e.g. "screen-2", "COM3", "192.168.1.50"
+  driver              String?     // e.g. "second-screen", "pole-epson-vfd"
+  protocolSettings    Json?       // { baudRate, dataBits, parity, ... }
+  fallbackMode        DisplayMode @default(REMOTE_BROWSER)
+  lastConnectedAt     DateTime?
+  lastConnectionError String?
+  isAutoDetected      Boolean     @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Trusted Device - Persistent "Cockroach" binding for stations
@@ -1899,6 +1931,7 @@ model Product {
   stockAdjustments   StockAdjustment[]
   barcodeAliases     ProductBarcodeAlias[]
   costHistory        ProductCostHistory[]
+  priceChangeLogs    PriceChangeLog[]
 
   // Tag-Along Items (cross-sell suggestions)
   tagAlongParent TagAlongItem[] @relation("TagAlongParent")
@@ -3044,6 +3077,17 @@ model BusinessConfig {
   canExportData    Boolean @default(false) // Can export customer/transaction data
   canExportReports Boolean @default(false) // Can export reports to CSV/PDF
 
+  // ============ OPERATIONAL CONTROLS ============
+  // Refund thresholds (enforced by /api/pos/refund)
+  requireManagerPinAbove Decimal? @db.Decimal(12, 2) // Refunds above this $ amount require manager PIN
+  refundLimitPerDay      Decimal? @db.Decimal(12, 2) // Max total refund $ per employee per day
+
+  // Stock guard (enforced by lib/inventory/stock-guard.ts)
+  allowNegativeStock Boolean @default(false) // Default: strict mode — no negative stock
+
+  // Auto-lock (consumed by POS terminals)
+  autoLockMinutes Int @default(3) // Inactivity timeout for POS registers
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -4111,8 +4155,12 @@ model DepartmentTaxDefault {
 
 model PriceChangeLog {
   id     String @id @default(cuid())
-  itemId String
-  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  // Supports both Item and Product (one or the other)
+  itemId    String?
+  item      Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   oldPrice  Decimal @db.Decimal(12, 2)
   newPrice  Decimal @db.Decimal(12, 2)
@@ -4127,6 +4175,7 @@ model PriceChangeLog {
   createdAt DateTime @default(now())
 
   @@index([itemId])
+  @@index([productId])
   @@index([changedBy])
   @@index([createdAt])
 }

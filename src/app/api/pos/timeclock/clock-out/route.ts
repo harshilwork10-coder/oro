@@ -4,8 +4,8 @@
  * POST: Clock out an employee - closes their active time entry
  */
 
-import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Decimal } from '@prisma/client/runtime/library'
 import { auditLog } from '@/lib/audit'

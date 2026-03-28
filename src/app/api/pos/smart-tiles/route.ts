@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import jwt from 'jsonwebtoken'
 
@@ -69,13 +68,15 @@ interface NowNextStatus {
  * - Context-aware add-on suggestions
  */
 export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     // Auth - session or JWT
-    const session = await getServerSession(authOptions)
     let franchiseId: string | undefined
     let locationId: string | null = null
 
-    if (session?.user?.franchiseId) {
-        franchiseId = session.user.franchiseId
+    if (user?.franchiseId) {
+        franchiseId = user.franchiseId
     } else {
         const mobileAuth = verifyMobileToken(req.headers.get('Authorization'))
         if (mobileAuth) {

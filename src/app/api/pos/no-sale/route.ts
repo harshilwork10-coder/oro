@@ -1,60 +1,46 @@
-// @ts-nocheck
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
+import { validateReasonCode, NO_SALE_REASON_CODES } from '@/lib/constants/reason-codes'
 
 /**
- * No Sale API — Open drawer without a transaction
- * 
- * Logs the event for loss prevention. Every c-store POS has this.
- * Too many no-sales = suspicious activity (flagged in loss prevention).
+ * No Sale — Open drawer without a transaction
+ * POST /api/pos/no-sale
+ *
+ * Logs for loss prevention. Mandatory reason from dropdown.
  */
+// Use centralized reason codes (legacy list kept for backward compat)
+const VALID_REASONS = NO_SALE_REASON_CODES.map(r => r.code)
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const body = await req.json()
+        const { reason, reasonNote, stationId } = body
 
-        const franchiseId = user.franchiseId
-        if (!franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
+        const codeCheck = validateReasonCode(reason, reasonNote, NO_SALE_REASON_CODES)
+        if (!codeCheck.valid) {
+            return NextResponse.json({
+                error: codeCheck.error,
+                validReasons: VALID_REASONS
+            }, { status: 400 })
+        }
 
-        const body = await request.json()
-        const reason = body.reason || 'No reason given'
-        const stationId = body.stationId
-
-        // Audit log for loss prevention tracking
-        await auditLog({
-            userId: user.id,
-            userEmail: user.email,
-            userRole: user.role,
-            action: 'NO_SALE',
-            entityType: 'CashDrawer',
-            entityId: stationId || 'unknown',
-            franchiseId,
-            locationId: user.locationId,
-            metadata: {
-                reason,
-                stationId,
-                cashier: user.name || user.email,
-            }
+        await logActivity({
+            userId: user.id, userEmail: user.email, userRole: user.role,
+            franchiseId: user.franchiseId,
+            action: 'NO_SALE', entityType: 'CashDrawer', entityId: stationId || 'unknown',
+            details: { reason, reasonNote: reasonNote || null, stationId, cashier: user.email }
         })
 
         return NextResponse.json({
-            success: true,
-            drawerCommand: 'KICK',  // tells POS to send ESC/POS drawer kick
-            logged: true,
-            event: {
-                type: 'NO_SALE',
-                cashier: user.name || user.email,
-                reason,
-                timestamp: new Date().toISOString(),
-            },
+            success: true, drawerCommand: 'KICK', logged: true,
+            event: { type: 'NO_SALE', cashier: user.email, reason, timestamp: new Date().toISOString() }
         })
-
-    } catch (error) {
-        console.error('No Sale error:', error)
+    } catch (error: any) {
+        console.error('[NO_SALE_POST]', error)
         return NextResponse.json({ error: 'Server error' }, { status: 500 })
     }
 }

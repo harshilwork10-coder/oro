@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 function generateGiftCardCode(): string {
@@ -14,16 +13,15 @@ function generateGiftCardCode(): string {
 }
 
 // GET - Search gift cards, view stats
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const code = searchParams.get('code')
         const type = searchParams.get('type') || 'stats' // stats, search, recent
 
@@ -123,16 +121,13 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Issue new card, check balance, redeem
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { action, code, amount, recipientEmail, purchaserId } = body
         // action: 'issue', 'redeem', 'check'
 
@@ -261,11 +256,8 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT - Deactivate/reactivate card
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -274,7 +266,7 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { cardId, isActive } = body
 
         if (!cardId) {

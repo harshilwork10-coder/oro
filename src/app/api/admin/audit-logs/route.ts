@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Fetch audit logs for an entity
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const user = session.user as any
-    if (user.role !== 'PROVIDER') {
+if (user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'PROVIDER only' }, { status: 403 })
     }
 
-    const { searchParams } = new URL(request.url)
+    const { searchParams } = new URL(req.url)
     const mode = searchParams.get('mode') // 'summary' = counts only, null = full logs
     const entityType = searchParams.get('entityType')
     const entityId = searchParams.get('entityId')
@@ -111,15 +110,12 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create a new audit log entry
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const user = session.user as any
-    const body = await request.json()
+const body = await req.json()
 
     const { entityType, entityId, action, changes, status = 'SUCCESS' } = body
 
@@ -133,7 +129,7 @@ export async function POST(request: NextRequest) {
             action,
             changes: changes ? JSON.stringify(changes) : null,
             status,
-            ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+            ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
         }
     })
 

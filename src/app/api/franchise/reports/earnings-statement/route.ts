@@ -1,27 +1,22 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET: Barber/Stylist Earnings Statement
 // Shows detailed breakdown of earnings per barber for a date range
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id }
-        })
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
         if (!user) {
-            return ApiResponse.notFound('User')
+            return NextResponse.json({ error: 'User' }, { status: 404 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
         const employeeId = searchParams.get('employeeId')
@@ -49,7 +44,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (!franchiseId) {
-            return ApiResponse.error('Franchise not found', 404)
+            return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
         }
 
         // Build employee filter
@@ -149,7 +144,7 @@ export async function GET(request: NextRequest) {
                 })
 
                 // Get employee's compensation plan (not in main schema — any-cast)
-                const compensationPlan = await (prisma as any).compensationPlan.findFirst({
+                const compensationPlan = await prisma.compensationPlan.findFirst({
                     where: { userId: employee.id },
                     orderBy: { createdAt: 'desc' }
                 })
@@ -241,7 +236,7 @@ export async function GET(request: NextRequest) {
             })
         )
 
-        return ApiResponse.success({
+        return NextResponse.json({
             data: earningsStatements,
             dateRange: {
                 start: dateStart.toISOString(),
@@ -252,6 +247,6 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
         console.error('Error generating earnings statement:', error)
-        return ApiResponse.serverError('Failed to generate earnings statement')
+        return NextResponse.json({ error: 'Failed to generate earnings statement' }, { status: 500 })
     }
 }

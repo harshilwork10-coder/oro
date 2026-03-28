@@ -5,30 +5,22 @@
  *        cash variance, waste losses, and composite risk score
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { role: true, franchiseId: true }
-        })
-
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
         if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role || '')) {
-            return ApiResponse.forbidden('Manager+ only')
+            return NextResponse.json({ error: 'Manager+ only' }, { status: 403 })
         }
 
         const franchiseId = user.franchiseId
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '7')
         const since = new Date(); since.setDate(since.getDate() - days)
 
@@ -72,7 +64,7 @@ export async function GET(request: NextRequest) {
         if (noSales > 10) alerts.push({ severity: 'WARNING', message: `${noSales} no-sale drawer opens this period` })
         if (shortShifts > 0) alerts.push({ severity: 'WARNING', message: `${shortShifts} shifts closed short (cash variance)` })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             dashboard: {
                 riskScore,
                 riskLevel: riskScore >= 60 ? 'HIGH' : riskScore >= 30 ? 'MEDIUM' : 'LOW',
@@ -90,6 +82,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[LOSS_PREV_GET]', error)
-        return ApiResponse.error('Failed to generate loss prevention dashboard', 500)
+        return NextResponse.json({ error: 'Failed to generate loss prevention dashboard' }, { status: 500 })
     }
 }

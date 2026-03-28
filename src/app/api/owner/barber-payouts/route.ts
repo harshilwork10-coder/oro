@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -9,14 +8,16 @@ import { prisma } from '@/lib/prisma'
  * IMPORTANT: Uses snapshot fields from line items (commissionAmount, tipAllocated).
  * Never recalculates - sums are taken directly from immutable snapshots.
  */
-export async function GET() {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
-        const franchiseId = session.user.franchiseId
+        const franchiseId = user.franchiseId
 
         // Get today's date range
         const startOfDay = new Date()

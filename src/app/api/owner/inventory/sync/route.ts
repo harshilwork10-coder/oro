@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // POST - Sync inventory across locations using StockOnHand
@@ -8,11 +7,10 @@ import { prisma } from '@/lib/prisma'
 // - Push items to multiple locations (create StockOnHand records)
 // - Copy product catalog from one location to others
 // - Sync stock levels between locations
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -21,7 +19,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { action, sourceLocationId, targetLocationIds, itemIds, syncStock, initialStock } = body
 
         // Get user's franchise

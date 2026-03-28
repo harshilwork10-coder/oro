@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcrypt'
 import crypto from 'crypto'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // Rate limiting: Track creation attempts per user
 const creationAttempts = new Map<string, { count: number; resetAt: number }>()
@@ -36,25 +35,22 @@ function sanitizeInput(input: string): string {
     return input.trim().replace(/[<>"']/g, '')
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // Only FRANCHISOR can create franchisees
-        if (session.user.role !== 'FRANCHISOR') {
+        if (authUser.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Forbidden - Only franchisors can create franchisees' }, { status: 403 })
         }
 
         // Rate limiting check
-        if (!checkRateLimit(session.user.id)) {
+        if (!checkRateLimit(authUser.id)) {
             return NextResponse.json({ error: 'Too many requests. Please wait before creating more franchisees.' }, { status: 429 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, email, franchiseName } = body
 
         // Input validation
@@ -79,7 +75,7 @@ export async function POST(request: NextRequest) {
 
         // Get franchisor
         const franchisor = await prisma.franchisor.findFirst({
-            where: { ownerId: session.user.id }
+            where: { ownerId: authUser.id }
         })
 
         if (!franchisor) {
@@ -112,12 +108,12 @@ export async function POST(request: NextRequest) {
         })
 
         // Create franchisee user with sanitized data
-        const user = await prisma.user.create({
+        const newUser = await prisma.user.create({
             data: {
                 name: sanitizedName,
                 email: sanitizedEmail,
                 password: hashedPassword,
-                role: 'EMPLOYEE', // Franchisee role
+                role: 'EMPLOYEE',
                 franchiseId: franchise.id
             }
         })
@@ -130,7 +126,7 @@ export async function POST(request: NextRequest) {
         await prisma.magicLink.create({
             data: {
                 token,
-                userId: user.id,
+                userId: newUser.id,
                 email: sanitizedEmail,
                 expiresAt
             }
@@ -154,22 +150,22 @@ export async function POST(request: NextRequest) {
         // Debug log removed
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: newUser.id,
+            userEmail: newUser.email!,
             userRole: 'FRANCHISOR',
             action: 'FRANCHISEE_CREATED',
             entityType: 'User',
-            entityId: user.id,
+            entityId: newUser.id,
             metadata: { franchiseName: sanitizedFranchiseName, franchiseId: franchise.id, email: sanitizedEmail }
         })
 
         return NextResponse.json({
             success: true,
             user: {
-                id: user.id,
-                name: user.name,
-                email: user.email
+                id: newUser.id,
+                name: newUser.name,
+                email: newUser.email
             },
             franchise: {
                 id: franchise.id,

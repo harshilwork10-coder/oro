@@ -1,25 +1,24 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { THEME_PRESETS } from '@/lib/themes'
 import { cacheDelete, CACHE_KEYS } from '@/lib/cache'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // GET - Fetch current theme settings
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             // Return defaults for unauthenticated requests (Android initial load)
             return NextResponse.json({
                 themeId: 'classic_oro',
                 highContrast: false
             })
         }
-
-        const user = session.user as any
-        if (!user.franchiseId) {
+if (!user.franchiseId) {
             return NextResponse.json({
                 themeId: 'classic_oro',
                 highContrast: false
@@ -49,14 +48,10 @@ export async function GET() {
 // PUT - Update theme settings (requires auth + OWNER/MANAGER role)
 export async function PUT(request: Request) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-
-        // DIAGNOSTIC: Log full session to trace 403 issues
+// DIAGNOSTIC: Log full session to trace 403 issues
         console.error(`[THEME PUT] Session: id=${user.id} email=${user.email} role=${user.role} franchiseId=${user.franchiseId}`)
 
         // Any business role can change their theme
@@ -135,7 +130,7 @@ export async function PUT(request: Request) {
         console.error(`[THEME] Cache invalidated for ${allLocations.length} location(s) in franchise ${user.franchiseId}`)
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role,

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // Helper to parse integrations JSON string
 function parseIntegrations(integrationsStr: string | null): Record<string, boolean> {
@@ -16,8 +15,7 @@ function parseIntegrations(integrationsStr: string | null): Record<string, boole
 
 // Helper to check permissions
 async function checkPermission() {
-    const session = await getServerSession(authOptions)
-    if (!session?.user || session.user.role !== 'PROVIDER') {
+    if (!user || user.role !== 'PROVIDER') {
         return null
     }
     return session
@@ -28,6 +26,9 @@ export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const user = await getAuthUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const session = await checkPermission()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
@@ -141,9 +142,9 @@ export async function PUT(
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'FRANCHISOR_UPDATED',
             entityType: 'Franchisor',
@@ -233,9 +234,9 @@ export async function DELETE(
         await prisma.user.delete({ where: { id: franchisor.ownerId } })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'FRANCHISOR_HARD_DELETED',
             entityType: 'Franchisor',
@@ -279,9 +280,9 @@ export async function PATCH(
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'FRANCHISOR_APPROVAL_STATUS_CHANGED',
             entityType: 'Franchisor',

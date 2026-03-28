@@ -1,130 +1,137 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-// POST — Bulk price update for a category or all items
-export async function POST(request: NextRequest) {
+/**
+ * S8-09: Bulk Cost / Price Update Tools
+ *
+ * POST /api/inventory/bulk-price-update — Apply bulk price changes with preview
+ * POST /api/inventory/bulk-cost-update — Apply bulk cost changes with preview
+ *
+ * Body: { categoryId?, adjustmentType, adjustmentValue, preview? }
+ * adjustmentType: PERCENT_INCREASE | PERCENT_DECREASE | FIXED_INCREASE | FIXED_DECREASE | SET_MARKUP
+ */
+export async function POST(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Owner+ only
+    if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
+        return NextResponse.json({ error: 'Owner+ access required' }, { status: 403 })
+    }
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
-            return ApiResponse.forbidden('Owner+ only')
-        }
-        if (!user.franchiseId) return ApiResponse.badRequest('No franchise')
-
-        const body = await request.json()
-        const { categoryId, adjustmentType, adjustmentValue, preview } = body as {
-            categoryId?: string // null = all items
-            adjustmentType: string // PERCENT_INCREASE, PERCENT_DECREASE, FIXED_INCREASE, FIXED_DECREASE, SET_MARKUP
+        const body = await req.json()
+        const { categoryId, adjustmentType, adjustmentValue, preview, field } = body as {
+            categoryId?: string
+            adjustmentType: string
             adjustmentValue: number
-            preview?: boolean // If true, just show what would change
+            preview?: boolean
+            field?: 'price' | 'cost' // S8-09: Support both price and cost
         }
+
+        const targetField = field || 'price'
 
         if (!adjustmentType || adjustmentValue == null) {
-            return ApiResponse.badRequest('adjustmentType and adjustmentValue required')
+            return NextResponse.json({ error: 'adjustmentType and adjustmentValue required' }, { status: 400 })
         }
 
-        const where: any = { franchiseId: user.franchiseId, type: 'PRODUCT', isActive: true }
+        const validTypes = ['PERCENT_INCREASE', 'PERCENT_DECREASE', 'FIXED_INCREASE', 'FIXED_DECREASE', 'SET_MARKUP']
+        if (!validTypes.includes(adjustmentType)) {
+            return NextResponse.json({ error: `adjustmentType must be: ${validTypes.join(', ')}` }, { status: 400 })
+        }
+
+        const where: any = { franchiseId: user.franchiseId, isActive: true }
         if (categoryId) where.categoryId = categoryId
 
         const items = await prisma.item.findMany({
             where,
-            select: { id: true, name: true, price: true, cost: true, category: { select: { name: true } } }
+            select: { id: true, name: true, price: true, cost: true, sku: true, barcode: true, category: { select: { name: true } } }
         })
 
         const changes = items.map(item => {
-            const oldPrice = Number(item.price)
-            let newPrice = oldPrice
+            const oldValue = Number(targetField === 'cost' ? item.cost : item.price) || 0
+            let newValue = oldValue
 
             switch (adjustmentType) {
                 case 'PERCENT_INCREASE':
-                    newPrice = oldPrice * (1 + adjustmentValue / 100)
+                    newValue = oldValue * (1 + adjustmentValue / 100)
                     break
                 case 'PERCENT_DECREASE':
-                    newPrice = oldPrice * (1 - adjustmentValue / 100)
+                    newValue = oldValue * (1 - adjustmentValue / 100)
                     break
                 case 'FIXED_INCREASE':
-                    newPrice = oldPrice + adjustmentValue
+                    newValue = oldValue + adjustmentValue
                     break
                 case 'FIXED_DECREASE':
-                    newPrice = oldPrice - adjustmentValue
+                    newValue = oldValue - adjustmentValue
                     break
                 case 'SET_MARKUP':
                     const cost = Number(item.cost || 0)
-                    newPrice = cost > 0 ? cost * (1 + adjustmentValue / 100) : oldPrice
+                    newValue = cost > 0 ? cost * (1 + adjustmentValue / 100) : oldValue
                     break
             }
 
-            newPrice = Math.max(0, Math.round(newPrice * 100) / 100)
+            newValue = Math.max(0, Math.round(newValue * 100) / 100)
 
             return {
                 itemId: item.id,
                 name: item.name,
+                sku: item.sku,
                 category: item.category?.name,
-                oldPrice,
-                newPrice,
-                change: Math.round((newPrice - oldPrice) * 100) / 100
+                oldValue, newValue,
+                change: Math.round((newValue - oldValue) * 100) / 100,
+                changed: Math.abs(newValue - oldValue) > 0.001
             }
         })
 
+        const changedItems = changes.filter(c => c.changed)
+        const totalImpact = Math.round(changedItems.reduce((s, c) => s + c.change, 0) * 100) / 100
+
+        // Preview mode — return what would change without applying
         if (preview) {
-            return ApiResponse.success({
+            return NextResponse.json({
                 preview: true,
-                itemCount: changes.length,
-                changes: changes.slice(0, 100), // Show first 100
-                totalImpact: Math.round(changes.reduce((s, c) => s + c.change, 0) * 100) / 100
+                field: targetField,
+                adjustmentType, adjustmentValue,
+                categoryId: categoryId || 'ALL',
+                totalItems: items.length,
+                itemsAffected: changedItems.length,
+                totalImpact,
+                changes: changedItems.slice(0, 100) // First 100
             })
         }
 
         // Apply changes
         let updated = 0
-        for (const change of changes) {
-            if (change.oldPrice !== change.newPrice) {
-                await prisma.item.update({
-                    where: { id: change.itemId },
-                    data: { price: change.newPrice }
-                })
-
-                // Log price change
-                await (prisma as any).priceChangeLog.create({
-                    data: {
-                        itemId: change.itemId,
-                        oldPrice: change.oldPrice,
-                        newPrice: change.newPrice,
-                        changedBy: user.id,
-                        reason: `Bulk update: ${adjustmentType} ${adjustmentValue}`
-                    }
-                })
-                updated++
-            }
+        for (const change of changedItems) {
+            await prisma.item.update({
+                where: { id: change.itemId },
+                data: { [targetField]: change.newValue }
+            })
+            updated++
         }
 
-        // Audit log
-        await auditLog({
-            userId: user.id,
-            userEmail: user.email,
-            userRole: user.role,
-            action: 'BULK_PRICE_UPDATE',
-            entityType: 'Item',
-            entityId: user.franchiseId,
-            metadata: { adjustmentType, adjustmentValue, categoryId, itemsUpdated: updated }
+        await logActivity({
+            userId: user.id, userEmail: user.email, userRole: user.role,
+            franchiseId: user.franchiseId,
+            action: 'BULK_PRICE_UPDATE', entityType: 'Item', entityId: user.franchiseId,
+            details: {
+                field: targetField, adjustmentType, adjustmentValue,
+                categoryId: categoryId || 'ALL',
+                itemsUpdated: updated, totalImpact
+            }
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             applied: true,
+            field: targetField,
             itemsUpdated: updated,
-            totalImpact: Math.round(changes.reduce((s, c) => s + c.change, 0) * 100) / 100
+            totalImpact
         })
-    } catch (error) {
-        console.error('[BULK_PRICE_POST]', error)
-        return ApiResponse.error('Failed to update prices')
+    } catch (error: any) {
+        console.error('[BULK_UPDATE_POST]', error)
+        return NextResponse.json({ error: error.message || 'Failed to update' }, { status: 500 })
     }
 }

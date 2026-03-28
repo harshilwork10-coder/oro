@@ -85,7 +85,7 @@ export async function POST(request: Request) {
 
         // Create Check-In Record
         if (resolvedLocationId) {
-            await (prisma as any).checkIn.create({
+            await prisma.checkIn.create({
                 data: {
                     clientId: customer.id,
                     locationId: resolvedLocationId,

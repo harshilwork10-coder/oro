@@ -1,27 +1,22 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET: Barber Utilization Report
 // Measures chair efficiency: services performed, revenue per estimated hour
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id }
-        })
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
         if (!user) {
-            return ApiResponse.notFound('User')
+            return NextResponse.json({ error: 'User' }, { status: 404 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
 
@@ -47,7 +42,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (!franchiseId) {
-            return ApiResponse.error('Franchise not found', 404)
+            return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
         }
 
         // Get all employees who worked during this period
@@ -154,7 +149,7 @@ export async function GET(request: NextRequest) {
         const avgUtilization = totalClockedHours > 0 ? (totalServiceHours / totalClockedHours) * 100 : 0
         const avgRevenuePerHour = totalClockedHours > 0 ? totalRevenue / totalClockedHours : 0
 
-        return ApiResponse.success({
+        return NextResponse.json({
             summary: {
                 totalClockedHours,
                 totalServiceHours,
@@ -174,6 +169,6 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
         console.error('Error generating utilization report:', error)
-        return ApiResponse.serverError('Failed to generate utilization report')
+        return NextResponse.json({ error: 'Failed to generate utilization report' }, { status: 500 })
     }
 }

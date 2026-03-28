@@ -1,104 +1,107 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
+import { logActivity, ActionTypes } from '@/lib/auditLog'
 
-// POST — Submit void/refund/override for manager approval
+/**
+ * POST /api/pos/approval-queue — Submit void/refund/override for manager approval
+ * GET /api/pos/approval-queue — List pending approvals (manager+ only)
+ * PUT /api/pos/approval-queue — Approve or deny a request (manager+ only)
+ *
+ * Uses AuditLog for approval tracking (StoreException is for operational alerts only)
+ */
 export async function POST(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
         const body = await request.json()
         const { type, transactionId, itemId, amount, reason } = body
 
-        if (!type) return ApiResponse.badRequest('type required (VOID, REFUND, PRICE_OVERRIDE, DISCOUNT)')
+        if (!type) return NextResponse.json({ error: 'type required (VOID, REFUND, PRICE_OVERRIDE, DISCOUNT)' }, { status: 400 })
 
-        const request_ = await (prisma as any).storeException.create({
-            data: {
-                locationId,
-                type,
-                requestedBy: user.id,
+        // Store approval request in audit log
+        const entry = await logActivity({
+            userId: user.id, userEmail: user.email, userRole: user.role,
+            franchiseId: user.franchiseId,
+            action: ActionTypes.APPROVAL_REQUESTED,
+            entityType: 'ApprovalRequest', entityId: transactionId || 'pending',
+            details: {
+                requestedAction: type,
+                transactionId, itemId, amount, reason,
                 status: 'PENDING',
-                data: JSON.stringify({ transactionId, itemId, amount, reason }),
-                notes: reason
+                requestedAt: new Date().toISOString()
             }
         })
 
-        return ApiResponse.success({ request: request_, message: 'Submitted for manager approval' })
-    } catch (error) {
+        return NextResponse.json({
+            message: 'Submitted for manager approval',
+            requestType: type,
+            status: 'PENDING'
+        }, { status: 201 })
+    } catch (error: any) {
         console.error('[APPROVAL_QUEUE_POST]', error)
-        return ApiResponse.error('Failed to submit request')
+        return NextResponse.json({ error: error.message || 'Failed to submit' }, { status: 500 })
     }
 }
 
-// GET — List pending approval requests
 export async function GET(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const isManager = ['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)
+    if (!isManager) return NextResponse.json({ error: 'Manager+ only' }, { status: 403 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)) {
-            return ApiResponse.forbidden('Manager+ only')
-        }
-
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
-        const { searchParams } = new URL(request.url)
-        const status = searchParams.get('status') || 'PENDING'
-
-        const requests = await (prisma as any).storeException.findMany({
-            where: { locationId, status },
+        // Find pending approval requests from audit log
+        const pending = await prisma.auditLog.findMany({
+            where: {
+                franchiseId: user.franchiseId,
+                action: ActionTypes.APPROVAL_REQUESTED,
+                changes: { contains: '"status":"PENDING"' }
+            },
             orderBy: { createdAt: 'desc' },
             take: 50
         })
 
-        return ApiResponse.success({ requests })
-    } catch (error) {
+        const requests = pending.map(log => ({
+            id: log.id,
+            requestedBy: log.userEmail,
+            requestedAt: log.createdAt,
+            details: log.changes ? JSON.parse(log.changes) : {}
+        }))
+
+        return NextResponse.json({ requests })
+    } catch (error: any) {
         console.error('[APPROVAL_QUEUE_GET]', error)
-        return ApiResponse.error('Failed to fetch requests')
+        return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
     }
 }
 
-// PUT — Approve or deny a request
 export async function PUT(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const isManager = ['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)
+    if (!isManager) return NextResponse.json({ error: 'Manager+ only' }, { status: 403 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)) {
-            return ApiResponse.forbidden('Manager+ only')
-        }
-
         const body = await request.json()
         const { id, action, notes } = body
 
-        if (!id || !action) return ApiResponse.badRequest('id and action (APPROVE/DENY) required')
+        if (!id || !action) return NextResponse.json({ error: 'id and action (APPROVE/DENY) required' }, { status: 400 })
 
-        await (prisma as any).storeException.update({
-            where: { id },
-            data: {
-                status: action === 'APPROVE' ? 'APPROVED' : 'DENIED',
-                resolvedBy: user.id,
-                resolvedAt: new Date(),
-                notes: notes || null
-            }
+        await logActivity({
+            userId: user.id, userEmail: user.email, userRole: user.role,
+            franchiseId: user.franchiseId,
+            action: action === 'APPROVE' ? ActionTypes.APPROVAL_GRANTED : ActionTypes.APPROVAL_DENIED,
+            entityType: 'ApprovalRequest', entityId: id,
+            details: { decision: action, notes, decidedAt: new Date().toISOString() }
         })
 
-        return ApiResponse.success({ id, status: action })
-    } catch (error) {
+        return NextResponse.json({ id, status: action })
+    } catch (error: any) {
         console.error('[APPROVAL_QUEUE_PUT]', error)
-        return ApiResponse.error('Failed to process request')
+        return NextResponse.json({ error: 'Failed to process' }, { status: 500 })
     }
 }

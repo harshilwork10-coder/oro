@@ -1,24 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 
 // POST /api/admin/offboarding/export - Generate data export
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user || (session.user as any).role !== 'PROVIDER') {
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        ;
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await request.json();
+        const body = await req.json();
         const { caseId } = body;
 
         if (!caseId) {
             return NextResponse.json({ error: 'caseId is required' }, { status: 400 });
         }
 
-        const offboardingCase = await (prisma as any).offboardingCase.findUnique({
+        const offboardingCase = await prisma.offboardingCase.findUnique({
             where: { id: caseId }
         });
 
@@ -116,7 +118,7 @@ export async function POST(request: NextRequest) {
         const exportFileUrl = `/api/admin/offboarding/export/${caseId}/download`;
         const exportFileExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
-        await (prisma as any).offboardingCase.update({
+        await prisma.offboardingCase.update({
             where: { id: caseId },
             data: {
                 status: 'OFFBOARDING_EXPORT',

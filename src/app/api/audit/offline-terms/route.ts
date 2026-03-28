@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 
 // POST - Log audit events for offline mode
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
+        ;
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await request.json();
+        const body = await req.json();
         const { action, storeName, ownerName, timestamp, termsVersion, details } = body;
 
         // Log to audit table
@@ -20,14 +19,14 @@ export async function POST(request: NextRequest) {
                 action,
                 entityType: 'OFFLINE_MODE',
                 entityId: storeName || 'unknown',
-                userId: (session.user as any).id,
+                userId: user.id,
                 changes: JSON.stringify({
                     storeName,
                     ownerName,
                     termsVersion,
                     timestamp,
-                    userAgent: request.headers.get('user-agent'),
-                    ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+                    userAgent: req.headers.get('user-agent'),
+                    ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
                     ...details
                 })
             }
@@ -47,21 +46,16 @@ export async function POST(request: NextRequest) {
 }
 
 // GET - Get offline mode audit logs for a store
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const user = session.user as any;
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         // Only providers can view audit logs
         if (user.role !== 'PROVIDER' && user.role !== 'ADMIN') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const { searchParams } = new URL(request.url);
+        const { searchParams } = new URL(req.url);
         const storeId = searchParams.get('storeId');
         const limit = parseInt(searchParams.get('limit') || '100');
 

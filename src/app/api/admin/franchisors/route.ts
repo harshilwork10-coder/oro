@@ -1,8 +1,6 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
 
 // Helper to parse integrations JSON string
@@ -18,19 +16,21 @@ function parseIntegrations(integrationsStr: string | null): Record<string, boole
 
 
 // GET all franchisors (clients) - for Account Configs page with pagination
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Only PROVIDER can see all franchisors
-        if (session.user.role !== 'PROVIDER') {
-            return ApiResponse.forbidden()
+        if (user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
         const search = searchParams.get('search')
         const status = searchParams.get('status')
@@ -145,13 +145,13 @@ export async function GET(request: NextRequest) {
         const data = hasMore ? transformedData.slice(0, take || 50) : transformedData
         const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-        return ApiResponse.paginated(data, {
+        return NextResponse.json({ data: data, pagination: {
             nextCursor,
             hasMore,
             total: data.length
-        })
+        } })
     } catch (error) {
         console.error('Error fetching franchisors:', error)
-        return ApiResponse.serverError('Failed to fetch franchisors')
+        return NextResponse.json({ error: 'Failed to fetch franchisors' }, { status: 500 })
     }
 }

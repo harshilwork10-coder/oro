@@ -1,24 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET: Get all users with Pulse access for the owner's franchise
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Owner/Franchisor can manage their employees' Pulse access
-        if (session.user.role !== 'FRANCHISOR' && session.user.role !== 'OWNER' && session.user.role !== 'PROVIDER') {
+        if (user.role !== 'FRANCHISOR' && user.role !== 'OWNER' && user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
         // Get owner's franchise
         const owner = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: user.id },
             include: {
                 franchisor: {
                     include: {
@@ -76,18 +77,17 @@ export async function GET() {
 }
 
 // PATCH: Update a user's Pulse location access
-export async function PATCH(request: NextRequest) {
+export async function PATCH(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        if (session.user.role !== 'FRANCHISOR' && session.user.role !== 'OWNER' && session.user.role !== 'PROVIDER') {
+        if (user.role !== 'FRANCHISOR' && user.role !== 'OWNER' && user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
-        const { userId, locationIds } = await request.json()
+        const { userId, locationIds } = await req.json()
 
         if (!userId) {
             return NextResponse.json({ error: 'User ID required' }, { status: 400 })

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 /**
  * GET /api/admin/locations/[id]/store-code
@@ -13,8 +12,10 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user || !['PROVIDER', 'FRANCHISOR'].includes(session.user.role)) {
+        const user = await getAuthUser(request)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user || !['PROVIDER', 'FRANCHISOR'].includes(user.role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -45,8 +46,7 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user || !['PROVIDER', 'FRANCHISOR'].includes(session.user.role)) {
+        if (!user || !['PROVIDER', 'FRANCHISOR'].includes(user.role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -88,10 +88,10 @@ export async function PATCH(
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
-            userRole: session.user.role,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
+            userRole: user.role,
             action: 'STORE_CODE_SET',
             entityType: 'Location',
             entityId: id,
@@ -118,8 +118,7 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user || !['PROVIDER', 'FRANCHISOR'].includes(session.user.role)) {
+        if (!user || !['PROVIDER', 'FRANCHISOR'].includes(user.role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -131,10 +130,10 @@ export async function DELETE(
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
-            userRole: session.user.role,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
+            userRole: user.role,
             action: 'STORE_CODE_REMOVED',
             entityType: 'Location',
             entityId: id,

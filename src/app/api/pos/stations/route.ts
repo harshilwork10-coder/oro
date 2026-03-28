@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Get stations for current user's location (with terminal info)
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-
-        // Get locationId - could be on user directly or need to look it up
+// Get locationId - could be on user directly or need to look it up
         let locationId = user.locationId
 
         // If no direct locationId, try to get from user's franchise default location
@@ -104,19 +102,16 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create a new station (manager/owner only)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role)) {
+if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role)) {
             return NextResponse.json({ error: 'Not authorized to create stations' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { locationId, name } = body
 
         if (!locationId || !name) {

@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 
-const STORAGE_KEY = 'oronext_device_id'
-const DB_NAME = 'OronextSystem'
+const STORAGE_KEY = 'oro9_device_id'
+const DB_NAME = 'Oro9System'
 const STORE_NAME = 'SysConfig'
 
 export class DeviceTrust {

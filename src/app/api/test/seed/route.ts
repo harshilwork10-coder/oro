@@ -51,7 +51,7 @@ export async function GET() {
         await prisma.user.create({
             data: {
                 name: 'Platform Admin',
-                email: 'provider@oronex.com',
+                email: 'provider@oro9.com',
                 password: hashedPassword,
                 pin: await hash('1111', 10),
                 role: 'PROVIDER'

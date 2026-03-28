@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 import {
     generateAltriaFile,
     generateRJRFile,
@@ -17,8 +16,10 @@ import {
 // Downloads the pipe-delimited .txt file for manufacturer submission
 export async function GET(request: Request) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -47,13 +48,13 @@ export async function GET(request: Request) {
 
         // Get store info
         const location = await prisma.location.findFirst({
-            where: { franchise: { id: session.user.franchiseId } }
+            where: { franchise: { id: user.franchiseId } }
         })
 
         // Get manufacturer config for account number
         const mfgConfig = await prisma.manufacturerConfig.findFirst({
             where: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 manufacturer
             }
         })
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
         // Get all tobacco transactions for the week
         const transactions = await prisma.transaction.findMany({
             where: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 status: 'COMPLETED',
                 createdAt: {
                     gte: startOfWeek,

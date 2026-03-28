@@ -1,29 +1,29 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 
-// GET — Price check: scan barcode, get price + stock
-export async function GET(request: NextRequest) {
+/**
+ * Price Check — Scan barcode or SKU, get price + stock
+ * GET /api/pos/price-check?barcode=xxx or ?sku=xxx
+ *
+ * Works without auth (for price check kiosks).
+ */
+export async function GET(req: NextRequest) {
+    const { searchParams } = new URL(req.url)
+    const barcode = searchParams.get('barcode')
+    const sku = searchParams.get('sku')
+    const locationId = searchParams.get('locationId')
+
+    if (!barcode && !sku) {
+        return NextResponse.json({ error: 'barcode or sku required' }, { status: 400 })
+    }
+
     try {
-        // This endpoint can work without auth (for price check kiosks)
-        const { searchParams } = new URL(request.url)
-        const barcode = searchParams.get('barcode')
-        const sku = searchParams.get('sku')
-        const locationId = searchParams.get('locationId')
-
-        if (!barcode && !sku) return ApiResponse.badRequest('barcode or sku required')
-
-        const where: any = {}
+        const where: any = { isActive: true }
         if (barcode) where.barcode = barcode
         if (sku) where.sku = sku
 
         const item = await prisma.item.findFirst({
-            where: { ...where, isActive: true },
+            where,
             select: {
                 id: true, name: true, barcode: true, price: true,
                 description: true, isWeighted: true, unitOfMeasure: true,
@@ -36,12 +36,12 @@ export async function GET(request: NextRequest) {
             }
         })
 
-        if (!item) return ApiResponse.notFound('Item not found')
+        if (!item) return NextResponse.json({ error: 'Item not found' }, { status: 404 })
 
-        const locationPrice = item.locationOverrides?.[0]?.price
+        const locationPrice = (item as any).locationOverrides?.[0]?.price
         const displayPrice = locationPrice ? Number(locationPrice) : Number(item.price)
 
-        return ApiResponse.success({
+        return NextResponse.json({
             name: item.name,
             price: `$${displayPrice.toFixed(2)}`,
             priceNumeric: displayPrice,
@@ -52,8 +52,8 @@ export async function GET(request: NextRequest) {
             isWeighted: item.isWeighted,
             unitOfMeasure: item.unitOfMeasure
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[PRICE_CHECK_GET]', error)
-        return ApiResponse.error('Failed to look up price')
+        return NextResponse.json({ error: 'Failed to look up price' }, { status: 500 })
     }
 }

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 
 // PUT /api/inventory/purchase-orders/[id] - Update purchase order
 export async function PUT(
@@ -9,8 +8,10 @@ export async function PUT(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -21,7 +22,7 @@ export async function PUT(
         const existingPO = await prisma.purchaseOrder.findFirst({
             where: {
                 id,
-                franchiseId: session.user.franchiseId
+                franchiseId: user.franchiseId
             },
             include: {
                 items: {
@@ -55,7 +56,7 @@ export async function PUT(
                             quantity: item.quantity,
                             reason: 'RESTOCK',
                             notes: `Received from PO #${id.slice(-6).toUpperCase()}`,
-                            performedBy: session.user.id || session.user.email || 'system'
+                            performedBy: user.id || user.email || 'system'
                         }
                     })
                 }
@@ -87,8 +88,7 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -98,7 +98,7 @@ export async function DELETE(
         const existingPO = await prisma.purchaseOrder.findFirst({
             where: {
                 id,
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 status: 'DRAFT'
             }
         })

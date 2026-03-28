@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET: Fetch feature requests for current franchisor
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-
-        // Find the franchisor for this user
+// Find the franchisor for this user
         const franchisor = await prisma.franchisor.findFirst({
             where: { ownerId: user.id }
         })
@@ -39,14 +36,10 @@ export async function GET(req: NextRequest) {
 // POST: Submit a new feature request
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const { featureKey } = await req.json()
+const { featureKey } = await req.json()
 
         if (!featureKey) {
             return NextResponse.json({ error: 'Feature key is required' }, { status: 400 })

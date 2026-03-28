@@ -1,40 +1,29 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 
-// GET — List tax groups for current user's location, with components expanded
-export async function GET() {
+/**
+ * Tax Groups — CRUD for tax groups at a location
+ * GET /api/tax/groups — List groups with components
+ * POST /api/tax/groups — Create (Owner+)
+ * PUT /api/tax/groups — Update (Owner+)
+ * DELETE /api/tax/groups?id=xxx — Delete (Owner+)
+ *
+ * Note: taxGroup, taxGroupComponent are accessed via (prisma as any) because
+ * these models may not be in the generated Prisma client yet.
+ */
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.locationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-
-        if (!locationId) {
-            return ApiResponse.badRequest('No location associated')
-        }
-
-        const taxGroups = await (prisma as any).taxGroup.findMany({
-            where: { locationId },
+        const taxGroups = await prisma.taxGroup.findMany({
+            where: { locationId: user.locationId },
             include: {
                 components: {
                     include: {
                         jurisdiction: {
-                            select: {
-                                id: true,
-                                name: true,
-                                type: true,
-                                salesTaxRate: true,
-                                effectiveFrom: true,
-                                isActive: true,
-                                priority: true
-                            }
+                            select: { id: true, name: true, type: true, salesTaxRate: true, effectiveFrom: true, isActive: true, priority: true }
                         }
                     },
                     orderBy: { compoundOrder: 'asc' }
@@ -44,49 +33,40 @@ export async function GET() {
             orderBy: [{ isDefault: 'desc' }, { name: 'asc' }]
         })
 
-        return ApiResponse.success({ taxGroups })
-    } catch (error) {
+        return NextResponse.json({ taxGroups })
+    } catch (error: any) {
         console.error('[TAX_GROUPS_GET]', error)
-        return ApiResponse.error('Failed to fetch tax groups')
+        return NextResponse.json({ error: 'Failed to fetch tax groups' }, { status: 500 })
     }
 }
 
-// POST — Create a tax group with components
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.locationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
+        return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
+    }
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
-            return ApiResponse.forbidden('Only owners can manage tax groups')
-        }
-
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location associated')
-
-        const body = await request.json()
+        const body = await req.json()
         const { name, isDefault, componentIds } = body as {
-            name: string
-            isDefault?: boolean
+            name: string; isDefault?: boolean
             componentIds?: { jurisdictionId: string; compoundOrder?: number }[]
         }
 
-        if (!name?.trim()) {
-            return ApiResponse.badRequest('Tax group name is required')
-        }
+        if (!name?.trim()) return NextResponse.json({ error: 'Tax group name required' }, { status: 400 })
 
-        // If setting as default, unset any existing default first
         if (isDefault) {
-            await (prisma as any).taxGroup.updateMany({
-                where: { locationId, isDefault: true },
+            await prisma.taxGroup.updateMany({
+                where: { locationId: user.locationId, isDefault: true },
                 data: { isDefault: false }
             })
         }
 
-        const taxGroup = await (prisma as any).taxGroup.create({
+        const taxGroup = await prisma.taxGroup.create({
             data: {
-                locationId,
+                locationId: user.locationId,
                 name: name.trim().toUpperCase(),
                 isDefault: isDefault || false,
                 components: componentIds?.length ? {
@@ -96,128 +76,91 @@ export async function POST(request: NextRequest) {
                     }))
                 } : undefined
             },
-            include: {
-                components: {
-                    include: { jurisdiction: true },
-                    orderBy: { compoundOrder: 'asc' }
-                }
-            }
+            include: { components: { include: { jurisdiction: true }, orderBy: { compoundOrder: 'asc' } } }
         })
 
-        return ApiResponse.success({ taxGroup })
+        return NextResponse.json({ taxGroup })
     } catch (error: any) {
-        if (error?.code === 'P2002') {
-            return ApiResponse.badRequest('A tax group with that name already exists at this location')
-        }
+        if (error?.code === 'P2002') return NextResponse.json({ error: 'Tax group name already exists' }, { status: 400 })
         console.error('[TAX_GROUPS_POST]', error)
-        return ApiResponse.error('Failed to create tax group')
+        return NextResponse.json({ error: 'Failed to create tax group' }, { status: 500 })
     }
 }
 
-// PUT — Update a tax group (rename, change default, replace components)
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.locationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
+        return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
+    }
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
-            return ApiResponse.forbidden('Only owners can manage tax groups')
-        }
-
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location associated')
-
-        const body = await request.json()
+        const body = await req.json()
         const { id, name, isDefault, componentIds } = body as {
-            id: string
-            name?: string
-            isDefault?: boolean
+            id: string; name?: string; isDefault?: boolean
             componentIds?: { jurisdictionId: string; compoundOrder?: number }[]
         }
 
-        if (!id) return ApiResponse.badRequest('Tax group ID is required')
+        if (!id) return NextResponse.json({ error: 'Tax group ID required' }, { status: 400 })
 
-        // Verify ownership
-        const existing = await (prisma as any).taxGroup.findFirst({
-            where: { id, locationId }
-        })
-        if (!existing) return ApiResponse.notFound('Tax group not found')
+        const existing = await prisma.taxGroup.findFirst({ where: { id, locationId: user.locationId } })
+        if (!existing) return NextResponse.json({ error: 'Tax group not found' }, { status: 404 })
 
-        // If setting as default, unset others
         if (isDefault) {
-            await (prisma as any).taxGroup.updateMany({
-                where: { locationId, isDefault: true, id: { not: id } },
+            await prisma.taxGroup.updateMany({
+                where: { locationId: user.locationId, isDefault: true, id: { not: id } },
                 data: { isDefault: false }
             })
         }
 
-        // Replace components if provided
         if (componentIds !== undefined) {
-            await (prisma as any).taxGroupComponent.deleteMany({
-                where: { taxGroupId: id }
-            })
+            await prisma.taxGroupComponent.deleteMany({ where: { taxGroupId: id } })
             if (componentIds.length > 0) {
-                await (prisma as any).taxGroupComponent.createMany({
+                await prisma.taxGroupComponent.createMany({
                     data: componentIds.map(c => ({
-                        taxGroupId: id,
-                        jurisdictionId: c.jurisdictionId,
-                        compoundOrder: c.compoundOrder || 0
+                        taxGroupId: id, jurisdictionId: c.jurisdictionId, compoundOrder: c.compoundOrder || 0
                     }))
                 })
             }
         }
 
-        const taxGroup = await (prisma as any).taxGroup.update({
+        const taxGroup = await prisma.taxGroup.update({
             where: { id },
             data: {
                 ...(name ? { name: name.trim().toUpperCase() } : {}),
                 ...(isDefault !== undefined ? { isDefault } : {})
             },
-            include: {
-                components: {
-                    include: { jurisdiction: true },
-                    orderBy: { compoundOrder: 'asc' }
-                }
-            }
+            include: { components: { include: { jurisdiction: true }, orderBy: { compoundOrder: 'asc' } } }
         })
 
-        return ApiResponse.success({ taxGroup })
-    } catch (error) {
+        return NextResponse.json({ taxGroup })
+    } catch (error: any) {
         console.error('[TAX_GROUPS_PUT]', error)
-        return ApiResponse.error('Failed to update tax group')
+        return NextResponse.json({ error: 'Failed to update tax group' }, { status: 500 })
     }
 }
 
-// DELETE — Delete a tax group
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.locationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
+        return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'Tax group ID required' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const existing = await prisma.taxGroup.findFirst({ where: { id, locationId: user.locationId } })
+        if (!existing) return NextResponse.json({ error: 'Tax group not found' }, { status: 404 })
 
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
-            return ApiResponse.forbidden('Only owners can manage tax groups')
-        }
-
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location associated')
-
-        const { searchParams } = new URL(request.url)
-        const id = searchParams.get('id')
-        if (!id) return ApiResponse.badRequest('Tax group ID is required')
-
-        // Verify ownership
-        const existing = await (prisma as any).taxGroup.findFirst({
-            where: { id, locationId }
-        })
-        if (!existing) return ApiResponse.notFound('Tax group not found')
-
-        await (prisma as any).taxGroup.delete({ where: { id } })
-
-        return ApiResponse.success({ deleted: true })
-    } catch (error) {
+        await prisma.taxGroup.delete({ where: { id } })
+        return NextResponse.json({ deleted: true })
+    } catch (error: any) {
         console.error('[TAX_GROUPS_DELETE]', error)
-        return ApiResponse.error('Failed to delete tax group')
+        return NextResponse.json({ error: 'Failed to delete tax group' }, { status: 500 })
     }
 }

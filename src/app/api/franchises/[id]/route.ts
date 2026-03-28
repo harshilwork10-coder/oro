@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { encryptField, decryptField } from '@/lib/security'
 
@@ -54,10 +53,11 @@ export async function GET(
     context: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // Allow PROVIDER, FRANCHISOR, and EMPLOYEE to access franchise settings (needed for POS pricing)
-        if (!session || !['PROVIDER', 'FRANCHISOR', 'EMPLOYEE'].includes(session.user.role)) {
+        if (!session || !['PROVIDER', 'FRANCHISOR', 'EMPLOYEE'].includes(user.role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -88,9 +88,7 @@ export async function PUT(
     context: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session || session.user.role !== 'PROVIDER') {
+        if (!session || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -115,9 +113,7 @@ export async function DELETE(
     context: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session || session.user.role !== 'PROVIDER') {
+        if (!session || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -138,9 +134,7 @@ export async function PATCH(
     context: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session || (session.user.role !== 'PROVIDER' && session.user.role !== 'FRANCHISOR')) {
+        if (!session || (user.role !== 'PROVIDER' && user.role !== 'FRANCHISOR')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 

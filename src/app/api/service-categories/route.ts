@@ -1,44 +1,17 @@
-import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 
-// GET - Fetch all categories for the franchise
-// Supports both web session and mobile Bearer token
-export async function GET(request: Request) {
+/** Service Categories — CRUD for salon/service verticals */
+export async function GET(req: NextRequest) {
     try {
-        // Try mobile auth first, then fall back to session
-        const authUser = await getAuthUser(request)
-
-        let franchiseId: string | undefined
-
-        if (authUser?.franchiseId) {
-            franchiseId = authUser.franchiseId
-        } else {
-            // Fall back to session auth for web dashboard
-            const session = await getServerSession(authOptions)
-            if (!session?.user) {
-                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-            }
-
-            const user = await prisma.user.findUnique({
-                where: { email: session.user.email! },
-                include: { franchise: true }
-            })
-
-            franchiseId = user?.franchiseId || undefined
-        }
-
-        if (!franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const categories = await prisma.serviceCategory.findMany({
-            where: { franchiseId },
+            where: { franchiseId: user.franchiseId },
             orderBy: { sortOrder: 'asc' }
         })
-
         return NextResponse.json(categories)
     } catch (error) {
         console.error('Error fetching categories:', error)
@@ -46,43 +19,16 @@ export async function GET(request: Request) {
     }
 }
 
-
-// POST - Create a new category
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email! }
-        })
+        const { name } = await req.json()
+        if (!name) return NextResponse.json({ error: 'Category name is required' }, { status: 400 })
 
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
-        }
-
-        const { name } = await request.json()
-
-        if (!name) {
-            return NextResponse.json({ error: 'Category name is required' }, { status: 400 })
-        }
-
-        // Get the max sortOrder to append new category at the end
-        const maxCategory = await prisma.serviceCategory.findFirst({
-            where: { franchiseId: user.franchiseId },
-            orderBy: { sortOrder: 'desc' }
-        })
-
-        const category = await prisma.serviceCategory.create({
-            data: {
-                name: name.toUpperCase(),
-                franchiseId: user.franchiseId,
-                sortOrder: (maxCategory?.sortOrder || 0) + 1
-            }
-        })
-
+        const maxCategory = await prisma.serviceCategory.findFirst({ where: { franchiseId: user.franchiseId }, orderBy: { sortOrder: 'desc' } })
+        const category = await prisma.serviceCategory.create({ data: { name: name.toUpperCase(), franchiseId: user.franchiseId, sortOrder: (maxCategory?.sortOrder || 0) + 1 } })
         return NextResponse.json(category)
     } catch (error) {
         console.error('Error creating category:', error)
@@ -90,44 +36,19 @@ export async function POST(request: Request) {
     }
 }
 
-// PUT - Update an existing category
-export async function PUT(request: Request) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const { id, name, sortOrder } = await req.json()
+        if (!id || !name) return NextResponse.json({ error: 'Category ID and name are required' }, { status: 400 })
 
-        const { id, name, sortOrder } = await request.json()
+        const existing = await prisma.serviceCategory.findUnique({ where: { id }, select: { franchiseId: true } })
+        if (!existing) return NextResponse.json({ error: 'Category not found' }, { status: 404 })
+        if (existing.franchiseId !== user.franchiseId && user.role !== 'PROVIDER') return NextResponse.json({ error: 'Access denied' }, { status: 403 })
 
-        if (!id || !name) {
-            return NextResponse.json({ error: 'Category ID and name are required' }, { status: 400 })
-        }
-
-        // Security: Verify category belongs to user's franchise
-        const existingCategory = await prisma.serviceCategory.findUnique({
-            where: { id },
-            select: { franchiseId: true }
-        })
-
-        if (!existingCategory) {
-            return NextResponse.json({ error: 'Category not found' }, { status: 404 })
-        }
-
-        if (existingCategory.franchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
-            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
-        }
-
-        const category = await prisma.serviceCategory.update({
-            where: { id },
-            data: {
-                name: name.toUpperCase(),
-                ...(sortOrder !== undefined && { sortOrder })
-            }
-        })
-
+        const category = await prisma.serviceCategory.update({ where: { id }, data: { name: name.toUpperCase(), ...(sortOrder !== undefined && { sortOrder }) } })
         return NextResponse.json(category)
     } catch (error) {
         console.error('Error updating category:', error)
@@ -135,55 +56,25 @@ export async function PUT(request: Request) {
     }
 }
 
-// DELETE - Delete a category
-export async function DELETE(request: Request) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const { id } = await req.json()
+        if (!id) return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })
 
-        const { id } = await request.json()
+        const existing = await prisma.serviceCategory.findUnique({ where: { id }, select: { franchiseId: true } })
+        if (!existing) return NextResponse.json({ error: 'Category not found' }, { status: 404 })
+        if (existing.franchiseId !== user.franchiseId && user.role !== 'PROVIDER') return NextResponse.json({ error: 'Access denied' }, { status: 403 })
 
-        if (!id) {
-            return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })
-        }
+        const servicesCount = await prisma.service.count({ where: { categoryId: id } })
+        if (servicesCount > 0) return NextResponse.json({ error: `Cannot delete category. ${servicesCount} service(s) are using this category.` }, { status: 400 })
 
-        // Security: Verify category belongs to user's franchise
-        const existingCategory = await prisma.serviceCategory.findUnique({
-            where: { id },
-            select: { franchiseId: true }
-        })
-
-        if (!existingCategory) {
-            return NextResponse.json({ error: 'Category not found' }, { status: 404 })
-        }
-
-        if (existingCategory.franchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
-            return NextResponse.json({ error: 'Access denied' }, { status: 403 })
-        }
-
-        // Check if any services are using this category
-        const servicesCount = await prisma.service.count({
-            where: { categoryId: id }
-        })
-
-        if (servicesCount > 0) {
-            return NextResponse.json({
-                error: `Cannot delete category. ${servicesCount} service(s) are using this category.`
-            }, { status: 400 })
-        }
-
-        await prisma.serviceCategory.delete({
-            where: { id }
-        })
-
+        await prisma.serviceCategory.delete({ where: { id } })
         return NextResponse.json({ success: true })
     } catch (error) {
         console.error('Error deleting category:', error)
         return NextResponse.json({ error: 'Failed to delete category' }, { status: 500 })
     }
 }
-

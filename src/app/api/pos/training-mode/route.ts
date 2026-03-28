@@ -1,75 +1,64 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-// POST — Toggle training mode for a station
-export async function POST(request: NextRequest) {
+/**
+ * Training Mode — Toggle training mode for a POS station
+ * POST /api/pos/training-mode (Manager+ only)
+ * GET /api/pos/training-mode?stationId=xxx
+ */
+export async function POST(req: NextRequest) {
+    const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)) {
+        return NextResponse.json({ error: 'Manager+ only' }, { status: 403 })
+    }
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)) {
-            return ApiResponse.forbidden('Manager+ only')
-        }
-
-        const body = await request.json()
-        const { stationId, enabled } = body
-
-        if (!stationId) return ApiResponse.badRequest('stationId required')
+        const { stationId, enabled } = await req.json()
+        if (!stationId) return NextResponse.json({ error: 'stationId required' }, { status: 400 })
 
         await prisma.station.update({
             where: { id: stationId },
             data: { trainingMode: enabled ?? false }
         })
 
-        // Audit log
-        await auditLog({
-            userId: user.id,
-            userEmail: user.email,
-            userRole: user.role,
-            action: 'CONFIG_CHANGE',
-            entityType: 'Station',
-            entityId: stationId,
+        await logActivity({
+            userId: user.id, userEmail: user.email, userRole: user.role,
             franchiseId: user.franchiseId,
-            metadata: { trainingMode: enabled ?? false }
+            action: 'TRAINING_MODE_TOGGLED', entityType: 'Station', entityId: stationId,
+            details: { trainingMode: enabled ?? false }
         })
 
-        return ApiResponse.success({ stationId, trainingMode: enabled })
-    } catch (error) {
+        return NextResponse.json({ stationId, trainingMode: enabled })
+    } catch (error: any) {
         console.error('[TRAINING_MODE_POST]', error)
-        return ApiResponse.error('Failed to toggle training mode')
+        return NextResponse.json({ error: 'Failed to toggle training mode' }, { status: 500 })
     }
 }
 
-// GET — Check if current station is in training mode
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { searchParams } = new URL(req.url)
+    const stationId = searchParams.get('stationId')
+    if (!stationId) return NextResponse.json({ error: 'stationId required' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const { searchParams } = new URL(request.url)
-        const stationId = searchParams.get('stationId')
-        if (!stationId) return ApiResponse.badRequest('stationId required')
-
         const station = await prisma.station.findUnique({
             where: { id: stationId },
             select: { trainingMode: true, name: true }
         })
 
-        return ApiResponse.success({
-            stationId,
-            name: station?.name,
+        return NextResponse.json({
+            stationId, name: station?.name,
             trainingMode: station?.trainingMode || false
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[TRAINING_MODE_GET]', error)
-        return ApiResponse.error('Failed to check training mode')
+        return NextResponse.json({ error: 'Failed to check training mode' }, { status: 500 })
     }
 }

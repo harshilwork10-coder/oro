@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // Simulated global product database (in production, this would be a real database or API)
 // Contains 200K+ common liquor, beer, wine products with UPCs
 const GLOBAL_PRODUCTS: Record<string, {
@@ -111,14 +108,16 @@ const GLOBAL_PRODUCTS: Record<string, {
 }
 
 // GET - Lookup product by barcode from global catalog
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const barcode = searchParams.get('barcode')?.replace(/\D/g, '')
         const search = searchParams.get('search')
 

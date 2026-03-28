@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // GET - List recurring appointments for a location
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const locationId = user.locationId
-        const { searchParams } = new URL(request.url)
+const locationId = user.locationId
+        const { searchParams } = new URL(req.url)
         const clientId = searchParams.get('clientId')
 
         if (!locationId) {
@@ -42,22 +41,19 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create a recurring appointment pattern
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const locationId = user.locationId
+const locationId = user.locationId
         const franchiseId = user.franchiseId
 
         if (!locationId) {
             return NextResponse.json({ error: 'No location associated' }, { status: 400 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const {
             clientId,
             serviceId,
@@ -114,7 +110,7 @@ export async function POST(request: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role || 'USER',
@@ -132,17 +128,14 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT - Update a recurring appointment
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
+const locationId = user.locationId
 
-        const user = session.user as any
-        const locationId = user.locationId
-
-        const body = await request.json()
+        const body = await req.json()
         const { id, frequency, dayOfWeek, dayOfMonth, preferredTime, endDate, maxOccurrences, isActive, employeeId } = body
 
         if (!id) {
@@ -173,7 +166,7 @@ export async function PUT(request: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role || 'USER',
@@ -191,16 +184,13 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE - Deactivate recurring appointment
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const locationId = user.locationId
-        const { searchParams } = new URL(request.url)
+const locationId = user.locationId
+        const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
 
         if (!id) {
@@ -223,7 +213,7 @@ export async function DELETE(request: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role || 'USER',

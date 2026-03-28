@@ -4,25 +4,17 @@
  * GET — Returns paginated transaction list with filtering
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { role: true, franchiseId: true }
-        })
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        if (!user?.franchiseId) return ApiResponse.error('No franchise', 400)
-
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '7')
         const status = searchParams.get('status') || undefined
         const paymentMethod = searchParams.get('payment') || undefined
@@ -73,7 +65,7 @@ export async function GET(request: NextRequest) {
             paymentBreakdown[m].total += Number(t.total || 0)
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             transactions: transactions.map(t => ({
                 id: t.id,
                 invoiceNumber: t.invoiceNumber,
@@ -100,6 +92,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[TRANSACTIONS_REPORT]', error)
-        return ApiResponse.error('Failed to generate transaction report', 500)
+        return NextResponse.json({ error: 'Failed to generate transaction report' }, { status: 500 })
     }
 }

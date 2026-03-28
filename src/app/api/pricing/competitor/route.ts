@@ -1,12 +1,10 @@
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // GET - Fetch competitor pricing data
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // TODO: Integrate with competitor pricing data sources
@@ -22,13 +20,11 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Submit competitor price observation
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const body = await request.json()
+        const body = await req.json()
         console.log('[COMPETITOR_PRICE]', body)
 
         return NextResponse.json({ success: true, message: 'Price observation recorded' })

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 const statusSchema = z.object({
     status: z.enum(['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'])
@@ -14,8 +13,10 @@ export async function PATCH(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -38,7 +39,7 @@ export async function PATCH(
             return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
         }
 
-        if (appointment.location?.franchiseId !== session.user.franchiseId) {
+        if (appointment.location?.franchiseId !== user.franchiseId) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
@@ -60,10 +61,10 @@ export async function PATCH(
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
-            userRole: (session.user as any).role || 'USER',
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
+            userRole: user.role || 'USER',
             action: 'APPOINTMENT_STATUS_CHANGED',
             entityType: 'Appointment',
             entityId: appointmentId,

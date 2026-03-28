@@ -1,23 +1,18 @@
 'use strict'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // PUT — Set tax exempt status on a customer
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        const user = session.user as any
         if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) {
             return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
         }
         if (!user.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const body = await request.json()
+        const body = await req.json()
         const { clientId, taxExempt, exemptionId, expiryDate } = body
 
         if (!clientId) return NextResponse.json({ error: 'clientId required' }, { status: 400 })
@@ -44,12 +39,11 @@ export async function PUT(request: NextRequest) {
 }
 
 // GET — List tax exempt customers
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = session.user as any
         if (!user.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
         const exemptClients = await prisma.client.findMany({

@@ -1,23 +1,20 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET - List inventory items for POS (offline sync, search, barcode lookup)
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = session.user as { franchiseId?: string }
+        if (!authUser) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
         if (!user.franchiseId) {
-            return ApiResponse.error('No franchise associated', 400)
+            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const limit = parseInt(searchParams.get('limit') || '50')
         const search = searchParams.get('search')
         const barcode = searchParams.get('barcode')
@@ -83,6 +80,6 @@ export async function GET(request: NextRequest) {
         return Response.json({ items: products })
     } catch (error) {
         console.error('[INVENTORY_ITEMS_GET]', error)
-        return ApiResponse.serverError('Failed to fetch items')
+        return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 })
     }
 }

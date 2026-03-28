@@ -1,19 +1,15 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
-import { ApiResponse } from '@/lib/api-response'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 import { parsePaginationParams } from '@/lib/pagination'
 
 // GET /api/inventory/purchase-orders - List all purchase orders with pagination
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
-            return ApiResponse.unauthorized()
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
         const status = searchParams.get('status')
         const supplierId = searchParams.get('supplierId')
@@ -21,34 +17,20 @@ export async function GET(request: NextRequest) {
         const dateFrom = searchParams.get('dateFrom')
         const dateTo = searchParams.get('dateTo')
 
-        // Build where clause
         const whereClause: Record<string, unknown> = {
-            franchiseId: session.user.franchiseId
+            franchiseId: user.franchiseId
         }
 
-        if (status && status !== 'ALL') {
-            whereClause.status = status
-        }
-
-        if (supplierId) {
-            whereClause.supplierId = supplierId
-        }
-
-        if (locationId) {
-            whereClause.locationId = locationId
-        }
+        if (status && status !== 'ALL') whereClause.status = status
+        if (supplierId) whereClause.supplierId = supplierId
+        if (locationId) whereClause.locationId = locationId
 
         if (dateFrom || dateTo) {
             whereClause.createdAt = {}
-            if (dateFrom) {
-                (whereClause.createdAt as Record<string, Date>).gte = new Date(dateFrom)
-            }
-            if (dateTo) {
-                (whereClause.createdAt as Record<string, Date>).lte = new Date(dateTo + 'T23:59:59')
-            }
+            if (dateFrom) (whereClause.createdAt as Record<string, Date>).gte = new Date(dateFrom)
+            if (dateTo) (whereClause.createdAt as Record<string, Date>).lte = new Date(dateTo + 'T23:59:59')
         }
 
-        // Build query with pagination
         const queryArgs: Record<string, unknown> = {
             where: whereClause,
             take: (take || 50) + 1,
@@ -77,43 +59,38 @@ export async function GET(request: NextRequest) {
         const data = hasMore ? purchaseOrders.slice(0, take || 50) : purchaseOrders
         const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-        return ApiResponse.paginated(data, {
-            nextCursor,
-            hasMore,
-            total: data.length
-        })
+        return NextResponse.json({ data, pagination: { nextCursor, hasMore, total: data.length } })
     } catch (error) {
         console.error('Failed to fetch purchase orders:', error)
-        return ApiResponse.serverError('Failed to fetch purchase orders')
+        return NextResponse.json({ error: 'Failed to fetch purchase orders' }, { status: 500 })
     }
 }
 
 // POST /api/inventory/purchase-orders - Create new purchase order
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { supplierId, locationId, expectedDate, items, status } = body
 
         if (!supplierId || !locationId || !items || items.length === 0) {
-            return ApiResponse.validationError('Supplier, location, and items are required')
+            return NextResponse.json({ error: 'Supplier, location, and items are required' }, { status: 422 })
         }
 
-        // Calculate total cost
         const totalCost = items.reduce((sum: number, item: { quantity: number; unitCost: number }) => {
             return sum + (item.quantity * item.unitCost)
         }, 0)
 
         const purchaseOrder = await prisma.purchaseOrder.create({
             data: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 supplierId,
                 locationId,
-                status: (status === 'RECEIVED' ? 'DRAFT' : status) || 'DRAFT', // SECURITY: Prevent "RECEIVED" on create to ensure stock logic triggers via PUT
+                status: (status === 'RECEIVED' ? 'DRAFT' : status) || 'DRAFT',
                 totalCost,
                 expectedDate: expectedDate ? new Date(expectedDate) : null,
                 items: {
@@ -127,15 +104,13 @@ export async function POST(request: NextRequest) {
             },
             include: {
                 supplier: true,
-                items: {
-                    include: { product: true }
-                }
+                items: { include: { product: true } }
             }
         })
 
-        return ApiResponse.created(purchaseOrder)
+        return NextResponse.json(purchaseOrder, { status: 201 })
     } catch (error) {
         console.error('Failed to create purchase order:', error)
-        return ApiResponse.serverError('Failed to create purchase order')
+        return NextResponse.json({ error: 'Failed to create purchase order' }, { status: 500 })
     }
 }

@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseInvoiceCsv, computeBaseUnits } from '@/lib/fintech-invoice-parser'
 import { matchInvoiceItem } from '@/lib/invoice-matcher'
 import crypto from 'crypto'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const MAX_ROWS = 10000
@@ -16,18 +15,20 @@ const MAX_ROWS = 10000
  */
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const franchiseId = (session.user as { franchiseId?: string }).franchiseId
+    const franchiseId = (user as { franchiseId?: string }).franchiseId
     if (!franchiseId) {
       return NextResponse.json({ error: 'No franchise context' }, { status: 400 })
     }
 
     // Role guard: OWNER/ADMIN only
-    const role = (session.user as { role?: string }).role
+    const role = (user as { role?: string }).role
     if (!role || !['OWNER', 'ADMIN', 'PROVIDER'].includes(role)) {
       return NextResponse.json({ error: 'Insufficient permissions — OWNER/ADMIN required' }, { status: 403 })
     }
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
         parsedRows: parseResult.parsedRows,
         errorRows: parseResult.errorRows,
         errors: parseResult.errors.length > 0 ? parseResult.errors : undefined,
-        uploadedBy: session.user.id || session.user.email || 'unknown',
+        uploadedBy: user.id || user.email || 'unknown',
         completedAt: new Date()
       }
     })
@@ -255,7 +256,7 @@ export async function POST(request: Request) {
           parsedTotal: parsedTotalAcc,
           discrepancy,
           discrepancyOk,
-          uploadedBy: session.user.id || session.user.email || 'unknown',
+          uploadedBy: user.id || user.email || 'unknown',
           items: {
             create: itemData
           }

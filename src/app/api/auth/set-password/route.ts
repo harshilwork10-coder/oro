@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcrypt'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { validatePassword, getPasswordRequirementsText } from '@/lib/security'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const body = await request.json()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const body = await req.json()
         const { userId, password, token } = body
 
         if (!password) {
@@ -56,17 +58,16 @@ export async function POST(request: NextRequest) {
             })
         } else {
             // Session-based - user changing their own password
-            const session = await getServerSession(authOptions)
-            if (!session?.user) {
+            if (!user) {
                 return NextResponse.json({ error: 'Unauthorized - please log in' }, { status: 401 })
             }
 
             // Users can only change their own password via this endpoint
-            if (userId && userId !== session.user.id) {
+            if (userId && userId !== user.id) {
                 return NextResponse.json({ error: 'You can only change your own password' }, { status: 403 })
             }
 
-            targetUserId = session.user.id
+            targetUserId = user.id
         }
 
         // Hash new password
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: targetUserId,
             userEmail: 'system',
             userRole: 'SYSTEM',

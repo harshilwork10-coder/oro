@@ -9,24 +9,18 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 import { getLocationScope, buildLocationWhereClause, UserRole } from '@/lib/reporting/scopeEnforcement';
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const user = session.user as { id: string; role: string; franchiseId?: string };
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         // Get user's allowed locations
         const scope = await getLocationScope(user.id, user.role as UserRole, user.franchiseId);
 
-        const { searchParams } = new URL(request.url);
+        const { searchParams } = new URL(req.url);
         const q = searchParams.get('q') || '';
         const state = searchParams.get('state');
         const city = searchParams.get('city');
@@ -58,7 +52,7 @@ export async function GET(request: NextRequest) {
         // Get locations with pagination
         // franchiseLocation may not be in main schema — any-cast
         const [locations, total] = await Promise.all([
-            (prisma as any).franchiseLocation.findMany({
+            prisma.location.findMany({
                 where,
                 select: {
                     id: true,
@@ -80,26 +74,26 @@ export async function GET(request: NextRequest) {
                 take: pageSize,
                 ...(cursor && { cursor: { id: cursor } })
             }),
-            (prisma as any).franchiseLocation.count({ where })
+            prisma.location.count({ where })
         ]);
 
         // Get facets (counts for filters)
         const [stateFacets, cityFacets, regionFacets] = await Promise.all([
-            (prisma as any).franchiseLocation.groupBy({
+            prisma.location.groupBy({
                 by: ['state'],
                 where: scopeWhere,
                 _count: true,
                 orderBy: { _count: { state: 'desc' } },
                 take: 50
             }),
-            (prisma as any).franchiseLocation.groupBy({
+            prisma.location.groupBy({
                 by: ['city'],
                 where: { ...scopeWhere, ...(state && { state }) },
                 _count: true,
                 orderBy: { _count: { city: 'desc' } },
                 take: 50
             }),
-            (prisma as any).franchiseLocation.groupBy({
+            prisma.location.groupBy({
                 by: ['region'],
                 where: scopeWhere,
                 _count: true,

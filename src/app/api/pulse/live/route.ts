@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -10,40 +9,22 @@ import { prisma } from '@/lib/prisma'
  * - RETAIL: products, inventory, low stock
  * - SERVICE/SALON: appointments, services, upcoming bookings
  */
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const locationId = searchParams.get('locationId') // 'all' or specific location ID
 
         // Get industry type from session
-        const industryType = (session.user as any)?.industryType || 'SERVICE'
+        const industryType = (user as any)?.industryType || 'SERVICE'
 
         // Get user with their franchisor info (owner gets access to all locations)
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: {
-                role: true,
-                franchiseId: true,
-                franchise: {
-                    select: {
-                        id: true,
-                        franchisorId: true,
-                        locations: {
-                            select: {
-                                id: true,
-                                name: true
-                            }
-                        }
-                    }
-                }
-            }
-        })
-
         if (!user?.franchise) {
             return NextResponse.json({
                 industryType,

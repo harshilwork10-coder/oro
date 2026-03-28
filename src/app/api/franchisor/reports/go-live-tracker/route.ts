@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -8,16 +7,17 @@ import { prisma } from '@/lib/prisma'
  * Returns pending locations with checklist status for franchisor dashboards
  */
 export async function GET(req: NextRequest) {
-    const session = await getServerSession(authOptions)
+    const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!session?.user?.email) {
+    if (!authUser?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
         // Get franchisor ID
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { email: user.email },
             include: {
                 franchisorMemberships: {
                     include: { franchisor: true }
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
         // Get all non-active locations with provisioning details
         // Use as any since provisioning fields may not be in current schema
-        const pendingLocations = await (prisma as any).location.findMany({
+        const pendingLocations = await prisma.location.findMany({
             where: {
                 franchisorId,
                 provisioningStatus: { not: 'ACTIVE' }

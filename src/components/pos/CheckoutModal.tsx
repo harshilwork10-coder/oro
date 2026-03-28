@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { X, CreditCard, DollarSign, Delete, Banknote, Trophy, Gift } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { X, CreditCard, DollarSign, Delete, Banknote, Trophy, Gift, AlertTriangle, RefreshCw, Lock, WifiOff } from 'lucide-react'
 import GiftCardModal from './GiftCardModal'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 
@@ -42,6 +42,114 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
     const [showPaxModal, setShowPaxModal] = useState(false)
     const [pendingPaxAmount, setPendingPaxAmount] = useState(0)
     const [pendingPaxMethod, setPendingPaxMethod] = useState<'CREDIT_CARD' | 'DEBIT_CARD'>('CREDIT_CARD')
+
+    // S5-1: Card timeout / retry
+    const [cardTimedOut, setCardTimedOut] = useState(false)
+    const [cardRetryCount, setCardRetryCount] = useState(0)
+    const cardTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+    // S5-1b: Timeout recovery instructions from server
+    const [timeoutRecovery, setTimeoutRecovery] = useState<{ steps: string[]; contactProcessor: boolean; manualReviewRequired: boolean } | null>(null)
+
+    // S5-2: Terminal disconnect detection
+    const [terminalDisconnected, setTerminalDisconnected] = useState(false)
+    const reconnectAttemptRef = useRef(0)
+
+    // S7-07: Partial authorization
+    const [partialAuth, setPartialAuth] = useState<{ requested: number; approved: number; remaining: number } | null>(null)
+
+    // S5-4: Auto-lock inactivity timer (5 min default)
+    const [isLocked, setIsLocked] = useState(false)
+    const [lockPin, setLockPin] = useState('')
+    const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null)
+    const INACTIVITY_TIMEOUT = 5 * 60 * 1000 // 5 minutes
+
+    // Reset inactivity timer on any user interaction
+    const resetInactivityTimer = useCallback(() => {
+        if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
+        inactivityTimerRef.current = setTimeout(() => {
+            if (!paymentCompleted) setIsLocked(true)
+        }, INACTIVITY_TIMEOUT)
+    }, [paymentCompleted])
+
+    useEffect(() => {
+        if (isOpen && !paymentCompleted) {
+            resetInactivityTimer()
+            const handler = () => resetInactivityTimer()
+            window.addEventListener('click', handler)
+            window.addEventListener('keydown', handler)
+            return () => {
+                window.removeEventListener('click', handler)
+                window.removeEventListener('keydown', handler)
+                if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
+            }
+        }
+    }, [isOpen, paymentCompleted, resetInactivityTimer])
+
+    // S5-1: Start card timeout when PAX modal opens
+    useEffect(() => {
+        if (showPaxModal) {
+            setCardTimedOut(false)
+            cardTimeoutRef.current = setTimeout(async () => {
+                setCardTimedOut(true)
+                // Report timeout to server for audit + recovery
+                try {
+                    const res = await fetch('/api/pos/payment-timeout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            amount: pendingPaxAmount,
+                            stationId: null,
+                        })
+                    })
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data.recovery) setTimeoutRecovery(data.recovery)
+                    }
+                } catch { /* ignore - timeout still shown even if logging fails */ }
+            }, 30000) // 30-second timeout
+        } else {
+            if (cardTimeoutRef.current) clearTimeout(cardTimeoutRef.current)
+            setCardTimedOut(false)
+        }
+        return () => { if (cardTimeoutRef.current) clearTimeout(cardTimeoutRef.current) }
+    }, [showPaxModal])
+
+    // S5-1: Retry card payment
+    const handleCardRetry = () => {
+        setCardRetryCount(prev => prev + 1)
+        setCardTimedOut(false)
+        setTimeoutRecovery(null)
+        setShowPaxModal(false)
+        setTimeout(() => {
+            setShowPaxModal(true)
+        }, 500)
+    }
+
+    // S5-2: Terminal reconnect
+    const handleTerminalReconnect = async () => {
+        reconnectAttemptRef.current++
+        try {
+            const res = await fetch('/api/pos/terminal/ping', { method: 'POST' })
+            if (res.ok) setTerminalDisconnected(false)
+        } catch { /* stay disconnected */ }
+    }
+
+    // S5-4: Unlock with PIN
+    const handleUnlock = async () => {
+        try {
+            const res = await fetch('/api/pos/verify-pin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pin: lockPin })
+            })
+            if (res.ok) {
+                setIsLocked(false)
+                setLockPin('')
+                resetInactivityTimer()
+            }
+        } catch { /* stay locked */ }
+    }
 
     // BUG-3 FIX: Use pricing settings from parent (franchise config) instead of hardcoded values
     const merchantConfig = {
@@ -167,10 +275,35 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
         }
     }
 
-    // PAX terminal approved a card charge
-    const handlePaxSuccess = () => {
+    // PAX terminal approved a card charge (S7-07: may be partial)
+    const handlePaxSuccess = (response: { status: string; responseCode: string; hostInformation?: any; transactionId?: string; authCode?: string; cardLast4?: string; [key: string]: any }) => {
         setShowPaxModal(false)
-        addPayment(pendingPaxMethod, pendingPaxAmount)
+
+        // S7-07: Extract approved amount from PAX host information
+        // PAX returns approved amount in hostInformation field — may differ from requested
+        let actualApproved = pendingPaxAmount
+        if (response.hostInformation) {
+            const hostParts = typeof response.hostInformation === 'string'
+                ? response.hostInformation.split('\x1f')
+                : []
+            const approvedAmountCents = parseInt(hostParts[4] || '0', 10) // Host field 5 = approved amount
+            if (approvedAmountCents > 0) {
+                actualApproved = approvedAmountCents / 100
+            }
+        }
+
+        // S7-07: Detect partial authorization
+        if (actualApproved < pendingPaxAmount - 0.01) {
+            setPartialAuth({
+                requested: pendingPaxAmount,
+                approved: actualApproved,
+                remaining: pendingPaxAmount - actualApproved
+            })
+        } else {
+            setPartialAuth(null)
+        }
+
+        addPayment(pendingPaxMethod, actualApproved)
     }
 
     // PAX terminal was cancelled/closed — stay in checkout
@@ -245,10 +378,87 @@ export default function CheckoutModal({ isOpen, onClose, cart, subtotal, taxRate
         ? (payments.reduce((s, p) => s + p.amount, 0) + lotteryCredit + giftCardCredit) - (subtotal - discount + cardFee + tax + tip)
         : 0
 
+    // S5-4: Locked screen overlay
+    if (isLocked && isOpen) {
+        return (
+            <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center">
+                <div className="bg-stone-900 rounded-2xl p-8 w-96 border border-amber-500/30 shadow-2xl">
+                    <div className="flex flex-col items-center gap-4 mb-6">
+                        <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center">
+                            <Lock className="h-8 w-8 text-amber-400" />
+                        </div>
+                        <h2 className="text-xl font-bold text-white">Session Locked</h2>
+                        <p className="text-stone-400 text-sm text-center">Inactivity detected. Enter your PIN to resume.</p>
+                    </div>
+                    <input
+                        type="password"
+                        value={lockPin}
+                        onChange={e => setLockPin(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleUnlock()}
+                        placeholder="Enter PIN"
+                        autoFocus
+                        maxLength={6}
+                        className="w-full px-4 py-3 bg-stone-800 border border-stone-700 rounded-xl text-white text-center text-2xl tracking-[0.5em] mb-4"
+                    />
+                    <button
+                        onClick={handleUnlock}
+                        disabled={lockPin.length < 4}
+                        className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold transition-all disabled:opacity-50"
+                    >
+                        Unlock
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <>
             <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                 <div className="bg-stone-900 rounded-3xl w-full max-w-5xl h-[80vh] overflow-hidden shadow-2xl border border-stone-800 flex flex-col">
+                    {/* S5-2: Terminal Disconnect Banner */}
+                    {terminalDisconnected && (
+                        <div className="bg-red-900/30 border-b border-red-700 px-6 py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-red-400">
+                                <WifiOff className="h-5 w-5" />
+                                <span className="font-medium text-sm">Terminal disconnected — card payments unavailable</span>
+                            </div>
+                            <button onClick={handleTerminalReconnect} className="px-3 py-1 bg-red-800 hover:bg-red-700 text-red-200 rounded-lg text-xs font-medium flex items-center gap-1">
+                                <RefreshCw className="h-3 w-3" /> Reconnect
+                            </button>
+                        </div>
+                    )}
+
+                    {/* S5-1: Card Timeout Banner */}
+                    {cardTimedOut && (
+                        <div className="bg-amber-900/30 border-b border-amber-700 px-6 py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-amber-400">
+                                <AlertTriangle className="h-5 w-5" />
+                                <span className="font-medium text-sm">Card reader timed out (attempt {cardRetryCount + 1})</span>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={handleCardRetry} className="px-3 py-1 bg-amber-800 hover:bg-amber-700 text-amber-200 rounded-lg text-xs font-medium flex items-center gap-1">
+                                    <RefreshCw className="h-3 w-3" /> Retry
+                                </button>
+                                <button onClick={() => { setShowPaxModal(false); setCardTimedOut(false) }} className="px-3 py-1 bg-stone-700 hover:bg-stone-600 text-stone-300 rounded-lg text-xs font-medium">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* S5-1b: Timeout recovery instructions */}
+                    {timeoutRecovery && cardTimedOut && (
+                        <div className="bg-stone-800/50 border-b border-stone-700 px-6 py-2">
+                            <p className="text-xs text-stone-400 mb-1 font-medium">Recovery Steps:</p>
+                            <ul className="text-xs text-stone-500 space-y-0.5">
+                                {timeoutRecovery.steps.map((step: string, i: number) => (
+                                    <li key={i}>â€¢ {step}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     {/* Header */}
                     <div className="bg-stone-950 px-8 py-4 flex items-center justify-between border-b border-stone-800">
                         <div className="flex items-center gap-3">

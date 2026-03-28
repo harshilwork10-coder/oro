@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // GET - Get feature toggle settings
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -81,11 +79,8 @@ export async function GET(request: NextRequest) {
 }
 
 // PUT - Update feature toggle settings
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -99,7 +94,7 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
 
         // Build update object with only allowed fields
         const updateData: any = {}
@@ -129,7 +124,7 @@ export async function PUT(request: NextRequest) {
         })
 
         // Audit log the setting changes
-        await auditLog({
+        await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role,

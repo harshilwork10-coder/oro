@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - List service packages for a franchise
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const franchiseId = user.franchiseId
+const franchiseId = user.franchiseId
 
         if (!franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
@@ -39,21 +38,18 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create a new service package
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const franchiseId = user.franchiseId
+const franchiseId = user.franchiseId
 
         if (!franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { name, description, serviceId, sessionsIncluded, price, validityDays } = body
 
         if (!name || !serviceId || !sessionsIncluded || !price) {
@@ -92,17 +88,14 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT - Update a service package
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
+const franchiseId = user.franchiseId
 
-        const user = session.user as any
-        const franchiseId = user.franchiseId
-
-        const body = await request.json()
+        const body = await req.json()
         const { id, name, description, sessionsIncluded, price, validityDays, isActive } = body
 
         if (!id) {
@@ -138,16 +131,13 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE - Deactivate a package (soft delete)
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const franchiseId = user.franchiseId
-        const { searchParams } = new URL(request.url)
+const franchiseId = user.franchiseId
+        const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
 
         if (!id) {

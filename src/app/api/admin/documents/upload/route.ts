@@ -1,26 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 // POST - Upload a document for a franchisor
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        // Only PROVIDER can upload documents for clients
+// Only PROVIDER can upload documents for clients
         if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
-        const formData = await request.formData()
+        const formData = await req.formData()
         const file = formData.get('file') as File
         const documentType = formData.get('documentType') as string
         const franchisorId = formData.get('franchisorId') as string
@@ -70,7 +69,7 @@ export async function POST(request: NextRequest) {
         // Debug log removed
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: 'PROVIDER',

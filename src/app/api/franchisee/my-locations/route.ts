@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET: Fetch locations owned by the current franchisee
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session?.user || session.user.role !== 'FRANCHISEE') {
+        if (!user || user.role !== 'FRANCHISEE') {
             return NextResponse.json({ error: 'Unauthorized - Franchisee only' }, { status: 401 })
         }
 
         // Get locations where this user is the owner
         const locations = await prisma.location.findMany({
             where: {
-                ownerId: session.user.id
+                ownerId: user.id
             },
             include: {
                 franchise: {

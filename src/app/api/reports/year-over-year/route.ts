@@ -4,24 +4,17 @@
  * GET — Compare current period vs same period last year
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const period = searchParams.get('period') || 'MONTH'
 
         const now = new Date()
@@ -79,7 +72,7 @@ export async function GET(request: NextRequest) {
             avgTicket: prior.avgTicket > 0 ? Math.round(((current.avgTicket - prior.avgTicket) / prior.avgTicket) * 1000) / 10 : null
         }
 
-        return ApiResponse.success({
+        return NextResponse.json({
             period,
             currentPeriod: { start: currentStart, end: currentEnd, ...current },
             priorPeriod: { start: priorStart, end: priorEnd, ...prior },
@@ -88,6 +81,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[YOY_GET]', error)
-        return ApiResponse.error('Failed to generate YoY comparison', 500)
+        return NextResponse.json({ error: 'Failed to generate YoY comparison' }, { status: 500 })
     }
 }

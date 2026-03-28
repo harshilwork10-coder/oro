@@ -1,24 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // In-memory rate limiter (consider Redis for production)
 const receiptRateLimits = new Map<string, number>()
 
 // POST - Send SMS receipt
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // SECURITY: Rate Limiting
         const now = Date.now()
-        const clientIP = request.headers.get('x-forwarded-for') || 'unknown'
+        const clientIP = req.headers.get('x-forwarded-for') || 'unknown'
         const lastRequest = receiptRateLimits.get(clientIP) || 0
 
         // 1 request every 2 seconds per IP is reasonable for manual POS usage
@@ -27,7 +23,7 @@ export async function POST(request: NextRequest) {
         }
         receiptRateLimits.set(clientIP, now)
 
-        const body = await request.json()
+        const body = await req.json()
         const { phone, transactionId } = body
 
         if (!phone) {
@@ -148,11 +144,10 @@ Thank you!`
 }
 
 // GET - Get receipt settings
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

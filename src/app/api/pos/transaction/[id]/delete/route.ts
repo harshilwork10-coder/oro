@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 export async function POST(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.franchiseId) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -24,7 +25,7 @@ export async function POST(
 
         // Find the transaction — scoped to franchise
         const transaction = await prisma.transaction.findFirst({
-            where: { id: transactionId, franchiseId: session.user.franchiseId },
+            where: { id: transactionId, franchiseId: user.franchiseId },
             include: { lineItems: true }
         })
 
@@ -57,21 +58,21 @@ export async function POST(
             where: { id: transactionId },
             data: {
                 status: 'VOIDED',
-                voidedById: session.user.id,
+                voidedById: user.id,
                 voidedAt: new Date(),
                 voidReason: reason
             }
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email,
-            userRole: (session.user as any).role,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
+            userRole: user.role,
             action: 'VOID_TRANSACTION',
             entityType: 'Transaction',
             entityId: transactionId,
-            franchiseId: session.user.franchiseId,
+            franchiseId: user.franchiseId,
             metadata: { reason, originalStatus: transaction.status, total: Number(transaction.total), via: 'delete-endpoint' }
         })
 

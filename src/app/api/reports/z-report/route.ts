@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // AUDIT STANDARD: Proper decimal rounding to prevent penny errors
@@ -12,14 +11,16 @@ function roundCurrency(value: number): number {
 const COMPLETED_STATUSES = ['COMPLETED', 'APPROVED'] as const
 const REFUNDED_STATUSES = ['REFUNDED', 'VOIDED', 'CANCELLED'] as const
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!authUser) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const dateParam = searchParams.get('date')
         const date = dateParam ? new Date(dateParam) : new Date()
 
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
         endOfDay.setHours(23, 59, 59, 999)
 
         // Get user's location/franchise for filtering
-        const userId = session.user.id
+        const userId = user.id
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: { locationId: true, franchiseId: true, role: true }

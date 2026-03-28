@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET: Get slow-moving products (no sales in X months)
 export async function GET(request: Request) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const { searchParams } = new URL(request.url)
         const months = parseInt(searchParams.get('months') || '6')
-        const franchiseId = searchParams.get('franchiseId') || (session.user as any).franchiseId
+        const franchiseId = searchParams.get('franchiseId') || user.franchiseId
 
         if (!franchiseId) {
             return NextResponse.json({ error: 'franchiseId required' }, { status: 400 })

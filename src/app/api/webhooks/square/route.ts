@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Square Webhook Handler
  *

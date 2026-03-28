@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Fetch user's active chat or create new one
 export async function GET(req: Request) {
-    const session = await getServerSession(authOptions)
     const user = session?.user as any
 
     if (!user?.id) {
@@ -67,7 +64,6 @@ export async function GET(req: Request) {
 
 // POST - Send a message
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
     const user = session?.user as any
 
     if (!user?.id) {
@@ -119,7 +115,6 @@ export async function POST(req: Request) {
 
 // PUT - Close chat
 export async function PUT(req: Request) {
-    const session = await getServerSession(authOptions)
     const user = session?.user as any
 
     if (!user?.id) {

@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import net from 'net'
 
 // SECURITY: Check if IP is in private range (local network only)
@@ -43,15 +41,14 @@ function sendPaxCommand(ip: string, port: number, command: Buffer): Promise<{ su
 }
 
 // PAX Cancel Command - A14 (Reset/Cancel)
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<NextResponse> {
     // SECURITY: Require authentication
-    const session = await getServerSession(authOptions)
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
-        const { ip, port } = await request.json()
+        const { ip, port } = await req.json()
 
         if (!ip || !port) {
             return NextResponse.json({ error: 'IP and port required' }, { status: 400 })

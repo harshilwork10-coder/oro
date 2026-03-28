@@ -1,20 +1,20 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { generateInvoiceNumber, getPaxInvoiceNumber } from '@/lib/invoice'
 
 /**
  * Generate next invoice number
  * Returns both full invoice number and PAX-compatible version
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const fullInvoiceNumber = await generateInvoiceNumber(session.user.franchiseId)
+        const fullInvoiceNumber = await generateInvoiceNumber(user.franchiseId)
         const paxInvoiceNumber = getPaxInvoiceNumber(fullInvoiceNumber)
 
         return NextResponse.json({

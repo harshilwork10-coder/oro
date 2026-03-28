@@ -1,23 +1,20 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-// POST — Process an exchange (return item A, give item B, charge/refund difference)
+/**
+ * POST /api/pos/exchange — Process an exchange (return item A, give item B)
+ */
 export async function POST(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
+    const locationId = dbUser?.locationId
+    if (!locationId) return NextResponse.json({ error: 'No location' }, { status: 400 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
         const body = await request.json()
         const { originalTransactionId, returnItems, newItems, reason } = body as {
             originalTransactionId: string
@@ -27,7 +24,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!returnItems?.length || !newItems?.length) {
-            return ApiResponse.badRequest('returnItems and newItems required')
+            return NextResponse.json({ error: 'returnItems and newItems required' }, { status: 400 })
         }
 
         // Calculate return value
@@ -44,7 +41,6 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Calculate new items total
         const newTotal = newItems.reduce((s, ni) => s + (ni.price * ni.quantity), 0)
         const difference = newTotal - returnTotal
 
@@ -87,42 +83,36 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        // Adjust inventory: return items back to stock, deduct new items
+        // Adjust inventory
         for (const ri of returnItems) {
             await prisma.item.update({
                 where: { id: ri.itemId },
                 data: { stock: { increment: ri.quantity } }
-            })
+            }).catch(() => {}) // Item may not exist
         }
         for (const ni of newItems) {
             await prisma.item.update({
                 where: { id: ni.itemId },
                 data: { stock: { decrement: ni.quantity } }
-            })
+            }).catch(() => {})
         }
 
-        // Audit log
-        await auditLog({
-            userId: user.id,
-            userEmail: user.email,
-            userRole: user.role,
-            action: 'CREATE',
-            entityType: 'Exchange',
-            entityId: exchange.id,
+        await logActivity({
+            userId: user.id, userEmail: user.email, userRole: user.role,
             franchiseId: user.franchiseId,
-            locationId,
-            metadata: { originalTransactionId, returnTotal, newTotal, difference: Math.round(difference * 100) / 100, reason }
+            action: 'EXCHANGE_PROCESSED', entityType: 'Transaction', entityId: exchange.id,
+            details: { originalTransactionId, returnTotal, newTotal, difference: Math.round(difference * 100) / 100, reason }
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             exchangeId: exchange.id,
             returnTotal: Math.round(returnTotal * 100) / 100,
             newTotal: Math.round(newTotal * 100) / 100,
             difference: Math.round(difference * 100) / 100,
-            action: difference > 0 ? `Customer owes $${difference.toFixed(2)}` : difference < 0 ? `Refund $${Math.abs(difference).toFixed(2)} to customer` : 'Even exchange — no money due'
+            action: difference > 0 ? `Customer owes $${difference.toFixed(2)}` : difference < 0 ? `Refund $${Math.abs(difference).toFixed(2)} to customer` : 'Even exchange'
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('[EXCHANGE_POST]', error)
-        return ApiResponse.error('Failed to process exchange')
+        return NextResponse.json({ error: error.message || 'Failed to process exchange' }, { status: 500 })
     }
 }

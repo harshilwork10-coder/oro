@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { logActivity, ActionTypes } from '@/lib/auditLog'
 import { badRequestResponse } from '@/lib/validation'
+import { validateReasonCode, REFUND_REASON_CODES } from '@/lib/constants/reason-codes'
 
 export async function POST(req: NextRequest) {
     // Support both session (web) and Bearer token (mobile)
@@ -37,12 +38,20 @@ export async function POST(req: NextRequest) {
             refundType,
             items,
             reason,
+            reasonCode,
+            reasonNote,
             refundMethod,
             cashDrawerSessionId,
             authCode,      // PAX authorization code
             cardLast4,     // Last 4 digits of card
             gatewayTxId    // PAX transaction ID
         } = body
+
+        // Validate structured reason code (forward-only enforcement)
+        if (reasonCode) {
+            const codeCheck = validateReasonCode(reasonCode, reasonNote, REFUND_REASON_CODES)
+            if (!codeCheck.valid) return badRequestResponse(codeCheck.error)
+        }
 
         // NOTE: Shift requirement is handled on transaction create, not on refund
         // Refunds just need a valid reference to original transaction
@@ -72,10 +81,77 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
-        if (originalTx.status !== 'COMPLETED') {
+        if (originalTx.status !== 'COMPLETED' && originalTx.status !== 'PARTIALLY_REFUNDED') {
             return NextResponse.json({
                 error: `Cannot refund transaction with status: ${originalTx.status}`
             }, { status: 400 })
+        }
+
+        // ===== S1-6: DUPLICATE REFUND TIME-WINDOW DETECTION =====
+        // Reject if same transaction was refunded within the last 60 seconds
+        const recentDuplicateRefund = await prisma.transaction.findFirst({
+            where: {
+                originalTransactionId: originalTx.id,
+                status: 'REFUNDED',
+                createdAt: { gte: new Date(Date.now() - 60_000) } // Within 60 seconds
+            }
+        })
+        if (recentDuplicateRefund) {
+            return NextResponse.json({
+                error: 'Duplicate refund detected — this transaction was just refunded. Wait 60 seconds and try again if intentional.'
+            }, { status: 409 })
+        }
+
+        // ===== S1-5: REFUND APPROVAL THRESHOLDS =====
+        // Check per-franchise config for daily limits and per-refund manager PIN requirement
+        const isManager = user.role === 'OWNER' || user.role === 'FRANCHISOR'
+        if (!isManager) {
+            const franchise = await prisma.franchise.findUnique({
+                where: { id: user.franchiseId },
+                include: { franchisor: { include: { config: true } } }
+            })
+            const config = franchise?.franchisor?.config as any
+
+            // Check per-refund threshold (requires manager PIN above this amount)
+            if (config?.requireManagerPinAbove) {
+                const threshold = Number(config.requireManagerPinAbove)
+                // Calculate refund total from items to check against threshold
+                const estimatedRefundTotal = items.reduce((sum: number, ri: any) => {
+                    const origItem = originalTx.lineItems.find(li => li.id === ri.lineItemId)
+                    if (origItem) return sum + Number(origItem.price) * ri.quantity
+                    return sum
+                }, 0)
+                if (estimatedRefundTotal > threshold && !body.managerPinVerified) {
+                    return NextResponse.json({
+                        error: `Refund of ${estimatedRefundTotal.toFixed(2)} exceeds $${threshold.toFixed(2)} threshold. Manager PIN required.`,
+                        requiresManagerPin: true,
+                        threshold
+                    }, { status: 403 })
+                }
+            }
+
+            // Check daily refund limit per employee
+            if (config?.refundLimitPerDay) {
+                const dailyLimit = Number(config.refundLimitPerDay)
+                const todayStart = new Date()
+                todayStart.setHours(0, 0, 0, 0)
+                const todaysRefunds = await prisma.transaction.aggregate({
+                    where: {
+                        employeeId: user.id,
+                        status: 'REFUNDED',
+                        createdAt: { gte: todayStart }
+                    },
+                    _sum: { total: true }
+                })
+                const totalRefundedToday = Math.abs(Number(todaysRefunds._sum.total || 0))
+                if (totalRefundedToday >= dailyLimit) {
+                    return NextResponse.json({
+                        error: `Daily refund limit of $${dailyLimit.toFixed(2)} reached. Contact a manager.`,
+                        dailyLimitReached: true,
+                        totalRefundedToday
+                    }, { status: 403 })
+                }
+            }
         }
 
         // Map requested refund items to actual line items and CHECK LIMITS
@@ -178,7 +254,7 @@ export async function POST(req: NextRequest) {
                     subtotal: -refundSubtotal,
                     tax: -refundTax,
                     total: -refundTotal,
-                    voidReason: reason || 'No reason provided',
+                    voidReason: reasonCode ? `[${reasonCode}] ${reasonNote || reason || ''}`.trim() : (reason || 'No reason provided'),
                     cashDrawerSessionId: cashDrawerSessionId, // USE CURRENT SESSION ID
                     // ====== INDUSTRY-STANDARD CARD DATA STORAGE ======
                     authCode: authCode || null,        // PAX authorization code
@@ -198,6 +274,12 @@ export async function POST(req: NextRequest) {
                     where: { id: originalTx.id },
                     data: { status: 'REFUNDED' }
                 })
+            } else {
+                // Partial refund — mark so history/reports distinguish it
+                await tx.transaction.update({
+                    where: { id: originalTx.id },
+                    data: { status: 'PARTIALLY_REFUNDED' }
+                })
             }
 
             // Restock Inventory for refunded items
@@ -210,7 +292,23 @@ export async function POST(req: NextRequest) {
                 }
             }
 
-            return refundTransaction
+            // Issue Store Credit if refundMethod is STORE_CREDIT
+            let storeCreditCode: string | null = null
+            if (refundMethod === 'STORE_CREDIT') {
+                const code = 'SC-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase()
+                await tx.giftCard.create({
+                    data: {
+                        franchiseId: user.franchiseId,
+                        code,
+                        initialAmount: refundTotal,
+                        currentBalance: refundTotal,
+                        isActive: true
+                    }
+                })
+                storeCreditCode = code
+            }
+
+            return { ...refundTransaction, storeCreditCode }
         })
         // ===== END ATOMIC TRANSACTION BLOCK =====
 
@@ -228,13 +326,15 @@ export async function POST(req: NextRequest) {
                 refundType,
                 refundTotal,
                 refundMethod: refundMethod || originalTx.paymentMethod,
+                reasonCode: reasonCode || null,
+                reasonNote: reasonNote || null,
                 reason: reason || 'No reason provided',
                 itemsRefunded: items.length
             }
         })
         // =============================================================
 
-        return NextResponse.json(refundTx)
+        return NextResponse.json({ ...refundTx, storeCreditCode: refundTx.storeCreditCode || null })
     } catch (error) {
         console.error('[POS_REFUND_POST]', error)
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

@@ -1,24 +1,23 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET schedules for a week with standardized responses
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
         if (!session) {
-            return ApiResponse.unauthorized()
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const weekStart = searchParams.get('weekStart')
         const locationId = searchParams.get('locationId')
         const employeeId = searchParams.get('employeeId')
 
         if (!weekStart) {
-            return ApiResponse.validationError('weekStart is required')
+            return NextResponse.json({ error: 'weekStart is required' }, { status: 422 })
         }
 
         const startDate = new Date(weekStart)
@@ -40,9 +39,6 @@ export async function GET(request: NextRequest) {
         if (employeeId) {
             whereClause.employeeId = employeeId
         }
-
-        const user = session.user as { id: string; role: string; franchiseId?: string }
-
         // For employees, only show their own schedule
         if (user.role === 'EMPLOYEE') {
             whereClause.employeeId = user.id
@@ -85,32 +81,29 @@ export async function GET(request: NextRequest) {
             ]
         })
 
-        return ApiResponse.success(schedules)
+        return NextResponse.json(schedules)
     } catch (error) {
         console.error('Error fetching schedules:', error)
-        return ApiResponse.serverError('Failed to fetch schedules')
+        return NextResponse.json({ error: 'Failed to fetch schedules' }, { status: 500 })
     }
 }
 
 // POST - Create new schedule entry
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as { id: string; role: string; franchiseId?: string }
-
         if (!user?.id) {
-            return ApiResponse.unauthorized()
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role)) {
-            return ApiResponse.forbidden('Insufficient permissions')
+            return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { employeeId, locationId, date, startTime, endTime } = body
 
         if (!employeeId || !locationId || !date || !startTime || !endTime) {
-            return ApiResponse.validationError('All fields are required')
+            return NextResponse.json({ error: 'All fields are required' }, { status: 422 })
         }
 
         const location = await prisma.location.findUnique({
@@ -122,7 +115,7 @@ export async function POST(request: NextRequest) {
         })
 
         if (!location) {
-            return ApiResponse.notFound('Location')
+            return NextResponse.json({ error: 'Location' }, { status: 404 })
         }
 
         // Check access based on role
@@ -140,7 +133,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!hasAccess) {
-            return ApiResponse.forbidden()
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
         const schedule = await prisma.schedule.create({
@@ -157,32 +150,29 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        return ApiResponse.created(schedule)
+        return NextResponse.json(schedule, { status: 201 })
     } catch (error) {
         console.error('Error creating schedule:', error)
-        return ApiResponse.serverError('Failed to create schedule')
+        return NextResponse.json({ error: 'Failed to create schedule' }, { status: 500 })
     }
 }
 
 // DELETE - Delete schedule entry
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as { id: string; role: string; franchiseId?: string }
-
         if (!user?.id) {
-            return ApiResponse.unauthorized()
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role)) {
-            return ApiResponse.forbidden('Insufficient permissions')
+            return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const id = searchParams.get('id')
 
         if (!id) {
-            return ApiResponse.validationError('Schedule ID is required')
+            return NextResponse.json({ error: 'Schedule ID is required' }, { status: 422 })
         }
 
         const schedule = await prisma.schedule.findUnique({
@@ -191,18 +181,18 @@ export async function DELETE(request: NextRequest) {
         })
 
         if (!schedule) {
-            return ApiResponse.notFound('Schedule')
+            return NextResponse.json({ error: 'Schedule' }, { status: 404 })
         }
 
         if (schedule.location.franchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
-            return ApiResponse.forbidden()
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
         await prisma.schedule.delete({ where: { id } })
 
-        return ApiResponse.success({ deleted: true })
+        return NextResponse.json({ deleted: true })
     } catch (error) {
         console.error('Error deleting schedule:', error)
-        return ApiResponse.serverError('Failed to delete schedule')
+        return NextResponse.json({ error: 'Failed to delete schedule' }, { status: 500 })
     }
 }

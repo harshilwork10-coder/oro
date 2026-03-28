@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -16,10 +15,10 @@ import { prisma } from '@/lib/prisma'
  * PUT — check a cart against active deals and return discounts
  */
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const franchiseId = user.franchiseId
@@ -68,16 +67,14 @@ export async function GET(request: NextRequest) {
     }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const franchiseId = user.franchiseId
         if (!franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const body = await request.json()
+        const body = await req.json()
         const {
             name,               // "Any 3 Sodas for $5"
             quantityRequired,   // 3
@@ -123,16 +120,14 @@ export async function POST(request: NextRequest) {
  * PUT — Check cart items against active mix-and-match deals
  * Returns applicable discounts
  */
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const franchiseId = user.franchiseId
         if (!franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const { cartItems } = await request.json()
+        const { cartItems } = await req.json()
         // cartItems: [{ productId, name, category, price, quantity }]
 
         if (!cartItems?.length) {

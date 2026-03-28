@@ -1,24 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-// GET - Fetch recent transactions (alias for /api/pos/transaction)
-export async function GET(request: NextRequest) {
+// GET - Fetch recent transactions
+// Supports: ?limit=N, ?status=STATUS, ?locationId=xxx
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-        if (!user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const limit = parseInt(searchParams.get('limit') || '20')
         const status = searchParams.get('status')
+        const locationId = searchParams.get('locationId')
 
-        const where: any = {}
-        if (user.franchiseId) where.franchiseId = user.franchiseId
-        if (user.locationId) where.locationId = user.locationId
+        // Resolve franchiseId scope
+        let franchiseId = user.franchiseId
+        if (locationId) {
+            const location = await prisma.location.findFirst({
+                where: { id: locationId },
+                select: { franchiseId: true }
+            })
+            if (location?.franchiseId) {
+                franchiseId = location.franchiseId
+            }
+        }
+
+        const where: any = { franchiseId }
         if (status) where.status = status
 
         const transactions = await prisma.transaction.findMany({
@@ -26,7 +36,7 @@ export async function GET(request: NextRequest) {
             take: limit,
             orderBy: { createdAt: 'desc' },
             include: {
-                customer: { select: { firstName: true, lastName: true } }
+                client: { select: { firstName: true, lastName: true } }
             }
         })
 

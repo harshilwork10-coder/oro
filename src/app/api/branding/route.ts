@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // Default branding
         const defaultBranding = {
@@ -14,19 +14,19 @@ export async function GET(req: Request) {
             logoUrl: '/oro9-gold.png'
         }
 
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json(defaultBranding)
         }
 
         // Find franchisor associated with user
         let franchisorId = null
 
-        if (session.user.role === 'FRANCHISOR') {
+        if (user.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({
-                where: { ownerId: session.user.id }
+                where: { ownerId: user.id }
             })
             franchisorId = franchisor?.id
-        } else if (session.user.role === 'FRANCHISEE' || session.user.role === 'MANAGER' || session.user.role === 'EMPLOYEE') {
+        } else if (user.role === 'FRANCHISEE' || user.role === 'MANAGER' || user.role === 'EMPLOYEE') {
             // Find which franchise they belong to, then get the franchisor
             // This is a bit more complex depending on schema, assuming we can trace back to franchisor
             // For now, let's just handle FRANCHISOR role for the demo as requested "client account"

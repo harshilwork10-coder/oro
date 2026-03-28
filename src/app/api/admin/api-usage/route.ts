@@ -2,14 +2,13 @@
 // PROVIDER role only - for cost monitoring and optimization
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 export async function GET(req: NextRequest) {
-    const session = await getServerSession(authOptions)
+    const user = await getAuthUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!session?.user || session.user.role !== 'PROVIDER') {
+    if (!user || user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

@@ -9,18 +9,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ stationId: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -54,13 +55,13 @@ export async function POST(
             }
         })
 
-        console.log(`[reset-pairing] Station ${station.name} (${stationId}) reset by user ${session.user.email}`)
+        console.log(`[reset-pairing] Station ${station.name} (${stationId}) reset by user ${user.email}`)
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
-            userRole: (session.user as any).role || 'OWNER',
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
+            userRole: user.role || 'OWNER',
             action: 'STATION_RESET_PAIRING',
             entityType: 'Station',
             entityId: stationId,

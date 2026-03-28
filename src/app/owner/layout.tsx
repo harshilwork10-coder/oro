@@ -10,6 +10,8 @@ import {
     Menu, X, Bell, Search, ChevronDown, MapPin, Store, Scissors, LogOut,
     CreditCard, Clock, FileText, MessageSquare, Building2, Check, Palette
 } from 'lucide-react';
+import NotificationCenter from '@/components/dashboard/NotificationCenter';
+import QuickSearch from '@/components/dashboard/QuickSearch';
 
 // Business Membership interface
 interface BusinessMembership {
@@ -272,15 +274,10 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
                                 </div>
                             </div>
 
-                            {/* Right: Search, Notifications, Profile */}
+                            {/* Right: Quick Search, Notifications, Profile */}
                             <div className="flex items-center gap-2">
-                                <button className="p-2 hover:bg-[var(--surface-hover)] rounded-lg text-[var(--text-secondary)]">
-                                    <Search size={20} />
-                                </button>
-                                <button className="p-2 hover:bg-[var(--surface-hover)] rounded-lg text-[var(--text-secondary)] relative">
-                                    <Bell size={20} />
-                                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-                                </button>
+                                <QuickSearch />
+                                <NotificationCenter />
                                 <div className="w-8 h-8 rounded-full bg-[var(--primary)] flex items-center justify-center text-white font-medium text-sm ml-2">
                                     JD
                                 </div>

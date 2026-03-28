@@ -1,7 +1,5 @@
-// @ts-nocheck
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -41,12 +39,10 @@ const CATEGORY_PAIRINGS: Record<string, string[]> = {
 
 export async function POST(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const franchiseId = user.franchiseId
-        if (!franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
         const { cartItems } = await request.json()
         // cartItems: [{ productId, name, category, price }]

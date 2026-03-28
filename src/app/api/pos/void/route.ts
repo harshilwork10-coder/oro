@@ -1,14 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { validateBody, unauthorizedResponse, badRequestResponse } from '@/lib/validation'
 import { logActivity, ActionTypes } from '@/lib/auditLog'
+import { validateReasonCode, VOID_REASON_CODES } from '@/lib/constants/reason-codes'
 
 // Validation schema
 const voidRequestSchema = z.object({
     transactionId: z.string().min(1, 'Transaction ID required'),
     reason: z.string().min(3, 'Void reason required (min 3 chars)').optional(),
+    reasonCode: z.string().optional(),
+    reasonNote: z.string().optional(),
     cashDrawerSessionId: z.string().optional()
 })
 
@@ -42,7 +45,13 @@ export async function POST(req: NextRequest) {
     const validation = await validateBody(req, voidRequestSchema)
     if ('error' in validation) return validation.error
 
-    const { transactionId, reason, cashDrawerSessionId } = validation.data
+    const { transactionId, reason, reasonCode, reasonNote, cashDrawerSessionId } = validation.data
+
+    // Validate structured reason code (forward-only enforcement)
+    if (reasonCode) {
+        const codeCheck = validateReasonCode(reasonCode, reasonNote, VOID_REASON_CODES)
+        if (!codeCheck.valid) return badRequestResponse(codeCheck.error)
+    }
 
     // Shift validation (OPTIONAL - matches transaction behavior)
     // Only validate if cashDrawerSessionId is provided
@@ -89,7 +98,7 @@ export async function POST(req: NextRequest) {
                     status: 'VOIDED',
                     voidedById: user.id,
                     voidedAt: new Date(),
-                    voidReason: reason || null
+                    voidReason: reasonCode ? `[${reasonCode}] ${reasonNote || reason || ''}`.trim() : (reason || null)
                 },
                 include: {
                     employee: {
@@ -123,6 +132,8 @@ export async function POST(req: NextRequest) {
             entityId: voidedTransaction.id,
             details: {
                 originalTotal: transaction.total,
+                reasonCode: reasonCode || null,
+                reasonNote: reasonNote || null,
                 reason: reason || 'No reason provided',
             }
         })

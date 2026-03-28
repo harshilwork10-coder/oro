@@ -1,54 +1,47 @@
-// @ts-nocheck
-'use strict'
-
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
-// POST — Process split tender payment (multiple payment methods on one transaction)
-export async function POST(request: NextRequest) {
+/**
+ * Split Tender — Multiple payment methods on one transaction
+ * POST /api/pos/split-tender
+ */
+export async function POST(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
-
-        const user = session.user as any
-        const locationId = user.locationId
-        if (!locationId) return ApiResponse.badRequest('No location')
-
-        const body = await request.json()
+        const body = await req.json()
         const { transactionId, tenders } = body as {
             transactionId: string
             tenders: { method: string; amount: number; reference?: string }[]
         }
 
         if (!transactionId || !tenders?.length) {
-            return ApiResponse.badRequest('transactionId and tenders required')
+            return NextResponse.json({ error: 'transactionId and tenders required' }, { status: 400 })
         }
 
-        // Validate totals match
         const tx = await prisma.transaction.findFirst({
-            where: { id: transactionId, locationId }
+            where: { id: transactionId, locationId: user.locationId || undefined }
         })
-        if (!tx) return ApiResponse.notFound('Transaction not found')
+        if (!tx) return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
 
         const tenderTotal = tenders.reduce((s, t) => s + t.amount, 0)
         const txTotal = Number(tx.total || 0)
 
         if (Math.abs(tenderTotal - txTotal) > 0.01) {
-            return ApiResponse.badRequest(`Tender total ($${tenderTotal.toFixed(2)}) doesn't match transaction total ($${txTotal.toFixed(2)})`)
+            return NextResponse.json({
+                error: `Tender total ($${tenderTotal.toFixed(2)}) doesn't match transaction total ($${txTotal.toFixed(2)})`
+            }, { status: 400 })
         }
 
-        // Record each tender as payment method metadata
         const tenderData = tenders.map(t => ({
-            method: t.method.toUpperCase(), // CASH, CARD, EBT, GIFT_CARD, STORE_CREDIT
+            method: t.method.toUpperCase(),
             amount: Math.round(t.amount * 100) / 100,
             reference: t.reference || null
         }))
 
-        // Update transaction with split tender data and primary method
         const updated = await prisma.transaction.update({
             where: { id: transactionId },
             data: {
@@ -58,22 +51,16 @@ export async function POST(request: NextRequest) {
             }
         })
 
-        // Audit log
-        await auditLog({
-            userId: user.id,
-            userEmail: user.email,
-            userRole: user.role,
-            action: 'PAYMENT',
-            entityType: 'Transaction',
-            entityId: transactionId,
+        await logActivity({
+            userId: user.id, userEmail: user.email, userRole: user.role,
             franchiseId: user.franchiseId,
-            locationId,
-            metadata: { paymentMethod: 'SPLIT', tenders: tenderData, total: txTotal }
+            action: 'SPLIT_TENDER_PAYMENT', entityType: 'Transaction', entityId: transactionId,
+            details: { tenders: tenderData, total: txTotal }
         })
 
-        return ApiResponse.success({ transaction: updated, tenders: tenderData })
-    } catch (error) {
+        return NextResponse.json({ transaction: updated, tenders: tenderData })
+    } catch (error: any) {
         console.error('[SPLIT_TENDER_POST]', error)
-        return ApiResponse.error('Failed to process split tender')
+        return NextResponse.json({ error: 'Failed to process split tender' }, { status: 500 })
     }
 }

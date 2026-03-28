@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { uploadToS3 } from '@/lib/s3'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // Route segment config - Allow larger body size for file uploads
@@ -21,9 +20,12 @@ const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'
 
 // Special upload endpoint for onboarding documents
 // Supports BOTH: session auth (logged in users) AND magic-link token auth (onboarding users)
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const formData = await request.formData()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const formData = await req.formData()
         const file = formData.get('file') as File
         const documentType = formData.get('documentType') as string
         const magicLinkToken = formData.get('token') as string | null
@@ -32,9 +34,8 @@ export async function POST(request: NextRequest) {
         let userId: string | null = null
 
         // Try session auth first (for logged-in users)
-        const session = await getServerSession(authOptions)
-        if (session?.user?.id) {
-            userId = session.user.id
+        if (user?.id) {
+            userId = user.id
         }
 
         // If no session, try magic-link token auth (for onboarding users)

@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - List all promotions for franchise
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!user.franchiseId) {
+if (!user.franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const activeOnly = searchParams.get('active') !== 'false'
 
         const promotions = await prisma.promotion.findMany({
@@ -41,15 +40,12 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create a new promotion
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!user.franchiseId) {
+if (!user.franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
@@ -58,7 +54,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const {
             name,
             description,
@@ -129,19 +125,16 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE - Deactivate a promotion
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        if (!['ADMIN', 'OWNER', 'MANAGER'].includes(user.role)) {
+if (!['ADMIN', 'OWNER', 'MANAGER'].includes(user.role)) {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
 
         if (!id) {

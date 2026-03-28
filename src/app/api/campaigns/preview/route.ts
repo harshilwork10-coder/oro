@@ -5,8 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import {
     generateCampaignPreview,
@@ -15,14 +14,16 @@ import {
 } from '@/lib/sms/compliance'
 
 // GET - Preview campaign before sending
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { locationId, audienceType, messageTemplate, dealSuggestionId } = body
 
         if (!locationId || !audienceType || !messageTemplate) {
@@ -118,7 +119,7 @@ async function buildAudience(locationId: string, audienceType: string): Promise<
             break
     }
 
-    const clients = await (prisma as any).client.findMany({
+    const clients = await prisma.client.findMany({
         where: whereClause,
         select: {
             id: true,
@@ -133,13 +134,13 @@ async function buildAudience(locationId: string, audienceType: string): Promise<
     })
 
     // Get opted out phones
-    const optOuts = await (prisma as any).smsOptOut.findMany({
+    const optOuts = await prisma.smsOptOut.findMany({
         select: { phone: true }
     })
     const optOutSet = new Set(optOuts.map((o: any) => o.phone))
 
     // Get recent sends for frequency check
-    const recentSends = await (prisma as any).smsUsageLedger.findMany({
+    const recentSends = await prisma.smsUsageLedger.findMany({
         where: {
             locationId,
             messageType: 'PROMO',
@@ -152,7 +153,7 @@ async function buildAudience(locationId: string, audienceType: string): Promise<
 
     // Get delivery failures
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    const failures = await (prisma as any).smsUsageLedger.groupBy({
+    const failures = await prisma.smsUsageLedger.groupBy({
         by: ['phone'],
         where: {
             locationId,

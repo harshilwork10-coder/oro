@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     // SECURITY: Only PROVIDER can list agents
-    const session = await getServerSession(authOptions)
-    if (!session?.user || (session.user as any).role !== 'PROVIDER') {
+    if (!user || user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -38,15 +39,14 @@ export async function GET(request: NextRequest) {
     }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     // SECURITY: Only PROVIDER can create agents
-    const session = await getServerSession(authOptions)
-    if (!session?.user || (session.user as any).role !== 'PROVIDER') {
+    if (!user || user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     try {
-        const { name, email } = await request.json()
+        const { name, email } = await req.json()
 
         if (!name || !email) {
             return NextResponse.json({ error: 'Name and email required' }, { status: 400 })

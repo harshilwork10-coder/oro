@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // POST - Settle/close a pack
@@ -9,8 +8,10 @@ export async function POST(
     { params }: { params: Promise<{ packId: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -19,7 +20,7 @@ export async function POST(
         const { physicalCount } = body
 
         // Get the pack (lotteryPack not in main schema — any-cast)
-        const pack = await (prisma as any).lotteryPack.findUnique({
+        const pack = await prisma.lotteryPack.findUnique({
             where: { id: packId },
             include: { game: true }
         })
@@ -36,7 +37,7 @@ export async function POST(
         const hasDiscrepancy = physicalCount !== undefined && physicalCount !== systemRemaining
 
         // Update pack to SETTLED status
-        const settledPack = await (prisma as any).lotteryPack.update({
+        const settledPack = await prisma.lotteryPack.update({
             where: { id: packId },
             data: {
                 status: 'SETTLED',

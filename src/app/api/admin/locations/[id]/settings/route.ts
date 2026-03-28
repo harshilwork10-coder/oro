@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { logActivity } from '@/lib/auditLog'
 
 // GET - Fetch location-specific settings
 export async function GET(
@@ -10,8 +9,8 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = await getAuthUser(request)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const location = await prisma.location.findUnique({
             where: { id: params.id },
@@ -45,9 +44,6 @@ export async function PUT(
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
         const body = await request.json()
         const location = await prisma.location.update({
             where: { id: params.id },
@@ -55,10 +51,10 @@ export async function PUT(
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
-            userRole: (session.user as any).role || 'PROVIDER',
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
+            userRole: user.role || 'PROVIDER',
             action: 'LOCATION_SETTINGS_UPDATE',
             entityType: 'Location',
             entityId: params.id,

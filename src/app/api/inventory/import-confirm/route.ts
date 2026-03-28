@@ -1,14 +1,11 @@
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // POST - Confirm and save imported items to database
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -18,7 +15,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Permission denied. Only providers can import inventory.' }, { status: 403 })
         }
 
-        const { items, updateExisting, franchiseId } = await request.json()
+        const { items, updateExisting, franchiseId } = await req.json()
 
         // PROVIDER must specify which franchise to import to
         if (!franchiseId) {

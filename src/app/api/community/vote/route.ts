@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { postId, commentId, value } = body
 
         if (!postId && !commentId) {
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
         // Check if vote already exists
         const existingVote = await prisma.vote.findFirst({
             where: {
-                userId: session.user.id,
+                userId: user.id,
                 postId: postId || undefined
                 // commentId: commentId || undefined // Removed as not in schema
             }
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
             const vote = await prisma.vote.create({
                 data: {
                     type: voteType,
-                    userId: session.user.id,
+                    userId: user.id,
                     postId: postId || undefined
                     // commentId: commentId || undefined // Removed
                 }

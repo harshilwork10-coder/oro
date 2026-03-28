@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { prisma } from '@/lib/prisma'
 
 // GET /api/tobacco-scan/rebate-estimate - Calculate estimated rebates
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get manufacturer configs with rebate rates
         const configs = await prisma.manufacturerConfig.findMany({
-            where: { franchiseId: session.user.franchiseId, isActive: true }
+            where: { franchiseId: user.franchiseId, isActive: true }
         })
 
         // Get current week dates
@@ -34,7 +35,7 @@ export async function GET() {
         // Get tobacco transactions this week
         const weeklyTransactions = await prisma.transaction.findMany({
             where: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 status: 'COMPLETED',
                 createdAt: { gte: startOfWeek, lte: endOfWeek }
             },
@@ -49,7 +50,7 @@ export async function GET() {
         // Get tobacco transactions this month
         const monthlyTransactions = await prisma.transaction.findMany({
             where: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 status: 'COMPLETED',
                 createdAt: { gte: startOfMonth, lte: endOfMonth }
             },
@@ -105,7 +106,7 @@ export async function GET() {
         // Get active deals count
         const activeDeals = await prisma.tobaccoDeal.count({
             where: {
-                franchiseId: session.user.franchiseId,
+                franchiseId: user.franchiseId,
                 isActive: true,
                 OR: [
                     { endDate: null },

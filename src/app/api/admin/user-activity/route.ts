@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Fetch user activity log for an account/franchise
 // PROVIDER can see all activity for any client
 // This is for legal protection - see exactly what users did
-export async function GET(request: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const user = session.user as any
-    if (user.role !== 'PROVIDER') {
+if (user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'PROVIDER only' }, { status: 403 })
     }
 
-    const { searchParams } = new URL(request.url)
+    const { searchParams } = new URL(req.url)
     const franchisorId = searchParams.get('franchisorId')
     const userId = searchParams.get('userId')
     const action = searchParams.get('action')

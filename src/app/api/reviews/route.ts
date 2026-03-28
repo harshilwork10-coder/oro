@@ -1,16 +1,13 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
 
 // POST /api/reviews - Create a new review
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const body = await req.json()
@@ -18,18 +15,18 @@ export async function POST(req: NextRequest) {
 
         // Validate required fields
         if (!clientId || !rating) {
-            return ApiResponse.validationError('Client ID and rating are required')
+            return NextResponse.json({ error: 'Client ID and rating are required' }, { status: 422 })
         }
 
         // Validate rating range
         if (rating < 1 || rating > 5) {
-            return ApiResponse.validationError('Rating must be between 1 and 5')
+            return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 422 })
         }
 
         // Get franchise ID from user session
-        const franchiseId = session.user.franchiseId
+        const franchiseId = user.franchiseId
         if (!franchiseId) {
-            return ApiResponse.error('Franchise ID not found', 400)
+            return NextResponse.json({ error: 'Franchise ID not found' }, { status: 400 })
         }
 
         // Create the review
@@ -54,25 +51,27 @@ export async function POST(req: NextRequest) {
             }
         })
 
-        return ApiResponse.created(review)
+        return NextResponse.json(review, { status: 201 })
 
     } catch (error) {
         console.error('Error creating review:', error)
-        return ApiResponse.serverError('Failed to create review')
+        return NextResponse.json({ error: 'Failed to create review' }, { status: 500 })
     }
 }
 
 // GET /api/reviews - Fetch reviews for franchise with pagination
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const franchiseId = session.user.franchiseId
+        const franchiseId = user.franchiseId
         if (!franchiseId) {
-            return ApiResponse.error('Franchise ID not found', 400)
+            return NextResponse.json({ error: 'Franchise ID not found' }, { status: 400 })
         }
 
         const searchParams = req.nextUrl.searchParams
@@ -132,14 +131,14 @@ export async function GET(req: NextRequest) {
         const data = hasMore ? reviews.slice(0, take || 50) : reviews
         const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-        return ApiResponse.paginated(data, {
+        return NextResponse.json({ data: data, pagination: {
             nextCursor,
             hasMore,
             total: data.length
-        })
+        } })
 
     } catch (error) {
         console.error('Error fetching reviews:', error)
-        return ApiResponse.serverError('Failed to fetch reviews')
+        return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 })
     }
 }

@@ -1,30 +1,27 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET - Search products by name, barcode, or SKU with standardized response
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
-            return ApiResponse.unauthorized()
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = session.user as { franchiseId?: string }
+        if (!authUser) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
         if (!user.franchiseId) {
-            return ApiResponse.error('No franchise associated', 400)
+            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const query = searchParams.get('q')
         const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
         const categoryId = searchParams.get('categoryId')
         const inStockOnly = searchParams.get('inStockOnly') === 'true'
 
         if (!query || query.length < 2) {
-            return ApiResponse.validationError('Query must be at least 2 characters')
+            return NextResponse.json({ error: 'Query must be at least 2 characters' }, { status: 422 })
         }
 
         // Build where clause
@@ -87,9 +84,9 @@ export async function GET(request: NextRequest) {
             sellByCase: p.sellByCase
         }))
 
-        return ApiResponse.success(productsWithRetailFields)
+        return NextResponse.json(productsWithRetailFields)
     } catch (error) {
         console.error('[RETAIL_SEARCH]', error)
-        return ApiResponse.serverError('Failed to search products')
+        return NextResponse.json({ error: 'Failed to search products' }, { status: 500 })
     }
 }

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { auditLog } from '@/lib/audit'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { logActivity } from '@/lib/auditLog'
 
 // Helper to get user's locationId (direct or via franchise)
 async function getUserLocationId(user: any): Promise<string | null> {
@@ -25,14 +24,14 @@ async function getUserLocationId(user: any): Promise<string | null> {
 }
 
 // GET - List all terminals for this location (PROVIDER only)
-export async function GET() {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const user = session.user as any
-    // ONLY PROVIDER can access
+// ONLY PROVIDER can access
     if (user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -51,14 +50,11 @@ export async function GET() {
 }
 
 // POST - Create new terminal (PROVIDER only)
-export async function POST(request: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+export async function POST(req: NextRequest) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const user = session.user as any
-    // ONLY PROVIDER can create
+// ONLY PROVIDER can create
     if (user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -69,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { name, terminalIP, terminalPort, terminalType } = await request.json()
+        const { name, terminalIP, terminalPort, terminalType } = await req.json()
 
         if (!name || !terminalIP) {
             return NextResponse.json({ error: 'Name and IP address required' }, { status: 400 })
@@ -86,7 +82,7 @@ export async function POST(request: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role,
@@ -104,19 +100,16 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE - Delete a terminal (PROVIDER only)
-export async function DELETE(request: NextRequest) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+export async function DELETE(req: NextRequest) {
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const user = session.user as any
-    // ONLY PROVIDER can delete
+// ONLY PROVIDER can delete
     if (user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { searchParams } = new URL(request.url)
+    const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
     if (!id) {
@@ -129,7 +122,7 @@ export async function DELETE(request: NextRequest) {
         })
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: user.id,
             userEmail: user.email,
             userRole: user.role,

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
+import { prisma } from '@/lib/prisma'
 import { generateStationCode } from '@/lib/codeGenerator';
-import { auditLog } from '@/lib/audit';
+import { logActivity } from '@/lib/auditLog';
 
 /**
  * POST /api/settings/stations/[stationId]/regenerate-code
@@ -18,13 +17,8 @@ export async function POST(
     { params }: { params: Promise<{ stationId: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions);
-
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const user = session.user as any;
+        const user = await getAuthUser(request)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         const { stationId } = await params;
 
         if (!stationId) {
@@ -89,8 +83,8 @@ export async function POST(
         console.log(`[regenerate-code] New code for ${station.name} @ ${station.location.name}: ${newCode}`);
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
+        await logActivity({
+            userId: user.id,
             userEmail: user.email,
             userRole: user.role,
             action: 'STATION_REGENERATE_CODE',

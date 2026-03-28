@@ -1,29 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET /api/barber/my-prices - Get barber's price overrides
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get user with their canSetOwnPrices permission and franchise info
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            include: {
-                franchise: {
-                    include: {
-                        services: true // Shop's service menu
-                    }
-                },
-                priceOverrides: true // User's price overrides
-            }
-        })
-
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 })
         }
@@ -62,26 +51,20 @@ export async function GET(request: NextRequest) {
 }
 
 // PUT /api/barber/my-prices - Update barber's price overrides
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Check permission
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { canSetOwnPrices: true }
-        })
-
         if (!user?.canSetOwnPrices) {
             return NextResponse.json({
                 error: 'You are not authorized to set your own prices'
             }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { serviceId, price } = body
 
         if (!serviceId) {
@@ -92,7 +75,7 @@ export async function PUT(request: NextRequest) {
         if (price === null || price === undefined) {
             await prisma.employeeServicePriceOverride.deleteMany({
                 where: {
-                    userId: session.user.id,
+                    userId: user.id,
                     serviceId: serviceId
                 }
             })
@@ -112,7 +95,7 @@ export async function PUT(request: NextRequest) {
         const override = await prisma.employeeServicePriceOverride.upsert({
             where: {
                 userId_serviceId: {
-                    userId: session.user.id,
+                    userId: user.id,
                     serviceId: serviceId
                 }
             },
@@ -120,7 +103,7 @@ export async function PUT(request: NextRequest) {
                 price: numericPrice
             },
             create: {
-                userId: session.user.id,
+                userId: user.id,
                 serviceId: serviceId,
                 price: numericPrice
             }

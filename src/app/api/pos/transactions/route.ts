@@ -1,14 +1,13 @@
-import { NextRequest } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
 import { parsePaginationParams } from '@/lib/pagination'
 
 export async function GET(req: NextRequest) {
     // Support both session (web) and Bearer token (mobile)
     const user = await getAuthUser(req)
     if (!user?.franchiseId) {
-        return ApiResponse.unauthorized()
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
@@ -75,13 +74,13 @@ export async function GET(req: NextRequest) {
         const data = hasMore ? transactions.slice(0, take || 50) : transactions
         const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
 
-        return ApiResponse.paginated(data, {
+        return NextResponse.json({ data: data, pagination: {
             nextCursor,
             hasMore,
             total: data.length
-        })
+        } })
     } catch (error) {
         console.error('[POS_TRANSACTIONS_GET]', error)
-        return ApiResponse.serverError('Failed to fetch transactions')
+        return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 })
     }
 }

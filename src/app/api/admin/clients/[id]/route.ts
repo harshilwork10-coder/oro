@@ -1,20 +1,20 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { validateCuid, applyRateLimit, logSuccess, logFailure, RATE_LIMITS } from '@/lib/security'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 export async function GET(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const user = await getAuthUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { id } = await params
     // Debug log removed
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session || session.user.role !== 'PROVIDER') {
+        if (!session || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -81,9 +81,7 @@ export async function PUT(
 ) {
     const { id } = await params
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session || session.user.role !== 'PROVIDER') {
+        if (!session || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -126,9 +124,9 @@ export async function PUT(
         })
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: session.user.email!,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email!,
             userRole: 'PROVIDER',
             action: 'CLIENT_UPDATED',
             entityType: 'Franchisor',
@@ -161,14 +159,13 @@ export async function DELETE(
         }
 
         // 2. Authentication
-        const session = await getServerSession(authOptions)
-        if (!session || session.user.role !== 'PROVIDER') {
+        if (!session || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // 3. Rate Limiting
         const rateLimitResponse = await applyRateLimit(
-            `/api/admin/clients/delete:${session.user.id}`,
+            `/api/admin/clients/delete:${user.id}`,
             RATE_LIMITS.api
         )
         if (rateLimitResponse) {
@@ -470,15 +467,15 @@ export async function DELETE(
 
         // Audit Log - Success
         await logSuccess({
-            userId: session.user.id,
-            userEmail: session.user.email || '',
-            userRole: session.user.role,
+            userId: user.id,
+            userEmail: user.email || '',
+            userRole: user.role,
             action: 'DELETE',
             resource: 'Franchisor',
             resourceId: id,
             details: {
                 franchisorName: franchisor.name,
-                deletedBy: session.user.email
+                deletedBy: user.email
             }
         })
 
@@ -490,12 +487,11 @@ export async function DELETE(
         console.error('Error details JSON:', JSON.stringify(error, null, 2))
 
         // Audit Log - Failure (best effort, don't await)
-        const session = await getServerSession(authOptions)
         if (session) {
             logFailure({
-                userId: session.user.id,
-                userEmail: session.user.email || '',
-                userRole: session.user.role,
+                userId: user.id,
+                userEmail: user.email || '',
+                userRole: user.role,
                 action: 'DELETE',
                 resource: 'Franchisor',
                 resourceId: id,

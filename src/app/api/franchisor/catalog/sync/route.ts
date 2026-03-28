@@ -1,9 +1,7 @@
-import { NextRequest } from 'next/server'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { ApiResponse } from '@/lib/api-response'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 /**
  * POST: Diff-based sync of brand catalog to locations
@@ -16,25 +14,17 @@ import { auditLog } from '@/lib/audit'
  */
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get user's franchisor
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            include: {
-                roleAssignments: {
-                    where: { franchisorId: { not: null } },
-                    select: { franchisorId: true }
-                }
-            }
-        })
-
         const franchisorId = user?.roleAssignments?.[0]?.franchisorId
         if (!franchisorId) {
-            return ApiResponse.forbidden('Not a franchisor')
+            return NextResponse.json({ error: 'Not a franchisor' }, { status: 403 })
         }
 
         const body = await req.json()
@@ -54,7 +44,7 @@ export async function POST(req: NextRequest) {
         })
 
         if (!franchisor) {
-            return ApiResponse.notFound('Franchisor')
+            return NextResponse.json({ error: 'Franchisor' }, { status: 404 })
         }
 
         const locations = targetLocationIds
@@ -136,9 +126,9 @@ export async function POST(req: NextRequest) {
         }
 
         // Audit log
-        await auditLog({
-            userId: session.user.id,
-            userEmail: (session.user as any).email,
+        await logActivity({
+            userId: user.id,
+            userEmail: user.email,
             userRole: 'FRANCHISOR',
             action: 'CATALOG_SYNC',
             entityType: 'Franchisor',
@@ -146,7 +136,7 @@ export async function POST(req: NextRequest) {
             metadata: { ...stats, applyPriceUpdates }
         })
 
-        return ApiResponse.success({
+        return NextResponse.json({
             message: 'Sync completed',
             stats,
             locations: locations.map(l => l.name)
@@ -154,6 +144,6 @@ export async function POST(req: NextRequest) {
 
     } catch (error) {
         console.error('Error syncing brand catalog:', error)
-        return ApiResponse.serverError('Failed to sync brand catalog')
+        return NextResponse.json({ error: 'Failed to sync brand catalog' }, { status: 500 })
     }
 }

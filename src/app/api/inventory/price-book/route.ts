@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -16,10 +15,10 @@ import { prisma } from '@/lib/prisma'
  *   - Margin-based pricing (cost + markup%)
  */
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const franchiseId = user.franchiseId
@@ -85,16 +84,14 @@ export async function GET(request: NextRequest) {
     }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const franchiseId = user.franchiseId
         if (!franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const body = await request.json()
+        const body = await req.json()
         const { action, categoryId, adjustmentType, value, preview } = body
 
         if (action === 'adjust') {

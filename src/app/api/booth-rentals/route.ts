@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // GET - Get booth rentals for a franchise/location
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const locationId = searchParams.get('locationId')
 
         const rentals = await prisma.boothRental.findMany({
@@ -47,11 +44,8 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create a new booth rental
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -61,7 +55,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { userId, boothNumber, weeklyRate, dueDay, locationId } = body
 
         if (!userId || !boothNumber) {
@@ -87,11 +81,8 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT - Update booth rental
-export async function PUT(request: NextRequest) {
+export async function PUT(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -100,7 +91,7 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { id, boothNumber, weeklyRate, dueDay, isActive } = body
 
         if (!id) {
@@ -125,11 +116,8 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE - End booth rental (set inactive)
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        const user = session?.user as any
-
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -138,7 +126,7 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
 
         if (!id) {

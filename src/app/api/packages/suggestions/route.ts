@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 interface PackageSuggestion {
@@ -20,15 +19,15 @@ interface PackageSuggestion {
 }
 
 // GET - Generate AI-powered package suggestions
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const franchiseId = user.franchiseId
+const franchiseId = user.franchiseId
 
         if (!franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })

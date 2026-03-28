@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { authenticatePOSRequest } from '@/lib/posAuth'
-import { auditLog } from '@/lib/audit'
+import { logActivity } from '@/lib/auditLog'
 
 /**
  * Dual auth helper: tries station token first (for Android POS),
@@ -18,7 +17,6 @@ async function resolveAuth(req: Request): Promise<boolean> {
     }
 
     // Fall back to NextAuth web session
-    const session = await getServerSession(authOptions)
     return !!session
 }
 
@@ -28,6 +26,9 @@ export async function GET(
     { params }: { params: Promise<{ code: string }> }
 ) {
     try {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
         const { code } = await params
         const isAuthed = await resolveAuth(req)
         if (!isAuthed) {
@@ -90,7 +91,7 @@ export async function POST(
         })
 
         // Audit log
-        await auditLog({
+        await logActivity({
             userId: 'system',
             userEmail: 'pos',
             userRole: 'STATION',

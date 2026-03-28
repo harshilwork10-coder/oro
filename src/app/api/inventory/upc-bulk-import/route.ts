@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // UPCitemdb API configuration
@@ -15,20 +14,17 @@ interface ImportResult {
 }
 
 // POST: Bulk import UPC codes to master database
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        // Only providers/admins can bulk import to master DB
+// Only providers/admins can bulk import to master DB
         if (!['PROVIDER', 'ADMIN', 'FRANCHISOR'].includes(user.role)) {
             return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
         }
 
-        const { upcCodes, delayMs = 500 } = await request.json()
+        const { upcCodes, delayMs = 500 } = await req.json()
 
         if (!upcCodes || !Array.isArray(upcCodes)) {
             return NextResponse.json({ error: 'upcCodes array required' }, { status: 400 })
@@ -154,10 +150,12 @@ export async function POST(request: NextRequest) {
 }
 
 // GET: Get stats on master UPC database
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -11,15 +10,15 @@ import { prisma } from '@/lib/prisma'
  */
 
 // GET — Fetch products with their price at each location
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const { searchParams } = new URL(request.url)
+const { searchParams } = new URL(req.url)
         const search = searchParams.get('search') || ''
         const categoryId = searchParams.get('categoryId') || ''
         const limit = parseInt(searchParams.get('limit') || '50')
@@ -165,15 +164,12 @@ export async function GET(request: NextRequest) {
 }
 
 // POST — Update price at specific locations
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const user = session.user as any
-        const body = await request.json()
+const body = await req.json()
         const { updates } = body
         // updates: Array<{ productId, locationIds: string[], newPrice: number }>
 
@@ -256,14 +252,13 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE — Remove location override (revert to default franchise price)
-export async function DELETE(request: NextRequest) {
+export async function DELETE(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const productId = searchParams.get('productId')
         const locationId = searchParams.get('locationId')
 

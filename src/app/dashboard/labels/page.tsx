@@ -84,17 +84,44 @@ export default function LabelPrintPage() {
         loadStoreSettings()
     }, [])
 
-    // Search products
+    // Search products — searches both Product (retail) and Item (salon) sources, merges results
     async function searchProducts() {
         if (!searchQuery.trim()) return
 
         try {
-            // Search by barcode first
-            const res = await fetch(`/api/inventory/items?search=${encodeURIComponent(searchQuery)}`)
-            if (res.ok) {
-                const data = await res.json()
-                setProducts(data.items || [])
+            const encodedQuery = encodeURIComponent(searchQuery)
+
+            // Search both sources in parallel to support both retail and salon stores
+            const [productsRes, itemsRes] = await Promise.allSettled([
+                fetch(`/api/inventory/products?search=${encodedQuery}`),
+                fetch(`/api/inventory/items?search=${encodedQuery}`)
+            ])
+
+            const merged: Product[] = []
+            const seenBarcodes = new Set<string>()
+
+            // Products source (retail) — primary
+            if (productsRes.status === 'fulfilled' && productsRes.value.ok) {
+                const data = await productsRes.value.json()
+                const items = data.data || data.products || []
+                for (const p of items) {
+                    merged.push(p)
+                    if (p.barcode) seenBarcodes.add(p.barcode)
+                }
             }
+
+            // Items source (salon/unified) — secondary, deduplicate by barcode
+            if (itemsRes.status === 'fulfilled' && itemsRes.value.ok) {
+                const data = await itemsRes.value.json()
+                const items = data.items || data.data || []
+                for (const item of items) {
+                    if (item.barcode && seenBarcodes.has(item.barcode)) continue
+                    merged.push(item)
+                    if (item.barcode) seenBarcodes.add(item.barcode)
+                }
+            }
+
+            setProducts(merged)
         } catch (e) {
             console.error('Search failed', e)
         }

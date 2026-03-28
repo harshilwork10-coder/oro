@@ -1,14 +1,12 @@
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // POST - AI-powered SKU lookup for product identification
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const { query, barcode, image } = await request.json()
+        const { query, barcode, image } = await req.json()
         // TODO: Integrate with AI model for SKU identification
         console.log('[AI_SKU_LOOKUP]', { query, barcode })
 

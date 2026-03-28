@@ -6,24 +6,17 @@
  *       line deletes, and more. Risk-scored per employee.
  */
 
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { franchiseId: true }
-        })
-        if (!user?.franchiseId) return ApiResponse.badRequest('No franchise')
+        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '7')
         const employeeId = searchParams.get('employeeId')
         const eventType = searchParams.get('eventType')
@@ -208,7 +201,7 @@ export async function GET(request: NextRequest) {
             locationId: e.locationId
         }))
 
-        return ApiResponse.success({
+        return NextResponse.json({
             eventLog,
             employeeRiskRanking: riskRanking,
             byEventType,
@@ -232,6 +225,6 @@ export async function GET(request: NextRequest) {
         })
     } catch (error) {
         console.error('[EMPLOYEE_AUDIT_GET]', error)
-        return ApiResponse.error('Failed to generate employee audit report', 500)
+        return NextResponse.json({ error: 'Failed to generate employee audit report' }, { status: 500 })
     }
 }

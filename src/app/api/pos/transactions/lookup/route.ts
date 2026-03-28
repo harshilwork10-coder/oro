@@ -1,29 +1,28 @@
-import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import {NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { ApiResponse } from '@/lib/api-response'
-
 // GET /api/pos/transactions/lookup - Lookup transaction by invoice number for refunds
 // This enables the "scan receipt barcode" feature for quick refunds
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.franchiseId) {
-            return ApiResponse.unauthorized()
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (!user?.franchiseId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const searchParams = request.nextUrl.searchParams
+        const searchParams = req.nextUrl.searchParams
         const invoiceNumber = searchParams.get('invoice')
         const transactionId = searchParams.get('id')
 
         if (!invoiceNumber && !transactionId) {
-            return ApiResponse.validationError('Invoice number or transaction ID is required')
+            return NextResponse.json({ error: 'Invoice number or transaction ID is required' }, { status: 422 })
         }
 
         // Build where clause
         const whereClause: Record<string, unknown> = {
-            franchiseId: session.user.franchiseId
+            franchiseId: user.franchiseId
         }
 
         if (invoiceNumber) {
@@ -43,7 +42,7 @@ export async function GET(request: NextRequest) {
         })
 
         if (!transaction) {
-            return ApiResponse.notFound('Transaction')
+            return NextResponse.json({ error: 'Transaction' }, { status: 404 })
         }
 
         // Format for refund display
@@ -72,10 +71,10 @@ export async function GET(request: NextRequest) {
             refundable: transaction.status !== 'REFUNDED' && transaction.status !== 'VOIDED'
         }
 
-        return ApiResponse.success(refundData)
+        return NextResponse.json(refundData)
 
     } catch (error) {
         console.error('Transaction lookup failed:', error)
-        return ApiResponse.serverError('Failed to lookup transaction')
+        return NextResponse.json({ error: 'Failed to lookup transaction' }, { status: 500 })
     }
 }

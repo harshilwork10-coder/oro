@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
 // STUB: License management feature not yet implemented in current schema
 // The License model does not exist in the Prisma schema
 
-export async function GET() {
-    const session = await getServerSession(authOptions)
-    if (!session?.user || !['PROVIDER', 'ADMIN'].includes(session.user.role)) {
+export async function GET(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!user || !['PROVIDER', 'ADMIN'].includes(user.role)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
