@@ -199,6 +199,7 @@ export async function POST(request: NextRequest) {
                 startTime,
                 endTime: primaryEndTime,
                 status: 'PENDING_APPROVAL',
+                source: 'ONLINE',
                 notes: cleanNotes,
                 groupBookingId,
                 groupPosition: isGroupBooking ? 1 : null
@@ -242,6 +243,7 @@ export async function POST(request: NextRequest) {
                     startTime: currentStartTime,
                     endTime: memberEndTime,
                     status: 'PENDING_APPROVAL',
+                    source: 'ONLINE',
                     notes: `Group booking with ${cleanName}`,
                     groupBookingId,
                     groupPosition: i + 2 // 2, 3, 4, etc.

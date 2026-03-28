@@ -22,6 +22,8 @@ interface Location {
     id: string
     name: string
     address: string | null
+    slug?: string
+    timezone?: string
 }
 
 interface TimeSlot {
@@ -36,10 +38,10 @@ interface GroupMember {
     addons: Service[]
 }
 
-type Step = 'service' | 'addons' | 'staff' | 'datetime' | 'details' | 'waiver' | 'confirm' | 'success'
+type Step = 'service' | 'location' | 'addons' | 'staff' | 'datetime' | 'details' | 'waiver' | 'confirm' | 'success'
 
 
-const STEPS = ['service', 'addons', 'staff', 'datetime', 'details', 'waiver', 'confirm'] as const
+const STEPS = ['service', 'location', 'addons', 'staff', 'datetime', 'details', 'waiver', 'confirm'] as const
 
 export default function BookingPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params)
@@ -105,6 +107,14 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
             setLocations(data.locations)
             if (data.locations.length === 1) {
                 setSelectedLocation(data.locations[0])
+            } else {
+                // Check for ?locationId= query param (from /book/l/[slug] redirect)
+                const urlParams = new URLSearchParams(window.location.search)
+                const preSelectedId = urlParams.get('locationId')
+                if (preSelectedId) {
+                    const match = data.locations.find((l: Location) => l.id === preSelectedId)
+                    if (match) setSelectedLocation(match)
+                }
             }
         } catch (err) {
             setError('Failed to load booking page')
@@ -299,6 +309,84 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         )
     }
 
+    // BRAND LANDING MODE: For multi-location businesses, show a brand landing
+    // page where customers choose a location BEFORE entering the booking flow.
+    // This activates when: >1 locations, no location pre-selected, and we're at the start.
+    if (locations.length > 1 && !selectedLocation && step === 'service') {
+        return (
+            <div className="min-h-screen bg-[#0a0a0f] relative overflow-hidden">
+                {/* Background */}
+                <div className="fixed inset-0 pointer-events-none">
+                    <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-violet-600/20 rounded-full blur-[120px] animate-pulse" />
+                    <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-fuchsia-600/15 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+                </div>
+
+                <div className="relative z-10">
+                    {/* Brand Header */}
+                    <header className="pt-10 pb-8 px-6">
+                        <div className="max-w-3xl mx-auto text-center">
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 backdrop-blur-xl border border-violet-500/30 rounded-full text-violet-200 text-sm mb-6">
+                                <MapPin className="h-3.5 w-3.5" />
+                                <span>{locations.length} locations</span>
+                            </div>
+
+                            <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-fuchsia-200 mb-3">
+                                {franchise?.name}
+                            </h1>
+                            <p className="text-lg text-violet-300/70 max-w-xl mx-auto">
+                                Choose a location to book your appointment
+                            </p>
+                        </div>
+                    </header>
+
+                    {/* Location Cards */}
+                    <main className="px-6 pb-20">
+                        <div className="max-w-3xl mx-auto grid gap-4 md:grid-cols-2">
+                            {locations.map((loc, index) => (
+                                <button
+                                    key={loc.id}
+                                    onClick={() => {
+                                        setSelectedLocation(loc)
+                                        // Stay on 'service' step — the booking flow will proceed normally
+                                    }}
+                                    className="group relative bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-violet-500/40 rounded-2xl p-6 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-violet-500/10"
+                                    style={{ animationDelay: `${index * 80}ms` }}
+                                >
+                                    {/* Location icon */}
+                                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/20 flex items-center justify-center mb-4">
+                                        <MapPin className="h-6 w-6 text-emerald-400" />
+                                    </div>
+
+                                    <h3 className="font-bold text-white text-lg mb-1 group-hover:text-violet-200 transition-colors">
+                                        {loc.name}
+                                    </h3>
+
+                                    {loc.address && (
+                                        <p className="text-sm text-stone-400 mb-3">{loc.address}</p>
+                                    )}
+
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-300 rounded-full text-xs font-medium">
+                                            <Zap className="h-3 w-3" /> Book Now
+                                        </span>
+                                    </div>
+
+                                    {/* Hover glow */}
+                                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-violet-500/0 via-violet-500/5 to-fuchsia-500/0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Direct link hint */}
+                        <p className="text-center text-stone-500 text-sm mt-8">
+                            Each location has its own booking page and availability
+                        </p>
+                    </main>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="min-h-screen bg-[#0a0a0f] relative overflow-hidden">
             {/* Animated Background */}
@@ -375,13 +463,16 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                                                 onClick={() => {
                                                     setSelectedService(service)
                                                     setSelectedAddons([])
-                                                    // Auto-select first location if not already selected
-                                                    if (!selectedLocation && locations.length > 0) {
-                                                        setSelectedLocation(locations[0])
+                                                    // Multi-location: show location picker; single-location: auto-select and skip
+                                                    if (locations.length > 1 && !selectedLocation) {
+                                                        setTimeout(() => animateToStep('location'), 200)
+                                                    } else {
+                                                        if (!selectedLocation && locations.length > 0) {
+                                                            setSelectedLocation(locations[0])
+                                                        }
+                                                        const nextStep = addons.length > 0 ? 'addons' : 'staff'
+                                                        setTimeout(() => animateToStep(nextStep), 200)
                                                     }
-                                                    // Go to addons if available, otherwise staff selection
-                                                    const nextStep = addons.length > 0 ? 'addons' : 'staff'
-                                                    setTimeout(() => animateToStep(nextStep), 200)
                                                 }}
                                                 className="w-full group relative bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-violet-500/50 rounded-2xl p-5 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-violet-500/10"
                                                 style={{ animationDelay: `${index * 100}ms` }}
@@ -430,7 +521,63 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                             </div>
                         )}
 
-                        {/* Step 1.5: Add-on Services */}
+                        {/* Step 1.5: Location Selection (multi-location only) */}
+                        {step === 'location' && (
+                            <div className="space-y-4">
+                                <div className="text-center mb-6">
+                                    <h2 className="text-xl font-bold text-white mb-1">Choose a Location</h2>
+                                    <p className="text-violet-300/70">Select the store you'd like to visit</p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {locations.map((loc, index) => (
+                                        <button
+                                            key={loc.id}
+                                            onClick={() => {
+                                                setSelectedLocation(loc)
+                                                const nextStep = addons.length > 0 ? 'addons' : 'staff'
+                                                setTimeout(() => animateToStep(nextStep), 200)
+                                            }}
+                                            className={`w-full group relative bg-white/[0.03] hover:bg-white/[0.08] border rounded-2xl p-5 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-violet-500/10 ${
+                                                selectedLocation?.id === loc.id ? 'border-violet-500/50 bg-violet-500/10' : 'border-white/10 hover:border-violet-500/50'
+                                            }`}
+                                            style={{ animationDelay: `${index * 100}ms` }}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-[1px]">
+                                                    <div className="w-full h-full rounded-2xl bg-[#0a0a0f] flex items-center justify-center">
+                                                        <MapPin className="h-6 w-6 text-emerald-400" />
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-semibold text-white text-lg group-hover:text-violet-200 transition-colors">
+                                                        {loc.name}
+                                                    </h3>
+                                                    {loc.address && (
+                                                        <p className="text-sm text-violet-300/70 mt-0.5">
+                                                            <MapPin className="h-3.5 w-3.5 inline mr-1" />
+                                                            {loc.address}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <ChevronRight className="h-5 w-5 text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Back Button */}
+                                <button
+                                    onClick={() => animateToStep('service')}
+                                    className="flex items-center gap-2 text-violet-400 hover:text-violet-300 transition-colors mx-auto mt-4"
+                                >
+                                    <ArrowLeft className="h-4 w-4" />
+                                    <span>Back to services</span>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Step 2: Add-on Services */}
                         {step === 'addons' && (
                             <div className="space-y-4">
                                 {/* Selected Service Card */}

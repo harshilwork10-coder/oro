@@ -979,6 +979,12 @@ model Location {
   // Operating hours (JSON: {"mon": "9:00-21:00", "tue": "9:00-21:00", ...})
   operatingHours String?
 
+  // Timezone (IANA format: "America/Chicago", "America/New_York", etc.)
+  timezone String @default("America/Chicago")
+
+  // Booking profile (auto-created for SERVICE businesses)
+  bookingProfile BookingProfile?
+
   // Branding for public display
   publicLogoUrl   String?
   publicBannerUrl String?
@@ -1762,6 +1768,9 @@ model Appointment {
   endTime   DateTime
   status    String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED, NO_SHOW
   notes     String?
+
+  // Booking source tracking
+  source String @default("POS") // ONLINE, POS, PHONE, WALK_IN
 
   // Group booking - links multiple appointments made together
   groupBookingId String? // Shared ID for all appointments in a group
@@ -6272,4 +6281,37 @@ model OwnerNotificationPreference {
   updatedAt              DateTime @updatedAt
 
   @@unique([userId, franchiseId])
+}
+
+// ============ ONLINE BOOKING: PER-LOCATION PROFILE ============
+// Auto-created for SERVICE businesses during onboarding.
+// Controls publish state, booking rules, branding, and setup wizard progress.
+
+model BookingProfile {
+  id         String   @id @default(cuid())
+  locationId String   @unique
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  // Publish state — booking page is DRAFT until owner explicitly publishes
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+
+  // Booking rules
+  maxAdvanceDays   Int @default(30) // How far ahead customers can book
+  minNoticeMinutes Int @default(120) // Minimum notice before appointment (2 hours default)
+  slotIntervalMin  Int @default(30) // Time slot granularity in minutes
+  bufferMinutes    Int @default(0) // Buffer between consecutive appointments
+
+  // Branding
+  accentColor    String  @default("#7C3AED") // Violet default
+  welcomeMessage String?
+
+  // Setup wizard tracking
+  setupCompleted Boolean @default(false)
+  setupStep      String  @default("services") // services, staff, hours, rules, publish
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isPublished])
 }

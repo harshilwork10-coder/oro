@@ -5,6 +5,7 @@ import { hash } from 'bcrypt'
 import crypto from 'crypto'
 import { sendEmail } from '@/lib/email'
 import { logActivity } from '@/lib/auditLog'
+import { autoSetupBooking, generateUniqueSlug } from '@/lib/booking/autoSetup'
 
 // Rate limiting
 const creationAttempts = new Map<string, { count: number; resetAt: number }>()
@@ -138,16 +139,18 @@ export async function POST(req: NextRequest) {
 
         // For MULTI_LOCATION_OWNER, create default franchise and location
         if (finalBusinessType === 'MULTI_LOCATION_OWNER') {
-            // Create a slug from company name
+            // Create a unique slug from company name (with deduplication)
             const baseSlug = sanitizedCompanyName
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/(^-|-$)/g, '')
 
+            const franchiseSlug = await generateUniqueSlug(baseSlug, 'franchise')
+
             const franchise = await prisma.franchise.create({
                 data: {
                     name: sanitizedCompanyName,
-                    slug: baseSlug,
+                    slug: franchiseSlug,
                     franchisorId: franchisor.id,
                     approvalStatus: 'PENDING'
                 }
@@ -160,18 +163,30 @@ export async function POST(req: NextRequest) {
             })
 
             // Create the default location using STORE NAME (DBA), not company name
-            const storeSlug = sanitizedStoreName
+            const storeBaseSlug = sanitizedStoreName
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/(^-|-$)/g, '')
 
-            await prisma.location.create({
+            const locationSlug = await generateUniqueSlug(`${storeBaseSlug}-main`, 'location')
+
+            const location = await prisma.location.create({
                 data: {
                     name: sanitizedStoreName, // Use DBA name for the location!
-                    slug: `${storeSlug}-main`,
+                    slug: locationSlug,
                     franchiseId: franchise.id
                 }
             })
+
+            // AUTO-SETUP BOOKING for SERVICE businesses
+            if (finalIndustryType === 'SERVICE') {
+                try {
+                    await autoSetupBooking(location.id, franchise.id, sanitizedStoreName)
+                } catch (err) {
+                    console.error('Booking auto-setup failed (non-blocking):', err)
+                    // Non-blocking: business creation succeeds even if booking setup fails
+                }
+            }
         }
 
         // Auto-license generation removed - stations are added by franchisor post-signup

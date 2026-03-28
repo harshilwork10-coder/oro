@@ -28,8 +28,8 @@ interface ClientRebookingSuggestion {
 // GET - Get clients who are due for rebooking
 export async function GET(req: NextRequest) {
     try {
-        const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

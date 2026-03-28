@@ -24,10 +24,91 @@ export async function GET(request: NextRequest) {
             if (service) duration = service.duration
         }
 
-        // Parse date as local date (YYYY-MM-DD format)
+        // Fetch location with booking profile for rules and real operating hours
+        const location = await prisma.location.findUnique({
+            where: { id: locationId },
+            select: {
+                operatingHours: true,
+                storeHours: true,
+                timezone: true,
+                bookingProfile: {
+                    select: {
+                        isPublished: true,
+                        slotIntervalMin: true,
+                        bufferMinutes: true,
+                        maxAdvanceDays: true,
+                        minNoticeMinutes: true
+                    }
+                }
+            }
+        })
+
+        // Get booking rules from profile (or defaults)
+        const slotInterval = location?.bookingProfile?.slotIntervalMin || 30
+        const bufferMinutes = location?.bookingProfile?.bufferMinutes || 0
+        const maxAdvanceDays = location?.bookingProfile?.maxAdvanceDays || 30
+        const minNoticeMinutes = location?.bookingProfile?.minNoticeMinutes || 0
+
+        // Parse operating hours from Location — use operatingHours first, fallback to storeHours
+        const hoursJson = location?.operatingHours || location?.storeHours
+        const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
         const [y, m, d] = date.split('-').map(Number)
+        const dateObj = new Date(y, m - 1, d)
+        const dayOfWeek = dayNames[dateObj.getDay()]
+
+        let startHour = 9
+        let startMinute = 0
+        let endHour = 18
+        let endMinute = 0
+
+        if (hoursJson) {
+            try {
+                const hours = JSON.parse(hoursJson)
+                // Support both formats:
+                // Format A: { "mon": "9:00-21:00" }
+                // Format B: { "monday": { "open": "09:00", "close": "22:00" } }
+                const dayKey = Object.keys(hours).find(k =>
+                    k.toLowerCase().startsWith(dayOfWeek) ||
+                    k.toLowerCase() === dayOfWeek
+                )
+                if (dayKey) {
+                    const dayVal = hours[dayKey]
+                    if (typeof dayVal === 'string') {
+                        // Format A: "9:00-21:00"
+                        if (dayVal.toLowerCase() === 'closed') {
+                            return NextResponse.json({ slots: [], duration, closed: true })
+                        }
+                        const [openStr, closeStr] = dayVal.split('-')
+                        const [oh, om] = openStr.split(':').map(Number)
+                        const [ch, cm] = closeStr.split(':').map(Number)
+                        startHour = oh; startMinute = om || 0
+                        endHour = ch; endMinute = cm || 0
+                    } else if (typeof dayVal === 'object' && dayVal.open) {
+                        // Format B: { open: "09:00", close: "22:00" }
+                        if (dayVal.closed === true) {
+                            return NextResponse.json({ slots: [], duration, closed: true })
+                        }
+                        const [oh, om] = dayVal.open.split(':').map(Number)
+                        const [ch, cm] = dayVal.close.split(':').map(Number)
+                        startHour = oh; startMinute = om || 0
+                        endHour = ch; endMinute = cm || 0
+                    }
+                }
+            } catch { /* use defaults 9-18 */ }
+        }
+
+        // Parse date as local date (YYYY-MM-DD format)
         const dateStart = new Date(y, m - 1, d, 0, 0, 0, 0)
         const dateEnd = new Date(y, m - 1, d, 23, 59, 59, 999)
+
+        // Check max advance days
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const requestedDate = new Date(y, m - 1, d)
+        const daysDiff = Math.floor((requestedDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysDiff > maxAdvanceDays) {
+            return NextResponse.json({ slots: [], duration, message: 'Date is too far in advance' })
+        }
 
         const appointments = await prisma.appointment.findMany({
             where: {
@@ -46,7 +127,7 @@ export async function GET(request: NextRequest) {
         // Get time blocks for the staff member (if specified)
         let timeBlocks: { startTime: Date; endTime: Date }[] = []
         if (staffId) {
-            const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
+            const dayOfWeekStr = new Date(date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
 
             const blocks = await prisma.timeBlock.findMany({
                 where: {
@@ -85,7 +166,7 @@ export async function GET(request: NextRequest) {
                 if (block.recurringDays) {
                     try {
                         const days = JSON.parse(block.recurringDays) as string[]
-                        if (!days.includes(dayOfWeek)) {
+                        if (!days.includes(dayOfWeekStr)) {
                             return false // Doesn't apply to this day
                         }
                     } catch {
@@ -109,46 +190,30 @@ export async function GET(request: NextRequest) {
             })
         }
 
-        // BUG-9 FIX: Fetch actual business hours instead of hardcoding 9-18
-        let startHour = 9
-        let endHour = 18
-        try {
-            const loc = await prisma.location.findUnique({
-                where: { id: locationId },
-                select: { franchiseId: true }
-            })
-            if (loc?.franchiseId) {
-                const franchise = await prisma.franchise.findUnique({
-                    where: { id: loc.franchiseId },
-                    select: { franchisorId: true }
-                })
-                if (franchise?.franchisorId) {
-                    const bizConfig = await (prisma as any).businessConfig?.findUnique?.({
-                        where: { franchisorId: franchise.franchisorId },
-                        select: { openTime: true, closeTime: true }
-                    })
-                    if (bizConfig?.openTime) startHour = parseInt(bizConfig.openTime.split(':')[0]) || 9
-                    if (bizConfig?.closeTime) endHour = parseInt(bizConfig.closeTime.split(':')[0]) || 18
-                }
-            }
-        } catch { /* use defaults */ }
-
         const slots: { time: string; available: boolean }[] = []
+        const now = new Date()
 
-        // Parse the date string to get year, month, day in local context
-        const [year, month, day] = date.split('-').map(Number)
+        // Generate slots using real operating hours and booking profile rules
+        for (let hour = startHour; hour < endHour || (hour === endHour && 0 < endMinute); hour++) {
+            for (let minute = (hour === startHour ? startMinute : 0); minute < 60; minute += slotInterval) {
+                // Don't exceed business close time
+                if (hour > endHour || (hour === endHour && minute >= endMinute)) break
 
-        for (let hour = startHour; hour < endHour; hour++) {
-            for (let minute = 0; minute < 60; minute += 30) {
                 // Create slot time explicitly in local timezone
-                const slotTime = new Date(year, month - 1, day, hour, minute, 0, 0)
+                const slotTime = new Date(y, m - 1, d, hour, minute, 0, 0)
 
                 // Check if slot is in the past
-                if (slotTime < new Date()) {
+                if (slotTime < now) {
                     continue
                 }
 
-                const slotEnd = new Date(slotTime.getTime() + duration * 60000)
+                // Check minimum notice period
+                const minutesUntilSlot = (slotTime.getTime() - now.getTime()) / 60000
+                if (minutesUntilSlot < minNoticeMinutes) {
+                    continue
+                }
+
+                const slotEnd = new Date(slotTime.getTime() + (duration + bufferMinutes) * 60000)
 
                 // Check if slot conflicts with existing appointments
                 const isAppointmentConflict = appointments.some(apt => {
@@ -175,4 +240,3 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to fetch availability' }, { status: 500 })
     }
 }
-
