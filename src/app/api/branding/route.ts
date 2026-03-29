@@ -7,6 +7,15 @@ export async function GET(req: Request) {
         const user = await getAuthUser(req)
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+        // PROVIDER/ADMIN users operate above franchise hierarchy — return default branding
+        if (user.role === 'PROVIDER' || user.role === 'ADMIN') {
+            return NextResponse.json({
+                primary: '#9D7DD9',
+                secondary: '#5B9FE3',
+                logoUrl: '/oro9-gold.png'
+            })
+        }
+
         // Default branding
         const defaultBranding = {
             primary: '#9D7DD9',

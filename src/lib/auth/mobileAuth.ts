@@ -17,8 +17,13 @@ import jwt from 'jsonwebtoken'
 const JWT_SECRET = process.env.JWT_SECRET || 'CHANGE_THIS_IN_PRODUCTION_' + process.env.NEXTAUTH_SECRET?.slice(0, 16)
 
 if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
-    console.error('[SECURITY] JWT_SECRET not set in production! This is a critical security issue.')
+    // GO-LIVE GATE: Hard block — do NOT start with weak token signing
+    throw new Error(
+        '[FATAL SECURITY] JWT_SECRET environment variable is not set in production. ' +
+        'The application cannot start. Set JWT_SECRET in your deployment configuration.'
+    )
 }
+
 
 export interface AuthUser {
     id: string

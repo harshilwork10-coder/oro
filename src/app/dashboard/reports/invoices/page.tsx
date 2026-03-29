@@ -437,6 +437,21 @@ export default function InvoiceDashboard() {
         </button>
       </div>
 
+      {/* Cross-link to PO-based matching */}
+      <Link
+        href="/dashboard/inventory/invoice-match"
+        className="flex items-center justify-between p-3 rounded-lg transition-colors"
+        style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}
+      >
+        <div className="flex items-center gap-2 text-sm text-indigo-300">
+          <FileText size={14} />
+          <span>Need to match a PO against a vendor invoice?</span>
+        </div>
+        <div className="flex items-center gap-1 text-xs text-indigo-400">
+          Invoice Match (PO) <ArrowRight size={12} />
+        </div>
+      </Link>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <StatCard label="Needs Review" value={stats.REVIEW_REQUIRED?.count || 0} color="text-amber-400" bgColor="bg-amber-500/10" />

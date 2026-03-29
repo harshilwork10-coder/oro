@@ -8,8 +8,8 @@ import { prisma } from '@/lib/prisma'
  * POST /api/inventory/invoice-match — Match invoice against PO
  */
 export async function GET(req: NextRequest) {
-    const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status')

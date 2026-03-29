@@ -47,7 +47,7 @@ import clsx from 'clsx'
 import { hasPermission, Role } from '@/lib/permissions'
 import { useBusinessConfig } from '@/hooks/useBusinessConfig'
 import { useCompensationSettings } from '@/hooks/useCompensationSettings'
-import { Sparkles, Armchair, Ticket, Cigarette, Store, TrendingUp, Tag, Zap } from 'lucide-react'
+import { Sparkles, Armchair, Ticket, Cigarette, Store, TrendingUp, Tag, Zap, Clipboard } from 'lucide-react'
 
 // Type for sidebar link
 type SidebarLink = {
@@ -167,26 +167,24 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     const multiLocationLinksBase = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, always: true },
+        { name: 'POS', href: industryType === 'RETAIL' ? '/dashboard/pos/retail' : '/dashboard/pos/salon', icon: CreditCard, always: true },
         { name: 'My Stores', href: '/dashboard/locations', icon: MapPin, always: true },
-        { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
         // SERVICE only - appointments and calendar
         { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar, industry: ['SERVICE'] as const },
         // SERVICE only - services catalog
         { name: 'Services', href: '/dashboard/services', icon: Briefcase, feature: 'usesServices' as const, industry: ['SERVICE'] as const },
         { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag, feature: 'usesInventory' as const },
-        // RETAIL only - Smart Ordering
-        { name: 'Smart Ordering', href: '/dashboard/inventory/smart-ordering', icon: Sparkles, industry: ['RETAIL'] as const },
-        // RETAIL only - Label Printing
-        { name: 'Labels', href: '/dashboard/labels', icon: Tag, industry: ['RETAIL'] as const },
         { name: 'Deals', href: '/dashboard/deals', icon: Gift, industry: ['RETAIL'] as const },
         // RETAIL only - Lottery management
         { name: 'Lottery', href: '/dashboard/lottery', icon: Ticket, feature: 'lotteryEnabled' as const, industry: ['RETAIL'] as const },
+        { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
         { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
-        { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
+        { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt, always: true },
         { name: 'Reports', href: '/dashboard/reports', icon: BarChart3, always: true },
-        // RETAIL only - Multi-Store Dashboard and Pricing Intelligence
-        { name: 'Multi-Store', href: '/dashboard/multi-store', icon: Store, industry: ['RETAIL'] as const },
-        { name: 'Pricing Intelligence', href: '/dashboard/multi-store/pricing', icon: TrendingUp, industry: ['RETAIL'] as const },
+        // RETAIL only - Pricing Intelligence
+        { name: 'Pricing', href: '/dashboard/multi-store/pricing', icon: TrendingUp, industry: ['RETAIL'] as const },
+        // Operations Hub - RETAIL owners
+        { name: 'Operations', href: '/dashboard/operations', icon: Clipboard, industry: ['RETAIL'] as const },
         { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },
         // SERVICE only - online booking controls
         { name: 'Online Booking', href: '/dashboard/booking', icon: Globe, industry: ['SERVICE'] as const },
@@ -311,8 +309,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'POS', href: industryType === 'RETAIL' ? '/dashboard/pos/retail' : '/dashboard/pos/salon', icon: CreditCard, always: true },
         { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag, always: true },
         // RETAIL only
-        { name: 'Smart Ordering', href: '/dashboard/inventory/smart-ordering', icon: Sparkles, industry: ['RETAIL'] as const },
-        { name: 'Labels', href: '/dashboard/labels', icon: Tag, industry: ['RETAIL'] as const },
         { name: 'Deals', href: '/dashboard/deals', icon: Gift, industry: ['RETAIL'] as const },
         { name: 'Lottery', href: '/dashboard/lottery', icon: Ticket, feature: 'lotteryEnabled' as const, industry: ['RETAIL'] as const },
         // SERVICE only
@@ -323,10 +319,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
         { name: 'Customers', href: '/dashboard/customers', icon: UserCircle, always: true },
         { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt, always: true },
+        { name: 'Operations', href: '/dashboard/operations', icon: Clipboard, always: true },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },
-        { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },
         { name: 'Settings', href: '/dashboard/settings', icon: Settings, always: true },
-        { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones, always: true },
+        { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones, always: true },
     ]
 
     const ownerLinks = ownerLinksBase.filter(link => {

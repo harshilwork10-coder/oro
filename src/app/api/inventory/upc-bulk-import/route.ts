@@ -16,10 +16,13 @@ interface ImportResult {
 // POST: Bulk import UPC codes to master database
 export async function POST(req: NextRequest) {
     try {
+        // BUG FIX: was missing entirely — caused ReferenceError crash on every POST
+        const user = await getAuthUser(req)
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-// Only providers/admins can bulk import to master DB
+
+        // Only providers/admins can bulk import to master DB
         if (!['PROVIDER', 'ADMIN', 'FRANCHISOR'].includes(user.role)) {
             return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
         }
@@ -105,7 +108,7 @@ export async function POST(req: NextRequest) {
 
                 const item = data.items[0]
 
-                // Save to master database (only essential fields)
+                // Save to master database
                 await prisma.masterUpcProduct.create({
                     data: {
                         upc,
@@ -153,10 +156,15 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+        // BUG FIX: Provider users have franchiseId='__SYSTEM__', not a real franchise.
+        // This is a provider-level route — check role, not franchiseId.
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        // Only providers/admins/franchisors/owners can view master UPC stats
+        if (!['PROVIDER', 'ADMIN', 'FRANCHISOR', 'OWNER'].includes(user.role)) {
+            return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
         }
 
         const totalProducts = await prisma.masterUpcProduct.count()
@@ -182,4 +190,3 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to get stats' }, { status: 500 })
     }
 }
-

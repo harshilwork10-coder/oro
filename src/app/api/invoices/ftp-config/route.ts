@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma'
  */
 export async function GET(req: NextRequest) {
   try {
-        const user = await getAuthUser(request)
+        const user = await getAuthUser(req)
         if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!user) {
@@ -50,8 +50,9 @@ export async function GET(req: NextRequest) {
  * Create or update FTP config
  * Role: OWNER only
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

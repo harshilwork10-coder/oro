@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FileCheck, AlertTriangle, CheckCircle, XCircle, DollarSign, Package, Search, Plus, Trash2 } from 'lucide-react';
+import { FileCheck, AlertTriangle, CheckCircle, XCircle, DollarSign, Package, Search, Plus, Trash2, ArrowRight, FileText } from 'lucide-react';
+import Link from 'next/link';
 
 interface POSummary {
     id: string;
@@ -138,6 +139,21 @@ export default function InvoiceMatchPage() {
                         </div>
                     )}
                 </div>
+
+                {/* Cross-link to Vendor Invoice Manager */}
+                <Link
+                    href="/dashboard/reports/invoices"
+                    className="flex items-center justify-between p-3 rounded-lg transition-colors"
+                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}
+                >
+                    <div className="flex items-center gap-2 text-sm text-indigo-300">
+                        <FileText size={14} />
+                        <span>Need to import, upload, or post vendor invoices?</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-indigo-400">
+                        Vendor Invoice Manager <ArrowRight size={12} />
+                    </div>
+                </Link>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Left: PO List */}
