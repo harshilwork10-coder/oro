@@ -1,118 +1,124 @@
-import {NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcryptjs'
 import { parsePaginationParams } from '@/lib/pagination'
 
 export async function GET(req: NextRequest) {
-    if (!authUser?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    try {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const user = await prisma.user.findUnique({
-        where: { email: user.email },
-        include: { franchise: true }
-    })
-
-    if (!user) return NextResponse.json({ error: 'User' }, { status: 404 })
-
-    const searchParams = req.nextUrl.searchParams
-    const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
-    const search = searchParams.get('search')
-    const locationId = searchParams.get('locationId')
-
-    // Build where clause based on user role
-    const whereClause: Record<string, unknown> = {
-        role: 'EMPLOYEE',
-        isActive: true  // Hide deactivated/soft-deleted employees
-    }
-
-    if (user.role === 'FRANCHISOR') {
-        const franchisor = await prisma.franchisor.findUnique({
-            where: { ownerId: user.id }
+        const user = await prisma.user.findUnique({
+            where: { email: authUser.email },
+            include: { franchise: true }
         })
-        if (!franchisor) return NextResponse.json({ data: [], pagination: { hasMore: false, nextCursor: null } })
 
-        whereClause.franchise = { franchisorId: franchisor.id }
-    } else if (user.franchiseId) {
-        whereClause.franchiseId = user.franchiseId
-    } else {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+        const searchParams = req.nextUrl.searchParams
+        const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
+        const search = searchParams.get('search')
+        const locationId = searchParams.get('locationId')
+
+        // Build where clause based on user role
+        const whereClause: Record<string, unknown> = {
+            role: 'EMPLOYEE',
+            isActive: true  // Hide deactivated/soft-deleted employees
+        }
+
+        if (user.role === 'FRANCHISOR') {
+            const franchisor = await prisma.franchisor.findUnique({
+                where: { ownerId: user.id }
+            })
+            if (!franchisor) return NextResponse.json({ data: [], pagination: { hasMore: false, nextCursor: null } })
+
+            whereClause.franchise = { franchisorId: franchisor.id }
+        } else if (user.franchiseId) {
+            whereClause.franchiseId = user.franchiseId
+        } else {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
+        // Search filter
+        if (search) {
+            whereClause.OR = [
+                { name: { contains: search } },
+                { email: { contains: search } }
+            ]
+        }
+
+        // Location filter
+        if (locationId) {
+            whereClause.locationId = locationId
+        }
+
+        // Build query with pagination
+        const queryArgs: Record<string, unknown> = {
+            where: whereClause,
+            take: (take || 50) + 1,
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,          // For Phone + PIN login
+                role: true,
+                locationId: true,     // For edit form
+                location: { select: { id: true, name: true } },
+                // Permission fields
+                canAddServices: true,
+                canAddProducts: true,
+                canManageInventory: true,
+                canViewReports: true,
+                canProcessRefunds: true,
+                canManageSchedule: true,
+                canManageEmployees: true,
+                // Employee settings
+                canSetOwnPrices: true,
+                createdAt: true
+            },
+            orderBy: orderBy || { createdAt: 'desc' }
+        }
+
+        if (cursor) {
+            queryArgs.cursor = { id: cursor }
+            queryArgs.skip = 1
+        }
+
+        const employees = await prisma.user.findMany(
+            queryArgs as Parameters<typeof prisma.user.findMany>[0]
+        )
+
+        const hasMore = employees.length > (take || 50)
+        const data = hasMore ? employees.slice(0, take || 50) : employees
+        const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
+
+        return NextResponse.json({ data: data, pagination: {
+            nextCursor,
+            hasMore,
+            total: data.length
+        } })
+    } catch (error) {
+        console.error('[FRANCHISE_EMPLOYEES_GET]', error)
+        return NextResponse.json({ error: 'Failed to fetch employees' }, { status: 500 })
     }
-
-    // Search filter
-    if (search) {
-        whereClause.OR = [
-            { name: { contains: search } },
-            { email: { contains: search } }
-        ]
-    }
-
-    // Location filter
-    if (locationId) {
-        whereClause.locationId = locationId
-    }
-
-    // Build query with pagination
-    const queryArgs: Record<string, unknown> = {
-        where: whereClause,
-        take: (take || 50) + 1,
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,          // For Phone + PIN login
-            role: true,
-            locationId: true,     // For edit form
-            location: { select: { id: true, name: true } },
-            // Permission fields
-            canAddServices: true,
-            canAddProducts: true,
-            canManageInventory: true,
-            canViewReports: true,
-            canProcessRefunds: true,
-            canManageSchedule: true,
-            canManageEmployees: true,
-            // Employee settings
-            canSetOwnPrices: true,
-            createdAt: true
-        },
-        orderBy: orderBy || { createdAt: 'desc' }
-    }
-
-    if (cursor) {
-        queryArgs.cursor = { id: cursor }
-        queryArgs.skip = 1
-    }
-
-    const employees = await prisma.user.findMany(
-        queryArgs as Parameters<typeof prisma.user.findMany>[0]
-    )
-
-    const hasMore = employees.length > (take || 50)
-    const data = hasMore ? employees.slice(0, take || 50) : employees
-    const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
-
-    return NextResponse.json({ data: data, pagination: {
-        nextCursor,
-        hasMore,
-        total: data.length
-    } })
 }
 
 export async function POST(req: NextRequest) {
   try {
         const authUser = await getAuthUser(req)
         if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser?.email) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
-    if (!authUser?.email) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+        const user = await prisma.user.findUnique({
+            where: { email: authUser.email },
+            include: { franchise: true }
+        })
 
-    const user = await prisma.user.findUnique({
-        where: { email: user.email },
-        include: { franchise: true }
-    })
-
-    if (!user) return NextResponse.json({ error: 'User' }, { status: 404 })
+        if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
     // Only owners/managers can add employees
     if (user.role !== 'FRANCHISOR' && user.role !== 'FRANCHISEE' && !user.canManageEmployees) {
@@ -155,7 +161,7 @@ export async function POST(req: NextRequest) {
         })
 
         if (!location) {
-            return NextResponse.json({ error: 'Location' }, { status: 404 })
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 })
         }
 
         // Verify Access to this Location

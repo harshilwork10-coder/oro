@@ -9,12 +9,7 @@ export async function GET(req: NextRequest) {
         const authUser = await getAuthUser(req)
         if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!authUser) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-        if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
-        }
+        const franchiseId = authUser.franchiseId
 
         const searchParams = req.nextUrl.searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
@@ -28,7 +23,7 @@ export async function GET(req: NextRequest) {
 
         // Build where clause
         const whereClause: Record<string, unknown> = {
-            franchiseId: user.franchiseId,
+            franchiseId,
             isActive: true
         }
 
@@ -109,12 +104,10 @@ export async function GET(req: NextRequest) {
 // POST - Create new product
 export async function POST(req: NextRequest) {
     try {
-        if (!authUser) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const franchiseId = authUser.franchiseId
 
         const body = await req.json()
         const { name, barcode, sku, price, cashPrice, cost, stock, reorderPoint, categoryId, vendor, unitsPerCase, casePrice, sellByCase } = body
@@ -127,7 +120,7 @@ if (!user.franchiseId) {
         if (barcode) {
             const existing = await prisma.product.findFirst({
                 where: {
-                    franchiseId: user.franchiseId,
+                    franchiseId,
                     barcode: barcode
                 }
             })
@@ -138,7 +131,7 @@ if (!user.franchiseId) {
 
         // Get franchise config for dual pricing settings
         const franchise = await prisma.franchise.findUnique({
-            where: { id: user.franchiseId },
+            where: { id: franchiseId },
             include: {
                 franchisor: {
                     include: { config: true }
@@ -177,7 +170,7 @@ if (!user.franchiseId) {
                 unitsPerCase: unitsPerCase ? parseInt(unitsPerCase) : null,
                 casePrice: casePrice ? parseFloat(casePrice) : null,
                 sellByCase: sellByCase ?? false,
-                franchiseId: user.franchiseId
+                franchiseId
             } as any,
             include: {
                 productCategory: {
@@ -198,4 +191,3 @@ if (!user.franchiseId) {
         return NextResponse.json({ error: 'Failed to create product' }, { status: 500 })
     }
 }
-

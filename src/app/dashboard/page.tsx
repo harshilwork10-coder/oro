@@ -25,7 +25,7 @@ import NextClientSpotlight from "@/components/dashboard/employee/NextClientSpotl
 import EmployeePerformanceStats from "@/components/dashboard/employee/EmployeePerformanceStats"
 import { useState, useEffect } from "react"
 
-// ─── Sub-components for role-specific dashboards ──────────────────────
+// â”€â”€â”€ Sub-components for role-specific dashboards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Each gets its own hooks at the top level (Rules of Hooks compliant)
 
 function MultiLocationOwnerDashboard({ session }: { session: { user: { name?: string | null } } }) {
@@ -67,7 +67,7 @@ function MultiLocationOwnerDashboard({ session }: { session: { user: { name?: st
         <div className="p-4 md:p-8 space-y-6 md:space-y-8">
             <div>
                 <h1 className="text-3xl font-bold text-stone-100">
-                    Welcome back, {session?.user?.name?.split(' ')[0] || 'there'}! 👋
+                    Welcome back, {session?.user?.name?.split(' ')[0] || 'there'}! ðŸ‘‹
                 </h1>
                 <p className="text-stone-400 mt-2">Here&apos;s what&apos;s happening with your business today.</p>
             </div>
@@ -192,7 +192,7 @@ function FranchisorDashboard({ session }: { session: { user: { name?: string | n
         <div className="p-4 md:p-8 space-y-6 md:space-y-8">
             <div>
                 <h1 className="text-3xl font-bold text-stone-100">
-                    Welcome back, {session?.user?.name?.split(' ')[0] || 'there'}! 👋
+                    Welcome back, {session?.user?.name?.split(' ')[0] || 'there'}! ðŸ‘‹
                 </h1>
                 <p className="text-stone-400 mt-2">Here&apos;s what&apos;s happening with your business today.</p>
             </div>
@@ -335,7 +335,7 @@ function FranchiseeDashboard({ session }: { session: { user: { name?: string | n
         <div className="p-4 md:p-8 space-y-6 md:space-y-8">
             <div>
                 <h1 className="text-3xl font-bold text-stone-100">
-                    Welcome back, {session?.user?.name?.split(' ')[0] || 'there'}! 👋
+                    Welcome back, {session?.user?.name?.split(' ')[0] || 'there'}! ðŸ‘‹
                 </h1>
                 <p className="text-stone-400 mt-2">Here&apos;s your franchise operations overview.</p>
             </div>
@@ -432,7 +432,7 @@ function DefaultOwnerDashboard({ session }: { session: { user: { name?: string |
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-stone-100">
-                        Welcome back, {session?.user?.name}! 👋
+                        Welcome back, {session?.user?.name}! ðŸ‘‹
                     </h1>
                     <p className="text-stone-400 mt-2">Here&apos;s what&apos;s happening at your location today.</p>
                 </div>
@@ -523,13 +523,14 @@ function DefaultOwnerDashboard({ session }: { session: { user: { name?: string |
     )
 }
 
-// ─── Retail & Service Employee Dashboards (stateless, just UI) ─────────
+// â”€â”€â”€ Retail & Service Employee Dashboards (stateless, just UI) â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function RetailOwnerDashboard({ session }: { session: { user: { name?: string | null; role?: string | null } } }) {
     const [isExpansionModalOpen, setIsExpansionModalOpen] = useState(false)
     const [isConsultationModalOpen, setIsConsultationModalOpen] = useState(false)
     const [isMerchantApplicationModalOpen, setIsMerchantApplicationModalOpen] = useState(false)
     const [todayStats, setTodayStats] = useState({ visits: 0, revenue: 0, transactions: 0, itemsSold: 0 })
+    const [lowStockItems, setLowStockItems] = useState<any[]>([])
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -548,7 +549,19 @@ function RetailOwnerDashboard({ session }: { session: { user: { name?: string | 
                 console.error('Error fetching stats:', error)
             }
         }
+        const fetchLowStock = async () => {
+            try {
+                const res = await fetch('/api/inventory/products?lowStock=true&take=10')
+                if (res.ok) {
+                    const data = await res.json()
+                    setLowStockItems(data.data || [])
+                }
+            } catch (error) {
+                console.error('Error fetching low stock:', error)
+            }
+        }
         fetchStats()
+        fetchLowStock()
     }, [])
 
     return (
@@ -556,9 +569,9 @@ function RetailOwnerDashboard({ session }: { session: { user: { name?: string | 
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-stone-100">
-                        Welcome back, {session?.user?.name}! 👋
+                        Welcome back, {session?.user?.name}! ðŸ‘‹
                     </h1>
-                    <p className="text-stone-400 mt-2">Here's your retail store today.</p>
+                    <p className="text-stone-400 mt-2">Here&apos;s your retail store today.</p>
                 </div>
                 {session?.user?.role !== 'EMPLOYEE' && (
                     <div className="flex flex-wrap gap-3">
@@ -603,9 +616,9 @@ function RetailOwnerDashboard({ session }: { session: { user: { name?: string | 
                 onSuccess={() => { alert('Merchant application submitted successfully!') }}
             />
 
-            {/* Today's Stats */}
+            {/* Today's Stats - Clickable KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                <Link href="/dashboard/customers" className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-stone-400">Customer Visits</p>
@@ -614,12 +627,12 @@ function RetailOwnerDashboard({ session }: { session: { user: { name?: string | 
                                 <TrendingUp className="h-4 w-4 mr-1" /> Live Today
                             </p>
                         </div>
-                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center">
+                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                             <Users className="h-6 w-6 text-stone-300" />
                         </div>
                     </div>
-                </div>
-                <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                </Link>
+                <Link href="/dashboard/transactions" className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-stone-400">Transactions</p>
@@ -628,35 +641,35 @@ function RetailOwnerDashboard({ session }: { session: { user: { name?: string | 
                                 <TrendingUp className="h-4 w-4 mr-1" /> Live Today
                             </p>
                         </div>
-                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center">
+                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                             <CreditCard className="h-6 w-6 text-stone-300" />
                         </div>
                     </div>
-                </div>
-                <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                </Link>
+                <Link href="/dashboard/inventory/retail" className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-stone-400">Items Sold</p>
                             <p className="text-3xl font-bold text-stone-100 mt-2">{todayStats.itemsSold}</p>
                             <p className="text-sm text-stone-500 mt-2">Today</p>
                         </div>
-                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center">
+                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                             <Building2 className="h-6 w-6 text-stone-300" />
                         </div>
                     </div>
-                </div>
-                <div className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
+                </Link>
+                <Link href="/dashboard/reports" className="glass-panel p-6 rounded-2xl group cursor-pointer hover:border-orange-500/30 transition-all">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-stone-400">Today's Revenue</p>
+                            <p className="text-sm font-medium text-stone-400">Today&apos;s Revenue</p>
                             <p className="text-3xl font-bold text-stone-100 mt-2">${todayStats.revenue.toFixed(2)}</p>
                             <p className="text-sm text-stone-500 mt-2">Live</p>
                         </div>
-                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center">
+                        <div className="h-12 w-12 bg-stone-700/50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                             <DollarSign className="h-6 w-6 text-stone-300" />
                         </div>
                     </div>
-                </div>
+                </Link>
             </div>
 
             {/* Quick Actions */}
@@ -682,20 +695,50 @@ function RetailOwnerDashboard({ session }: { session: { user: { name?: string | 
                 </div>
             </div>
 
-            {/* Low Stock Alert section */}
+            {/* Low Stock Alerts â€” wired to real data */}
             <div className="glass-panel p-6 rounded-2xl">
                 <h2 className="text-lg font-semibold text-stone-100 mb-4 flex items-center gap-2">
                     <AlertCircle className="h-5 w-5 text-amber-500" />
                     Low Stock Alerts
+                    {lowStockItems.length > 0 && (
+                        <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400">{lowStockItems.length}</span>
+                    )}
                 </h2>
-                <div className="text-center py-8 text-stone-500">
-                    <p>No low stock alerts</p>
-                    <p className="text-sm mt-1">Products below reorder point will appear here</p>
-                </div>
+                {lowStockItems.length > 0 ? (
+                    <div className="space-y-2">
+                        {lowStockItems.map((item: any) => (
+                            <div key={item.id} className="flex items-center justify-between p-3 bg-stone-800/50 rounded-xl border border-stone-700">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-stone-200 truncate">{item.name}</p>
+                                    <p className="text-xs text-stone-500">{item.barcode || item.sku || 'No barcode'}</p>
+                                </div>
+                                <div className="flex items-center gap-3 ml-4">
+                                    <div className="text-right">
+                                        <p className={`text-sm font-bold ${(item.stock || 0) === 0 ? 'text-red-400' : 'text-amber-400'}`}>
+                                            {item.stock || 0} left
+                                        </p>
+                                        {item.reorderPoint && (
+                                            <p className="text-xs text-stone-500">Reorder at {item.reorderPoint}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        <Link href="/dashboard/inventory/smart-ordering" className="block text-center text-sm text-orange-400 hover:text-orange-300 transition-colors pt-2">
+                            View Smart Ordering â†’
+                        </Link>
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-stone-500">
+                        <p>No low stock alerts</p>
+                        <p className="text-sm mt-1">Products below reorder point will appear here</p>
+                    </div>
+                )}
             </div>
         </div>
     )
 }
+
 
 const currentHour = () => new Date().getHours()
 const todayDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
@@ -725,7 +768,7 @@ function RetailEmployeeDashboard({ session }: { session: { user: { name?: string
                 <div className="glass-panel p-4 rounded-xl">
                     <p className="text-xs text-stone-500 uppercase">Today&apos;s Sales</p>
                     <p className="text-2xl font-bold text-stone-100 mt-1">$0.00</p>
-                    <p className="text-xs text-emerald-500 mt-1">↑ Live</p>
+                    <p className="text-xs text-emerald-500 mt-1">â†‘ Live</p>
                 </div>
                 <div className="glass-panel p-4 rounded-xl">
                     <p className="text-xs text-stone-500 uppercase">Transactions</p>
@@ -839,7 +882,7 @@ function ServiceEmployeeDashboard({ session }: { session: { user: { name?: strin
     )
 }
 
-// ─── Main Dashboard Page ───────────────────────────────────────────────
+// â”€â”€â”€ Main Dashboard Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type DashboardStats = {
     totalFranchisors: number
@@ -899,7 +942,7 @@ export default function DashboardPage() {
     const businessType = (session?.user as any)?.businessType
     const industryType = (session?.user as any)?.industryType || 'SERVICE'
 
-    // Suppress unused variable warning — stats is fetched for potential future use
+    // Suppress unused variable warning â€” stats is fetched for potential future use
     void stats
     void loading
 
@@ -930,7 +973,7 @@ export default function DashboardPage() {
         return <ServiceEmployeeDashboard session={session!} />
     }
 
-    // Default: OWNER/MANAGER or any other role — branch on industry
+    // Default: OWNER/MANAGER or any other role â€” branch on industry
     if (industryType === 'RETAIL') {
         return <RetailOwnerDashboard session={session!} />
     }

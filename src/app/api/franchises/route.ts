@@ -1,21 +1,21 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
     try {
-        const user = await getAuthUser(request)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session || (user.role !== 'PROVIDER' && user.role !== 'FRANCHISOR')) {
+        if (authUser.role !== 'PROVIDER' && authUser.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         let whereClause = {}
 
-        if (user.role === 'FRANCHISOR') {
+        if (authUser.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({
-                where: { ownerId: user.id }
+                where: { ownerId: authUser.id }
             })
 
             if (!franchisor) {
@@ -47,19 +47,24 @@ export async function GET(req: NextRequest) {
     }
 }
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
     try {
-        if (!session || (user.role !== 'PROVIDER' && user.role !== 'FRANCHISOR')) {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId && authUser?.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        if (authUser.role !== 'PROVIDER' && authUser.role !== 'FRANCHISOR') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const body = await req.json()
         let { name, franchisorId } = body
 
         // If Franchisor, force their own ID
-        if (user.role === 'FRANCHISOR') {
+        if (authUser.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({
-                where: { ownerId: user.id }
+                where: { ownerId: authUser.id }
             })
             if (!franchisor) return NextResponse.json({ error: 'Franchisor profile not found' }, { status: 404 })
             franchisorId = franchisor.id
@@ -99,4 +104,3 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to create franchise' }, { status: 500 })
     }
 }
-

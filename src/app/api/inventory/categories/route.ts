@@ -1,4 +1,4 @@
-import {NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { parsePaginationParams } from '@/lib/pagination'
@@ -9,12 +9,7 @@ export async function GET(req: NextRequest) {
         const authUser = await getAuthUser(req)
         if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!authUser) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-        if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
-        }
+        const franchiseId = authUser.franchiseId
 
         const searchParams = req.nextUrl.searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
@@ -25,7 +20,7 @@ export async function GET(req: NextRequest) {
 
         // Check if any categories exist, create defaults if not
         const existingCount = await prisma.productCategory.count({
-            where: { franchiseId: user.franchiseId, isActive: true }
+            where: { franchiseId, isActive: true }
         })
 
         if (existingCount === 0) {
@@ -43,7 +38,7 @@ export async function GET(req: NextRequest) {
             await prisma.productCategory.createMany({
                 data: defaultCategories.map(cat => ({
                     ...cat,
-                    franchiseId: user.franchiseId!,
+                    franchiseId,
                     isActive: true
                 }))
             })
@@ -51,7 +46,7 @@ export async function GET(req: NextRequest) {
 
         // Build where clause
         const whereClause: Record<string, unknown> = {
-            franchiseId: user.franchiseId,
+            franchiseId,
             isActive: true
         }
 
@@ -116,12 +111,10 @@ export async function GET(req: NextRequest) {
 // POST - Create new product category
 export async function POST(req: NextRequest) {
     try {
-        if (!authUser) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-        if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const franchiseId = authUser.franchiseId
 
         const body = await req.json()
         const { name, description, ageRestricted, minimumAge, departmentId, isEbtEligible } = body
@@ -131,7 +124,7 @@ export async function POST(req: NextRequest) {
         }
 
         const maxSort = await prisma.productCategory.aggregate({
-            where: { franchiseId: user.franchiseId },
+            where: { franchiseId },
             _max: { sortOrder: true }
         })
 
@@ -143,7 +136,7 @@ export async function POST(req: NextRequest) {
                 minimumAge: ageRestricted ? (minimumAge || 21) : null,
                 isEbtEligible: isEbtEligible || false,
                 sortOrder: (maxSort._max.sortOrder || 0) + 1,
-                franchiseId: user.franchiseId,
+                franchiseId,
                 departmentId: departmentId || null
             }
         })

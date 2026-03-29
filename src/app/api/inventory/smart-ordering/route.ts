@@ -8,14 +8,8 @@ export async function GET(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
         if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
 
-        const franchiseId = user.franchiseId
-        if (!franchiseId) {
-            return NextResponse.json({ error: 'No franchise' }, { status: 400 })
-        }
+        const franchiseId = authUser.franchiseId
 
         const { searchParams } = new URL(req.url)
         const locationId = searchParams.get('locationId')
@@ -188,4 +182,3 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Server error' }, { status: 500 })
     }
 }
-

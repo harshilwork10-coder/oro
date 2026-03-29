@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { invalidateLocationCache } from '@/lib/cache'
@@ -6,16 +6,15 @@ import { logActivity } from '@/lib/auditLog'
 
 // GET: Fetch franchise settings
 export async function GET(req: NextRequest) {
-    const authUser = await getAuthUser(request)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    if (!authUser?.email) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     try {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser?.email) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             include: { franchise: true }
         })
 
@@ -80,21 +79,22 @@ export async function GET(req: NextRequest) {
 }
 
 // POST: Update franchise settings
-export async function POST(request: Request) {
-    if (!authUser?.email) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export async function POST(req: NextRequest) {
     try {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.email) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const user = await prisma.user.findUnique({
-            where: { email: user.email }
+            where: { email: authUser.email }
         })
 
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'No franchise found' }, { status: 404 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const {
             pricingModel,
             cardSurchargeType,
@@ -188,4 +188,3 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Internal error' }, { status: 500 })
     }
 }
-

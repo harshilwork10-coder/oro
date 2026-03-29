@@ -184,17 +184,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
         { name: 'Reports', href: '/dashboard/reports', icon: BarChart3, always: true },
-        { name: 'Download Reports', href: '/dashboard/reports/download', icon: Download, always: true },
-        // RETAIL only - Multi-Store Dashboard and Competitor Pricing
+        // RETAIL only - Multi-Store Dashboard and Pricing Intelligence
         { name: 'Multi-Store', href: '/dashboard/multi-store', icon: Store, industry: ['RETAIL'] as const },
-        { name: 'Store Pricing', href: '/dashboard/multi-store/pricing', icon: DollarSign, industry: ['RETAIL'] as const },
-        { name: 'Competitor Pricing', href: '/dashboard/pricing/competitor', icon: TrendingUp, industry: ['RETAIL'] as const },
+        { name: 'Pricing Intelligence', href: '/dashboard/multi-store/pricing', icon: TrendingUp, industry: ['RETAIL'] as const },
         { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },
+        // SERVICE only - online booking controls
+        { name: 'Online Booking', href: '/dashboard/booking', icon: Globe, industry: ['SERVICE'] as const },
         // SERVICE only - resources (chairs, rooms)
         { name: 'Resources', href: '/dashboard/resources', icon: Armchair, feature: 'enableResources' as const, industry: ['SERVICE'] as const },
+        { name: 'Settings', href: '/dashboard/settings', icon: Settings, always: true },
         { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones, always: true },
-        { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Sparkles, always: true },
-        { name: 'Security', href: '/dashboard/settings/security', icon: Shield, always: true },
     ]
 
     // Filter based on config AND industryType
@@ -306,20 +305,36 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     }).map(({ always, permission, industry, compensationFlag, ...link }) => link)
 
     // OWNER: Retail/Salon store owner - full management access
-    const ownerLinks = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Briefing', href: '/dashboard/owner/briefing', icon: Bell },
-        { name: 'POS', href: industryType === 'RETAIL' ? '/dashboard/pos/retail' : '/dashboard/pos/salon', icon: CreditCard },
-        { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag },
-        { name: 'Deals', href: '/dashboard/deals', icon: Tag },
-        { name: 'Employees', href: '/dashboard/employees', icon: Users },
-        { name: 'Customers', href: '/dashboard/customers', icon: UserCircle },
-        { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt },
-        { name: 'Reports', href: '/dashboard/reports', icon: FileText },
-        { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-        { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Sparkles },
-        { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones },
+    // Industry-aware with feature gating
+    const ownerLinksBase = [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, always: true },
+        { name: 'POS', href: industryType === 'RETAIL' ? '/dashboard/pos/retail' : '/dashboard/pos/salon', icon: CreditCard, always: true },
+        { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag, always: true },
+        // RETAIL only
+        { name: 'Smart Ordering', href: '/dashboard/inventory/smart-ordering', icon: Sparkles, industry: ['RETAIL'] as const },
+        { name: 'Labels', href: '/dashboard/labels', icon: Tag, industry: ['RETAIL'] as const },
+        { name: 'Deals', href: '/dashboard/deals', icon: Gift, industry: ['RETAIL'] as const },
+        { name: 'Lottery', href: '/dashboard/lottery', icon: Ticket, feature: 'lotteryEnabled' as const, industry: ['RETAIL'] as const },
+        // SERVICE only
+        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar, industry: ['SERVICE'] as const },
+        { name: 'Services', href: '/dashboard/services', icon: Briefcase, industry: ['SERVICE'] as const },
+        { name: 'Online Booking', href: '/dashboard/booking', icon: Globe, industry: ['SERVICE'] as const },
+        // Universal
+        { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
+        { name: 'Customers', href: '/dashboard/customers', icon: UserCircle, always: true },
+        { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt, always: true },
+        { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },
+        { name: 'Marketing', href: '/dashboard/marketing', icon: Mail, feature: 'usesEmailMarketing' as const },
+        { name: 'Settings', href: '/dashboard/settings', icon: Settings, always: true },
+        { name: 'Help Desk', href: '/dashboard/help-desk', icon: Headphones, always: true },
     ]
+
+    const ownerLinks = ownerLinksBase.filter(link => {
+        if (link.industry && !(link.industry as readonly string[]).includes(industryType)) return false
+        if (link.always) return true
+        if (!link.feature) return true
+        return config?.[link.feature] ?? true
+    }).map(({ always, feature, industry, ...link }) => link)
 
     // SUPPORT_STAFF: Support team members - only see support inbox
     const supportStaffLinks = [

@@ -1,22 +1,17 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
     try {
-        const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
-        }
+        const franchiseId = authUser.franchiseId
 
         // Get locations for this franchise, then get campaigns for those locations
         const locations = await prisma.location.findMany({
-            where: { franchiseId: user.franchiseId },
+            where: { franchiseId },
             select: { id: true }
         })
         const locationIds = locations.map(l => l.id)
@@ -37,17 +32,15 @@ if (!user.franchiseId) {
     }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
     try {
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const franchiseId = authUser.franchiseId
 
         // Only OWNER, MANAGER can create campaigns
-        if (!['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR'].includes(user.role)) {
+        if (!['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR'].includes(authUser.role || '')) {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
@@ -60,7 +53,7 @@ if (!user.franchiseId) {
 
         // Verify location belongs to user's franchise
         const location = await prisma.location.findFirst({
-            where: { id: locationId, franchiseId: user.franchiseId }
+            where: { id: locationId, franchiseId }
         })
         if (!location) {
             return NextResponse.json({ error: 'Location not found' }, { status: 404 })
@@ -74,7 +67,7 @@ if (!user.franchiseId) {
                 templateHash,
                 messageTemplate: templateContent,
                 locationId,
-                createdById: user.id,
+                createdById: authUser.id,
                 scheduledFor: new Date(),
                 status: 'DRAFT',
             }
