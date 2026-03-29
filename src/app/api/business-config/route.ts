@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
         // Get user with all possible relationships to find config
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             include: {
                 // Direct franchisor ownership (for owners)
                 franchisor: {
@@ -108,6 +108,7 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
     try {
+        const authUser = await getAuthUser(req)
         if (!authUser?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -121,7 +122,7 @@ export async function PATCH(req: NextRequest) {
 
         // Get user's franchisor record
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             include: {
                 franchisor: true
             }
@@ -161,4 +162,3 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
 }
-
