@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
         const sanitizedName = sanitizeInput(name)
         const sanitizedCompanyName = sanitizeInput(companyName)
-        const sanitizedStoreName = storeName ? sanitizeInput(storeName) : sanitizedCompanyName // Default to company name if not provided
+        const sanitizedStoreName = storeName ? sanitizeInput(storeName) : sanitizedCompanyName
         const sanitizedEmail = email.toLowerCase().trim()
         const sanitizedPhone = phone ? sanitizeInput(phone) : null
 
@@ -93,11 +93,9 @@ export async function POST(req: NextRequest) {
         let isExistingUser = false;
 
         if (existingUser) {
-            // User exists - we'll link them to a NEW business via membership
             user = existingUser;
             isExistingUser = true;
         } else {
-            // New user - create them
             const tempPassword = crypto.randomBytes(32).toString('hex')
             const hashedPassword = await hash(tempPassword, 10)
 
@@ -123,7 +121,7 @@ export async function POST(req: NextRequest) {
                 industryType: finalIndustryType,
                 processingType: finalProcessingType,
                 phone: sanitizedPhone,
-                dealerBrandingId: dealerBrandingId || null,  // Dealer co-branding assignment
+                dealerBrandingId: dealerBrandingId || null,
             }
         })
 
@@ -133,13 +131,50 @@ export async function POST(req: NextRequest) {
                 userId: user.id,
                 franchisorId: franchisor.id,
                 role: 'OWNER',
-                isPrimary: !isExistingUser // Only primary if this is their first business
+                isPrimary: !isExistingUser
+            }
+        })
+
+        // AUTO-CREATE BusinessConfig with industry-appropriate defaults
+        // This ensures every new business has proper feature gating from day 1
+        const isService = finalIndustryType === 'SERVICE'
+        const isRetail = finalIndustryType === 'RETAIL'
+
+        await prisma.businessConfig.create({
+            data: {
+                franchisorId: franchisor.id,
+                posMode: isService ? 'SALON' : isRetail ? 'RETAIL' : 'HYBRID',
+                usesCommissions: isService,
+                usesInventory: isRetail,
+                usesAppointments: isService,
+                usesScheduling: isService,
+                usesVirtualKeypad: true,
+                usesLoyalty: true,
+                usesGiftCards: true,
+                usesMemberships: isService,
+                usesReferrals: true,
+                usesRoyalties: finalBusinessType === 'BRAND_FRANCHISOR',
+                usesTipping: isService,
+                usesDiscounts: true,
+                servicesTaxableDefault: false,
+                productsTaxableDefault: true,
+                usesRetailProducts: isRetail || !isService,
+                usesServices: isService,
+                usesEmailMarketing: true,
+                usesSMSMarketing: true,
+                usesReviewManagement: true,
+                usesMultiLocation: false,
+                usesFranchising: finalBusinessType === 'BRAND_FRANCHISOR',
+                usesTimeTracking: isService,
+                usesPayroll: false,
+                subscriptionTier: 'STARTER',
+                maxLocations: 1,
+                maxUsers: isService ? 10 : 5,
             }
         })
 
         // For MULTI_LOCATION_OWNER, create default franchise and location
         if (finalBusinessType === 'MULTI_LOCATION_OWNER') {
-            // Create a unique slug from company name (with deduplication)
             const baseSlug = sanitizedCompanyName
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-')
@@ -172,7 +207,7 @@ export async function POST(req: NextRequest) {
 
             const location = await prisma.location.create({
                 data: {
-                    name: sanitizedStoreName, // Use DBA name for the location!
+                    name: sanitizedStoreName,
                     slug: locationSlug,
                     franchiseId: franchise.id
                 }
@@ -184,12 +219,9 @@ export async function POST(req: NextRequest) {
                     await autoSetupBooking(location.id, franchise.id, sanitizedStoreName)
                 } catch (err) {
                     console.error('Booking auto-setup failed (non-blocking):', err)
-                    // Non-blocking: business creation succeeds even if booking setup fails
                 }
             }
         }
-
-        // Auto-license generation removed - stations are added by franchisor post-signup
 
         // Generate magic link
         const token = crypto.randomBytes(32).toString('hex')
@@ -232,7 +264,7 @@ export async function POST(req: NextRequest) {
             action: 'FRANCHISOR_CREATED',
             entityType: 'Franchisor',
             entityId: franchisor.id,
-            metadata: { companyName: sanitizedCompanyName, businessType: finalBusinessType, industryType: finalIndustryType, isExistingUser, ownerEmail: sanitizedEmail }
+            details: { companyName: sanitizedCompanyName, businessType: finalBusinessType, industryType: finalIndustryType, isExistingUser, ownerEmail: sanitizedEmail }
         })
 
         return NextResponse.json({
@@ -254,4 +286,3 @@ export async function POST(req: NextRequest) {
         )
     }
 }
-
