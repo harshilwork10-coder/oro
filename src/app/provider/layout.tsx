@@ -18,18 +18,15 @@ const PROVIDER_SIDEBAR = [
     { name: 'Provisioning', href: '/provider/provisioning', icon: MapPin },
     { name: 'Tickets', href: '/provider/tickets', icon: Ticket },
     { name: 'Devices', href: '/provider/devices', icon: HardDrive },
-    { name: 'Monitoring', href: '/provider/monitoring', icon: Monitor },
+    { name: 'Dealers', href: '/provider/dealers', icon: Building2 },
     { name: 'Audit Logs', href: '/provider/audit-logs', icon: ClipboardList },
-    { name: 'Billing', href: '/provider/billing', icon: CreditCard },
     { name: 'UPC Import', href: '/provider/upc-import', icon: Package },
     { name: 'Data Import', href: '/provider/data-import', icon: Upload },
-    { name: 'System', href: '/provider/system', icon: Settings },
 ];
 
 // Quick add menu items
 const ADD_MENU_ITEMS = [
     { name: 'New Owner/Client', href: '/provider/onboarding/new', icon: Users },
-    { name: 'New Onboarding Request', href: '/provider/onboarding/new', icon: FileText },
     { name: 'New Ticket', href: '/provider/tickets/new', icon: Ticket },
     { name: 'Add Device to Inventory', href: '/provider/devices?action=add', icon: HardDrive },
 ];

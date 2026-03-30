@@ -21,6 +21,16 @@ export default function SystemPage() {
 
     return (
         <div>
+            {/* ⚠️ PLACEHOLDER BANNER - This page is not connected to any backend */}
+            <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3">
+                <span className="text-amber-400 text-xl">⚠️</span>
+                <div>
+                    <p className="text-amber-400 font-semibold text-sm">Placeholder — Not Connected</p>
+                    <p className="text-amber-400/70 text-xs">This page displays static defaults only. Toggles and save buttons are not functional. Settings will be wired to onboarding/provisioning in a future release.</p>
+                </div>
+            </div>
+
+            {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-stone-100">System Settings</h1>

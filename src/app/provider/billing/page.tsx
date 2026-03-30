@@ -18,6 +18,15 @@ export default function BillingPage() {
 
     return (
         <div>
+            {/* ⚠️ PLACEHOLDER BANNER */}
+            <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3">
+                <span className="text-amber-400 text-xl">⚠️</span>
+                <div>
+                    <p className="text-amber-400 font-semibold text-sm">Placeholder — Not Connected</p>
+                    <p className="text-amber-400/70 text-xs">All billing values are static placeholders. Real subscription and invoice data will be connected in a future release.</p>
+                </div>
+            </div>
+
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-stone-100">Billing</h1>
