@@ -27,15 +27,15 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
         }
 
-        const { upcCodes, delayMs = 500 } = await req.json()
+        const { upcCodes, delayMs = 200 } = await req.json()
 
         if (!upcCodes || !Array.isArray(upcCodes)) {
             return NextResponse.json({ error: 'upcCodes array required' }, { status: 400 })
         }
 
-        if (upcCodes.length > 100) {
+        if (upcCodes.length > 500) {
             return NextResponse.json({
-                error: 'Max 100 UPCs per batch',
+                error: 'Max 500 UPCs per batch',
                 message: 'Split into multiple requests to avoid timeout'
             }, { status: 400 })
         }
@@ -73,65 +73,86 @@ export async function POST(req: NextRequest) {
                 continue
             }
 
-            // Lookup from UPCitemdb
-            try {
-                const response = await fetch(`${UPC_API_URL}?upc=${upc}`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'user_key': UPC_API_KEY
+            // Lookup from UPCitemdb with retry logic
+            let retries = 0
+            const maxRetries = 3
+            let lookupSuccess = false
+
+            while (retries < maxRetries && !lookupSuccess) {
+                try {
+                    const response = await fetch(`${UPC_API_URL}?upc=${upc}`, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'user_key': UPC_API_KEY
+                        }
+                    })
+
+                    if (response.status === 429) {
+                        retries++
+                        if (retries < maxRetries) {
+                            // Exponential backoff: 2s, 4s, 8s
+                            const backoff = Math.pow(2, retries) * 1000
+                            console.log(`[UPC API Rate Limited] Retry ${retries}/${maxRetries} in ${backoff}ms for UPC ${upc}`)
+                            await new Promise(resolve => setTimeout(resolve, backoff))
+                            continue
+                        }
+                        // All retries exhausted
+                        console.error('[UPC API Rate Limited] All retries exhausted for UPC', upc)
+                        results.push({ upc, status: 'error', error: 'Rate limited - retries exhausted' })
+                        errorCount++
+                        lookupSuccess = true // exit retry loop
+                        continue
                     }
-                })
 
-                if (response.status === 429) {
-                    const errorText = await response.text()
-                    console.error('[UPC API Rate Limited]', response.status, errorText)
-                    results.push({ upc, status: 'error', error: 'Rate limited - try again later' })
-                    errorCount++
-                    // Stop further requests if rate limited
-                    break
-                }
-
-                if (!response.ok) {
-                    results.push({ upc, status: 'not_found' })
-                    notFoundCount++
-                    continue
-                }
-
-                const data = await response.json()
-
-                if (!data.items || data.items.length === 0) {
-                    results.push({ upc, status: 'not_found' })
-                    notFoundCount++
-                    continue
-                }
-
-                const item = data.items[0]
-
-                // Save to master database
-                await prisma.masterUpcProduct.create({
-                    data: {
-                        upc,
-                        name: item.title || 'Unknown Product',
-                        brand: item.brand || null,
-                        description: item.description || null,
-                        category: item.category || null,
-                        size: item.size || null,
-                        weight: item.weight || null
+                    if (!response.ok) {
+                        results.push({ upc, status: 'not_found' })
+                        notFoundCount++
+                        lookupSuccess = true
+                        continue
                     }
-                })
 
-                results.push({ upc, status: 'success', name: item.title })
-                successCount++
+                    const data = await response.json()
 
-                // Delay between API calls to avoid rate limiting
-                if (delayMs > 0) {
-                    await new Promise(resolve => setTimeout(resolve, delayMs))
+                    if (!data.items || data.items.length === 0) {
+                        results.push({ upc, status: 'not_found' })
+                        notFoundCount++
+                        lookupSuccess = true
+                        continue
+                    }
+
+                    const item = data.items[0]
+
+                    // Save to master database
+                    await prisma.masterUpcProduct.create({
+                        data: {
+                            upc,
+                            name: item.title || 'Unknown Product',
+                            brand: item.brand || null,
+                            description: item.description || null,
+                            category: item.category || null,
+                            size: item.size || null,
+                            weight: item.weight || null
+                        }
+                    })
+
+                    results.push({ upc, status: 'success', name: item.title })
+                    successCount++
+                    lookupSuccess = true
+
+                    // Delay between API calls to avoid rate limiting
+                    if (delayMs > 0) {
+                        await new Promise(resolve => setTimeout(resolve, delayMs))
+                    }
+
+                } catch (err) {
+                    retries++
+                    if (retries >= maxRetries) {
+                        results.push({ upc, status: 'error', error: 'API request failed after retries' })
+                        errorCount++
+                        lookupSuccess = true
+                    }
                 }
-
-            } catch (err) {
-                results.push({ upc, status: 'error', error: 'API request failed' })
-                errorCount++
             }
         }
 

@@ -119,7 +119,7 @@ export const PIN_RATE_LIMIT: RateLimitConfig = {
 }
 
 export const API_RATE_LIMIT: RateLimitConfig = {
-    maxAttempts: 100,         // 100 requests
+    maxAttempts: 500,         // 500 requests
     windowMs: 60 * 1000,      // per minute
 }
 

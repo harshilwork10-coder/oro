@@ -46,9 +46,9 @@ interface RateLimitConfig {
 }
 
 const RATE_LIMIT_DEFAULTS: Record<string, RateLimitConfig> = {
-    auth: { windowMs: 15 * 60 * 1000, maxRequests: 10 },      // 10 requests per 15 min
-    sensitive: { windowMs: 60 * 1000, maxRequests: 30 },       // 30 requests per minute
-    standard: { windowMs: 60 * 1000, maxRequests: 100 },       // 100 requests per minute
+    auth: { windowMs: 15 * 60 * 1000, maxRequests: 20 },      // 20 requests per 15 min
+    sensitive: { windowMs: 60 * 1000, maxRequests: 60 },       // 60 requests per minute
+    standard: { windowMs: 60 * 1000, maxRequests: 500 },       // 500 requests per minute
 }
 
 /**
