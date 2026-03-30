@@ -7,9 +7,6 @@ import { prisma } from '@/lib/prisma'
 // GET /api/provider/provisioning-tasks - List provisioning tasks for Provider
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    ;
     if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -20,7 +17,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const statusFilter = searchParams.get('status'); // e.g., "OPEN,IN_PROGRESS"
+    const statusFilter = searchParams.get('status');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const whereClause: any = {};

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { THEME_PRESETS } from '@/lib/themes'
@@ -8,8 +8,7 @@ import { logActivity } from '@/lib/auditLog'
 // GET - Fetch current theme settings
 export async function GET(req: NextRequest) {
     try {
-        const user = await getAuthUser(request)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = await getAuthUser(req)
 
         if (!user) {
             // Return defaults for unauthenticated requests (Android initial load)
@@ -18,7 +17,9 @@ export async function GET(req: NextRequest) {
                 highContrast: false
             })
         }
-if (!user.franchiseId) {
+
+        // PROVIDER/ADMIN — no franchise, return defaults
+        if (!user.franchiseId || user.franchiseId === '__SYSTEM__') {
             return NextResponse.json({
                 themeId: 'classic_oro',
                 highContrast: false
@@ -46,32 +47,28 @@ if (!user.franchiseId) {
 }
 
 // PUT - Update theme settings (requires auth + OWNER/MANAGER role)
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
     try {
+        const user = await getAuthUser(request)
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-// DIAGNOSTIC: Log full session to trace 403 issues
-        console.error(`[THEME PUT] Session: id=${user.id} email=${user.email} role=${user.role} franchiseId=${user.franchiseId}`)
 
         // Any business role can change their theme
         const allowedRoles = ['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'ADMIN']
         if (!allowedRoles.includes(user.role)) {
-            console.error('[THEME] Permission denied for role:', user.role, '— Full user:', JSON.stringify({ id: user.id, email: user.email, role: user.role }))
             return NextResponse.json({ error: 'Permission denied', role: user.role || 'NO_ROLE' }, { status: 403 })
         }
 
-        if (!user.franchiseId) {
+        if (!user.franchiseId || user.franchiseId === '__SYSTEM__') {
             return NextResponse.json(
-                { error: 'No franchise associated' },
+                { error: 'No franchise associated — Provider users cannot set franchise themes from here' },
                 { status: 400 }
             )
         }
 
         const body = await request.json()
         const { themeId, highContrast, locationId } = body
-
-        console.error(`[THEME PUT] user=${user.email} role=${user.role} franchiseId=${user.franchiseId} themeId=${themeId} locationId=${locationId || 'ALL'}`)
 
         // Validate themeId
         const validThemes = Object.keys(THEME_PRESETS)
@@ -102,9 +99,7 @@ export async function PUT(request: Request) {
                 select: { themeId: true, highContrast: true }
             })
 
-            // Bust the Redis cache so Android picks up the new theme immediately
             await cacheDelete(CACHE_KEYS.BOOTSTRAP(locationId)).catch(() => {})
-            console.error(`[THEME] Cache invalidated for location: ${locationId}`)
 
             return NextResponse.json({
                 themeId: updated.themeId,
@@ -119,7 +114,6 @@ export async function PUT(request: Request) {
             data: updateData
         })
 
-        // Bust the Redis cache for ALL locations in this franchise so Android picks up immediately
         const allLocations = await prisma.location.findMany({
             where: { franchiseId: user.franchiseId },
             select: { id: true }
@@ -127,9 +121,7 @@ export async function PUT(request: Request) {
         await Promise.all(
             allLocations.map(loc => cacheDelete(CACHE_KEYS.BOOTSTRAP(loc.id)).catch(() => {}))
         )
-        console.error(`[THEME] Cache invalidated for ${allLocations.length} location(s) in franchise ${user.franchiseId}`)
 
-        // Audit log
         await logActivity({
             userId: user.id,
             userEmail: user.email,
@@ -137,7 +129,7 @@ export async function PUT(request: Request) {
             action: 'THEME_UPDATED',
             entityType: 'Location',
             entityId: locationId || 'ALL',
-            metadata: { themeId, highContrast, scope: locationId ? 'single' : 'all_locations' }
+            details: { themeId, highContrast, scope: locationId ? 'single' : 'all_locations' }
         })
 
         return NextResponse.json({

@@ -6,13 +6,12 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-// PROVIDER role doesn't have franchiseId - return empty for now
-        if (!user.franchiseId || user.role === 'PROVIDER') {
+
+        // PROVIDER role doesn't have franchiseId - return empty for now
+        if (!user.franchiseId || user.franchiseId === '__SYSTEM__' || user.role === 'PROVIDER') {
             return NextResponse.json([])
         }
 
@@ -40,7 +39,7 @@ export async function GET(req: NextRequest) {
                 }
             },
             orderBy: [
-                { status: 'asc' }, // OPEN first
+                { status: 'asc' },
                 { lastMessageAt: 'desc' }
             ]
         })
@@ -65,7 +64,6 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // Create conversation with first message
         const conversation = await prisma.chatConversation.create({
             data: {
                 franchiseId,
@@ -92,4 +90,3 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 })
     }
 }
-

@@ -4,9 +4,10 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    if (!user || user.role !== 'PROVIDER') {
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const user = await getAuthUser(req)
     if (!user || user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
@@ -48,7 +50,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Subject and description are required' }, { status: 400 })
         }
 
-        // Map priority to severity (P0-P4 format)
         const severityMap: Record<string, string> = {
             'CRITICAL': 'P0',
             'HIGH': 'P1',
@@ -57,7 +58,6 @@ export async function POST(req: NextRequest) {
         }
         const severity = severityMap[priority] || 'P2'
 
-        // Get any franchise and its first location
         const franchise = await prisma.franchise.findFirst({
             include: { locations: { take: 1 } }
         })
@@ -68,7 +68,6 @@ export async function POST(req: NextRequest) {
 
         let locationId = franchise.locations[0]?.id
 
-        // If no location exists, create one
         if (!locationId) {
             const newLocation = await prisma.location.create({
                 data: {
@@ -80,7 +79,6 @@ export async function POST(req: NextRequest) {
             locationId = newLocation.id
         }
 
-        // Create the ticket
         const ticket = await prisma.ticket.create({
             data: {
                 franchiseId: franchise.id,
@@ -93,7 +91,6 @@ export async function POST(req: NextRequest) {
             }
         })
 
-        // Create initial message with description (field is "message", not "content")
         await prisma.ticketMessage.create({
             data: {
                 ticketId: ticket.id,

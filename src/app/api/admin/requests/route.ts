@@ -1,12 +1,12 @@
-import { NextResponse } from 'next/server'
-// STUB: License request feature not yet implemented in current schema
-// The licenseRequest model doesn't exist in the Prisma schema
+import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 
+// STUB: License request feature not yet implemented in current schema
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!user || user.role !== 'PROVIDER') {
+    if (user.role !== 'PROVIDER') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -16,4 +16,3 @@ export async function GET(req: NextRequest) {
         requests: []
     })
 }
-

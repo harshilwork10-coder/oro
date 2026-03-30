@@ -1,14 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET — list all payment terminals grouped by location
 export async function GET(req: NextRequest) {
     try {
-        const user = await getAuthUser(request)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        if (!session || user.role !== 'PROVIDER') {
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -43,11 +42,9 @@ export async function GET(req: NextRequest) {
                 locationId: loc.id,
                 locationName: loc.name,
                 franchiseName: loc.franchise.name,
-                // Legacy single-terminal fields (for backward compat)
                 legacyIP: loc.paxTerminalIP,
                 legacyPort: loc.paxTerminalPort,
                 legacyMID: loc.processorMID,
-                // Proper multi-terminal list
                 terminals: loc.paymentTerminals.map(t => ({
                     id: t.id,
                     name: t.name,
@@ -77,13 +74,15 @@ export async function GET(req: NextRequest) {
 }
 
 // POST — create a new PaymentTerminal for a location
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
     try {
-        if (!session || user.role !== 'PROVIDER') {
+        const user = await getAuthUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { locationId, name, terminalIP, terminalPort, stationId } = body
 
         if (!locationId || !name || !terminalIP) {
