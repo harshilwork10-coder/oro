@@ -106,7 +106,7 @@ export default function StoreDetailsPage() {
 
     async function fetchData() {
         try {
-            const res = await fetch(`/api/admin/owners/${ownerId}/${llcId}/${storeId}`);
+            const res = await fetch(`/api/provider/owners/${ownerId}/${llcId}/${storeId}`);
             if (res.ok) {
                 const result = await res.json();
                 setData(result);

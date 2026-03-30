@@ -72,7 +72,7 @@ export default function OwnersListPage() {
     async function fetchOwners() {
         setLoading(true);
         try {
-            const res = await fetch('/api/admin/owners');
+            const res = await fetch('/api/provider/owners');
             if (res.ok) {
                 const data = await res.json();
                 setOwners(data);

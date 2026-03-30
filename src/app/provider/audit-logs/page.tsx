@@ -166,7 +166,7 @@ export default function AuditLogsPage() {
         setSummaryLoading(true);
         try {
             const qs = buildParams({ mode: 'summary' });
-            const res = await fetch(`/api/admin/audit-logs?${qs}`);
+            const res = await fetch(`/api/provider/audit-logs?${qs}`);
             if (res.ok) {
                 const data = await res.json();
                 setSummary(data.summary || {});
@@ -184,7 +184,7 @@ export default function AuditLogsPage() {
         setDrillAction(action);
         try {
             const qs = buildParams({ action, limit: '100' });
-            const res = await fetch(`/api/admin/audit-logs?${qs}`);
+            const res = await fetch(`/api/provider/audit-logs?${qs}`);
             if (res.ok) {
                 const data = await res.json();
                 setDrillLogs(data.logs || []);
@@ -202,7 +202,7 @@ export default function AuditLogsPage() {
         setDrillAction('SEARCH');
         try {
             const qs = buildParams({ search: searchQuery, limit: '100' });
-            const res = await fetch(`/api/admin/audit-logs?${qs}`);
+            const res = await fetch(`/api/provider/audit-logs?${qs}`);
             if (res.ok) {
                 const data = await res.json();
                 setDrillLogs(data.logs || []);

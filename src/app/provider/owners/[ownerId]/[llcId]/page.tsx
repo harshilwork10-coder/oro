@@ -79,7 +79,7 @@ export default function LlcStoresPage() {
 
     async function fetchData() {
         try {
-            const res = await fetch(`/api/admin/owners/${ownerId}/${llcId}`);
+            const res = await fetch(`/api/provider/owners/${ownerId}/${llcId}`);
             if (res.ok) {
                 const result = await res.json();
                 setData(result);

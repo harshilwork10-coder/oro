@@ -88,7 +88,7 @@ export default function OwnerBusinessesPage() {
 
     async function fetchOwner() {
         try {
-            const res = await fetch(`/api/admin/owners/${ownerId}`);
+            const res = await fetch(`/api/provider/owners/${ownerId}`);
             if (res.ok) {
                 const data = await res.json();
                 setOwner(data);

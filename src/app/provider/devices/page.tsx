@@ -126,7 +126,7 @@ export default function DevicesPage() {
 
     const fetchLicenses = async () => {
         try {
-            const res = await fetch('/api/admin/terminals');
+            const res = await fetch('/api/provider/terminals');
             const data = await res.json();
             if (data.licenses) setLicenses(data.licenses);
         } catch (e) { console.error(e); }
@@ -162,7 +162,7 @@ export default function DevicesPage() {
     const checkTerminalStatus = async (terminalId: string, ipAddress: string, port: string = DEFAULT_PAX_PORT) => {
         setCheckingTerminalId(terminalId);
         try {
-            const res = await fetch('/api/admin/terminals/discover', {
+            const res = await fetch('/api/provider/terminals/discover', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ipAddress, port })
