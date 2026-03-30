@@ -13,14 +13,14 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
 
-// SECURITY: JWT secret — prefer dedicated JWT_SECRET, fall back to NEXTAUTH_SECRET
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-fallback-secret'
+// SECURITY: JWT secret must be set in production
+const JWT_SECRET = process.env.JWT_SECRET || 'CHANGE_THIS_IN_PRODUCTION_' + process.env.NEXTAUTH_SECRET?.slice(0, 16)
 
 if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
-    // SECURITY WARNING: JWT_SECRET not set — using NEXTAUTH_SECRET as fallback
-    console.error(
-        '[SECURITY WARNING] JWT_SECRET is not set. Using NEXTAUTH_SECRET as fallback. ' +
-        'Set JWT_SECRET in Vercel Environment Variables for best security.'
+    // GO-LIVE GATE: Hard block — do NOT start with weak token signing
+    throw new Error(
+        '[FATAL SECURITY] JWT_SECRET environment variable is not set in production. ' +
+        'The application cannot start. Set JWT_SECRET in your deployment configuration.'
     )
 }
 
