@@ -157,7 +157,7 @@ export default function DataImportPage() {
 
             let url = '';
             if (selectedType === 'products') {
-                // Use the existing inventory import flow: parse first, then confirm
+                // Step 1: Parse CSV
                 const parseRes = await fetch('/api/inventory/import', {
                     method: 'POST',
                     body: formData,
@@ -168,12 +168,29 @@ export default function DataImportPage() {
                 }
                 const parsed = await parseRes.json();
 
-                // Now confirm the import
+                // Step 2: Enrich with master UPC database (auto-fills name, brand, size, category)
+                let enrichedItems = parsed.items;
+                try {
+                    const enrichRes = await fetch('/api/inventory/owner-enrich', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ items: parsed.items }),
+                    });
+                    if (enrichRes.ok) {
+                        const enrichData = await enrichRes.json();
+                        enrichedItems = enrichData.items;
+                        console.log(`[Import] Enriched ${enrichData.enrichedCount}/${enrichData.totalItems} items from master DB`);
+                    }
+                } catch (e) {
+                    console.warn('[Import] Enrichment failed, proceeding with raw data:', e);
+                }
+
+                // Step 3: Confirm import — save to DB
                 const confirmRes = await fetch('/api/inventory/import-confirm', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        items: parsed.items,
+                        items: enrichedItems,
                         updateExisting: true,
                         franchiseId: selectedFranchise.id,
                     }),
