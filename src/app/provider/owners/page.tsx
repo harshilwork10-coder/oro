@@ -242,14 +242,15 @@ export default function OwnersListPage() {
             {/* Virtualized Table */}
             <div className="bg-stone-900 rounded-lg border border-stone-800 overflow-hidden">
                 {/* Table Header */}
-                <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-stone-800/50 text-stone-400 text-xs font-medium uppercase tracking-wide">
-                    <div className="col-span-3">Owner</div>
-                    <div className="col-span-2">Primary Business</div>
-                    <div className="col-span-1 text-center"># Biz</div>
-                    <div className="col-span-1 text-center"># Stores</div>
-                    <div className="col-span-2">Status</div>
-                    <div className="col-span-2">Joined</div>
-                    <div className="col-span-1"></div>
+                <div className="grid grid-cols-13 gap-2 px-4 py-3 bg-stone-800/50 text-stone-400 text-xs font-medium uppercase tracking-wide" style={{ gridTemplateColumns: '3fr 2fr 1.5fr 0.7fr 0.7fr 1.5fr 1.5fr 0.5fr' }}>
+                    <div>Owner</div>
+                    <div>Primary Business</div>
+                    <div>Dealer</div>
+                    <div className="text-center"># Biz</div>
+                    <div className="text-center"># Stores</div>
+                    <div>Status</div>
+                    <div>Joined</div>
+                    <div></div>
                 </div>
 
                 {/* Table Body (Virtualized) */}
@@ -271,11 +272,11 @@ export default function OwnersListPage() {
                                     <Link
                                         key={owner.id}
                                         href={`/provider/owners/${owner.id}`}
-                                        className="grid grid-cols-12 gap-2 px-4 py-2.5 hover:bg-stone-800/50 items-center border-b border-stone-800/50 absolute w-full"
-                                        style={{ top: actualIdx * 48 + 'px', height: '48px' }}
+                                        className="grid gap-2 px-4 py-2.5 hover:bg-stone-800/50 items-center border-b border-stone-800/50 absolute w-full"
+                                        style={{ top: actualIdx * 48 + 'px', height: '48px', gridTemplateColumns: '3fr 2fr 1.5fr 0.7fr 0.7fr 1.5fr 1.5fr 0.5fr' }}
                                     >
                                         {/* Owner */}
-                                        <div className="col-span-3 flex items-center gap-3">
+                                        <div className="flex items-center gap-3">
                                             <div className="h-8 w-8 bg-amber-500/20 rounded-lg flex items-center justify-center shrink-0">
                                                 {owner.image ? (
                                                     <img src={owner.image} alt="" className="h-8 w-8 rounded-lg object-cover" />
@@ -294,12 +295,24 @@ export default function OwnersListPage() {
                                         </div>
 
                                         {/* Primary Business */}
-                                        <div className="col-span-2 text-stone-300 text-sm truncate">
+                                        <div className="text-stone-300 text-sm truncate">
                                             {owner.primaryLlc || '-'}
                                         </div>
 
+                                        {/* Dealer */}
+                                        <div>
+                                            {owner.dealerName ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium text-sky-300 bg-sky-500/15 border border-sky-500/20 truncate max-w-full">
+                                                    <Building2 size={10} />
+                                                    {owner.dealerName}
+                                                </span>
+                                            ) : (
+                                                <span className="text-stone-600 text-xs">—</span>
+                                            )}
+                                        </div>
+
                                         {/* # Businesses */}
-                                        <div className="col-span-1 text-center">
+                                        <div className="text-center">
                                             <span className="inline-flex items-center gap-1 text-blue-400 text-sm font-medium">
                                                 <Building2 size={12} />
                                                 {owner.llcCount}
@@ -307,7 +320,7 @@ export default function OwnersListPage() {
                                         </div>
 
                                         {/* # Stores */}
-                                        <div className="col-span-1 text-center">
+                                        <div className="text-center">
                                             <span className={`inline-flex items-center gap-1 text-sm font-medium ${owner.storeCount === 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
                                                 <Store size={12} />
                                                 {owner.storeCount}
@@ -315,7 +328,7 @@ export default function OwnersListPage() {
                                         </div>
 
                                         {/* Status - Explicit Labels */}
-                                        <div className="col-span-2">
+                                        <div>
                                             {issue ? (
                                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${issue.color}`}>
                                                     <AlertTriangle size={10} />
@@ -330,12 +343,12 @@ export default function OwnersListPage() {
                                         </div>
 
                                         {/* Joined */}
-                                        <div className="col-span-2 text-stone-500 text-xs">
+                                        <div className="text-stone-500 text-xs">
                                             {formatDate(owner.createdAt)}
                                         </div>
 
                                         {/* Arrow */}
-                                        <div className="col-span-1 flex justify-end">
+                                        <div className="flex justify-end">
                                             <ChevronRight size={16} className="text-stone-600" />
                                         </div>
                                     </Link>

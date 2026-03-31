@@ -642,6 +642,18 @@ model Franchise {
 }
 
 // Franchise-specific settings for pricing and features
+// ════════════════════════════════════════════════════════════════════
+// FRANCHISE SETTINGS — LIVE RUNTIME SOURCE OF TRUTH
+//
+// This model is the CANONICAL source for all live store behavior:
+//   - Pricing: pricingModel, cardSurcharge, showDualPricing
+//   - Tax: taxRate
+//   - Receipts, POS display, salon features, void/refund limits
+//
+// POS (Android + Web), web dashboard hooks, and all runtime reads
+// consume this model. BusinessConfig provides PROVIDER DEFAULTS that
+// seed these values at onboarding — once populated here, this model wins.
+// ════════════════════════════════════════════════════════════════════
 model FranchiseSettings {
   id          String    @id @default(cuid())
   franchiseId String    @unique
@@ -1887,17 +1899,18 @@ model Product {
 
   name        String
   description String?
-  price       Decimal // Legacy - kept for backward compatibility
+  price       Decimal // @deprecated — Legacy single-price field. Use cashPrice/cardPrice via resolvePrice(). Retained for backward compat.
 
-  // Dual Pricing Fields (compliant dual price system)
-  // cashPrice is the PRIMARY price, cardPrice is derived
+  // SOURCE OF TRUTH for pricing — dual pricing fields
+  // cashPrice is the PRIMARY price, cardPrice is derived via FranchisorConfig.dualPricingPercent
+  // Resolution order: resolvePrice.ts → LocationOverride → Product.cashPrice → Product.price (fallback)
   cashPrice Decimal? // Cash price (base price)
   cardPrice Decimal? // Card price = cashPrice × (1 + dualPricingPercent)
 
   cost            Decimal? // Cost to franchise
   stock           Int              @default(0)
-  category        String? // Legacy - plain text category
-  categoryId      String? // NEW - link to ProductCategory
+  category        String? // @deprecated — Plain text category. Use categoryId + ProductCategory relation instead.
+  categoryId      String? // SOURCE OF TRUTH for category assignment
   productCategory ProductCategory? @relation(fields: [categoryId], references: [id])
   sku             String?
   barcode         String? // UPC/EAN barcode for scanner
@@ -2940,8 +2953,19 @@ model OffboardingCase {
   @@index([accountType, status])
 }
 
-// BUSINESS CONFIGURATION (PROVIDER-CONTROLLED)
-// One config per franchisor, but PROVIDER decides what's in it
+// BUSINESS CONFIGURATION (PROVIDER-CONTROLLED DEFAULTS/TEMPLATES)
+// One config per franchisor — PROVIDER decides initial settings.
+//
+// ════════════════════════════════════════════════════════════════════
+// SOURCE OF TRUTH HIERARCHY:
+//   LIVE runtime pricing/tax/tip behavior → FranchiseSettings
+//   Provider defaults / feature toggles  → BusinessConfig (this model)
+//
+// Pricing/tax fields on this model are PROVIDER DEFAULTS only.
+// They seed FranchiseSettings at onboarding time. Once the owner
+// customizes their settings, FranchiseSettings wins for all
+// runtime reads (POS, web dashboard, mobile).
+// ════════════════════════════════════════════════════════════════════
 // Franchisors can READ but NOT EDIT
 model BusinessConfig {
   id           String     @id @default(cuid())
@@ -2966,10 +2990,12 @@ model BusinessConfig {
   usesTipping   Boolean @default(true)
   usesDiscounts Boolean @default(true)
 
-  // Tax Configuration (Business-Level Defaults)
-  taxRate     Float   @default(0.08) // Legacy default rate
-  taxServices Boolean @default(true) // Legacy - use servicesTaxableDefault
-  taxProducts Boolean @default(true) // Legacy - use productsTaxableDefault
+  // Tax Configuration (PROVIDER DEFAULTS — not live runtime source)
+  // @deprecated for live runtime use: FranchiseSettings.taxRate is the live source of truth.
+  // These values seed FranchiseSettings at onboarding. Once owner customizes, FranchiseSettings wins.
+  taxRate     Float   @default(0.08) // PROVIDER DEFAULT ONLY — live runtime reads FranchiseSettings.taxRate
+  taxServices Boolean @default(true) // @deprecated: use servicesTaxableDefault instead
+  taxProducts Boolean @default(true) // @deprecated: use productsTaxableDefault instead
 
   // NEW: Business-level tax defaults (applied to all stores unless overridden)
   servicesTaxableDefault Boolean         @default(false) // Salon default: services NOT taxable
@@ -3081,25 +3107,28 @@ model BusinessConfig {
   newClientBonusEnabled Boolean @default(false)
   newClientBonusAmount  Decimal @default(10)
 
-  // Pricing & Surcharges
-  pricingModel      String  @default("STANDARD") // STANDARD, CASH_DISCOUNT, DUAL_PRICING
-  cardSurcharge     Decimal @default(0) // Surcharge amount or percent
-  cardSurchargeType String  @default("PERCENTAGE") // PERCENTAGE or FIXED
-  showDualPricing   Boolean @default(false)
+  // Pricing & Surcharges (PROVIDER DEFAULTS — not live runtime source)
+  // @deprecated for live runtime use: FranchiseSettings.pricingModel is the live source of truth.
+  // These values seed FranchiseSettings at onboarding. Once owner customizes, FranchiseSettings wins.
+  pricingModel      String  @default("STANDARD") // PROVIDER DEFAULT ONLY — live reads FranchiseSettings.pricingModel
+  cardSurcharge     Decimal @default(0) // PROVIDER DEFAULT ONLY — live reads FranchiseSettings.cardSurcharge
+  cardSurchargeType String  @default("PERCENTAGE") // PROVIDER DEFAULT ONLY
+  showDualPricing   Boolean @default(false) // PROVIDER DEFAULT ONLY
 
-  // Cash Discount Program (FRANCHISOR-CONTROLLED)
-  // Each salon owner decides if they want dual pricing
-  cashDiscountEnabled Boolean @default(false)
-  cashDiscountPercent Decimal @default(3.5) // Default 3.5%, they can change
+  // Cash Discount Program (PROVIDER DEFAULTS)
+  // @deprecated for live runtime: owner sets pricing via FranchiseSettings
+  cashDiscountEnabled Boolean @default(false) // PROVIDER DEFAULT ONLY
+  cashDiscountPercent Decimal @default(3.5) // PROVIDER DEFAULT ONLY
 
   // Data Export Permissions (PROVIDER-CONTROLLED)
   canExportData    Boolean @default(false) // Can export customer/transaction data
   canExportReports Boolean @default(false) // Can export reports to CSV/PDF
 
   // ============ OPERATIONAL CONTROLS ============
-  // Refund thresholds (enforced by /api/pos/refund)
-  requireManagerPinAbove Decimal? @db.Decimal(12, 2) // Refunds above this $ amount require manager PIN
-  refundLimitPerDay      Decimal? @db.Decimal(12, 2) // Max total refund $ per employee per day
+  // Refund thresholds (PROVIDER DEFAULTS — live runtime reads FranchiseSettings)
+  // @deprecated for live runtime: FranchiseSettings.requireManagerPinAbove is the live source.
+  requireManagerPinAbove Decimal? @db.Decimal(12, 2) // PROVIDER DEFAULT ONLY
+  refundLimitPerDay      Decimal? @db.Decimal(12, 2) // PROVIDER DEFAULT ONLY
 
   // ORO 9 Storefront
   usesStorefront Boolean @default(false) // Enable per-location storefront pages

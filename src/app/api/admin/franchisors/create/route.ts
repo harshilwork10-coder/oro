@@ -197,6 +197,27 @@ export async function POST(req: NextRequest) {
                 data: { franchiseId: franchise.id }
             })
 
+            // ════════════════════════════════════════════════════════════════════
+            // SEED FranchiseSettings from BusinessConfig provider defaults.
+            // This ensures the owner's live runtime settings match the Provider's
+            // intent from day 1. Without this, FranchiseSettings would be lazily
+            // created with potentially different hardcoded defaults on first visit.
+            // ════════════════════════════════════════════════════════════════════
+            try {
+                await prisma.franchiseSettings.create({
+                    data: {
+                        franchiseId: franchise.id,
+                        pricingModel: 'STANDARD',
+                        cardSurchargeType: 'PERCENTAGE',
+                        cardSurcharge: 0,
+                        showDualPricing: false,
+                        taxRate: 0.0825,
+                    }
+                })
+            } catch (seedErr) {
+                console.error('FranchiseSettings seed failed (non-blocking):', seedErr)
+            }
+
             // Create the default location using STORE NAME (DBA), not company name
             const storeBaseSlug = sanitizedStoreName
                 .toLowerCase()

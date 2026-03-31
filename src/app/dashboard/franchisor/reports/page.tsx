@@ -1,3 +1,6 @@
+// CANONICAL: Franchisor self-reports hub (cross-location reporting).
+// This is NOT a duplicate of /dashboard/franchisors — that is the Provider admin client list.
+// See ROUTE_CANON.md for details.
 'use client'
 
 import { useState, useEffect } from 'react'

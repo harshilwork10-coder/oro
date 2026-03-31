@@ -1,3 +1,17 @@
+/**
+ * @deprecated — LEGACY dual pricing utility.
+ *
+ * SOURCE OF TRUTH: lib/pricing/resolvePrice.ts
+ *
+ * This file is superseded by resolvePrice.ts which provides:
+ * - Unified pricing resolution hierarchy (FranchisorConfig → LocationOverride → Product fields)
+ * - `resolvePrice()`, `resolveCartTotal()`, `calculateTax()`
+ * - Proper dual pricing with the configFromDb() helper
+ *
+ * Do NOT add new features here. All new pricing code must use resolvePrice.ts.
+ * This file is retained only for backward compatibility with existing call sites
+ * that have not yet been migrated.
+ */
 import { prisma } from '@/lib/prisma'
 
 // Provider-level settings (YOU control the percentage)

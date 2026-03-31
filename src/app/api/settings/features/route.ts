@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { logActivity } from '@/lib/auditLog'
+import { enforceBrandLocks } from '@/lib/settings/brandLocks'
 
 // GET - Get feature toggle settings
 export async function GET(req: NextRequest) {
@@ -97,6 +98,21 @@ export async function PUT(req: NextRequest) {
 
         const body = await req.json()
 
+        // ════════════════════════════════════════════════════════════════════
+        // BRAND LOCK ENFORCEMENT
+        // Service-related feature toggles are checked against lockServices.
+        // For MULTI_LOCATION_OWNER, this is a no-op pass-through.
+        // ════════════════════════════════════════════════════════════════════
+        const enforcement = await enforceBrandLocks(user.franchiseId, Object.keys(body))
+
+        if (!enforcement.allowed) {
+            return NextResponse.json({
+                error: enforcement.message,
+                blockedFields: enforcement.blockedFields,
+                blockedByLock: enforcement.blockedByLock,
+            }, { status: 403 })
+        }
+
         // Build update object with only allowed fields
         const updateData: any = {}
         const allowedFields = [
@@ -132,7 +148,7 @@ export async function PUT(req: NextRequest) {
             action: 'SETTINGS_CHANGE',
             entityType: 'FeatureSettings',
             franchiseId: user.franchiseId,
-            metadata: { changedFields: Object.keys(updateData), values: updateData }
+            details: { changedFields: Object.keys(updateData), values: updateData }
         })
 
         return NextResponse.json({ success: true, settings })

@@ -1,3 +1,6 @@
+// CANONICAL: Admin employee management (CRUD, permissions, PIN/password reset).
+// This is NOT a duplicate of /dashboard/employee — that is the employee self-view dashboard.
+// See ROUTE_CANON.md for details.
 'use client'
 
 import { useState, useEffect, useRef } from 'react'

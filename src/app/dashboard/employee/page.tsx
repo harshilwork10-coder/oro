@@ -1,3 +1,6 @@
+// CANONICAL: Employee self-view dashboard (schedule, stats, tips).
+// This is NOT a duplicate of /dashboard/employees — that is admin employee management.
+// See ROUTE_CANON.md for details.
 'use client'
 
 import { useState, useEffect } from 'react'

@@ -1,3 +1,6 @@
+// CANONICAL: Provider-level client management (franchisor CRUD, onboarding, account ops).
+// This is NOT a duplicate of /dashboard/franchisor — that is the franchisor self-reports hub.
+// See ROUTE_CANON.md for details.
 'use client'
 
 import { useSession } from "next-auth/react"

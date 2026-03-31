@@ -3,10 +3,11 @@
 import {
     Home, Users, Ticket, Monitor, HardDrive, FileText,
     CreditCard, Settings, Plus, Bell, Search, Menu, ChevronDown,
-    Building2, Package, LogOut, User, MapPin, ClipboardList, Upload
+    Building2, Package, LogOut, User, MapPin, ClipboardList, Upload,
+    Activity, DollarSign
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 
@@ -22,6 +23,8 @@ const PROVIDER_SIDEBAR = [
     { name: 'Audit Logs', href: '/provider/audit-logs', icon: ClipboardList },
     { name: 'UPC Import', href: '/provider/upc-import', icon: Package },
     { name: 'Data Import', href: '/provider/data-import', icon: Upload },
+    { name: 'Billing', href: '/provider/billing', icon: DollarSign },
+    { name: 'Monitoring', href: '/provider/monitoring', icon: Activity },
 ];
 
 // Quick add menu items
@@ -33,6 +36,7 @@ const ADD_MENU_ITEMS = [
 
 export default function ProviderLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const router = useRouter();
     const { data: session } = useSession();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -114,6 +118,11 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
                                 placeholder="Search client, MID, TID, ticket, terminal..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && searchQuery.trim()) {
+                                        router.push(`/provider/owners?q=${encodeURIComponent(searchQuery.trim())}`);
+                                    }
+                                }}
                                 className="w-full bg-stone-800 border border-stone-700 rounded-lg py-2 pl-10 pr-4 text-sm text-stone-200 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                             />
                         </div>

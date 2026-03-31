@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { invalidateLocationCache } from '@/lib/cache'
 import { logActivity } from '@/lib/auditLog'
+import { enforceBrandLocks } from '@/lib/settings/brandLocks'
 
 // GET: Fetch franchise settings
 export async function GET(req: NextRequest) {
@@ -109,6 +110,22 @@ export async function POST(req: NextRequest) {
             acceptsOnAccount
         } = body
 
+        // ════════════════════════════════════════════════════════════════════
+        // BRAND LOCK ENFORCEMENT
+        // For BRAND_FRANCHISOR with active locks, reject writes to locked fields.
+        // For MULTI_LOCATION_OWNER, this is a no-op pass-through.
+        // ════════════════════════════════════════════════════════════════════
+        const settingsFields = Object.keys(body).filter(k => body[k] !== undefined)
+        const enforcement = await enforceBrandLocks(user.franchiseId, settingsFields)
+
+        if (!enforcement.allowed) {
+            return NextResponse.json({
+                error: enforcement.message,
+                blockedFields: enforcement.blockedFields,
+                blockedByLock: enforcement.blockedByLock,
+            }, { status: 403 })
+        }
+
         const settings = await prisma.franchiseSettings.upsert({
             where: { franchiseId: user.franchiseId },
             update: {
@@ -138,38 +155,19 @@ export async function POST(req: NextRequest) {
             await invalidateLocationCache(loc.id)
         }
 
-        // Also update tip and payment settings in BusinessConfig if user's franchisor has one
-        const franchise = await prisma.franchise.findUnique({
-            where: { id: user.franchiseId },
-            include: { franchisor: true }
-        })
-
-
-        if (franchise?.franchisorId) {
-            await prisma.businessConfig.upsert({
-                where: { franchisorId: franchise.franchisorId },
-                update: {
-                    tipPromptEnabled: tipPromptEnabled ?? true,
-                    tipType: tipType || 'PERCENT',
-                    tipSuggestions: tipSuggestions || '[15,20,25]',
-                    acceptsEbt: acceptsEbt ?? false,
-                    acceptsChecks: acceptsChecks ?? false,
-                    acceptsOnAccount: acceptsOnAccount ?? false,
-                    // Sync tax rate to BusinessConfig so useBusinessConfig() stays consistent
-                    ...(taxRate !== undefined && { taxRate })
-                },
-                create: {
-                    franchisorId: franchise.franchisorId,
-                    tipPromptEnabled: tipPromptEnabled ?? true,
-                    tipType: tipType || 'PERCENT',
-                    tipSuggestions: tipSuggestions || '[15,20,25]',
-                    acceptsEbt: acceptsEbt ?? false,
-                    acceptsChecks: acceptsChecks ?? false,
-                    acceptsOnAccount: acceptsOnAccount ?? false,
-                    ...(taxRate !== undefined && { taxRate })
-                }
-            })
-        }
+        // ════════════════════════════════════════════════════════════════════
+        // SOURCE OF TRUTH: FranchiseSettings is the LIVE runtime source.
+        // BusinessConfig is provider-defaults/templates ONLY.
+        //
+        // REMOVED: prisma.businessConfig.upsert() dual-write.
+        // Previously this POST handler wrote tip/payment/tax fields to BOTH
+        // FranchiseSettings AND BusinessConfig, causing silent setting drift
+        // when Provider later updated BusinessConfig independently.
+        //
+        // All live store pricing/tax/tip behavior now comes exclusively
+        // from FranchiseSettings. BusinessConfig retains provider-set
+        // feature toggles and subscription limits only.
+        // ════════════════════════════════════════════════════════════════════
 
         // Audit log
         await logActivity({

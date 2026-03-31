@@ -8,7 +8,8 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import {
     Home, ShoppingCart, Package, Calendar, Users, BarChart3, Settings,
     Menu, X, Bell, Search, ChevronDown, MapPin, Store, Scissors, LogOut,
-    CreditCard, Clock, FileText, MessageSquare, Building2, Check, Palette
+    CreditCard, Clock, FileText, MessageSquare, Building2, Check, Palette,
+    HeartPulse
 } from 'lucide-react';
 import NotificationCenter from '@/components/dashboard/NotificationCenter';
 import QuickSearch from '@/components/dashboard/QuickSearch';
@@ -90,6 +91,7 @@ function getNavItems(businessType: 'retail' | 'salon' | 'both') {
     const suffix = [
         { name: 'Employees', href: '/owner/employees', icon: Users },
         { name: 'Time Clock', href: '/owner/time-clock', icon: Clock },
+        { name: 'Store Health', href: '/owner/store-health', icon: HeartPulse },
         { name: 'Reports', href: '/owner/reports', icon: BarChart3 },
         { name: 'Documents', href: '/owner/documents', icon: FileText },
         { name: 'Support', href: '/owner/support', icon: MessageSquare },
