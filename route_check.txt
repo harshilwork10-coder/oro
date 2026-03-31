@@ -1,0 +1,16 @@
+﻿True --- src\app\api\branding\route.ts
+True --- src\app\api\business-config\route.ts
+True --- src\app\api\employees\compensation-settings\route.ts
+True --- src\app\api\settings\theme\route.ts
+True --- src\app\api\admin\owners\route.ts
+True --- src\app\api\admin\franchisors\route.ts
+True --- src\app\api\provider\provisioning-tasks\route.ts
+True --- src\app\api\chat\conversations\route.ts
+True --- src\app\api\provider\tickets\route.ts
+True --- src\app\api\admin\requests\route.ts
+False --- src\app\api\franchises\locations\route.ts
+True --- src\app\api\terminals\manage\route.ts
+True --- src\app\api\admin\terminals\route.ts
+True --- src\app\api\admin\audit-logs\route.ts
+True --- src\app\api\provider\dealers\route.ts
+True --- src\app\api\provider\data-import\clients\route.ts

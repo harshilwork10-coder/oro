@@ -24,6 +24,7 @@ import TodayAppointments from "@/components/dashboard/employee/TodayAppointments
 import NextClientSpotlight from "@/components/dashboard/employee/NextClientSpotlight"
 import EmployeePerformanceStats from "@/components/dashboard/employee/EmployeePerformanceStats"
 import { useState, useEffect } from "react"
+import RetailOwnerCommandCenter from "@/components/dashboard/RetailOwnerCommandCenter"
 
 // â”€â”€â”€ Sub-components for role-specific dashboards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Each gets its own hooks at the top level (Rules of Hooks compliant)
@@ -975,7 +976,7 @@ export default function DashboardPage() {
 
     // Default: OWNER/MANAGER or any other role â€” branch on industry
     if (industryType === 'RETAIL') {
-        return <RetailOwnerDashboard session={session!} />
+        return <RetailOwnerCommandCenter session={session!} />
     }
     return <DefaultOwnerDashboard session={session!} />
 }

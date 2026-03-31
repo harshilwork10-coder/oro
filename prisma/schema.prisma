@@ -1087,6 +1087,10 @@ model Location {
   // ============ OWNER OPERATING SYSTEM ============
   ownerIssues OwnerIssue[]
 
+  // ============ ORO 9 STOREFRONT ============
+  storefrontProfile StorefrontProfile?
+  storefrontOrders  StorefrontOrder[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -3090,6 +3094,9 @@ model BusinessConfig {
   // Refund thresholds (enforced by /api/pos/refund)
   requireManagerPinAbove Decimal? @db.Decimal(12, 2) // Refunds above this $ amount require manager PIN
   refundLimitPerDay      Decimal? @db.Decimal(12, 2) // Max total refund $ per employee per day
+
+  // ORO 9 Storefront
+  usesStorefront Boolean @default(false) // Enable per-location storefront pages
 
   // Stock guard (enforced by lib/inventory/stock-guard.ts)
   allowNegativeStock Boolean @default(false) // Default: strict mode — no negative stock
@@ -6314,4 +6321,91 @@ model BookingProfile {
   updatedAt DateTime @updatedAt
 
   @@index([isPublished])
+}
+
+// ============ ORO 9 STOREFRONT ============
+
+model StorefrontProfile {
+  id         String   @id @default(cuid())
+  locationId String   @unique
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  // Master toggle
+  isEnabled Boolean @default(false)
+
+  // Display
+  headline       String? // "Welcome to Mike's Corner Store"
+  bannerImageUrl String? // Hero banner
+
+  // Product Visibility
+  showAllCategories  Boolean @default(true)  // false = use visibleCategoryIds
+  visibleCategoryIds String? // JSON: ["catId1","catId2"]
+  hiddenItemIds      String? // JSON: ["itemId1","itemId2"]
+  hideOutOfStock     Boolean @default(true)
+
+  // Pickup Rules
+  pickupEnabled     Boolean @default(true)
+  pickupLeadMinutes Int     @default(30)  // "Ready in ~30 min"
+  maxOrdersPerSlot  Int     @default(10)
+
+  // Order Rules
+  minOrderAmount    Decimal? @db.Decimal(12, 2)
+  maxItemsPerOrder  Int      @default(50)
+  orderNotesEnabled Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StorefrontOrder {
+  id          String   @id @default(cuid())
+  orderNumber String   @unique // "SF-1001"
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id])
+
+  // Customer (no account required)
+  customerName  String
+  customerPhone String
+
+  // Line items
+  items StorefrontOrderItem[]
+
+  // Totals (estimated — final price determined at POS)
+  subtotal       Decimal @db.Decimal(12, 2)
+  estimatedTax   Decimal @default(0) @db.Decimal(12, 2)
+  estimatedTotal Decimal @db.Decimal(12, 2)
+  notes          String?
+
+  // PENDING → CONFIRMED → READY → PICKED_UP
+  // PENDING → CANCELLED
+  status String @default("PENDING")
+
+  // Pickup
+  pickupTime DateTime? // Requested
+  readyAt    DateTime? // Merchant marks ready
+  pickedUpAt DateTime? // Customer arrives
+
+  // POS linkage — set ONLY when converted at register
+  transactionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([locationId])
+  @@index([status])
+  @@index([orderNumber])
+}
+
+model StorefrontOrderItem {
+  id      String          @id @default(cuid())
+  orderId String
+  order   StorefrontOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  itemId   String  // Reference to Item (snapshot, not FK)
+  itemName String  // Snapshot at order time
+  quantity Int
+  price    Decimal @db.Decimal(12, 2) // Snapshot at order time
+  total    Decimal @db.Decimal(12, 2)
+
+  @@index([orderId])
 }

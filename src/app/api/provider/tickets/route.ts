@@ -3,15 +3,15 @@ import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
-    const user = await getAuthUser(req)
-    if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    if (user.role !== 'PROVIDER') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
-
     try {
+        const user = await getAuthUser(req)
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        if (user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+        }
+
         const tickets = await prisma.ticket.findMany({
             orderBy: { createdAt: 'desc' },
             take: 50,
@@ -37,12 +37,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    const user = await getAuthUser(req)
-    if (!user || user.role !== 'PROVIDER') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
-
     try {
+        const user = await getAuthUser(req)
+        if (!user || user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+        }
+
+
         const body = await req.json()
         const { subject, description, priority, category } = body
 

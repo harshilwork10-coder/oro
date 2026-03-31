@@ -21,10 +21,6 @@ export async function GET(req: NextRequest) {
         const user = await getAuthUser(req)
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         // Only PROVIDER can see all franchisors
         if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -94,10 +90,16 @@ export async function GET(req: NextRequest) {
         )
 
         // Get location codes via raw SQL since Prisma types are stale
-        const locationCodes = await prisma.$queryRaw<Array<{ id: string, pulseStoreCode: string | null }>>`
-            SELECT id, "pulseStoreCode" FROM "Location"
-        `
-        const codeMap = new Map(locationCodes.map(l => [l.id, l.pulseStoreCode]))
+        let codeMap = new Map<string, string | null>()
+        try {
+            const locationCodes = await prisma.$queryRaw<Array<{ id: string, pulseStoreCode: string | null }>>`
+                SELECT id, "pulseStoreCode" FROM "Location"
+            `
+            codeMap = new Map(locationCodes.map(l => [l.id, l.pulseStoreCode]))
+        } catch {
+            // Column may not exist in all environments — gracefully degrade
+            console.warn('[admin/franchisors] pulseStoreCode column not found, skipping')
+        }
 
         // Transform to include config and integrations from JSON fields
         const transformedData = (franchisors as any[]).map((f: any) => ({

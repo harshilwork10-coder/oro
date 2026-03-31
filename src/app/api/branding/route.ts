@@ -1,44 +1,38 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(req: Request) {
+const defaultBranding = {
+    primary: '#9D7DD9',
+    secondary: '#5B9FE3',
+    logoUrl: '/oro9-gold.png'
+}
+
+export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json(defaultBranding)
 
-        // PROVIDER/ADMIN users operate above franchise hierarchy — return default branding
+        // PROVIDER/ADMIN users — return default branding
         if (user.role === 'PROVIDER' || user.role === 'ADMIN') {
-            return NextResponse.json({
-                primary: '#9D7DD9',
-                secondary: '#5B9FE3',
-                logoUrl: '/oro9-gold.png'
-            })
-        }
-
-        // Default branding
-        const defaultBranding = {
-            primary: '#9D7DD9',
-            secondary: '#5B9FE3',
-            logoUrl: '/oro9-gold.png'
-        }
-
-        if (!user) {
             return NextResponse.json(defaultBranding)
         }
 
-        // Find franchisor associated with user
-        let franchisorId = null
+        // For franchise users, trace to franchisor for brand colors
+        let franchisorId: string | null = null
 
         if (user.role === 'FRANCHISOR') {
-            const franchisor = await prisma.franchisor.findUnique({
-                where: { ownerId: user.id }
+            const franchisor = await prisma.franchisor.findFirst({
+                where: { ownerId: user.id },
+                select: { id: true }
             })
-            franchisorId = franchisor?.id
-        } else if (user.role === 'FRANCHISEE' || user.role === 'MANAGER' || user.role === 'EMPLOYEE') {
-            // Find which franchise they belong to, then get the franchisor
-            // This is a bit more complex depending on schema, assuming we can trace back to franchisor
-            // For now, let's just handle FRANCHISOR role for the demo as requested "client account"
+            franchisorId = franchisor?.id || null
+        } else if (user.franchiseId) {
+            const franchise = await prisma.franchise.findUnique({
+                where: { id: user.franchiseId },
+                select: { franchisorId: true }
+            })
+            franchisorId = franchise?.franchisorId || null
         }
 
         if (franchisorId) {
@@ -63,11 +57,6 @@ export async function GET(req: Request) {
         return NextResponse.json(defaultBranding)
     } catch (error) {
         console.error('Error fetching branding:', error)
-        return NextResponse.json({
-            primary: '#9D7DD9',
-            secondary: '#5B9FE3',
-            logoUrl: '/oro9-gold.png'
-        })
+        return NextResponse.json(defaultBranding)
     }
 }
-

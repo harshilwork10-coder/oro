@@ -1,10 +1,72 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { redirect } from 'next/navigation'
-import { CreditCard, DollarSign, Users, Shield, Save, AlertCircle, FileText, Printer, Settings, Lock, Phone } from 'lucide-react'
 import Link from 'next/link'
+import {
+    CreditCard, DollarSign, Users, Shield, Save, AlertCircle, FileText, Printer, Settings, Lock, Phone,
+    Store, Clock, Tag, Palette, Eye, Monitor, Receipt, Megaphone, Calendar, ToggleRight,
+    Landmark, Percent, GraduationCap, Sliders, Globe, MessageSquare, ChefHat, ArrowRight
+} from 'lucide-react'
+import { useState, useEffect } from 'react'
+
+// Settings hub card grid
+const settingsCategories = [
+    {
+        title: 'Store & Business',
+        cards: [
+            { name: 'Business Info', href: '/dashboard/settings/business', icon: Store, desc: 'Store name, address, contact' },
+            { name: 'Store Hours', href: '/dashboard/settings/store-hours', icon: Clock, desc: 'Operating hours & holidays' },
+            { name: 'ORO Directory', href: '/dashboard/settings/oro-directory', icon: Globe, desc: 'Public listing settings' },
+        ]
+    },
+    {
+        title: 'Taxes & Pricing',
+        cards: [
+            { name: 'Tax Setup', href: '/dashboard/settings/tax-setup', icon: Landmark, desc: 'Tax rates & categories' },
+            { name: 'Pricing Rules', href: '/dashboard/settings/pricing-rules', icon: Percent, desc: 'Markups, rounding, rules' },
+            { name: 'Bottle Deposit', href: '/dashboard/settings/bottle-deposit', icon: Tag, desc: 'Container deposit reqs' },
+        ]
+    },
+    {
+        title: 'Hardware',
+        cards: [
+            { name: 'Printers', href: '/dashboard/settings/printers', icon: Printer, desc: 'Receipt & label printers' },
+            { name: 'Stations', href: '/dashboard/settings/stations', icon: Monitor, desc: 'POS station management' },
+            { name: 'POS Layout', href: '/dashboard/settings/pos-layout', icon: Sliders, desc: 'Screen layout & buttons' },
+        ]
+    },
+    {
+        title: 'Appearance & Security',
+        cards: [
+            { name: 'Branding', href: '/dashboard/settings/branding', icon: Palette, desc: 'Logo, colors, theme' },
+            { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Eye, desc: 'Theme & display options' },
+            { name: 'Security', href: '/dashboard/settings/security', icon: Shield, desc: 'Passwords, 2FA, access' },
+        ]
+    },
+    {
+        title: 'Features & Controls',
+        cards: [
+            { name: 'Feature Toggles', href: '/dashboard/settings/features', icon: ToggleRight, desc: 'Enable/disable features' },
+            { name: 'Training Mode', href: '/dashboard/settings/training-mode', icon: GraduationCap, desc: 'Practice mode for staff' },
+            { name: 'Operational Controls', href: '/dashboard/settings/operational-controls', icon: Sliders, desc: 'Drawer limits, return rules' },
+        ]
+    },
+    {
+        title: 'Communication',
+        cards: [
+            { name: 'SMS Marketing', href: '/dashboard/settings/sms-marketing', icon: MessageSquare, desc: 'Text campaigns' },
+            { name: 'Scheduled Reports', href: '/dashboard/settings/scheduled-reports', icon: Calendar, desc: 'Auto email reports' },
+            { name: 'Reminders', href: '/dashboard/settings/reminders', icon: Megaphone, desc: 'Customer notifications' },
+        ]
+    },
+    {
+        title: 'Payments',
+        cards: [
+            { name: 'Payment Processors', href: '/dashboard/settings/payment-processors', icon: CreditCard, desc: 'Gateway configuration' },
+            { name: 'Receipt Template', href: '/dashboard/settings/receipt-template', icon: Receipt, desc: 'Customize receipts' },
+        ]
+    },
+]
 
 export default function SettingsPage() {
     const { data: session, status } = useSession()
@@ -12,15 +74,15 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false)
     const [message, setMessage] = useState('')
 
-    // Provider controls all settings - Owners see read-only view
     const isProvider = session?.user?.role === 'PROVIDER'
     const canEdit = isProvider
+    const industryType = (session?.user as any)?.industryType || 'SERVICE'
 
     // Pricing Settings
     const [pricingModel, setPricingModel] = useState('DUAL_PRICING')
     const [surchargeType, setSurchargeType] = useState('PERCENTAGE')
     const [surchargeValue, setSurchargeValue] = useState('3.99')
-    const [taxRate, setTaxRate] = useState('8.25') // Tax rate as percentage (8.25 = 8.25%)
+    const [taxRate, setTaxRate] = useState('8.25')
 
     // Tip Settings
     const [tipEnabled, setTipEnabled] = useState(true)
@@ -53,19 +115,15 @@ export default function SettingsPage() {
                     setPricingModel(data.pricingModel || 'STANDARD')
                     setSurchargeType(data.cardSurchargeType || 'PERCENTAGE')
                     setSurchargeValue(data.cardSurcharge?.toString() || '3.99')
-                    // Tax rate - convert from decimal (0.0825) to percentage (8.25)
                     if (data.taxRate) {
                         setTaxRate((parseFloat(data.taxRate) * 100).toFixed(2))
                     }
-                    // Tip settings
                     setTipEnabled(data.tipPromptEnabled ?? true)
                     setTipType(data.tipType || 'PERCENT')
                     setTipSuggestions(data.tipSuggestions?.replace(/[\[\]]/g, '') || '15,20,25')
-                    // Payment settings
                     setAcceptsEbt(data.acceptsEbt ?? false)
                     setAcceptsChecks(data.acceptsChecks ?? false)
                     setAcceptsOnAccount(data.acceptsOnAccount ?? false)
-                    // Receipt print settings
                     setReceiptPrintMode(data.receiptPrintMode || 'ALL')
                     setOpenDrawerOnCash(data.openDrawerOnCash ?? true)
                 }
@@ -92,7 +150,6 @@ export default function SettingsPage() {
     const saveSettings = async () => {
         setSaving(true)
         setMessage('')
-
         try {
             const res = await fetch('/api/settings/franchise', {
                 method: 'POST',
@@ -102,29 +159,24 @@ export default function SettingsPage() {
                     cardSurchargeType: surchargeType,
                     cardSurcharge: parseFloat(surchargeValue),
                     showDualPricing: pricingModel === 'DUAL_PRICING',
-                    // Tax rate - convert from percentage (8.25) to decimal (0.0825)
                     taxRate: parseFloat(taxRate) / 100,
-                    // Tip settings
                     tipPromptEnabled: tipEnabled,
                     tipType,
                     tipSuggestions: `[${tipSuggestions}]`,
-                    // Payment settings
                     acceptsEbt,
                     acceptsChecks,
                     acceptsOnAccount,
-                    // Receipt print settings
                     receiptPrintMode,
                     openDrawerOnCash
                 })
             })
-
             if (res.ok) {
-                setMessage('✅ Settings saved successfully!')
+                setMessage('Settings saved successfully!')
             } else {
-                setMessage('❌ Failed to save settings')
+                setMessage('Failed to save settings')
             }
         } catch (error) {
-            setMessage('❌ Error saving settings')
+            setMessage('Error saving settings')
         } finally {
             setSaving(false)
             setTimeout(() => setMessage(''), 3000)
@@ -136,31 +188,22 @@ export default function SettingsPage() {
             const res = await fetch('/api/settings/employees/permissions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    employeeId,
-                    permission,
-                    value
-                })
+                body: JSON.stringify({ employeeId, permission, value })
             })
-
             if (res.ok) {
-                // Update local state
                 setEmployees(prev => prev.map(emp =>
-                    emp.id === employeeId
-                        ? { ...emp, [permission]: value }
-                        : emp
+                    emp.id === employeeId ? { ...emp, [permission]: value } : emp
                 ))
-                setMessage('✅ Permission updated!')
+                setMessage('Permission updated!')
                 setTimeout(() => setMessage(''), 2000)
             }
         } catch (error) {
-            setMessage('❌ Failed to update permission')
+            setMessage('Failed to update permission')
         }
     }
 
     const calculateCardPrice = (cashPrice: number) => {
         if (pricingModel === 'STANDARD') return cashPrice
-
         if (surchargeType === 'PERCENTAGE') {
             return cashPrice * (1 + parseFloat(surchargeValue) / 100)
         } else {
@@ -169,20 +212,24 @@ export default function SettingsPage() {
     }
 
     if (loading) {
-        return (
-            <div className="p-8">
-                <div className="animate-pulse">Loading settings...</div>
-            </div>
-        )
+        return (<div className="p-8"><div className="animate-pulse">Loading settings...</div></div>)
     }
+
+    // Filter categories by industry
+    const filteredCategories = settingsCategories.filter(cat => {
+        // Salon features only for SERVICE
+        if (cat.title === 'Salon Features' && industryType !== 'SERVICE') return false
+        return true
+    })
 
     return (
         <div className="p-8 max-w-6xl mx-auto">
-            <h1 className="text-3xl font-bold mb-8 bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
-                Franchise Settings
+            <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+                Settings
             </h1>
+            <p className="text-stone-400 mb-8">Manage your store configuration, hardware, and preferences.</p>
 
-            {/* Provider-Managed Settings Notice for Owners */}
+            {/* Provider-Managed Notice */}
             {!canEdit && (
                 <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30">
                     <div className="flex items-start gap-3">
@@ -192,12 +239,10 @@ export default function SettingsPage() {
                         <div>
                             <h3 className="font-semibold text-blue-200">Settings Managed by Your Provider</h3>
                             <p className="text-sm text-stone-400 mt-1">
-                                Your account settings are configured by our support team to ensure optimal setup for your business.
-                                Need changes? Contact support and we'll handle it for you.
+                                Core settings are configured by our support team. Need changes? Contact support.
                             </p>
                             <a href="tel:+18005551234" className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
-                                <Phone className="h-4 w-4" />
-                                Contact Support
+                                <Phone className="h-4 w-4" /> Contact Support
                             </a>
                         </div>
                     </div>
@@ -205,469 +250,240 @@ export default function SettingsPage() {
             )}
 
             {message && (
-                <div className={`mb-6 p-4 rounded-lg ${message.includes('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                <div className={`mb-6 p-4 rounded-lg ${message.includes('saved') || message.includes('updated') ? 'bg-emerald-900/30 border border-emerald-500/30 text-emerald-400' : 'bg-red-900/30 border border-red-500/30 text-red-400'}`}>
                     {message}
                 </div>
             )}
 
-            {/* Pricing Configuration */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="h-12 w-12 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
-                        <CreditCard className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-bold">Pricing Configuration</h2>
-                        <p className="text-gray-600">Configure card surcharge for your franchise</p>
-                    </div>
-                </div>
-
-                <div className="space-y-6">
-                    {/* Pricing Model */}
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-3">Pricing Model</label>
-                        <div className="flex gap-4">
-                            <button
-                                onClick={() => setPricingModel('STANDARD')}
-                                className={`flex-1 p-4 rounded-xl border-2 transition-all ${pricingModel === 'STANDARD'
-                                    ? 'border-orange-500 bg-orange-50'
-                                    : 'border-gray-200 hover:border-gray-300'
-                                    }`}
-                            >
-                                <div className="font-bold">Standard Pricing</div>
-                                <div className="text-sm text-gray-600">Single price for all payment types</div>
-                            </button>
-                            <button
-                                onClick={() => setPricingModel('DUAL_PRICING')}
-                                className={`flex-1 p-4 rounded-xl border-2 transition-all ${pricingModel === 'DUAL_PRICING'
-                                    ? 'border-orange-500 bg-orange-50'
-                                    : 'border-gray-200 hover:border-gray-300'
-                                    }`}
-                            >
-                                <div className="font-bold">Dual Pricing</div>
-                                <div className="text-sm text-gray-600">Separate cash and card prices</div>
-                            </button>
+            {/* ========== SETTINGS HUB GRID ========== */}
+            <div className="space-y-8 mb-10">
+                {filteredCategories.map((category) => (
+                    <div key={category.title}>
+                        <h2 className="text-sm font-semibold text-stone-400 uppercase tracking-wide mb-3">{category.title}</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {category.cards.map((card) => {
+                                const CardIcon = card.icon
+                                return (
+                                    <Link
+                                        key={card.href}
+                                        href={card.href}
+                                        className="glass-panel p-4 rounded-xl hover:border-orange-500/30 transition-all group flex items-start gap-3"
+                                    >
+                                        <div className="h-10 w-10 bg-stone-800/80 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-orange-500/10 transition-colors">
+                                            <CardIcon className="h-5 w-5 text-stone-400 group-hover:text-orange-400 transition-colors" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-stone-200 group-hover:text-orange-200 transition-colors">{card.name}</p>
+                                            <p className="text-xs text-stone-500 mt-0.5">{card.desc}</p>
+                                        </div>
+                                        <ArrowRight className="h-4 w-4 text-stone-600 group-hover:text-orange-400 mt-1 flex-shrink-0 transition-colors" />
+                                    </Link>
+                                )
+                            })}
                         </div>
                     </div>
-
-                    {pricingModel === 'DUAL_PRICING' && (
-                        <>
-                            {/* Surcharge Type */}
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-3">Card Surcharge Type</label>
-                                <div className="flex gap-4">
-                                    <button
-                                        onClick={() => setSurchargeType('PERCENTAGE')}
-                                        className={`flex-1 p-3 rounded-lg border-2 transition-all ${surchargeType === 'PERCENTAGE'
-                                            ? 'border-orange-500 bg-orange-50'
-                                            : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                    >
-                                        <div className="font-semibold">Percentage (%)</div>
-                                    </button>
-                                    <button
-                                        onClick={() => setSurchargeType('FLAT_AMOUNT')}
-                                        className={`flex-1 p-3 rounded-lg border-2 transition-all ${surchargeType === 'FLAT_AMOUNT'
-                                            ? 'border-orange-500 bg-orange-50'
-                                            : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                    >
-                                        <div className="font-semibold">Flat Amount ($)</div>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Surcharge Value */}
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    {surchargeType === 'PERCENTAGE' ? 'Surcharge Percentage' : 'Surcharge Amount'}
-                                </label>
-                                <div className="flex items-center gap-4">
-                                    <div className="relative flex-1 max-w-xs">
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={surchargeValue}
-                                            onChange={(e) => setSurchargeValue(e.target.value)}
-                                            className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none text-lg font-semibold"
-                                        />
-                                        <span className="absolute right-4 top-3 text-gray-500 text-lg">
-                                            {surchargeType === 'PERCENTAGE' ? '%' : '$'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Preview */}
-                            <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-6 rounded-xl border border-orange-200">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <AlertCircle className="h-5 w-5 text-orange-600" />
-                                    <div className="font-bold text-orange-900">Pricing Preview</div>
-                                </div>
-                                <div className="text-gray-700">
-                                    <p className="mb-2">Example: $100 service</p>
-                                    <div className="flex gap-6">
-                                        <div>
-                                            <div className="text-sm text-gray-600">Cash Price</div>
-                                            <div className="text-2xl font-bold text-emerald-700">$100.00</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-sm text-gray-600">Card Price</div>
-                                            <div className="text-2xl font-bold text-blue-700">
-                                                ${calculateCardPrice(100).toFixed(2)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    {/* Tax Rate */}
-                    <div className="mt-6 pt-6 border-t border-gray-200">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Sales Tax Rate
-                        </label>
-                        <div className="flex items-center gap-4">
-                            <div className="relative flex-1 max-w-xs">
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="25"
-                                    value={taxRate}
-                                    onChange={(e) => setTaxRate(e.target.value)}
-                                    className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none text-lg font-semibold"
-                                />
-                                <span className="absolute right-4 top-3 text-gray-500 text-lg">%</span>
-                            </div>
-                            <div className="text-sm text-gray-600">
-                                Example: $100 item → ${(100 * (1 + parseFloat(taxRate || '0') / 100)).toFixed(2)} with tax
-                            </div>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-2">
-                            This is the default sales tax rate applied to all taxable items at your store.
-                        </p>
-                    </div>
-                </div>
+                ))}
             </div>
 
-            {/* Tip Settings */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="h-12 w-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
-                        <DollarSign className="h-6 w-6 text-white" />
+            {/* ========== INLINE QUICK SETTINGS (preserved from original) ========== */}
+            <div className="border-t border-stone-800 pt-8">
+                <h2 className="text-lg font-bold text-stone-200 mb-6">Quick Settings</h2>
+
+                {/* Pricing Configuration */}
+                <div className="glass-panel rounded-2xl p-6 mb-6">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="h-12 w-12 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
+                            <CreditCard className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-stone-100">Pricing Configuration</h2>
+                            <p className="text-sm text-stone-400">Configure card surcharge for your franchise</p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="text-2xl font-bold">Tip Settings</h2>
-                        <p className="text-gray-600">Configure tip prompt on customer display</p>
+                    <div className="space-y-6">
+                        <div>
+                            <label className="block text-sm font-semibold text-stone-300 mb-3">Pricing Model</label>
+                            <div className="flex gap-4">
+                                <button onClick={() => setPricingModel('STANDARD')} className={`flex-1 p-4 rounded-xl border-2 transition-all ${pricingModel === 'STANDARD' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
+                                    <div className="font-bold text-stone-200">Standard Pricing</div>
+                                    <div className="text-sm text-stone-400">Single price for all payment types</div>
+                                </button>
+                                <button onClick={() => setPricingModel('DUAL_PRICING')} className={`flex-1 p-4 rounded-xl border-2 transition-all ${pricingModel === 'DUAL_PRICING' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
+                                    <div className="font-bold text-stone-200">Dual Pricing</div>
+                                    <div className="text-sm text-stone-400">Separate cash and card prices</div>
+                                </button>
+                            </div>
+                        </div>
+
+                        {pricingModel === 'DUAL_PRICING' && (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-semibold text-stone-300 mb-3">Card Surcharge Type</label>
+                                    <div className="flex gap-4">
+                                        <button onClick={() => setSurchargeType('PERCENTAGE')} className={`flex-1 p-3 rounded-lg border-2 transition-all ${surchargeType === 'PERCENTAGE' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
+                                            <div className="font-semibold text-stone-200">Percentage (%)</div>
+                                        </button>
+                                        <button onClick={() => setSurchargeType('FLAT_AMOUNT')} className={`flex-1 p-3 rounded-lg border-2 transition-all ${surchargeType === 'FLAT_AMOUNT' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
+                                            <div className="font-semibold text-stone-200">Flat Amount ($)</div>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-stone-300 mb-2">{surchargeType === 'PERCENTAGE' ? 'Surcharge Percentage' : 'Surcharge Amount'}</label>
+                                    <div className="relative flex-1 max-w-xs">
+                                        <input type="number" step="0.01" value={surchargeValue} onChange={(e) => setSurchargeValue(e.target.value)} className="w-full px-4 py-3 pr-12 border-2 border-stone-700 bg-stone-800 rounded-lg focus:border-orange-500 focus:outline-none text-lg font-semibold text-stone-100" />
+                                        <span className="absolute right-4 top-3 text-stone-500 text-lg">{surchargeType === 'PERCENTAGE' ? '%' : '$'}</span>
+                                    </div>
+                                </div>
+                                <div className="bg-stone-800/50 p-6 rounded-xl border border-stone-700">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <AlertCircle className="h-5 w-5 text-orange-400" />
+                                        <div className="font-bold text-stone-200">Pricing Preview</div>
+                                    </div>
+                                    <p className="text-stone-400 mb-2">Example: $100 service</p>
+                                    <div className="flex gap-6">
+                                        <div><div className="text-sm text-stone-500">Cash Price</div><div className="text-2xl font-bold text-emerald-400">$100.00</div></div>
+                                        <div><div className="text-sm text-stone-500">Card Price</div><div className="text-2xl font-bold text-blue-400">${calculateCardPrice(100).toFixed(2)}</div></div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        <div className="mt-6 pt-6 border-t border-stone-700">
+                            <label className="block text-sm font-semibold text-stone-300 mb-2">Sales Tax Rate</label>
+                            <div className="flex items-center gap-4">
+                                <div className="relative flex-1 max-w-xs">
+                                    <input type="number" step="0.01" min="0" max="25" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className="w-full px-4 py-3 pr-12 border-2 border-stone-700 bg-stone-800 rounded-lg focus:border-orange-500 focus:outline-none text-lg font-semibold text-stone-100" />
+                                    <span className="absolute right-4 top-3 text-stone-500 text-lg">%</span>
+                                </div>
+                                <div className="text-sm text-stone-400">Example: $100 item &rarr; ${(100 * (1 + parseFloat(taxRate || '0') / 100)).toFixed(2)} with tax</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div className="space-y-6">
-                    {/* Tip Enable/Disable */}
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                        <div>
-                            <div className="font-semibold">Enable Tip Prompt</div>
-                            <div className="text-sm text-gray-600">Show tip options on customer display during checkout</div>
+                {/* Tip Settings */}
+                <div className="glass-panel rounded-2xl p-6 mb-6">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="h-12 w-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                            <DollarSign className="h-6 w-6 text-white" />
                         </div>
-                        <button
-                            onClick={() => setTipEnabled(!tipEnabled)}
-                            className={`relative w-14 h-8 rounded-full transition-all ${tipEnabled ? 'bg-green-500' : 'bg-gray-300'}`}
-                        >
+                        <div>
+                            <h2 className="text-xl font-bold text-stone-100">Tip Settings</h2>
+                            <p className="text-sm text-stone-400">Configure tip prompt on customer display</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-stone-800/50 rounded-xl">
+                        <div><div className="font-semibold text-stone-200">Enable Tip Prompt</div><div className="text-sm text-stone-400">Show tip options on customer display during checkout</div></div>
+                        <button onClick={() => setTipEnabled(!tipEnabled)} className={`relative w-14 h-8 rounded-full transition-all ${tipEnabled ? 'bg-green-500' : 'bg-stone-600'}`}>
                             <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-all ${tipEnabled ? 'left-7' : 'left-1'}`} />
                         </button>
                     </div>
-
                     {tipEnabled && (
-                        <>
-                            {/* Tip Type */}
+                        <div className="mt-4 space-y-4">
+                            <div className="flex gap-4">
+                                <button onClick={() => setTipType('PERCENT')} className={`flex-1 p-3 rounded-lg border-2 transition-all ${tipType === 'PERCENT' ? 'border-green-500 bg-green-500/10' : 'border-stone-700'}`}><div className="font-semibold text-stone-200">Percentage (%)</div></button>
+                                <button onClick={() => setTipType('DOLLAR')} className={`flex-1 p-3 rounded-lg border-2 transition-all ${tipType === 'DOLLAR' ? 'border-green-500 bg-green-500/10' : 'border-stone-700'}`}><div className="font-semibold text-stone-200">Dollar Amount ($)</div></button>
+                            </div>
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-3">Tip Type</label>
-                                <div className="flex gap-4">
-                                    <button
-                                        onClick={() => setTipType('PERCENT')}
-                                        className={`flex-1 p-3 rounded-lg border-2 transition-all ${tipType === 'PERCENT'
-                                            ? 'border-green-500 bg-green-50'
-                                            : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                    >
-                                        <div className="font-semibold">Percentage (%)</div>
-                                    </button>
-                                    <button
-                                        onClick={() => setTipType('DOLLAR')}
-                                        className={`flex-1 p-3 rounded-lg border-2 transition-all ${tipType === 'DOLLAR'
-                                            ? 'border-green-500 bg-green-50'
-                                            : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                    >
-                                        <div className="font-semibold">Dollar Amount ($)</div>
-                                    </button>
-                                </div>
+                                <label className="block text-sm font-semibold text-stone-300 mb-2">Tip Suggestions ({tipType === 'PERCENT' ? 'percentages' : 'dollar amounts'})</label>
+                                <input type="text" value={tipSuggestions} onChange={(e) => setTipSuggestions(e.target.value)} placeholder={tipType === 'PERCENT' ? '15,18,20,25' : '2,5,10,15'} className="w-full max-w-sm px-4 py-3 border-2 border-stone-700 bg-stone-800 rounded-lg focus:border-green-500 focus:outline-none text-stone-100" />
                             </div>
-
-                            {/* Tip Suggestions */}
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Tip Suggestions ({tipType === 'PERCENT' ? 'percentages' : 'dollar amounts'})
-                                </label>
-                                <input
-                                    type="text"
-                                    value={tipSuggestions}
-                                    onChange={(e) => setTipSuggestions(e.target.value)}
-                                    placeholder={tipType === 'PERCENT' ? '15,18,20,25' : '2,5,10,15'}
-                                    className="w-full max-w-sm px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
-                                />
-                                <p className="text-sm text-gray-500 mt-2">Enter comma-separated values (e.g., 15,20,25)</p>
-                            </div>
-
-                            {/* Preview */}
-                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border border-green-200">
-                                <div className="font-bold text-green-900 mb-3">Tip Options Preview</div>
-                                <div className="flex gap-3">
-                                    {tipSuggestions.split(',').map((tip, i) => (
-                                        <div key={i} className="px-4 py-2 bg-white border border-green-300 rounded-lg font-semibold text-green-700">
-                                            {tipType === 'PERCENT' ? `${tip.trim()}%` : `$${tip.trim()}`}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </>
+                        </div>
                     )}
                 </div>
-            </div>
 
-            {/* Payment Options */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="h-12 w-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
-                        <DollarSign className="h-6 w-6 text-white" />
+                {/* Receipt Printing */}
+                <div className="glass-panel rounded-2xl p-6 mb-6">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="h-12 w-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                            <Printer className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-stone-100">Receipt Printing</h2>
+                            <p className="text-sm text-stone-400">Configure auto-print and cash drawer behavior</p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="text-2xl font-bold">Payment Methods</h2>
-                        <p className="text-gray-600">Enable or disable additional payment types</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                        {[
+                            { id: 'ALL', label: 'All Transactions', desc: 'Print every receipt' },
+                            { id: 'CARD_ONLY', label: 'Card Only', desc: 'Credit/Debit only' },
+                            { id: 'EBT_ONLY', label: 'EBT Only', desc: 'EBT transactions' },
+                            { id: 'CARD_AND_EBT', label: 'Card & EBT', desc: 'Card and EBT only' },
+                            { id: 'NONE', label: 'Never', desc: 'Use Last Receipt button' },
+                        ].map(mode => (
+                            <button key={mode.id} onClick={() => setReceiptPrintMode(mode.id)} className={`p-3 rounded-lg border-2 transition-all text-left ${receiptPrintMode === mode.id ? 'border-purple-500 bg-purple-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
+                                <div className="font-semibold text-sm text-stone-200">{mode.label}</div>
+                                <div className="text-xs text-stone-500">{mode.desc}</div>
+                            </button>
+                        ))}
                     </div>
-                </div>
-
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                    <div className="flex items-center justify-between p-4 bg-stone-800/50 rounded-xl">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                <CreditCard className="h-5 w-5 text-green-600" />
-                            </div>
-                            <div>
-                                <div className="font-bold text-gray-800">Accept EBT</div>
-                                <div className="text-sm text-gray-500">Allow Electronic Benefit Transfer cards</div>
-                            </div>
+                            <div className="h-10 w-10 bg-green-500/20 rounded-lg flex items-center justify-center"><DollarSign className="h-5 w-5 text-green-400" /></div>
+                            <div><div className="font-bold text-stone-200">Open Drawer on Cash</div><div className="text-sm text-stone-400">Automatically open cash drawer</div></div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={acceptsEbt}
-                                onChange={(e) => setAcceptsEbt(e.target.checked)}
-                                className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                                <FileText className="h-5 w-5 text-amber-600" />
-                            </div>
-                            <div>
-                                <div className="font-bold text-gray-800">Accept Checks</div>
-                                <div className="text-sm text-gray-500">Allow payment via personal or business checks</div>
-                            </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={acceptsChecks}
-                                onChange={(e) => setAcceptsChecks(e.target.checked)}
-                                className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                                <Users className="h-5 w-5 text-purple-600" />
-                            </div>
-                            <div>
-                                <div className="font-bold text-gray-800">On Account / Store Credit</div>
-                                <div className="text-sm text-gray-500">Allow customers to pay using store credit or account balance</div>
-                            </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={acceptsOnAccount}
-                                onChange={(e) => setAcceptsOnAccount(e.target.checked)}
-                                className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            <input type="checkbox" checked={openDrawerOnCash} onChange={(e) => setOpenDrawerOnCash(e.target.checked)} className="sr-only peer" />
+                            <div className="w-11 h-6 bg-stone-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                         </label>
                     </div>
                 </div>
-            </div>
 
-            {/* Receipt Printing Settings */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="h-12 w-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                        <Printer className="h-6 w-6 text-white" />
+                {/* Save Button */}
+                {canEdit && (
+                    <div className="mb-6">
+                        <button onClick={saveSettings} disabled={saving} className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 shadow-lg">
+                            <Save className="h-6 w-6" />
+                            {saving ? 'Saving...' : 'Save All Settings'}
+                        </button>
                     </div>
-                    <div>
-                        <h2 className="text-2xl font-bold">Receipt Printing</h2>
-                        <p className="text-gray-600">Configure when receipts auto-print and cash drawer behavior</p>
-                    </div>
-                </div>
+                )}
 
-                <div className="space-y-6">
-                    {/* Auto-Print Mode */}
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-3">Auto-Print Receipts</label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {[
-                                { id: 'ALL', label: 'All Transactions', desc: 'Print every receipt' },
-                                { id: 'CARD_ONLY', label: 'Card Only', desc: 'Credit/Debit only' },
-                                { id: 'EBT_ONLY', label: 'EBT Only', desc: 'EBT transactions only' },
-                                { id: 'CARD_AND_EBT', label: 'Card & EBT', desc: 'Card and EBT only' },
-                                { id: 'NONE', label: 'Never', desc: 'Use Last Receipt button' },
-                            ].map(mode => (
-                                <button
-                                    key={mode.id}
-                                    onClick={() => setReceiptPrintMode(mode.id)}
-                                    className={`p-3 rounded-lg border-2 transition-all text-left ${receiptPrintMode === mode.id
-                                        ? 'border-purple-500 bg-purple-50'
-                                        : 'border-gray-200 hover:border-gray-300'
-                                        }`}
-                                >
-                                    <div className="font-semibold text-sm">{mode.label}</div>
-                                    <div className="text-xs text-gray-500">{mode.desc}</div>
-                                </button>
-                            ))}
+                {/* Employee Permissions */}
+                <div className="glass-panel rounded-2xl p-6">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
+                            <Shield className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-stone-100">Employee Permissions</h2>
+                            <p className="text-sm text-stone-400">Manage shift and time tracking permissions</p>
                         </div>
                     </div>
-
-                    {/* Cash Drawer */}
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                <DollarSign className="h-5 w-5 text-green-600" />
-                            </div>
-                            <div>
-                                <div className="font-bold text-gray-800">Open Drawer on Cash</div>
-                                <div className="text-sm text-gray-500">Automatically open cash drawer for cash payments</div>
-                            </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={openDrawerOnCash}
-                                onChange={(e) => setOpenDrawerOnCash(e.target.checked)}
-                                className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                        </label>
-                    </div>
-
-                    {/* Info Box */}
-                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-200">
-                        <div className="text-sm text-purple-900">
-                            <strong>💡 Tip:</strong> Use "Never" mode to save paper. Customers can request a receipt using the "Last Receipt" button in the POS.
-                        </div>
-                    </div>
-
-                    {/* Configure Printers Link */}
-                    <Link
-                        href="/dashboard/settings/printers"
-                        className="flex items-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 rounded-lg text-sm border border-stone-600"
-                    >
-                        <Settings className="h-4 w-4" />
-                        Configure Printer Hardware
-                    </Link>
-                </div>
-            </div>
-
-            {/* Save All Settings Button - Provider Only */}
-            {canEdit && (
-                <div className="mb-8">
-                    <button
-                        onClick={saveSettings}
-                        disabled={saving}
-                        className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 shadow-lg"
-                    >
-                        <Save className="h-6 w-6" />
-                        {saving ? 'Saving...' : 'Save All Settings'}
-                    </button>
-                </div>
-            )}
-
-            {/* Employee Permissions */}
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
-                        <Shield className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-bold">Employee Permissions</h2>
-                        <p className="text-gray-600">Manage shift and time tracking permissions</p>
-                    </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="border-b-2 border-gray-200">
-                                <th className="text-left p-3 font-semibold">Employee</th>
-                                <th className="text-center p-3 font-semibold">Manage Shifts</th>
-                                <th className="text-center p-3 font-semibold">Clock In</th>
-                                <th className="text-center p-3 font-semibold">Clock Out</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {employees.map(employee => (
-                                <tr key={employee.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                    <td className="p-3">
-                                        <div className="font-semibold">{employee.name}</div>
-                                        <div className="text-sm text-gray-500">{employee.email}</div>
-                                    </td>
-                                    <td className="p-3 text-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={employee.canManageShifts || false}
-                                            onChange={(e) => updateEmployeePermission(employee.id, 'canManageShifts', e.target.checked)}
-                                            className="h-5 w-5 text-orange-500 rounded focus:ring-orange-500"
-                                        />
-                                    </td>
-                                    <td className="p-3 text-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={employee.canClockIn !== false}
-                                            onChange={(e) => updateEmployeePermission(employee.id, 'canClockIn', e.target.checked)}
-                                            className="h-5 w-5 text-blue-500 rounded focus:ring-blue-500"
-                                        />
-                                    </td>
-                                    <td className="p-3 text-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={employee.canClockOut !== false}
-                                            onChange={(e) => updateEmployeePermission(employee.id, 'canClockOut', e.target.checked)}
-                                            className="h-5 w-5 text-blue-500 rounded focus:ring-blue-500"
-                                        />
-                                    </td>
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b-2 border-stone-700">
+                                    <th className="text-left p-3 font-semibold text-stone-300">Employee</th>
+                                    <th className="text-center p-3 font-semibold text-stone-300">Manage Shifts</th>
+                                    <th className="text-center p-3 font-semibold text-stone-300">Clock In</th>
+                                    <th className="text-center p-3 font-semibold text-stone-300">Clock Out</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {employees.map(employee => (
+                                    <tr key={employee.id} className="border-b border-stone-800 hover:bg-stone-800/50">
+                                        <td className="p-3">
+                                            <div className="font-semibold text-stone-200">{employee.name}</div>
+                                            <div className="text-sm text-stone-500">{employee.email}</div>
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <input type="checkbox" checked={employee.canManageShifts || false} onChange={(e) => updateEmployeePermission(employee.id, 'canManageShifts', e.target.checked)} className="h-5 w-5 text-orange-500 rounded focus:ring-orange-500" />
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <input type="checkbox" checked={employee.canClockIn !== false} onChange={(e) => updateEmployeePermission(employee.id, 'canClockIn', e.target.checked)} className="h-5 w-5 text-blue-500 rounded focus:ring-blue-500" />
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <input type="checkbox" checked={employee.canClockOut !== false} onChange={(e) => updateEmployeePermission(employee.id, 'canClockOut', e.target.checked)} className="h-5 w-5 text-blue-500 rounded focus:ring-blue-500" />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     )
 }
-

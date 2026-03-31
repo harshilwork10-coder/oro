@@ -1,0 +1,31 @@
+/* ORO 9 Storefront — Light theme for public store pages */
+.sf-root {
+    min-height: 100vh;
+    background: #fafafa;
+    color: #111;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    display: flex;
+    flex-direction: column;
+}
+
+.sf-root * {
+    box-sizing: border-box;
+}
+
+.sf-footer {
+    margin-top: auto;
+    border-top: 1px solid #e5e5e5;
+    background: #fff;
+}
+
+/* Override dark theme from parent layout for storefront pages */
+.sf-root input,
+.sf-root select,
+.sf-root textarea {
+    color: #111;
+    background: #fff;
+}
+
+.sf-root input::placeholder {
+    color: #9ca3af;
+}

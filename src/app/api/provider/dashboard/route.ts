@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
@@ -34,7 +35,6 @@ export async function GET(req: NextRequest) {
             }),
 
             // KPI 3: Hardware To Assign (Status 4=APPROVED - pending shipment/assignment)
-            // Or use explicit device assignment check if complex
             prisma.onboardingRequest.count({
                 where: { status: 4 }
             }),
@@ -45,11 +45,6 @@ export async function GET(req: NextRequest) {
             }),
 
             // KPI 5: Offline Devices
-            // Assuming Terminal model has 'status' or check lastHearbeat
-            // Using placeholder logic or simplified count if field exists
-            // Checking schema via prisma.$queryRaw or just try/catch if field missing?
-            // I'll assume Terminal exists and has status='OFFLINE'.
-            // If it fails, I'll catch and return 0.
             prisma.terminal.count({
                 where: { status: 'OFFLINE' }
             }).catch(() => 0),
@@ -73,7 +68,7 @@ export async function GET(req: NextRequest) {
                 take: 5,
                 orderBy: { submittedAt: 'desc' },
                 include: {
-                    franchisor: { select: { name: true } }, // Or firstName/lastName
+                    franchisor: { select: { name: true } },
                     assignedToUser: { select: { name: true } }
                 }
             }),
@@ -82,7 +77,7 @@ export async function GET(req: NextRequest) {
             prisma.ticket.findMany({
                 where: { status: { in: ['OPEN', 'PENDING'] } },
                 take: 5,
-                orderBy: { severity: 'asc' }, // P1 first? Or P0? Assuming string sort works roughly or needs enum
+                orderBy: { severity: 'asc' },
                 include: {
                     location: { select: { name: true } },
                     franchise: { select: { name: true } }
@@ -115,8 +110,8 @@ export async function GET(req: NextRequest) {
         const ticketQueue = recentTickets.map(ticket => ({
             id: ticket.publicId,
             priority: ticket.severity,
-            client: ticket.franchise.name,
-            location: ticket.location.name,
+            client: ticket.franchise?.name || 'Unknown',
+            location: ticket.location?.name || 'Unknown',
             category: ticket.category || 'Support',
             status: ticket.status.toLowerCase(),
             sla: ticket.slaDueAt ? new Date(ticket.slaDueAt).toLocaleDateString() : 'N/A'

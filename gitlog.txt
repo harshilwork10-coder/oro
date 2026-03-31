@@ -1,0 +1,6 @@
+﻿02aafa5  trigger: redeploy with JWT_SECRET env var
+4732810  revert: restore JWT hard gate
+828614f  fix: soften JWT_SECRET gate ΓÇö was crashing every Vercel serverless function
+f694a37  fix: permanent provider/admin system page fix ΓÇö 16 routes repaired
+cbaaafc  Go-live readiness: command center, security gates, blocker fixes
+c0cdd27  Phase 1+2: Fix 8 broken API routes (auth bug), Owner Portal IA cleanup
