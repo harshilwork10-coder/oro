@@ -40,6 +40,9 @@ export async function GET(req: NextRequest) {
                                 name: true,
                                 businessType: true,
                                 approvalStatus: true,
+                                dealerBranding: {
+                                    select: { id: true, dealerName: true }
+                                },
                                 franchises: {
                                     select: {
                                         locations: {
@@ -74,6 +77,9 @@ export async function GET(req: NextRequest) {
                 llcCount,
                 storeCount,
                 primaryLlc: primaryMembership?.franchisor.name || null,
+                // Dealer info from the primary (or first) membership's franchisor
+                dealerName: (primaryMembership || owner.franchisorMemberships[0])?.franchisor.dealerBranding?.dealerName || null,
+                dealerId: (primaryMembership || owner.franchisorMemberships[0])?.franchisor.dealerBranding?.id || null,
                 memberships: owner.franchisorMemberships.map(m => ({
                     id: m.id,
                     role: m.role,

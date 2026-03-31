@@ -154,6 +154,10 @@ enum InvoiceStatus {
 // Resolution order: Station → Location → FranchiseeBusiness → Franchisor → Vertical Default → Global Default
 // ═══════════════════════════════════════════════════════════════════════════
 
+// @deprecated — FeatureFlag system has ZERO runtime consumers.
+// All feature control uses BusinessConfig boolean fields.
+// Kept for schema compatibility — do NOT add new code that reads these tables.
+// Scheduled for removal after confirming no production data exists.
 model FeatureFlag {
   id           String   @id @default(cuid())
   key          String   @unique // e.g., "appointments_v2", "inventory_advanced"
@@ -176,6 +180,7 @@ model FeatureFlag {
   @@index([status])
 }
 
+// @deprecated — see FeatureFlag above
 model FeatureFlagOverride {
   id          String   @id @default(cuid())
   flagId      String
@@ -2842,7 +2847,8 @@ model DealerBranding {
   supportUrl   String?   // Optional support website
   
   // Clients using this dealer branding
-  franchisors  Franchisor[]
+  franchisors         Franchisor[]
+  onboardingRequests  OnboardingRequest[]
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -4784,6 +4790,11 @@ model OnboardingRequest {
 
   businessType Int // 1=RETAIL, 2=SALON, 3=BOTH
 
+  // Dealer association — captured at onboarding time
+  // Links the new client to the dealer/reseller that referred them
+  dealerBrandingId String?
+  dealerBranding   DealerBranding? @relation(fields: [dealerBrandingId], references: [id])
+
   contactName  String?
   contactEmail String?
   contactPhone String?
@@ -4809,6 +4820,7 @@ model OnboardingRequest {
   @@index([assignedToUserId, status])
   @@index([franchisorId, status])
   @@index([franchiseId])
+  @@index([dealerBrandingId])
 }
 
 // ============ ONBOARDING REQUEST LOCATION (NEW) ============
@@ -5211,26 +5223,10 @@ model PushSubscription {
 // Allows multi-store owners and franchisees to set different prices per location
 // If no LocationProduct exists, falls back to Product.price (franchise default)
 
-model LocationProduct {
-  id         String @id @default(cuid())
-  locationId String
-  productId  String
-
-  price     Decimal @default(0) // Location-specific sell price
-  costPrice Decimal @default(0) // Location-specific cost
-  stock     Int     @default(0) // Location-specific stock count
-
-  // Relations (SQLite compatible - no cascade delete)
-  // location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  // product    Product  @relation(fields: [productId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([locationId, productId]) // One entry per product per location
-  @@index([locationId])
-  @@index([productId])
-}
+// @deprecated — LocationProduct model REMOVED.
+// Relations were already commented out (dead model).
+// Superseded by: LocationItemOverride (per-location pricing) + StockOnHand (per-location stock).
+// If you need per-location product data, use LocationItemOverride or StockOnHand.
 
 // ============ ID SCAN LOGGING ============
 // Track age verification scans and overrides

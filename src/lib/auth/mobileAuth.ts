@@ -5,6 +5,35 @@
  * 
  * SECURITY: JWT tokens are signed with JWT_SECRET (HS256)
  * The Bearer token contains: { userId, franchiseId, locationId, role, exp }
+ * 
+ * ═══════════════════════════════════════════════════════════════════
+ * SOURCE OF TRUTH — ROLE SYSTEM
+ * ═══════════════════════════════════════════════════════════════════
+ * The CANONICAL role system is `User.role` (string field on the User model).
+ * All role checks in middleware and API routes use: user.role === 'ROLE_NAME'
+ * 
+ * The `UserRoleAssignment` RBAC table exists in schema but is Phase 2 —
+ * it is NOT enforced at middleware or API level. Do not rely on it for
+ * access control decisions until the RBAC migration is complete.
+ * 
+ * Valid roles: PROVIDER, ADMIN, FRANCHISOR, FRANCHISEE, OWNER, MANAGER,
+ *              SHIFT_SUPERVISOR, EMPLOYEE, SUB_FRANCHISEE
+ * 
+ * ═══════════════════════════════════════════════════════════════════
+ * SOURCE OF TRUTH — PERMISSION SYSTEM
+ * ═══════════════════════════════════════════════════════════════════
+ * The CANONICAL permission system is boolean fields on the User model:
+ *   canProcessRefunds, canAddServices, canManageInventory,
+ *   canManageSchedule, canManageEmployees, canManageShifts,
+ *   canClockIn, canClockOut
+ * 
+ * These are checked directly in API routes (e.g., pos/refund, pos/void).
+ * 
+ * The `Permission` / `UserPermission` normalized tables exist in schema
+ * but have ZERO runtime consumers. The `customPermissions` JSON field
+ * on User is deprecated and not checked anywhere.
+ * Do not add new code that reads from UserPermission or customPermissions.
+ * ═══════════════════════════════════════════════════════════════════
  */
 
 import { getServerSession } from 'next-auth'

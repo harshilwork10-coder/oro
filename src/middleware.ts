@@ -50,16 +50,22 @@ export async function middleware(req: NextRequest) {
         }
 
         // ── Role-Based Route Protection ─────────────────────────────
+        // SOURCE OF TRUTH: User.role (string field) is the canonical role system.
+        // UserRoleAssignment table is Phase 2 — not yet enforced at middleware or API level.
+        // All role checks should reference: user.role === 'ROLE_NAME'
         const role = token.role as string | undefined
 
         // Define which route prefixes each role is BLOCKED from accessing
         const roleRestrictions: Record<string, string[]> = {
-            'OWNER': ['/provider', '/franchisor'],
+            'PROVIDER': [],              // Full access — no restrictions
+            'ADMIN': [],                 // Provider-equivalent — full access
             'FRANCHISOR': ['/provider'],
-            // PROVIDER has full access – no restrictions
-            // EMPLOYEE/MANAGER inherit OWNER-level restrictions
-            'EMPLOYEE': ['/provider', '/franchisor', '/owner'],
+            'OWNER': ['/provider', '/franchisor'],
             'MANAGER': ['/provider', '/franchisor'],
+            'FRANCHISEE': ['/provider', '/franchisor'],           // Same as OWNER
+            'SUB_FRANCHISEE': ['/provider', '/franchisor'],       // Same as OWNER
+            'SHIFT_SUPERVISOR': ['/provider', '/franchisor', '/owner'], // Same as EMPLOYEE
+            'EMPLOYEE': ['/provider', '/franchisor', '/owner'],
         }
 
         const blocked = role ? (roleRestrictions[role] || []) : []
@@ -69,10 +75,14 @@ export async function middleware(req: NextRequest) {
             // Redirect to the user's home page based on role
             const roleHome: Record<string, string> = {
                 'PROVIDER': '/provider/home',
+                'ADMIN': '/provider/home',
                 'FRANCHISOR': '/franchisor/home',
                 'OWNER': '/owner',
-                'EMPLOYEE': '/dashboard',
                 'MANAGER': '/owner',
+                'FRANCHISEE': '/owner',
+                'SUB_FRANCHISEE': '/dashboard',
+                'SHIFT_SUPERVISOR': '/dashboard',
+                'EMPLOYEE': '/dashboard',
             }
             const home = (role && roleHome[role]) || '/dashboard'
             return NextResponse.redirect(new URL(home, req.url))

@@ -20,6 +20,8 @@ interface OwnerData {
     storeCount: number;
     primaryLlc: string | null;
     lastActivity?: string | null;
+    dealerName: string | null;
+    dealerId: string | null;
     memberships: {
         id: string;
         role: string;
@@ -127,8 +129,17 @@ export default function OwnersListPage() {
             result = [...result].sort((a, b) => b.storeCount - a.storeCount).slice(0, threshold);
         }
 
+        // Dealer filter
+        if (dealerFilter !== 'ALL') {
+            if (dealerFilter === 'NONE') {
+                result = result.filter(o => !o.dealerId);
+            } else {
+                result = result.filter(o => o.dealerId === dealerFilter);
+            }
+        }
+
         return result;
-    }, [owners, searchQuery, quickFilter, getIssue]);
+    }, [owners, searchQuery, quickFilter, dealerFilter, getIssue]);
 
     // Format date
     const formatDate = (dateString: string | null | undefined) => {
@@ -210,7 +221,11 @@ export default function OwnersListPage() {
                 {/* Segmentation */}
                 <select value={dealerFilter} onChange={e => setDealerFilter(e.target.value)} className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-stone-200">
                     <option value="ALL">All Dealers</option>
-                    {/* TODO: Populate from API */}
+                    <option value="NONE">No Dealer</option>
+                    {/* Unique dealers from loaded owners */}
+                    {Array.from(new Map(owners.filter(o => o.dealerId).map(o => [o.dealerId!, o.dealerName!])).entries()).map(([id, name]) => (
+                        <option key={id} value={id}>{name}</option>
+                    ))}
                 </select>
                 <select value={stateFilter} onChange={e => setStateFilter(e.target.value)} className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-stone-200">
                     <option value="ALL">All States</option>

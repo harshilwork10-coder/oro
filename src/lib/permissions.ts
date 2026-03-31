@@ -1,15 +1,47 @@
+/**
+ * ORO 9 — Permission Utilities
+ * 
+ * ═══════════════════════════════════════════════════════════════════
+ * SOURCE OF TRUTH — PERMISSION SYSTEM
+ * ═══════════════════════════════════════════════════════════════════
+ * The CANONICAL permission system for operational actions is boolean
+ * fields on the User model:
+ *   canProcessRefunds, canAddServices, canManageInventory,
+ *   canManageSchedule, canManageEmployees, canManageShifts,
+ *   canClockIn, canClockOut
+ * 
+ * These are checked directly in API routes (e.g., pos/refund, pos/void).
+ * 
+ * This file provides ROLE-BASED permissions (what pages/features a role
+ * can access). For operational permission checks (refund, void, etc.),
+ * use the boolean fields on the User model directly.
+ * 
+ * DEPRECATED — do not use:
+ *   - Permission / UserPermission tables (zero runtime consumers)
+ *   - customPermissions JSON field on User (not checked anywhere)
+ * ═══════════════════════════════════════════════════════════════════
+ * 
+ * SOURCE OF TRUTH — ROLE SYSTEM
+ * ═══════════════════════════════════════════════════════════════════
+ * The canonical role system is `User.role` (string field).
+ * See src/lib/auth/mobileAuth.ts for full documentation.
+ * ═══════════════════════════════════════════════════════════════════
+ */
+
 import { User } from '@prisma/client'
 
-// Define roles matching the database strings
-// We use strings here because we haven't fully migrated the DB enum yet
+// Roles matching the UserRole enum in schema.prisma
+// SOURCE OF TRUTH: User.role string field
 export enum Role {
-    PROVIDER = 'PROVIDER',          // Platform/Software owner
-    FRANCHISOR = 'FRANCHISOR',      // Brand owner
-    FRANCHISEE = 'FRANCHISEE',      // Location owner
-    MANAGER = 'MANAGER',            // Operations manager
-    EMPLOYEE = 'EMPLOYEE',          // Front-line staff
-    SUPPORT_STAFF = 'SUPPORT_STAFF', // Support team member
-    USER = 'USER'                   // Legacy fallback
+    PROVIDER = 'PROVIDER',              // Platform owner (Oronex)
+    ADMIN = 'ADMIN',                    // Provider-equivalent assistant
+    FRANCHISOR = 'FRANCHISOR',          // Brand owner or multi-location owner
+    FRANCHISEE = 'FRANCHISEE',          // Location owner (under a franchisor brand)
+    OWNER = 'OWNER',                    // Business owner (independent)
+    MANAGER = 'MANAGER',               // Operations manager
+    SHIFT_SUPERVISOR = 'SHIFT_SUPERVISOR', // Senior employee with limited manager privileges
+    EMPLOYEE = 'EMPLOYEE',              // Front-line staff
+    SUB_FRANCHISEE = 'SUB_FRANCHISEE',  // Phase 2 — sub-franchise operator
 }
 
 export type Permission =
@@ -38,6 +70,7 @@ export function getRolePermissions(roleStr: string): Permission[] {
 
     switch (role) {
         case Role.PROVIDER:
+        case Role.ADMIN:
             // Platform owner - highest level access
             return [
                 'view:all_franchisors',
@@ -54,6 +87,7 @@ export function getRolePermissions(roleStr: string): Permission[] {
                 'manage:royalty_config'
             ]
         case Role.FRANCHISEE:
+        case Role.OWNER:
             return [
                 'manage:own_locations',
                 'view:financial_reports',
@@ -75,8 +109,16 @@ export function getRolePermissions(roleStr: string): Permission[] {
                 'view:own_schedule',
                 'view:z_report'
             ]
+        case Role.SHIFT_SUPERVISOR:
+            // Same as EMPLOYEE plus shift management
+            return [
+                'access:pos_with_shift',
+                'manage:shifts',
+                'clock:in_out',
+                'view:own_schedule',
+                'view:z_report'
+            ]
         case Role.EMPLOYEE:
-        case Role.USER:
             return [
                 'access:pos_with_shift',
                 'clock:in_out',
@@ -96,8 +138,8 @@ export function hasPermission(user: User | null | undefined, permission: Permiss
     // Check role-based permissions
     if (rolePermissions.includes(permission)) return true
 
-    // Check custom overrides (if implemented in DB as JSON)
-    // if (user.customPermissions && user.customPermissions[permission]) return true
+    // DEPRECATED: customPermissions JSON is not checked.
+    // Future migration: read from UserPermission table via checkPermission() utility.
 
     return false
 }
@@ -107,9 +149,9 @@ export function requiresShiftForPOS(user: User | null | undefined): boolean {
     if (!user) return true
     const role = user.role as Role
 
-    // Only Employees (and legacy Users) require a shift
-    // Managers, Franchisees, Franchisors, Providers do NOT require a shift to access POS
-    return role === Role.EMPLOYEE || role === Role.USER
+    // Only Employees and Shift Supervisors require a shift
+    // Managers, Owners, Franchisees, Franchisors, Providers do NOT require a shift
+    return role === Role.EMPLOYEE || role === Role.SHIFT_SUPERVISOR
 }
 
 // Helper to check if user can manage another user
@@ -119,20 +161,19 @@ export function canManageUser(manager: User, targetUser: User): boolean {
     const managerRole = manager.role as Role
     const targetRole = targetUser.role as Role
 
-    if (managerRole === Role.FRANCHISOR || managerRole === Role.PROVIDER) {
-        // Franchisor/Provider can manage anyone (conceptually, but maybe restricted by franchiseId)
+    if (managerRole === Role.FRANCHISOR || managerRole === Role.PROVIDER || managerRole === Role.ADMIN) {
         return true
     }
 
-    if (managerRole === Role.FRANCHISEE) {
-        // Franchisee can manage anyone in their franchise
+    if (managerRole === Role.FRANCHISEE || managerRole === Role.OWNER) {
+        // Owner/Franchisee can manage anyone in their franchise
         return manager.franchiseId === targetUser.franchiseId
     }
 
     if (managerRole === Role.MANAGER) {
         // Manager can manage employees in their location
         return manager.locationId === targetUser.locationId &&
-            targetRole === Role.EMPLOYEE
+            (targetRole === Role.EMPLOYEE || targetRole === Role.SHIFT_SUPERVISOR)
     }
 
     return false
