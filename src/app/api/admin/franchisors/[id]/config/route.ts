@@ -9,6 +9,7 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const user = await getAuthUser(request)
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -96,7 +97,6 @@ export async function PATCH(
         const decimalFields = ['cardSurcharge', 'cashDiscountPercent', 'taxRate']
         for (const field of decimalFields) {
             if (filteredUpdates[field] !== undefined) {
-                // Ensure it's a number and convert to Decimal-compatible format
                 filteredUpdates[field] = parseFloat(String(filteredUpdates[field])) || 0
             }
         }
@@ -112,7 +112,6 @@ export async function PATCH(
         })
 
         // CRITICAL: Invalidate cache for ALL locations so Android gets updated settings IMMEDIATELY
-        // This applies to ALL config changes: tips, features, tax, shift, payments, etc.
         const allFranchises = await prisma.franchise.findMany({
             where: { franchisorId: id },
             include: { locations: { select: { id: true } } }
@@ -126,7 +125,7 @@ export async function PATCH(
         }
 
         // Log the change to audit trail
-await prisma.auditLog.create({
+        await prisma.auditLog.create({
             data: {
                 userId: user.id,
                 userEmail: user.email,
@@ -142,8 +141,6 @@ await prisma.auditLog.create({
                 status: 'SUCCESS'
             }
         })
-
-        // Debug log removed
 
         return NextResponse.json({
             success: true,
@@ -167,10 +164,6 @@ export async function GET(
     try {
         const user = await getAuthUser(request)
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
 
         if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
