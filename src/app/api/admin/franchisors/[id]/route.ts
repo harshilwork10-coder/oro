@@ -13,12 +13,13 @@ function parseIntegrations(integrationsStr: string | null): Record<string, boole
     }
 }
 
-// Helper to check permissions
-async function checkPermission() {
+// Helper to authenticate and check PROVIDER role
+async function getProviderUser(req: NextRequest) {
+    const user = await getAuthUser(req)
     if (!user || user.role !== 'PROVIDER') {
         return null
     }
-    return session
+    return user
 }
 
 // GET: Fetch Single Franchisor Details
@@ -26,11 +27,8 @@ export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const user = await getAuthUser(req)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const session = await checkPermission()
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    const user = await getProviderUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     try {
         const { id } = await params
@@ -115,8 +113,8 @@ export async function PUT(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await checkPermission()
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    const user = await getProviderUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     try {
         const { id } = await params
@@ -149,7 +147,7 @@ export async function PUT(
             action: 'FRANCHISOR_UPDATED',
             entityType: 'Franchisor',
             entityId: id,
-            metadata: { name, businessType, approvalStatus }
+            details: { name, businessType, approvalStatus }
         })
 
         return NextResponse.json(updated)
@@ -165,8 +163,8 @@ export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await checkPermission()
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    const user = await getProviderUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     try {
         const { id } = await params
@@ -241,7 +239,7 @@ export async function DELETE(
             action: 'FRANCHISOR_HARD_DELETED',
             entityType: 'Franchisor',
             entityId: id,
-            metadata: { name: franchisor.name, franchiseCount: franchiseIds.length, locationCount: locationIds.length }
+            details: { name: franchisor.name, franchiseCount: franchiseIds.length, locationCount: locationIds.length }
         })
 
         return NextResponse.json({ success: true, message: 'Deleted successfully' })
@@ -256,8 +254,8 @@ export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await checkPermission()
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    const user = await getProviderUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     try {
         const { id } = await params
@@ -287,7 +285,7 @@ export async function PATCH(
             action: 'FRANCHISOR_APPROVAL_STATUS_CHANGED',
             entityType: 'Franchisor',
             entityId: id,
-            metadata: { approvalStatus }
+            details: { approvalStatus }
         })
 
         return NextResponse.json({ success: true, franchisor: updated, message: `Status updated to ${approvalStatus}` })
