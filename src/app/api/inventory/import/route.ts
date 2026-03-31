@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import Papa from 'papaparse'
 
 // POST - Parse uploaded CSV file
@@ -6,8 +7,7 @@ import Papa from 'papaparse'
 export async function POST(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        if (!user?.id || !user?.franchiseId) {
+        if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -104,4 +104,3 @@ function getColumnValue(row: any, columnName: string | null): string {
     if (!columnName) return ''
     return String(row[columnName] || '').trim()
 }
-
