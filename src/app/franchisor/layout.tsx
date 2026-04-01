@@ -4,7 +4,7 @@ import {
     Home, Users, MapPin, BarChart3, Settings,
     Bell, Search, Menu, ChevronDown, LogOut,
     Briefcase, UserCog, AlertTriangle, DollarSign, Shield,
-    ArrowRightLeft, ShieldCheck
+    ArrowRightLeft, ShieldCheck, GitBranch
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -23,6 +23,7 @@ const ALL_SIDEBAR_ITEMS = [
     { name: 'Compare',       href: '/franchisor/compare',           icon: ArrowRightLeft,  badge: false },
     { name: 'Compliance',    href: '/franchisor/catalog/compliance',icon: ShieldCheck,     badge: false },
     { name: 'Royalties',     href: '/franchisor/royalties',         icon: DollarSign,      badge: false },
+    { name: 'Rollout',       href: '/franchisor/rollout',           icon: GitBranch,       badge: false },
     { name: 'Users',         href: '/franchisor/users',             icon: UserCog,         badge: false },
     { name: 'Settings',      href: '/franchisor/settings',          icon: Settings,        badge: false },
 ];

@@ -433,6 +433,7 @@ export default function UsersPage() {
                                     { label: 'Reports', key: 'canAccessReports' as const },
                                     { label: 'Compare Mode', key: 'canAccessCompare' as const },
                                     { label: 'Catalog Compliance', key: 'canAccessCompliance' as const },
+                                    { label: 'Rollout Timeline', key: 'canAccessRollout' as const },
                                     { label: 'Royalties', key: 'canAccessRoyalties' as const },
                                     { label: 'Manage Users', key: 'canManageUsers' as const },
                                     { label: 'Settings / Brand Locks', key: 'canAccessSettings' as const },

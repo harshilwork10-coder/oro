@@ -29,6 +29,7 @@ export interface HQRoleDefinition {
     canAccessExceptions: boolean;
     canAccessCompare: boolean;
     canAccessCompliance: boolean;
+    canAccessRollout: boolean;
 }
 
 export const HQ_ROLES: Record<HQRole, HQRoleDefinition> = {
@@ -49,6 +50,7 @@ export const HQ_ROLES: Record<HQRole, HQRoleDefinition> = {
         canAccessExceptions: true,
         canAccessCompare: true,
         canAccessCompliance: true,
+        canAccessRollout: true,
     },
     ADMIN: {
         label: 'HQ Admin',
@@ -63,6 +65,7 @@ export const HQ_ROLES: Record<HQRole, HQRoleDefinition> = {
             '/franchisor/catalog',
             '/franchisor/reports',
             '/franchisor/compare',
+            '/franchisor/rollout',
         ],
         canEdit: true,
         canManageUsers: false,
@@ -75,6 +78,7 @@ export const HQ_ROLES: Record<HQRole, HQRoleDefinition> = {
         canAccessExceptions: true,
         canAccessCompare: true,
         canAccessCompliance: false,
+        canAccessRollout: true,
     },
     ACCOUNTANT: {
         label: 'HQ Accountant',
@@ -98,6 +102,7 @@ export const HQ_ROLES: Record<HQRole, HQRoleDefinition> = {
         canAccessExceptions: false,
         canAccessCompare: true,
         canAccessCompliance: false,
+        canAccessRollout: false,
     },
     VIEWER: {
         label: 'HQ Viewer',
@@ -119,6 +124,7 @@ export const HQ_ROLES: Record<HQRole, HQRoleDefinition> = {
         canAccessExceptions: false,
         canAccessCompare: false,
         canAccessCompliance: false,
+        canAccessRollout: false,
     },
 };
 
