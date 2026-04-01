@@ -31,9 +31,15 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 });
     }
 
+    // Optional region filter — HQ can view by territory
+    const regionFilter = req.nextUrl.searchParams.get('region') || null;
+
     // Get all franchises (businesses) under this franchisor with owner info
     const franchises = await prisma.franchise.findMany({
-        where: { franchisorId: franchisor.id },
+        where: {
+            franchisorId: franchisor.id,
+            ...(regionFilter ? { region: regionFilter } : {})
+        },
         include: {
             _count: {
                 select: { locations: true }
@@ -51,6 +57,7 @@ export async function GET(req: NextRequest) {
     const franchisees = franchises.map(f => ({
         id: f.id,
         name: f.name,
+        region: f.region || null,
         locationCount: f._count.locations,
         status: f.approvalStatus || f.accountStatus || 'ACTIVE',
         ownerName: f.users[0]?.name || null,
@@ -68,7 +75,7 @@ export async function GET(req: NextRequest) {
 // POST /api/franchisor/franchisees - Create a new franchisee LLC + owner
 export async function POST(req: NextRequest) {
   try {
-    ;
+    const user = await getAuthUser(req);
     if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -142,6 +149,7 @@ export async function POST(req: NextRequest) {
                 franchisorId: franchisor.id,
                 approvalStatus: 'APPROVED', // Auto-approve when HQ creates
                 accountStatus: 'ACTIVE',
+                region: region || null, // Region/territory set at creation
             }
         });
 
@@ -169,6 +177,7 @@ export async function POST(req: NextRequest) {
         franchisee: {
             id: result.franchise.id,
             name: result.franchise.name,
+            region: result.franchise.region || null,
             locationCount: 0,
             status: result.franchise.approvalStatus || 'ACTIVE',
             ownerName: result.owner.name,

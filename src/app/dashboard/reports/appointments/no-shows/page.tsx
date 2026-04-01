@@ -12,8 +12,29 @@ import {
     DollarSign,
     Clock,
     User,
-    FileDown
+    FileDown,
+    Globe,
+    Smartphone,
+    PhoneCall,
+    Footprints
 } from 'lucide-react'
+
+function SourceBadge({ source }: { source?: string }) {
+    if (!source) return <span className="text-stone-600 text-xs">—</span>
+    const config: Record<string, { icon: React.ReactNode; label: string; cls: string }> = {
+        'ONLINE': { icon: <Globe className="h-3 w-3" />, label: 'Online', cls: 'bg-blue-500/15 text-blue-300' },
+        'POS': { icon: <Smartphone className="h-3 w-3" />, label: 'POS', cls: 'bg-emerald-500/15 text-emerald-300' },
+        'PHONE': { icon: <PhoneCall className="h-3 w-3" />, label: 'Phone', cls: 'bg-purple-500/15 text-purple-300' },
+        'WALK_IN': { icon: <Footprints className="h-3 w-3" />, label: 'Walk-in', cls: 'bg-amber-500/15 text-amber-300' },
+    }
+    const s = config[source]
+    if (!s) return <span className="text-stone-600 text-xs">{source}</span>
+    return (
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded ${s.cls}`}>
+            {s.icon} {s.label}
+        </span>
+    )
+}
 
 export default function NoShowReportPage() {
     const [data, setData] = useState<any>(null)
@@ -111,7 +132,7 @@ export default function NoShowReportPage() {
                 doc.addPage()
                 yPos = 20
             }
-            doc.text(`  ${formatDate(apt.date)} - ${apt.client} - ${apt.service} - ${apt.status} - ${formatCurrency(apt.lostRevenue)}`, 20, yPos)
+            doc.text(`  ${formatDate(apt.date)} - ${apt.client} - ${apt.service} - ${apt.status} - ${apt.source || 'N/A'} - ${formatCurrency(apt.lostRevenue)}`, 20, yPos)
             yPos += 5
         })
 
@@ -277,6 +298,7 @@ export default function NoShowReportPage() {
                                     <th className="text-left px-6 py-3">Client</th>
                                     <th className="text-left px-6 py-3">Barber</th>
                                     <th className="text-left px-6 py-3">Service</th>
+                                    <th className="text-center px-6 py-3">Source</th>
                                     <th className="text-center px-6 py-3">Status</th>
                                     <th className="text-right px-6 py-3">Lost Revenue</th>
                                 </tr>
@@ -288,6 +310,7 @@ export default function NoShowReportPage() {
                                         <td className="px-6 py-3 text-white">{apt.client}</td>
                                         <td className="px-6 py-3 text-gray-300">{apt.barber}</td>
                                         <td className="px-6 py-3 text-gray-300">{apt.service}</td>
+                                        <td className="px-6 py-3 text-center"><SourceBadge source={apt.source} /></td>
                                         <td className="px-6 py-3 text-center">
                                             <span className={`px-2 py-1 rounded text-xs ${apt.status === 'NO_SHOW'
                                                 ? 'bg-red-500/20 text-red-400'

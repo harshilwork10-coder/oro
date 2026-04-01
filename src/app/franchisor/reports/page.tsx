@@ -227,32 +227,36 @@ export default function ReportsPage() {
                 </div>
             </div>
 
-            {/* Single Location Health Header - Shows when location selected */}
+            {/* Single Location Mode: redirect to Location 360 which has real per-location data */}
             {selectedLocation && (
-                <div className="glass-panel rounded-xl border border-[var(--border)] p-4 mb-6 relative z-10">
+                <div className="glass-panel rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 mb-6 relative z-10">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-lg font-bold text-[var(--text-primary)]">{selectedLocation.name}</h2>
-                            <p className="text-sm text-[var(--text-muted)]">
+                            <h2 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                <MapPin size={18} className="text-emerald-400" />
+                                {selectedLocation.name}
+                            </h2>
+                            <p className="text-sm text-[var(--text-muted)] mt-0.5">
                                 {selectedLocation.city}{selectedLocation.state ? `, ${selectedLocation.state}` : ''}
+                                {' — '}
+                                <span className="text-emerald-400">Single Location Mode</span>
                             </p>
                         </div>
-                        <div className="flex items-center gap-6">
-                            <div className="text-center">
-                                <div className="text-lg font-bold text-emerald-400">$0</div>
-                                <div className="text-xs text-[var(--text-muted)]">Today Sales</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-lg font-bold text-blue-400">0</div>
-                                <div className="text-xs text-[var(--text-muted)]">Appointments</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-lg font-bold text-purple-400">0</div>
-                                <div className="text-xs text-[var(--text-muted)]">Walk-ins</div>
-                            </div>
-                            <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded text-xs font-medium">Active</span>
+                        <div className="flex items-center gap-3">
+                            <p className="text-sm text-[var(--text-muted)] max-w-xs text-right">
+                                Full per-location analytics are available in Location 360
+                            </p>
+                            <a
+                                href={`/franchisor/locations/${selectedLocation.id}`}
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                            >
+                                View Location 360 →
+                            </a>
                         </div>
                     </div>
+                    <p className="text-xs text-[var(--text-muted)] mt-3 pt-3 border-t border-emerald-500/20">
+                        ℹ️ Network reports below show brand-wide data. Use Location 360 for individual location KPIs, customers, staff, and transaction ledger.
+                    </p>
                 </div>
             )}
 

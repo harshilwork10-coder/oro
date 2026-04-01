@@ -248,7 +248,9 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                     time: appointmentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
                     groupMembers: data.groupMembers || [],
                     totalPrice: data.totalPrice,
-                    totalPeople: data.totalPeople
+                    totalPeople: data.totalPeople,
+                    cancelToken: data.cancelToken,
+                    calendarEvent: data.calendarEvent
                 })
                 animateToStep('success')
             } else {
@@ -411,17 +413,13 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                             {franchise?.name}
                         </h1>
 
-                        {/* Trust indicators */}
-                        <div className="flex items-center justify-center gap-4 text-sm">
-                            <div className="flex items-center gap-1 text-amber-400">
-                                {[1, 2, 3, 4, 5].map(i => (
-                                    <Star key={i} className="h-4 w-4 fill-current" />
-                                ))}
-                                <span className="ml-1 font-semibold text-white">5.0</span>
+                        {/* Location info */}
+                        {selectedLocation && (
+                            <div className="flex items-center justify-center gap-2 text-sm text-violet-300/70">
+                                <MapPin className="h-3.5 w-3.5" />
+                                <span>{selectedLocation.name}</span>
                             </div>
-                            <span className="text-violet-300/50">•</span>
-                            <span className="text-violet-300">500+ happy customers</span>
-                        </div>
+                        )}
                     </div>
                 </header>
 
@@ -1171,13 +1169,13 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
                                 <h2 className="text-2xl font-bold text-white mb-2">You're all set! 🎉</h2>
 
-                                {/* Pending Notice */}
-                                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6 max-w-sm mx-auto">
-                                    <p className="text-amber-200 text-sm font-medium">
-                                        ⏱️ Please allow 10 minutes for confirmation
+                                {/* Confirmed Notice */}
+                                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-6 max-w-sm mx-auto">
+                                    <p className="text-emerald-200 text-sm font-medium">
+                                        ✅ Your appointment is confirmed!
                                     </p>
-                                    <p className="text-amber-200/60 text-xs mt-1">
-                                        We'll email you when your stylist confirms
+                                    <p className="text-emerald-200/60 text-xs mt-1">
+                                        Save the details below for your records
                                     </p>
                                 </div>
 
@@ -1189,19 +1187,91 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                                             <p className="font-semibold text-white">{confirmation.service}</p>
                                         </div>
                                         <div>
+                                            <p className="text-xs text-violet-400">Staff</p>
+                                            <p className="font-semibold text-white">{confirmation.staff}</p>
+                                        </div>
+                                        <div>
                                             <p className="text-xs text-violet-400">When</p>
                                             <p className="font-semibold text-white">{confirmation.date} at {confirmation.time}</p>
                                         </div>
                                         <div>
                                             <p className="text-xs text-violet-400">Where</p>
                                             <p className="font-semibold text-white">{confirmation.location}</p>
+                                            {confirmation.address && (
+                                                <p className="text-xs text-stone-400 mt-0.5">{confirmation.address}</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-violet-400">Price</p>
+                                            <p className="font-semibold text-white">${confirmation.price?.toFixed(2)}</p>
                                         </div>
                                     </div>
                                 </div>
 
+                                {/* Action Buttons */}
+                                <div className="flex flex-col gap-3 max-w-sm mx-auto mt-6">
+                                    {/* Add to Calendar */}
+                                    {confirmation.calendarEvent && (
+                                        <button
+                                            onClick={() => {
+                                                const ev = confirmation.calendarEvent
+                                                const dtStart = new Date(ev.start).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+                                                const dtEnd = new Date(ev.end).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+                                                const icsContent = [
+                                                    'BEGIN:VCALENDAR',
+                                                    'VERSION:2.0',
+                                                    'BEGIN:VEVENT',
+                                                    `DTSTART:${dtStart}`,
+                                                    `DTEND:${dtEnd}`,
+                                                    `SUMMARY:${ev.title}`,
+                                                    `LOCATION:${ev.location}`,
+                                                    `DESCRIPTION:${ev.description.replace(/\n/g, '\\n')}`,
+                                                    'END:VEVENT',
+                                                    'END:VCALENDAR'
+                                                ].join('\r\n')
+                                                const blob = new Blob([icsContent], { type: 'text/calendar' })
+                                                const url = URL.createObjectURL(blob)
+                                                const a = document.createElement('a')
+                                                a.href = url
+                                                a.download = 'appointment.ics'
+                                                a.click()
+                                                URL.revokeObjectURL(url)
+                                            }}
+                                            className="w-full py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-violet-500/30 flex items-center justify-center gap-2"
+                                        >
+                                            <Calendar className="h-5 w-5" />
+                                            Add to Calendar
+                                        </button>
+                                    )}
+
+                                    {/* Cancel Booking Link */}
+                                    {confirmation.cancelToken && (
+                                        <button
+                                            onClick={async () => {
+                                                if (!confirm('Are you sure you want to cancel this booking?')) return
+                                                try {
+                                                    const res = await fetch(`/api/public/booking/cancel?id=${confirmation.id}&token=${confirmation.cancelToken}`)
+                                                    if (res.ok) {
+                                                        alert('Booking cancelled successfully.')
+                                                        window.location.reload()
+                                                    } else {
+                                                        const data = await res.json()
+                                                        alert(data.error || 'Failed to cancel')
+                                                    }
+                                                } catch (e) {
+                                                    alert('Something went wrong')
+                                                }
+                                            }}
+                                            className="w-full py-3 bg-red-500/10 border border-red-500/20 text-red-300 font-medium rounded-xl hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 text-sm"
+                                        >
+                                            Need to cancel? Click here
+                                        </button>
+                                    )}
+                                </div>
+
                                 <button
                                     onClick={() => window.location.reload()}
-                                    className="mt-8 text-violet-400 hover:text-white text-sm font-medium"
+                                    className="mt-6 text-violet-400 hover:text-white text-sm font-medium"
                                 >
                                     Book another appointment →
                                 </button>

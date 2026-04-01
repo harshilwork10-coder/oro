@@ -1,74 +1,63 @@
-import { NextResponse } from 'next/server'
+/**
+ * Royalty Config API
+ * GET  — fetch this franchisor's royalty configuration
+ * POST — upsert royalty config (percentage, minimums, period)
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
     try {
-        const authUser = await getAuthUser(request)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        if (!authUser?.email) {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.id || authUser.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: user.email },
-            include: {
-                franchisor: {
-                    include: {
-                        royaltyConfig: true
-                    }
-                }
-            }
+        const franchisor = await prisma.franchisor.findFirst({
+            where: { ownerId: authUser.id },
+            include: { royaltyConfig: true }
         })
 
-        if (!user?.franchisor) {
-            return NextResponse.json({ error: 'User is not a franchisor' }, { status: 403 })
+        if (!franchisor) {
+            return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })
         }
 
-        return NextResponse.json(user.franchisor.royaltyConfig)
+        return NextResponse.json(franchisor.royaltyConfig || null)
     } catch (error) {
         console.error('Error fetching royalty config:', error)
         return NextResponse.json({ error: 'Failed to fetch configuration' }, { status: 500 })
     }
 }
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
     try {
-        if (!authUser?.email) {
+        const authUser = await getAuthUser(req)
+        if (!authUser?.id || authUser.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: user.email },
-            include: { franchisor: true }
+        const franchisor = await prisma.franchisor.findFirst({
+            where: { ownerId: authUser.id },
+            select: { id: true }
         })
 
-        if (!user?.franchisor) {
-            return NextResponse.json({ error: 'User is not a franchisor' }, { status: 403 })
+        if (!franchisor) {
+            return NextResponse.json({ error: 'Franchisor not found' }, { status: 404 })
         }
 
-        const body = await request.json()
+        const body = await req.json()
         const { percentage, minimumMonthlyFee, calculationPeriod } = body
 
-        if (!percentage || percentage < 0 || percentage > 100) {
+        if (percentage === undefined || percentage < 0 || percentage > 100) {
             return NextResponse.json({ error: 'Valid percentage is required (0-100)' }, { status: 400 })
         }
 
-        // Upsert (create or update)
         const config = await prisma.royaltyConfig.upsert({
-            where: { franchisorId: user.franchisor.id },
-            update: {
-                percentage,
-                minimumMonthlyFee,
-                calculationPeriod
-            },
-            create: {
-                franchisorId: user.franchisor.id,
-                percentage,
-                minimumMonthlyFee,
-                calculationPeriod
-            }
+            where: { franchisorId: franchisor.id },
+            update: { percentage, minimumMonthlyFee, calculationPeriod },
+            create: { franchisorId: franchisor.id, percentage, minimumMonthlyFee, calculationPeriod }
         })
 
         return NextResponse.json(config)
@@ -77,4 +66,3 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to save configuration' }, { status: 500 })
     }
 }
-

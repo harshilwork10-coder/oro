@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendBookingRequestSMS } from '@/lib/sms'
+import { generateCancelToken } from '../cancel/route'
 import {
     checkRateLimit,
     getRateLimitKey,
@@ -279,6 +280,18 @@ export async function POST(request: NextRequest) {
         // Calculate total price
         const totalPrice = Number(service.price) + groupAppointments.reduce((sum, a) => sum + a.price, 0)
 
+        // Generate cancel token for self-service cancellation
+        const cancelToken = generateCancelToken(primaryAppointment.id)
+
+        // Build calendar event data
+        const calendarEvent = {
+            title: `${service.name} at ${primaryAppointment.location.name}`,
+            start: startTime.toISOString(),
+            end: primaryEndTime.toISOString(),
+            location: primaryAppointment.location.address || primaryAppointment.location.name,
+            description: `Service: ${service.name}\nStaff: ${primaryAppointment.employee.name}\nPrice: $${Number(service.price).toFixed(2)}`
+        }
+
         return NextResponse.json({
             success: true,
             pendingApproval: true,
@@ -292,8 +305,11 @@ export async function POST(request: NextRequest) {
                 address: primaryAppointment.location.address,
                 // Pass raw ISO string so client can format in user's timezone
                 startTime: startTime.toISOString(),
+                endTime: primaryEndTime.toISOString(),
                 price: Number(primaryAppointment.service.price)
             },
+            cancelToken,
+            calendarEvent,
             groupMembers: groupAppointments,
             totalPrice,
             totalPeople: 1 + groupMembers.length

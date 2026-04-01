@@ -87,7 +87,8 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        if (!user?.id) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 

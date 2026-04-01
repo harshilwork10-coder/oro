@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, Clock, User, MapPin, X, Check, XCircle, Phone, Mail, Loader2, CreditCard } from 'lucide-react'
+import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, Clock, User, MapPin, X, Check, XCircle, Phone, Mail, Loader2, CreditCard, Download, Globe, Smartphone, PhoneCall, Footprints, AlertTriangle } from 'lucide-react'
 import BookingModal from '@/components/appointments/BookingModal'
 
 type Appointment = {
@@ -25,6 +25,7 @@ type Appointment = {
         name: string
     }
     status: string
+    source?: string
     notes?: string
 }
 
@@ -135,18 +136,55 @@ export default function AppointmentsPage() {
             'SCHEDULED': 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
             'CANCELLED': 'bg-red-500/20 text-red-300 border-red-500/30',
             'COMPLETED': 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+            'NO_SHOW': 'bg-orange-500/20 text-orange-300 border-orange-500/30',
         }
         const labels: Record<string, string> = {
             'PENDING_APPROVAL': '⏳ Pending',
             'SCHEDULED': '✓ Confirmed',
             'CANCELLED': '✕ Cancelled',
             'COMPLETED': '✓ Completed',
+            'NO_SHOW': '⚠ No-Show',
         }
         return (
             <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${styles[status] || 'bg-gray-500/20 text-gray-300'}`}>
                 {labels[status] || status}
             </span>
         )
+    }
+
+    function getSourceBadge(source?: string) {
+        if (!source) return null
+        const config: Record<string, { icon: React.ReactNode; label: string; className: string }> = {
+            'ONLINE': { icon: <Globe className="h-3 w-3" />, label: 'Online', className: 'bg-blue-500/15 text-blue-300 border-blue-500/25' },
+            'POS': { icon: <Smartphone className="h-3 w-3" />, label: 'POS', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' },
+            'PHONE': { icon: <PhoneCall className="h-3 w-3" />, label: 'Phone', className: 'bg-purple-500/15 text-purple-300 border-purple-500/25' },
+            'WALK_IN': { icon: <Footprints className="h-3 w-3" />, label: 'Walk-in', className: 'bg-amber-500/15 text-amber-300 border-amber-500/25' },
+        }
+        const s = config[source]
+        if (!s) return null
+        return (
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded border ${s.className}`}>
+                {s.icon} {s.label}
+            </span>
+        )
+    }
+
+    async function handleExport() {
+        const dateStr = currentDate.toISOString().split('T')[0]
+        try {
+            const res = await fetch(`/api/salon/appointments-export?date=${dateStr}`)
+            if (res.ok) {
+                const blob = await res.blob()
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `appointments-${dateStr}.csv`
+                a.click()
+                URL.revokeObjectURL(url)
+            }
+        } catch (error) {
+            console.error('Export failed:', error)
+        }
     }
 
     if (status === 'loading' || loading) {
@@ -158,6 +196,7 @@ export default function AppointmentsPage() {
     }
 
     const pendingCount = appointments.filter(a => a.status === 'PENDING_APPROVAL').length
+    const noShowCount = appointments.filter(a => a.status === 'NO_SHOW').length
 
     return (
         <div className="p-8 max-w-7xl mx-auto h-[calc(100vh-4rem)] flex flex-col">
@@ -167,13 +206,27 @@ export default function AppointmentsPage() {
                     <h1 className="text-3xl font-bold text-white mb-2">Appointments</h1>
                     <p className="text-stone-400">Manage schedule and bookings</p>
                 </div>
-                <div className="flex items-center gap-4">
-                    {pendingCount > 0 && (
-                        <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-2">
-                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-                            <span className="text-amber-300 font-medium">{pendingCount} pending approval</span>
+                <div className="flex items-center gap-3">
+                    {noShowCount > 0 && (
+                        <div className="px-3 py-2 bg-orange-500/10 border border-orange-500/30 rounded-xl flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-orange-400" />
+                            <span className="text-orange-300 font-medium text-sm">{noShowCount} no-show{noShowCount > 1 ? 's' : ''}</span>
                         </div>
                     )}
+                    {pendingCount > 0 && (
+                        <div className="px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-2">
+                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                            <span className="text-amber-300 font-medium text-sm">{pendingCount} pending</span>
+                        </div>
+                    )}
+                    <button
+                        onClick={handleExport}
+                        className="px-4 py-2.5 bg-stone-800 border border-stone-700 text-stone-300 rounded-xl hover:bg-stone-700 transition-all flex items-center gap-2 text-sm"
+                        title="Export appointments as CSV"
+                    >
+                        <Download className="h-4 w-4" />
+                        Export
+                    </button>
                     <button
                         onClick={() => setShowBookingModal(true)}
                         className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl shadow-lg hover:shadow-purple-900/40 transition-all font-medium flex items-center gap-2"
@@ -314,8 +367,9 @@ export default function AppointmentsPage() {
                                             <p className="text-white font-bold text-lg">
                                                 {apt.client.firstName} {apt.client.lastName}
                                             </p>
-                                            <p className="text-white/80 text-sm">
+                                            <p className="text-white/80 text-sm flex items-center gap-2">
                                                 {apt.service.name} • {apt.employee.name}
+                                                {getSourceBadge(apt.source)}
                                             </p>
                                         </div>
                                     </div>
@@ -328,6 +382,7 @@ export default function AppointmentsPage() {
                                         <span className="bg-white/20 px-2 py-1 rounded text-white text-xs font-medium">
                                             {apt.status === 'SCHEDULED' ? '✓ Confirmed' :
                                                 apt.status === 'PENDING_APPROVAL' ? '⏳ Pending' :
+                                                    apt.status === 'NO_SHOW' ? '⚠ No-Show' :
                                                     apt.status === 'CANCELLED' ? '✕ Cancelled' : '★ Done'}
                                         </span>
                                     </div>

@@ -521,6 +521,10 @@ model Franchise {
   id   String @id @default(cuid())
   name String
   slug String @unique // e.g. "aura-salon"
+
+  // Region / Territory grouping for enterprise HQ reporting and Regional Manager scoping
+  // Examples: "Southeast", "Pacific Northwest", "TX-DFW", "Chicago Metro"
+  region String? // Optional — set by HQ when adding franchisee or editing location
   
   // Customer ID: Format ZIPCODE-0001 (e.g., 75001-0001)
   // Generated based on storeZip from FranchiseSettings + sequential number

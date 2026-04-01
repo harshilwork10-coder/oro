@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+import { checkBrandLock } from '@/lib/brandLock'
 
-// GET - Fetch pricing rules for the franchise
+// GET — reads are never locked
 export async function GET(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
         if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        // PricingRule is per-location. Get all rules for locations in this franchise.
+        const locations = await prisma.location.findMany({
+            where: { franchiseId: authUser.franchiseId },
+            select: { id: true }
+        })
+        const locationIds = locations.map(l => l.id)
 
         const rules = await prisma.pricingRule.findMany({
-            where: { franchiseId: user.franchiseId },
+            where: { locationId: { in: locationIds } },
             orderBy: { createdAt: 'desc' }
         })
-
         return NextResponse.json({ rules })
     } catch (error) {
         console.error('[PRICING_RULES]', error)
@@ -21,19 +27,21 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST - Create a new pricing rule
+// POST — blocked by lockPricing
 export async function POST(req: NextRequest) {
     try {
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        // ── BRAND LOCK: lockPricing ───────────────────────────────
+        const lockError = await checkBrandLock(authUser.franchiseId, 'lockPricing')
+        if (lockError) return lockError
+        // ─────────────────────────────────────────────────────────
 
         const body = await req.json()
         const rule = await prisma.pricingRule.create({
-            data: {
-                ...body,
-                franchiseId: user.franchiseId
-            }
+            data: body
         })
-
         return NextResponse.json({ rule })
     } catch (error) {
         console.error('[PRICING_RULES_CREATE]', error)
@@ -41,21 +49,23 @@ export async function POST(req: NextRequest) {
     }
 }
 
-// PUT - Update a pricing rule
+// PUT — blocked by lockPricing
 export async function PUT(req: NextRequest) {
     try {
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        // ── BRAND LOCK: lockPricing ───────────────────────────────
+        const lockError = await checkBrandLock(authUser.franchiseId, 'lockPricing')
+        if (lockError) return lockError
+        // ─────────────────────────────────────────────────────────
 
         const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
         if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
 
         const body = await req.json()
-        const rule = await prisma.pricingRule.update({
-            where: { id, franchiseId: user.franchiseId },
-            data: body
-        })
-
+        const rule = await prisma.pricingRule.update({ where: { id }, data: body })
         return NextResponse.json({ rule })
     } catch (error) {
         console.error('[PRICING_RULES_UPDATE]', error)
@@ -63,19 +73,22 @@ export async function PUT(req: NextRequest) {
     }
 }
 
-// DELETE - Delete a pricing rule
+// DELETE — blocked by lockPricing
 export async function DELETE(req: NextRequest) {
     try {
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        // ── BRAND LOCK: lockPricing ───────────────────────────────
+        const lockError = await checkBrandLock(authUser.franchiseId, 'lockPricing')
+        if (lockError) return lockError
+        // ─────────────────────────────────────────────────────────
 
         const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
         if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
 
-        await prisma.pricingRule.delete({
-            where: { id, franchiseId: user.franchiseId }
-        })
-
+        await prisma.pricingRule.delete({ where: { id } })
         return NextResponse.json({ success: true })
     } catch (error) {
         console.error('[PRICING_RULES_DELETE]', error)

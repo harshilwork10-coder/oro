@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Calendar, Clock, User, Scissors, Search, Check } from 'lucide-react'
+import { X, Calendar, Clock, User, Scissors, Search, Check, Armchair } from 'lucide-react'
 
 type BookingModalProps = {
     isOpen: boolean
@@ -16,6 +16,7 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
     const [services, setServices] = useState<any[]>([])
     const [employees, setEmployees] = useState<any[]>([])
     const [locations, setLocations] = useState<any[]>([])
+    const [resources, setResources] = useState<any[]>([])
     const [bookedSlots, setBookedSlots] = useState<Map<string, 'online' | 'store'>>(new Map())
     const [serviceSearch, setServiceSearch] = useState('')
     const [serviceCategory, setServiceCategory] = useState('All')
@@ -49,6 +50,7 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
         clientId: '',
         serviceIds: [] as string[],
         employeeId: '',
+        resourceId: '',
         date: selectedDate.toISOString().split('T')[0],
         time: getInitialTime(),
         notes: ''
@@ -160,6 +162,20 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
         fetchServices()
         fetchEmployees()
         fetchLocations()
+
+        // Fetch resources (chairs/rooms)
+        const fetchResources = async () => {
+            try {
+                const res = await fetch('/api/resources')
+                if (res.ok) {
+                    const data = await res.json()
+                    setResources(Array.isArray(data) ? data : (data.resources || []))
+                }
+            } catch (error) {
+                console.error('Error fetching resources:', error)
+            }
+        }
+        fetchResources()
     }, [])
 
     // Fetch employee-specific prices when employee is selected
@@ -281,6 +297,7 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                     serviceId: formData.serviceIds[0], // Primary service for backward compat
                     serviceIds: formData.serviceIds,
                     clientId,
+                    resourceId: formData.resourceId || undefined,
                     locationId: locations[0]?.id, // Use first location from user's franchise
                     startTime: startTime.toISOString(),
                     endTime: endTime.toISOString()
@@ -533,6 +550,44 @@ export default function BookingModal({ isOpen, onClose, onSuccess, selectedDate,
                                 ))}
                             </div>
                         </div>
+
+                        {/* Resource / Chair Picker */}
+                        {resources.length > 0 && (
+                            <div>
+                                <label className="block text-sm font-medium text-stone-300 mb-2 flex items-center gap-1.5">
+                                    <Armchair className="h-4 w-4 text-amber-400" />
+                                    Chair / Room
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, resourceId: '' })}
+                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                            formData.resourceId === ''
+                                                ? 'bg-amber-600 text-white'
+                                                : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
+                                        }`}
+                                    >
+                                        Any Available
+                                    </button>
+                                    {resources.map((r: any) => (
+                                        <button
+                                            key={r.id}
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, resourceId: r.id })}
+                                            className={`px-4 py-3 rounded-xl text-sm font-medium transition-all min-h-[48px] active:scale-95 ${
+                                                formData.resourceId === r.id
+                                                    ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/30'
+                                                    : 'bg-stone-800 text-stone-300 hover:bg-stone-700 border border-stone-700'
+                                            }`}
+                                        >
+                                            {r.name}
+                                            <span className="block text-[10px] opacity-60">{r.type}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Date Selection */}
                         <div>

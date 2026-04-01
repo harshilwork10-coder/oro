@@ -1,11 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
     Search, Plus, Users, ChevronRight, MapPin, Loader2, X, Building2, Mail, Phone, User, KeyRound
 } from 'lucide-react';
 import Toast from '@/components/ui/Toast';
+
+// Reads ?search= URL param and passes it to parent — must be inside a Suspense boundary
+function SearchParamsReader({ onSearch }: { onSearch: (q: string) => void }) {
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        const q = searchParams.get('search');
+        if (q) onSearch(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+    return null;
+}
 
 interface Franchisee {
     id: string;
@@ -40,7 +52,8 @@ export default function FranchiseesPage() {
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-    // Reset password state
+    // Sync search from global header search (URL query param)
+    // SearchParamsReader below handles this via Suspense
     const [resetModal, setResetModal] = useState<{ id: string; name: string; email: string } | null>(null);
     const [newPassword, setNewPassword] = useState('');
     const [resetting, setResetting] = useState(false);
@@ -193,6 +206,10 @@ export default function FranchiseesPage() {
 
     return (
         <div>
+            {/* Reads ?search= query param from global header search — Suspense required by Next.js */}
+            <Suspense fallback={null}>
+                <SearchParamsReader onSearch={setSearchQuery} />
+            </Suspense>
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-[var(--text-primary)]">Franchisees</h1>

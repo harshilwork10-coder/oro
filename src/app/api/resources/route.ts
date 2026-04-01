@@ -8,10 +8,7 @@ export async function GET(req: NextRequest) {
         const user = await getAuthUser(req)
         if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-const { searchParams } = new URL(req.url)
+        const { searchParams } = new URL(req.url)
         const type = searchParams.get('type') // CHAIR, ROOM, EQUIPMENT
         const queryLocationId = searchParams.get('locationId')
 
@@ -42,13 +39,13 @@ const { searchParams } = new URL(req.url)
 // POST - Create a new resource
 export async function POST(req: NextRequest) {
     try {
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-const locationId = user.locationId
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const locationId = user.locationId
 
         // Check permissions - need to be manager/owner
-        if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role)) {
+        if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role!)) {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
@@ -85,12 +82,12 @@ const locationId = user.locationId
 // PUT - Update a resource
 export async function PUT(req: NextRequest) {
     try {
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-const locationId = user.locationId
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role)) {
+        const locationId = user.locationId
+
+        if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role!)) {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
@@ -133,14 +130,14 @@ const locationId = user.locationId
 // DELETE - Remove a resource
 export async function DELETE(req: NextRequest) {
     try {
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-const locationId = user.locationId
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const locationId = user.locationId
         const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
 
-        if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role)) {
+        if (!['FRANCHISOR', 'FRANCHISEE', 'MANAGER'].includes(user.role!)) {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
         }
 
@@ -169,4 +166,3 @@ const locationId = user.locationId
         return NextResponse.json({ error: 'Failed to delete resource' }, { status: 500 })
     }
 }
-

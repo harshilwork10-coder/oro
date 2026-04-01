@@ -230,6 +230,7 @@ export async function GET(req: NextRequest) {
                     client: client ? `${client.firstName} ${client.lastName}` : 'Unknown',
                     barber: employee?.name || 'Unassigned',
                     service: service?.name || 'Unknown',
+                    source: apt.source || null,
                     lostRevenue: Number(service?.price || 0)
                 }
             }),

@@ -27,7 +27,9 @@ import {
     X,
     Menu,
     Maximize2,
-    Minimize2
+    Minimize2,
+    Calendar,
+    Loader2
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
@@ -234,6 +236,64 @@ function POSContent() {
     // Receipt modal state
     const [showReceiptModal, setShowReceiptModal] = useState(false)
     const [lastTransactionData, setLastTransactionData] = useState<any>(null)
+
+    // Rebooking suggestion widget state
+    interface RebookingSuggestion {
+        serviceName: string
+        suggestedDate: string
+        suggestedTime: string
+        reason: string
+        intervalWeeks: number
+    }
+    const [showRebookingWidget, setShowRebookingWidget] = useState(false)
+    const [rebookingSuggestions, setRebookingSuggestions] = useState<RebookingSuggestion[]>([])
+    const [rebookingCustomerName, setRebookingCustomerName] = useState('')
+
+    // Membership enrollment state
+    interface MembershipPlan { id: string; name: string; price: number; billingCycle: string }
+    const [showEnrollModal, setShowEnrollModal] = useState(false)
+    const [membershipPlans, setMembershipPlans] = useState<MembershipPlan[]>([])
+    const [enrollingPlanId, setEnrollingPlanId] = useState<string | null>(null)
+    const [membershipLoading, setMembershipLoading] = useState(false)
+
+    const openEnrollModal = async () => {
+        setShowEnrollModal(true)
+        setMembershipLoading(true)
+        try {
+            const res = await fetch('/api/pos/memberships')
+            if (res.ok) {
+                const data = await res.json()
+                setMembershipPlans(data.plans || [])
+            }
+        } catch (e) {
+            console.error('Failed to load membership plans:', e)
+        } finally {
+            setMembershipLoading(false)
+        }
+    }
+
+    const enrollInPlan = async (planId: string) => {
+        if (!selectedCustomer?.id) return
+        setEnrollingPlanId(planId)
+        try {
+            const res = await fetch('/api/pos/memberships/enroll', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clientId: selectedCustomer.id, planId })
+            })
+            const data = await res.json()
+            if (res.ok) {
+                setToast({ message: `${selectedCustomer.firstName} enrolled in ${data.membership.planName}!`, type: 'success' })
+                setShowEnrollModal(false)
+            } else {
+                setToast({ message: data.error || 'Enrollment failed', type: 'error' })
+            }
+        } catch (e) {
+            setToast({ message: 'Failed to enroll client', type: 'error' })
+        } finally {
+            setEnrollingPlanId(null)
+        }
+    }
 
     // Franchise pricing settings
     const [pricingSettings, setPricingSettings] = useState<{ pricingModel: string; cardSurchargeType: string; cardSurcharge: number; showDualPricing: boolean; taxRate?: number }>({
@@ -1224,6 +1284,10 @@ function POSContent() {
             if (res.ok) {
                 const transaction = await res.json()
 
+                // Capture customer data before clearing state (for rebooking widget)
+                const checkoutCustomerId = selectedCustomer?.id
+                const checkoutCustomerName = selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : ''
+
                 // Clear state — reset ALL transaction-scoped state to prevent leaks
                 setCart([])
                 setPendingTipAmount(0)
@@ -1251,6 +1315,26 @@ function POSContent() {
                 // Print receipt using DB data only (no cart snapshot workaround)
                 setToast({ message: '✓ Transaction Successful!', type: 'success' })
                 printReceipt(transaction)
+
+                // Fetch rebooking suggestions if a customer was attached to this transaction
+                if (checkoutCustomerId) {
+                    setRebookingCustomerName(checkoutCustomerName)
+                    try {
+                        const rebookRes = await fetch(`/api/pos/rebooking-suggestions/${checkoutCustomerId}`)
+                        if (rebookRes.ok) {
+                            const rebookData = await rebookRes.json()
+                            if (rebookData.data && rebookData.data.length > 0) {
+                                setRebookingSuggestions(rebookData.data)
+                                setShowRebookingWidget(true)
+                                // Auto-dismiss after 15 seconds
+                                setTimeout(() => setShowRebookingWidget(false), 15000)
+                            }
+                        }
+                    } catch (rebookErr) {
+                        // Non-critical — don't block checkout on rebooking failures
+                        console.error('Rebooking suggestion fetch failed:', rebookErr)
+                    }
+                }
             } else {
                 const error = await res.json()
                 setToast({ message: error.error || 'Transaction failed', type: 'error' })
@@ -3336,12 +3420,22 @@ function POSContent() {
                                                 </p>
                                                 <p className="text-emerald-600 text-sm">{selectedCustomer.phone}</p>
                                             </div>
-                                            <button
-                                                onClick={() => setSelectedCustomer(null)}
-                                                className="text-emerald-400 hover:text-red-400 transition-colors"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={openEnrollModal}
+                                                    className="px-2 py-1 bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 text-xs font-medium rounded-md transition-colors flex items-center gap-1"
+                                                    title="Enroll in Membership"
+                                                >
+                                                    <Gift className="h-3 w-3" />
+                                                    Membership
+                                                </button>
+                                                <button
+                                                    onClick={() => setSelectedCustomer(null)}
+                                                    className="text-emerald-400 hover:text-red-400 transition-colors"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -3404,6 +3498,70 @@ function POSContent() {
                     )}
                 </div>
             </div >
+
+            {/* Membership Enrollment Modal */}
+            {showEnrollModal && selectedCustomer && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                    <div className="w-full max-w-md bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl">
+                        <div className="p-5 border-b border-stone-800">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                        <Gift className="h-5 w-5 text-violet-400" />
+                                        Enroll in Membership
+                                    </h3>
+                                    <p className="text-stone-400 text-sm mt-0.5">
+                                        {selectedCustomer.firstName} {selectedCustomer.lastName}
+                                    </p>
+                                </div>
+                                <button onClick={() => setShowEnrollModal(false)} className="text-stone-400 hover:text-white">
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-5">
+                            {membershipLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
+                                </div>
+                            ) : membershipPlans.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <Gift className="h-10 w-10 text-stone-600 mx-auto mb-3" />
+                                    <p className="text-stone-400">No membership plans available</p>
+                                    <p className="text-stone-500 text-sm mt-1">Create plans in Settings → Services</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {membershipPlans.map(plan => (
+                                        <button
+                                            key={plan.id}
+                                            onClick={() => enrollInPlan(plan.id)}
+                                            disabled={!!enrollingPlanId}
+                                            className="w-full p-4 bg-stone-800/60 hover:bg-stone-800 border border-stone-700 hover:border-violet-500/50 rounded-xl text-left transition-all disabled:opacity-50"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-white font-semibold">{plan.name}</p>
+                                                    <p className="text-stone-400 text-sm mt-0.5">
+                                                        {plan.billingCycle.charAt(0) + plan.billingCycle.slice(1).toLowerCase()} billing
+                                                    </p>
+                                                </div>
+                                                <div className="text-right">
+                                                    {enrollingPlanId === plan.id ? (
+                                                        <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
+                                                    ) : (
+                                                        <span className="text-lg font-bold text-violet-400">${plan.price.toFixed(2)}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Toast Notification */}
             {
@@ -3483,6 +3641,82 @@ function POSContent() {
             }
 
             {/* Duplicate Open Item Modal removed — the primary one is rendered above (lines ~3069-3176) */}
+
+            {/* Rebooking Suggestion Widget — appears after successful checkout */}
+            {showRebookingWidget && rebookingSuggestions.length > 0 && (
+                <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+                    <div className="bg-gradient-to-br from-violet-900/95 to-fuchsia-900/95 backdrop-blur-xl border border-violet-500/40 rounded-2xl shadow-2xl shadow-violet-500/20 p-5 w-[380px]">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-violet-500/20 rounded-lg">
+                                    <Calendar className="h-4 w-4 text-violet-300" />
+                                </div>
+                                <span className="text-sm font-semibold text-white">Rebook {rebookingCustomerName.split(' ')[0]}?</span>
+                            </div>
+                            <button
+                                onClick={() => setShowRebookingWidget(false)}
+                                className="p-1 hover:bg-white/10 rounded-lg text-stone-400 hover:text-white transition-colors"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Suggestions */}
+                        <div className="space-y-2">
+                            {rebookingSuggestions.slice(0, 2).map((sug, idx) => {
+                                const sugDate = new Date(sug.suggestedDate + 'T12:00:00')
+                                const dateStr = sugDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                                return (
+                                    <div key={idx} className="bg-white/[0.06] border border-white/10 rounded-xl p-3 hover:bg-white/[0.1] transition-colors">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-white font-medium text-sm">{sug.serviceName}</p>
+                                                <p className="text-violet-300/70 text-xs mt-0.5">{sug.reason}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-violet-200 font-semibold text-sm">{dateStr}</p>
+                                                <p className="text-violet-400/60 text-xs">{sug.suggestedTime}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+
+                        {/* Action */}
+                        <div className="flex gap-2 mt-3">
+                            <button
+                                onClick={() => {
+                                    setShowRebookingWidget(false)
+                                    window.open('/dashboard/appointments', '_blank')
+                                }}
+                                className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-medium rounded-xl text-sm transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-violet-500/25"
+                            >
+                                <Calendar className="h-3.5 w-3.5" />
+                                Book Next Visit
+                            </button>
+                            <button
+                                onClick={() => setShowRebookingWidget(false)}
+                                className="px-4 py-2.5 bg-white/[0.06] hover:bg-white/[0.12] text-stone-300 font-medium rounded-xl text-sm transition-colors border border-white/10"
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+
+                        {/* Auto-dismiss indicator */}
+                        <div className="mt-2 h-0.5 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-violet-500/50 rounded-full animate-shrink" style={{ animation: 'shrink 15s linear forwards' }} />
+                        </div>
+                    </div>
+                    <style jsx>{`
+                        @keyframes shrink {
+                            from { width: 100%; }
+                            to { width: 0%; }
+                        }
+                    `}</style>
+                </div>
+            )}
 
             {/* Existing Receipt Modal */}
             <ReceiptModal

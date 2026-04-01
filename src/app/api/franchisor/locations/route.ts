@@ -59,11 +59,17 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ data: [] });
     }
 
+    // Optional region filter — HQ can drill by territory
+    const regionFilter = req.nextUrl.searchParams.get('region') || null;
+
     // Get locations for these franchises
     const locations = await prisma.location.findMany({
-        where: { franchiseId: { in: franchiseIds } },
+        where: {
+            franchiseId: { in: franchiseIds },
+            ...(regionFilter ? { franchise: { region: regionFilter } } : {})
+        },
         include: {
-            franchise: { select: { id: true, name: true } },
+            franchise: { select: { id: true, name: true, region: true } },
             _count: { select: { stations: true } }
         },
         orderBy: { createdAt: 'desc' }
@@ -75,6 +81,7 @@ export async function GET(req: NextRequest) {
         address: loc.address,
         franchiseeId: loc.franchise?.id,
         franchiseeName: loc.franchise?.name,
+        region: loc.franchise?.region || null,
         provisioningStatus: loc.provisioningStatus,
         stationCount: loc._count.stations,
         createdAt: loc.createdAt
@@ -90,7 +97,7 @@ export async function GET(req: NextRequest) {
 // POST /api/franchisor/locations - HQ creates a new location
 export async function POST(req: NextRequest) {
   try {
-    ;
+    const user = await getAuthUser(req);
     if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

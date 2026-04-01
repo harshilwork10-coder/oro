@@ -20,11 +20,8 @@ import {
     Monitor,
     AlertTriangle,
     Users,
-    Calendar,
-    DollarSign,
     UserCircle,
     FileText,
-    Settings,
     TrendingUp,
     RefreshCw
 } from 'lucide-react';
@@ -118,11 +115,8 @@ export default function Location360Page() {
     const tabs = [
         { id: 'overview', label: 'Overview', icon: TrendingUp },
         { id: 'customers', label: 'Customers', icon: Users },
-        { id: 'bookings', label: 'Bookings', icon: Calendar },
-        { id: 'sales', label: 'Sales', icon: DollarSign },
         { id: 'staff', label: 'Staff', icon: UserCircle },
         { id: 'transactions', label: 'Transactions', icon: FileText },
-        { id: 'operations', label: 'Operations', icon: Settings }
     ];
 
     if (loading && !data) {
@@ -267,16 +261,10 @@ export default function Location360Page() {
 
             {/* Tab Content */}
             <main className="p-6">
-                {activeTab === 'overview' && <OverviewTab locationId={locationId} range={selectedRange} />}
+                {activeTab === 'overview' && <OverviewTab locationId={locationId} range={selectedRange} kpis={kpis} />}
                 {activeTab === 'customers' && <CustomersTab locationId={locationId} range={selectedRange} />}
                 {activeTab === 'staff' && <StaffTab locationId={locationId} range={selectedRange} />}
                 {activeTab === 'transactions' && <TransactionsTab locationId={locationId} />}
-                {/* Other tabs render placeholders for now */}
-                {['bookings', 'sales', 'operations'].includes(activeTab) && (
-                    <div className="flex items-center justify-center py-20 text-stone-500">
-                        <p>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} tab coming soon...</p>
-                    </div>
-                )}
             </main>
         </div>
     );
@@ -292,20 +280,60 @@ function KPICard({ label, value, highlight = false }: { label: string; value: st
     );
 }
 
-// Overview Tab
-function OverviewTab({ locationId, range }: { locationId: string; range: string }) {
+// Overview Tab — shows real KPI summary cards (no placeholder charts)
+function OverviewTab({ locationId, range, kpis }: { locationId: string; range: string; kpis: KPIs }) {
+    const completionRate = kpis.appointments.booked > 0
+        ? ((kpis.appointments.completed / kpis.appointments.booked) * 100).toFixed(1)
+        : '0.0';
+
     return (
-        <div className="grid grid-cols-2 gap-6">
+        <div className="space-y-6">
+            {/* Appointment Health */}
             <div className="bg-stone-900 rounded-xl p-6">
-                <h3 className="text-lg font-semibold mb-4">7-Day Sales Trend</h3>
-                <div className="h-48 flex items-center justify-center text-stone-500">
-                    Chart placeholder
+                <h3 className="text-lg font-semibold mb-4 text-orange-400">Appointment Health — {range}</h3>
+                <div className="grid grid-cols-4 gap-4">
+                    <div className="bg-stone-800 rounded-lg p-4 text-center">
+                        <p className="text-xs text-stone-400 mb-1">Booked</p>
+                        <p className="text-2xl font-bold">{kpis.appointments.booked}</p>
+                    </div>
+                    <div className="bg-stone-800 rounded-lg p-4 text-center">
+                        <p className="text-xs text-stone-400 mb-1">Completed</p>
+                        <p className="text-2xl font-bold text-emerald-400">{kpis.appointments.completed}</p>
+                    </div>
+                    <div className="bg-stone-800 rounded-lg p-4 text-center">
+                        <p className="text-xs text-stone-400 mb-1">No-Shows</p>
+                        <p className={`text-2xl font-bold ${kpis.appointments.noShows > 0 ? 'text-red-400' : 'text-stone-300'}`}>
+                            {kpis.appointments.noShows}
+                        </p>
+                    </div>
+                    <div className="bg-stone-800 rounded-lg p-4 text-center">
+                        <p className="text-xs text-stone-400 mb-1">Completion Rate</p>
+                        <p className={`text-2xl font-bold ${parseFloat(completionRate) >= 80 ? 'text-emerald-400' : parseFloat(completionRate) >= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                            {completionRate}%
+                        </p>
+                    </div>
                 </div>
             </div>
+
+            {/* Revenue & Traffic */}
             <div className="bg-stone-900 rounded-xl p-6">
-                <h3 className="text-lg font-semibold mb-4">Appointment Volume</h3>
-                <div className="h-48 flex items-center justify-center text-stone-500">
-                    Chart placeholder
+                <h3 className="text-lg font-semibold mb-4 text-orange-400">Revenue & Traffic — {range}</h3>
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-stone-800 rounded-lg p-4">
+                        <p className="text-xs text-stone-400 mb-1">Transactions</p>
+                        <p className="text-2xl font-bold">{kpis.transactionCount}</p>
+                        <p className="text-xs text-stone-500 mt-1">Avg ticket: ${kpis.avgTicket.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-stone-800 rounded-lg p-4">
+                        <p className="text-xs text-stone-400 mb-1">Unique Customers</p>
+                        <p className="text-2xl font-bold text-blue-400">{kpis.uniqueCustomers}</p>
+                        <p className="text-xs text-stone-500 mt-1">Walk-ins: {kpis.walkIns}</p>
+                    </div>
+                    <div className="bg-stone-800 rounded-lg p-4">
+                        <p className="text-xs text-stone-400 mb-1">Tips Collected</p>
+                        <p className="text-2xl font-bold text-amber-400">${kpis.tips.toFixed(2)}</p>
+                        <p className="text-xs text-stone-500 mt-1">Refunds: ${kpis.refunds.toFixed(2)}</p>
+                    </div>
                 </div>
             </div>
         </div>

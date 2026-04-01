@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import {
     Calendar, CreditCard, MessageSquare, Users, Sparkles, Eye,
     DollarSign, Clock, Star, Bell, Loader2, Check, AlertCircle,
-    Zap, UserPlus, Wallet, Brain, Scissors
+    Zap, UserPlus, Wallet, Brain, Scissors, Rocket
 } from 'lucide-react'
 
 interface FeatureSettings {
@@ -39,18 +39,26 @@ interface FeatureToggleProps {
     icon: React.ReactNode
     badge?: string
     disabled?: boolean
+    comingSoon?: boolean
 }
 
-function FeatureToggle({ title, description, enabled, onChange, icon, badge, disabled }: FeatureToggleProps) {
+function FeatureToggle({ title, description, enabled, onChange, icon, badge, disabled, comingSoon }: FeatureToggleProps) {
+    const isDisabled = disabled || comingSoon
     return (
-        <div className={`flex items-start gap-4 p-4 bg-stone-900/50 border border-stone-800 rounded-xl hover:border-stone-700 transition-all ${disabled ? 'opacity-50' : ''}`}>
-            <div className="p-2.5 bg-violet-500/10 rounded-lg text-violet-400 flex-shrink-0">
+        <div className={`flex items-start gap-4 p-4 bg-stone-900/50 border border-stone-800 rounded-xl hover:border-stone-700 transition-all ${isDisabled ? 'opacity-60' : ''}`}>
+            <div className={`p-2.5 rounded-lg flex-shrink-0 ${comingSoon ? 'bg-stone-700/50 text-stone-500' : 'bg-violet-500/10 text-violet-400'}`}>
                 {icon}
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-white">{title}</h3>
-                    {badge && (
+                    <h3 className={`font-semibold ${comingSoon ? 'text-stone-400' : 'text-white'}`}>{title}</h3>
+                    {comingSoon && (
+                        <span className="px-2 py-0.5 bg-violet-500/15 text-violet-400 text-xs rounded-full flex items-center gap-1 border border-violet-500/20">
+                            <Rocket className="h-3 w-3" />
+                            Coming Soon
+                        </span>
+                    )}
+                    {badge && !comingSoon && (
                         <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full">
                             {badge}
                         </span>
@@ -59,13 +67,17 @@ function FeatureToggle({ title, description, enabled, onChange, icon, badge, dis
                 <p className="text-sm text-stone-400 mt-0.5">{description}</p>
             </div>
             <button
-                onClick={() => !disabled && onChange(!enabled)}
-                disabled={disabled}
-                className={`relative w-12 h-6 rounded-full transition-all flex-shrink-0 ${enabled ? 'bg-violet-600' : 'bg-stone-700'
-                    } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                onClick={() => !isDisabled && onChange(!enabled)}
+                disabled={isDisabled}
+                className={`relative w-12 h-6 rounded-full transition-all flex-shrink-0 ${
+                    comingSoon ? 'bg-stone-800 cursor-not-allowed' :
+                    enabled ? 'bg-violet-600' : 'bg-stone-700'
+                } ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
             >
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow ${enabled ? 'left-7' : 'left-1'
-                    }`} />
+                <div className={`absolute top-1 w-4 h-4 rounded-full transition-all shadow ${
+                    comingSoon ? 'bg-stone-600 left-1' :
+                    enabled ? 'bg-white left-7' : 'bg-white left-1'
+                }`} />
             </button>
         </div>
     )
@@ -200,9 +212,10 @@ export default function SalonFeaturesPage() {
                         <FeatureToggle
                             title="Group Booking"
                             description="Allow families or friends to book together"
-                            enabled={settings.enableGroupBooking}
-                            onChange={(v) => updateSetting('enableGroupBooking', v)}
+                            enabled={false}
+                            onChange={() => {}}
                             icon={<Users className="h-5 w-5" />}
+                            comingSoon
                         />
                         <FeatureToggle
                             title="Waitlist"
@@ -214,10 +227,10 @@ export default function SalonFeaturesPage() {
                         <FeatureToggle
                             title="Waitlist Auto-Fill"
                             description="Auto-text waitlist when a spot opens"
-                            enabled={settings.enableWaitlistAutoFill}
-                            onChange={(v) => updateSetting('enableWaitlistAutoFill', v)}
+                            enabled={false}
+                            onChange={() => {}}
                             icon={<Zap className="h-5 w-5" />}
-                            badge="Requires SMS"
+                            comingSoon
                         />
                     </div>
                 </section>
@@ -232,45 +245,19 @@ export default function SalonFeaturesPage() {
                         <FeatureToggle
                             title="Prepayment / Deposits"
                             description="Require payment when booking to reduce no-shows"
-                            enabled={settings.enablePrepayment}
-                            onChange={(v) => updateSetting('enablePrepayment', v)}
+                            enabled={false}
+                            onChange={() => {}}
                             icon={<Wallet className="h-5 w-5" />}
-                            badge="Requires Payment Setup"
+                            comingSoon
                         />
                         <FeatureToggle
                             title="No-Show Charge"
                             description="Automatically charge for no-shows and late cancellations"
-                            enabled={settings.enableNoShowCharge}
-                            onChange={(v) => updateSetting('enableNoShowCharge', v)}
+                            enabled={false}
+                            onChange={() => {}}
                             icon={<DollarSign className="h-5 w-5" />}
-                            badge="Requires Card on File"
+                            comingSoon
                         />
-                        {settings.enableNoShowCharge && (
-                            <div className="ml-12 p-4 bg-stone-800/50 rounded-lg space-y-3 border border-stone-700">
-                                <div>
-                                    <label className="text-sm text-stone-400">Fee Type</label>
-                                    <select
-                                        value={settings.noShowFeeType}
-                                        onChange={(e) => updateSetting('noShowFeeType', e.target.value)}
-                                        className="mt-1 w-full bg-stone-900 border border-stone-700 rounded-lg px-3 py-2 text-white focus:border-violet-500 outline-none"
-                                    >
-                                        <option value="FLAT">Flat Amount</option>
-                                        <option value="PERCENTAGE">Percentage of Service</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-sm text-stone-400">
-                                        {settings.noShowFeeType === 'FLAT' ? 'Fee Amount ($)' : 'Fee Percentage (%)'}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={settings.noShowFeeAmount}
-                                        onChange={(e) => updateSetting('noShowFeeAmount', parseFloat(e.target.value) || 0)}
-                                        className="mt-1 w-full bg-stone-900 border border-stone-700 rounded-lg px-3 py-2 text-white focus:border-violet-500 outline-none"
-                                    />
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </section>
 
@@ -284,25 +271,26 @@ export default function SalonFeaturesPage() {
                         <FeatureToggle
                             title="SMS Reminders"
                             description="Send text reminders before appointments"
-                            enabled={settings.enableSmsReminders}
-                            onChange={(v) => updateSetting('enableSmsReminders', v)}
+                            enabled={false}
+                            onChange={() => {}}
                             icon={<Bell className="h-5 w-5" />}
-                            badge="Requires Twilio"
+                            comingSoon
                         />
                         <FeatureToggle
                             title="Google Reviews Booster"
                             description="Auto-request 5-star reviews from happy clients"
-                            enabled={settings.enableReviewBooster}
-                            onChange={(v) => updateSetting('enableReviewBooster', v)}
+                            enabled={false}
+                            onChange={() => {}}
                             icon={<Star className="h-5 w-5" />}
+                            comingSoon
                         />
                         <FeatureToggle
                             title="Marketing Campaigns"
                             description="Send text and email campaigns to clients"
-                            enabled={settings.enableMarketingCampaigns}
-                            onChange={(v) => updateSetting('enableMarketingCampaigns', v)}
+                            enabled={false}
+                            onChange={() => {}}
                             icon={<MessageSquare className="h-5 w-5" />}
-                            badge="Requires SMS"
+                            comingSoon
                         />
                     </div>
                 </section>
@@ -317,17 +305,18 @@ export default function SalonFeaturesPage() {
                         <FeatureToggle
                             title="Auto Payroll"
                             description="Auto-calculate barber commissions and payouts"
-                            enabled={settings.enableAutoPayroll}
-                            onChange={(v) => updateSetting('enableAutoPayroll', v)}
+                            enabled={false}
+                            onChange={() => {}}
                             icon={<DollarSign className="h-5 w-5" />}
+                            comingSoon
                         />
                         <FeatureToggle
                             title="Rent Auto-Collection"
                             description="Automatically charge booth renters on due dates"
-                            enabled={settings.enableRentCollection}
-                            onChange={(v) => updateSetting('enableRentCollection', v)}
+                            enabled={false}
+                            onChange={() => {}}
                             icon={<Wallet className="h-5 w-5" />}
-                            badge="Requires Payment Setup"
+                            comingSoon
                         />
                     </div>
                 </section>
@@ -342,9 +331,10 @@ export default function SalonFeaturesPage() {
                         <FeatureToggle
                             title="Smart Rebooking"
                             description="AI suggests when clients are due for their next visit"
-                            enabled={settings.enableSmartRebooking}
-                            onChange={(v) => updateSetting('enableSmartRebooking', v)}
+                            enabled={false}
+                            onChange={() => {}}
                             icon={<Sparkles className="h-5 w-5" />}
+                            comingSoon
                         />
                     </div>
                 </section>

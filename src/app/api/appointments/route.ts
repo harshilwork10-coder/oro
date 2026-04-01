@@ -9,13 +9,9 @@ export async function GET(req: NextRequest) {
         const authUser = await getAuthUser(req)
         if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!authUser?.email) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         // Get user's franchise/location
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email! },
             select: { franchiseId: true, locationId: true }
         })
 
@@ -83,12 +79,11 @@ export async function GET(req: NextRequest) {
 // POST: Create new appointment
 export async function POST(req: NextRequest) {
     try {
-        if (!user?.id) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const body = await req.json()
-        const { clientId, serviceId, employeeId, locationId, startTime, endTime, notes } = body
+        const { clientId, serviceId, employeeId, locationId, startTime, endTime, notes, resourceId } = body
 
         // Validate required fields
         if (!clientId || !serviceId || !employeeId || !locationId || !startTime || !endTime) {
@@ -151,6 +146,7 @@ export async function POST(req: NextRequest) {
                 serviceId,
                 employeeId,
                 locationId,
+                resourceId: resourceId || null,
                 startTime: new Date(startTime),
                 endTime: new Date(endTime),
                 notes: notes || null,

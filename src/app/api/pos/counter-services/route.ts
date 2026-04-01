@@ -20,10 +20,6 @@ export async function GET(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
         if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        const franchiseId = user.franchiseId
-        if (!franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
 
         // Return available counter services
         const services = [
@@ -117,7 +113,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     try {
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const body = await req.json()
         const { serviceId, amount, pages, recipient, notes } = body
@@ -167,7 +164,7 @@ export async function POST(req: NextRequest) {
             recipient: recipient || null,
             pages: pages || null,
             notes: notes || null,
-            cashier: user.name || user.email,
+            cashier: authUser.name || authUser.email,
             timestamp: new Date().toISOString(),
         }
 
