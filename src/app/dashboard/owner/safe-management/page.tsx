@@ -3,11 +3,26 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { ArrowLeft, Vault, Plus, DollarSign, ArrowDownToLine, Building2, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Vault, Plus, DollarSign, ArrowDownToLine, Building2, RefreshCw, Lock } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
 export default function SafeManagementPage() {
     const { data: session } = useSession()
+    const role = (session?.user as any)?.role
+    const canPost = ['OWNER', 'MANAGER', 'PROVIDER'].includes(role)
+
+    if (session !== undefined && !canPost) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white flex items-center justify-center p-6">
+                <div className="text-center max-w-md">
+                    <Lock className="h-16 w-16 mx-auto text-red-400 mb-4" />
+                    <h1 className="text-2xl font-bold mb-2">Access Restricted</h1>
+                    <p className="text-stone-400 mb-6">Safe management is restricted to Owners and Managers only.</p>
+                    <Link href="/dashboard/owner" className="px-6 py-3 bg-stone-800 hover:bg-stone-700 rounded-xl">← Back to Dashboard</Link>
+                </div>
+            </div>
+        )
+    }
     const [history, setHistory] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [showForm, setShowForm] = useState(false)
@@ -57,9 +72,11 @@ export default function SafeManagementPage() {
                         <p className="text-stone-400">Safe counts, drops & bank deposits</p>
                     </div>
                 </div>
+                {canPost && (
                 <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-xl">
                     <Plus className="h-4 w-4" /> New Entry
                 </button>
+                )}
             </div>
 
             {showForm && (

@@ -2,10 +2,28 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, FileSpreadsheet, Download, RefreshCw } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { ArrowLeft, FileSpreadsheet, Download, RefreshCw, Lock } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
+const ALLOWED_ROLES = ['OWNER', 'ACCOUNTANT', 'PROVIDER']
+
 export default function AccountingExportPage() {
+    const { data: session } = useSession()
+    const role = (session?.user as any)?.role
+    if (session !== undefined && !ALLOWED_ROLES.includes(role)) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white flex items-center justify-center p-6">
+                <div className="text-center max-w-md">
+                    <Lock className="h-16 w-16 mx-auto text-red-400 mb-4" />
+                    <h1 className="text-2xl font-bold mb-2">Access Restricted</h1>
+                    <p className="text-stone-400 mb-6">Accounting exports are restricted to Owners and Accountants only.</p>
+                    <Link href="/dashboard/owner" className="px-6 py-3 bg-stone-800 hover:bg-stone-700 rounded-xl">← Back to Dashboard</Link>
+                </div>
+            </div>
+        )
+    }
+
     const [format, setFormat] = useState('QUICKBOOKS')
     const [date, setDate] = useState(new Date().toISOString().split('T')[0])
     const [data, setData] = useState<any>(null)

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Store, CreditCard, Bell, Users, Shield, Palette, Clock, MapPin, ChevronRight, Star, Check, Loader2, Globe, RefreshCw, Package, Truck } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { Store, CreditCard, Bell, Users, Shield, Palette, Clock, MapPin, ChevronRight, Star, Check, Loader2, Globe, RefreshCw, Package, Truck, Lock } from 'lucide-react';
 
 type SettingsSection = 'general' | 'payment' | 'notifications' | 'employees' | 'security' | 'appearance' | 'hours' | 'location' | 'integrations' | 'delivery';
 
@@ -20,8 +21,10 @@ const sections = [
 ];
 
 export default function SettingsPage() {
+    const { data: session } = useSession();
     const [activeSection, setActiveSection] = useState<SettingsSection>('general');
     const router = useRouter();
+    const isProvider = (session?.user as any)?.role === 'PROVIDER';
     const [googlePlaceId, setGooglePlaceId] = useState('');
     const [placeIdSaving, setPlaceIdSaving] = useState(false);
     const [placeIdSaved, setPlaceIdSaved] = useState(false);
@@ -326,7 +329,8 @@ export default function SettingsPage() {
                                     </div>
                                 )}
 
-                                {/* Merchant Center Settings */}
+                                {/* Merchant Center Settings — PROVIDER ONLY */}
+                                {isProvider ? (
                                 <div className="p-4 rounded-lg border border-[var(--border)] space-y-4">
                                     <h4 className="font-medium text-[var(--text-primary)] flex items-center gap-2">
                                         <Package size={16} />
@@ -361,6 +365,15 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
                                 </div>
+                                ) : (
+                                <div className="p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] flex items-center gap-3">
+                                    <Lock size={18} className="text-stone-500 flex-shrink-0" />
+                                    <div>
+                                        <p className="text-sm font-medium text-[var(--text-primary)]">Google Merchant Center credentials</p>
+                                        <p className="text-xs text-[var(--text-muted)] mt-0.5">Managed by ORO / Provider. Contact support to update integration settings.</p>
+                                    </div>
+                                </div>
+                                )}
 
                                 {/* Actions */}
                                 <div className="flex gap-3">
@@ -448,12 +461,12 @@ export default function SettingsPage() {
                                     <div>
                                         <h3 className="font-semibold text-[var(--text-primary)]">DoorDash & Uber Eats</h3>
                                         <p className="text-sm text-[var(--text-muted)]">
-                                            Push your menu to delivery platforms. Orders flow directly into POS.
+                                            Delivery platform connections. Orders flow directly into POS.
                                         </p>
                                     </div>
                                 </div>
 
-                                {/* Menu Stats */}
+                                {/* Menu Stats — visible to all */}
                                 {deliveryStats?.menuStats && (
                                     <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--border)] flex items-center gap-6">
                                         <div>
@@ -464,12 +477,12 @@ export default function SettingsPage() {
                                             <p className="text-2xl font-bold text-blue-400">{deliveryStats.menuStats.categories?.length || 0}</p>
                                             <p className="text-xs text-[var(--text-muted)]">Categories</p>
                                         </div>
-                                        <div className="ml-auto text-xs text-[var(--text-muted)] font-mono bg-stone-900 px-3 py-1 rounded">
-                                            Webhook: /api/integrations/delivery/webhook
-                                        </div>
                                     </div>
                                 )}
 
+                                {/* PROVIDER-only: credential management */}
+                                {isProvider ? (
+                                <>
                                 {/* DoorDash */}
                                 <div className="p-5 rounded-lg border border-[var(--border)] space-y-4">
                                     <div className="flex items-center gap-3">
@@ -504,8 +517,7 @@ export default function SettingsPage() {
                                     <button
                                         onClick={() => handleMenuSync('doordash')}
                                         disabled={!ddStoreId || menuSyncing === 'doordash'}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${!ddStoreId ? 'bg-stone-600 text-stone-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white'
-                                            }`}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${!ddStoreId ? 'bg-stone-600 text-stone-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white'}`}
                                     >
                                         {menuSyncing === 'doordash' ? (
                                             <><RefreshCw size={14} className="animate-spin" /> Syncing...</>
@@ -559,8 +571,7 @@ export default function SettingsPage() {
                                     <button
                                         onClick={() => handleMenuSync('ubereats')}
                                         disabled={!ueStoreId || menuSyncing === 'ubereats'}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${!ueStoreId ? 'bg-stone-600 text-stone-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'
-                                            }`}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${!ueStoreId ? 'bg-stone-600 text-stone-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'}`}
                                     >
                                         {menuSyncing === 'ubereats' ? (
                                             <><RefreshCw size={14} className="animate-spin" /> Syncing...</>
@@ -572,22 +583,27 @@ export default function SettingsPage() {
 
                                 {/* Sync Result */}
                                 {menuSyncResult && (
-                                    <div className={`p-4 rounded-lg border ${menuSyncResult.success ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'
-                                        }`}>
+                                    <div className={`p-4 rounded-lg border ${menuSyncResult.success ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
                                         <p className={`text-sm font-medium ${menuSyncResult.success ? 'text-green-400' : 'text-red-400'}`}>
-                                            {menuSyncResult.success
-                                                ? `✅ ${menuSyncResult.message}`
-                                                : `❌ ${menuSyncResult.error}`
-                                            }
+                                            {menuSyncResult.success ? `✅ ${menuSyncResult.message}` : `❌ ${menuSyncResult.error}`}
                                         </p>
                                     </div>
                                 )}
-
-                                <p className="text-xs text-[var(--text-muted)]">
-                                    Need help? Apply for DoorDash access at <a href="https://developers.doordash.com" target="_blank" className="text-red-400 hover:underline">developers.doordash.com</a> or
-                                    Uber Eats at <a href="https://merchants.ubereats.com" target="_blank" className="text-green-400 hover:underline">merchants.ubereats.com</a>.
-                                    Orders will auto-flow into your POS once connected.
-                                </p>
+                                </>
+                                ) : (
+                                /* Owner: locked banner — no credentials visible */
+                                <div className="p-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] flex items-center gap-4">
+                                    <Lock size={22} className="text-stone-500 flex-shrink-0" />
+                                    <div>
+                                        <p className="font-medium text-[var(--text-primary)]">Delivery Platform Credentials</p>
+                                        <p className="text-sm text-[var(--text-muted)] mt-0.5">
+                                            DoorDash and Uber Eats API credentials are managed by ORO / Provider.
+                                            Contact support to update integration settings or troubleshoot connections.
+                                        </p>
+                                        <p className="text-xs text-[var(--text-muted)] mt-2">Orders still auto-flow into your POS when the integration is active.</p>
+                                    </div>
+                                </div>
+                                )}
                             </div>
                         )}
 

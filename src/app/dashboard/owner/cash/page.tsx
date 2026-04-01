@@ -157,13 +157,22 @@ export default function CashManagementPage() {
                         <p className="text-stone-400">Track drawer counts, drops, and deposits</p>
                     </div>
                 </div>
-                <button
-                    onClick={fetchData}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 rounded-xl"
-                >
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                </button>
+                <div className="flex gap-2">
+                    <Link
+                        href="/dashboard/owner/safe-management"
+                        className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 rounded-xl text-sm"
+                    >
+                        <PiggyBank className="h-4 w-4 text-blue-400" />
+                        Safe Management
+                    </Link>
+                    <button
+                        onClick={fetchData}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 rounded-xl"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
             </div>
 
             {/* Summary Cards */}

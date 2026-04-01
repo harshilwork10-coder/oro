@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
     Zap, AlertTriangle, Shield, CheckCircle, Clock, ArrowRight,
     MapPin, TrendingDown, DollarSign, Package, Users, Eye,
-    RefreshCw, Bell, ChevronRight, Timer, Target, Smartphone
+    RefreshCw, Bell, ChevronRight, Timer, Target
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
@@ -165,13 +165,6 @@ export default function BriefingCommandCenter() {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Link
-                            href="/dashboard/owner/briefing/mobile"
-                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-stone-800/50 border border-stone-700/50 text-stone-300 hover:text-white hover:border-stone-600 transition-all text-sm"
-                        >
-                            <Smartphone className="h-4 w-4" />
-                            Mobile View
-                        </Link>
                         <div className="flex gap-2 text-sm">
                             <span className="px-3 py-1.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
                                 {briefing?.counts.escalated || 0} escalated
@@ -203,10 +196,10 @@ export default function BriefingCommandCenter() {
                                 </div>
                             </div>
                             <Link
-                                href={`/dashboard/owner/issues?locationId=${priority.issueIds?.[0] || ''}`}
+                                href="/dashboard/owner/exceptions"
                                 className="px-4 py-2 bg-amber-500 text-black font-semibold rounded-lg hover:bg-amber-400 transition-colors text-sm"
                             >
-                                Take Action →
+                                View Exceptions →
                             </Link>
                         </div>
                     </div>
@@ -222,7 +215,7 @@ export default function BriefingCommandCenter() {
                                 Top Issues
                             </h2>
                             <Link
-                                href="/dashboard/owner/issues"
+                                href="/dashboard/owner/exceptions"
                                 className="text-sm text-stone-400 hover:text-amber-400 flex items-center gap-1 transition-colors"
                             >
                                 View all <ArrowRight className="h-3 w-3" />

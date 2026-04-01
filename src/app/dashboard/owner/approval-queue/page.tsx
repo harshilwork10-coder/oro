@@ -2,10 +2,30 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ShieldCheck, Check, X, RefreshCw } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { ArrowLeft, ShieldCheck, Check, X, RefreshCw, Lock } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
+const ALLOWED_ROLES = ['OWNER', 'MANAGER', 'PROVIDER']
+const CAN_APPROVE_ROLES = ['OWNER', 'MANAGER', 'PROVIDER']
+
 export default function ApprovalQueuePage() {
+    const { data: session } = useSession()
+    const role = (session?.user as any)?.role
+    const canApprove = CAN_APPROVE_ROLES.includes(role)
+    if (session !== undefined && !ALLOWED_ROLES.includes(role)) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white flex items-center justify-center p-6">
+                <div className="text-center max-w-md">
+                    <Lock className="h-16 w-16 mx-auto text-red-400 mb-4" />
+                    <h1 className="text-2xl font-bold mb-2">Access Restricted</h1>
+                    <p className="text-stone-400 mb-6">The approval queue is restricted to Owners and Managers only.</p>
+                    <Link href="/dashboard/owner" className="px-6 py-3 bg-stone-800 hover:bg-stone-700 rounded-xl">← Back to Dashboard</Link>
+                </div>
+            </div>
+        )
+    }
+
     const [requests, setRequests] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState('PENDING')
@@ -61,7 +81,7 @@ export default function ApprovalQueuePage() {
                                     {d.reason && <p className="mt-2 text-sm">{d.reason}</p>}
                                     {d.amount && <p className="text-emerald-400 font-mono mt-1">{formatCurrency(d.amount)}</p>}
                                 </div>
-                                {filter === 'PENDING' && (
+                                {filter === 'PENDING' && canApprove && (
                                     <div className="flex gap-2">
                                         <button onClick={() => handleAction(r.id, 'APPROVE')} className="flex items-center gap-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl"><Check className="h-4 w-4" /> Approve</button>
                                         <button onClick={() => handleAction(r.id, 'DENY')} className="flex items-center gap-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-xl"><X className="h-4 w-4" /> Deny</button>

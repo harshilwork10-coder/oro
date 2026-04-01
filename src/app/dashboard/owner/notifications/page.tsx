@@ -125,9 +125,12 @@ export default function NotificationsPage() {
                     <div>
                         <h1 className="text-3xl font-bold flex items-center gap-2">
                             <Bell className="h-8 w-8 text-violet-500" />
-                            Push Notifications
+                            Send Notification
                         </h1>
-                        <p className="text-stone-400">Send alerts to employees and customers</p>
+                        <p className="text-stone-400">Broadcast alerts to your employees and customers</p>
+                        <Link href="/owner/settings" className="text-xs text-stone-500 hover:text-stone-300 transition-colors">
+                            Notification preferences → Settings
+                        </Link>
                     </div>
                 </div>
                 <button onClick={fetchData} disabled={loading} className="p-2 bg-stone-800 hover:bg-stone-700 rounded-xl">

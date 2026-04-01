@@ -1,6 +1,9 @@
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-// GET - Fetch Google Pointy integration status
+
+const PROVIDER_ROLES = ['PROVIDER'] as const
+
+// GET - Fetch Google Pointy integration status (OWNER/MANAGER/PROVIDER can read)
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
@@ -19,11 +22,22 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST - Update Google Pointy settings
+// POST - Update Google Pointy credential settings (PROVIDER ONLY)
 export async function POST(req: NextRequest) {
     try {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        // R6: Pointy credential writes are PROVIDER-only
+        if (user.role !== 'PROVIDER') {
+            return NextResponse.json(
+                { error: 'Forbidden: Pointy credential configuration is managed by ORO. Contact your provider.' },
+                { status: 403 }
+            )
+        }
+
         const body = await req.json()
-        console.log('[INTEGRATIONS_GOOGLE_POINTY] Update:', body)
+        console.log('[INTEGRATIONS_GOOGLE_POINTY] Provider update:', body)
 
         return NextResponse.json({ success: true })
     } catch (error) {

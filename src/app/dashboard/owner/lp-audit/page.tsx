@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
-    ArrowLeft, Shield, RefreshCw, AlertTriangle, Eye,
+    ArrowLeft, Shield, RefreshCw, AlertTriangle, Eye, Lock,
     TrendingUp, DollarSign, User, Store, Clock, Filter,
     AlertCircle, ChevronRight, X, CheckCircle
 } from 'lucide-react'
@@ -44,6 +44,22 @@ interface Summary {
 
 export default function LPAuditDashboard() {
     const { data: session } = useSession()
+    const role = (session?.user as any)?.role
+    const canAccess = ['OWNER', 'MANAGER', 'PROVIDER'].includes(role)
+
+    if (session !== undefined && !canAccess) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white flex items-center justify-center p-6">
+                <div className="text-center max-w-md">
+                    <Lock className="h-16 w-16 mx-auto text-red-400 mb-4" />
+                    <h1 className="text-2xl font-bold mb-2">Access Restricted</h1>
+                    <p className="text-stone-400 mb-6">Loss prevention data is restricted to Owners and Managers only.</p>
+                    <Link href="/dashboard/owner" className="px-6 py-3 bg-stone-800 hover:bg-stone-700 rounded-xl">← Back to Dashboard</Link>
+                </div>
+            </div>
+        )
+    }
+
     const [loading, setLoading] = useState(true)
     const [suspiciousCashiers, setSuspiciousCashiers] = useState<SuspiciousCashier[]>([])
     const [recentAlerts, setRecentAlerts] = useState<Alert[]>([])

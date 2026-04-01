@@ -7,7 +7,8 @@ import {
     Store, DollarSign, AlertTriangle, Package, RefreshCw,
     TrendingUp, TrendingDown, Users, ArrowRight, Clock,
     Wallet, AlertCircle, Send, Settings, FileText, BarChart3,
-    Shield, Tag, Truck, Scan, Calendar, Award, Gift, Bell, Receipt
+    Shield, Tag, Truck, Scan, Calendar, Award, Gift, Bell, Receipt,
+    Newspaper, ShoppingBag, PieChart, FileSearch, Download
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
@@ -137,6 +138,31 @@ export default function OwnerDashboard() {
                 </button>
             </div>
 
+            {/* Persistent subnav — N1 */}
+            <nav className="flex items-center gap-1 mb-8 overflow-x-auto pb-1 border-b border-stone-800 scrollbar-hide">
+                {[
+                    { href: '/dashboard/owner', label: 'Overview', icon: Store },
+                    { href: '/dashboard/owner/briefing', label: 'Briefing', icon: Newspaper },
+                    { href: '/dashboard/owner/inventory', label: 'Inventory', icon: Package },
+                    { href: '/dashboard/owner/reports-hub', label: 'Reports', icon: BarChart3 },
+                    { href: '/dashboard/owner/approval-queue', label: 'Approvals', icon: ShoppingBag },
+                    { href: '/dashboard/owner/lp-audit', label: 'LP Audit', icon: Shield },
+                    { href: '/dashboard/owner/month-close', label: 'Month End', icon: Calendar },
+                    { href: '/dashboard/owner/accounting-export', label: 'Export', icon: Download },
+                    { href: '/dashboard/owner/notifications', label: 'Send Notification', icon: Bell },
+                    { href: '/owner/settings', label: 'Settings', icon: Settings },
+                ].map(({ href, label, icon: Icon }) => (
+                    <Link
+                        key={href}
+                        href={href}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition-colors whitespace-nowrap flex-shrink-0"
+                    >
+                        <Icon className="h-3.5 w-3.5" />
+                        {label}
+                    </Link>
+                ))}
+            </nav>
+
             {/* Hero Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-gradient-to-br from-emerald-600/30 to-emerald-900/30 border border-emerald-500/30 rounded-2xl p-5">
@@ -157,7 +183,9 @@ export default function OwnerDashboard() {
                         <span className="text-sm text-stone-400">Locations</span>
                     </div>
                     <p className="text-3xl font-bold">{data?.summary?.totalLocations || 0}</p>
-                    <p className="text-sm text-blue-400 mt-2">All online</p>
+                    <p className="text-sm text-blue-400 mt-2">
+                        {(data?.locations || []).filter(l => l.status === 'online').length} of {data?.summary?.totalLocations || 0} online
+                    </p>
                 </div>
 
                 <div className="bg-gradient-to-br from-purple-600/30 to-purple-900/30 border border-purple-500/30 rounded-2xl p-5">
@@ -283,10 +311,7 @@ export default function OwnerDashboard() {
                             <Calendar className="h-5 w-5 text-pink-400" />
                             <span className="text-xs">Month End</span>
                         </Link>
-                        <Link href="/dashboard/owner/exceptions" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <AlertTriangle className="h-5 w-5 text-amber-400" />
-                            <span className="text-xs">Exceptions</span>
-                        </Link>
+                        {/* Exceptions tile removed — already the hero stat card above */}
                         <Link href="/dashboard/owner/loyalty" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
                             <Award className="h-5 w-5 text-yellow-400" />
                             <span className="text-xs">Loyalty</span>
@@ -295,9 +320,10 @@ export default function OwnerDashboard() {
                             <Gift className="h-5 w-5 text-pink-400" />
                             <span className="text-xs">Gift Cards</span>
                         </Link>
+                        {/* D4: Renamed from "Notify" → "Send Notification" */}
                         <Link href="/dashboard/owner/notifications" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
                             <Bell className="h-5 w-5 text-violet-400" />
-                            <span className="text-xs">Notify</span>
+                            <span className="text-xs text-center leading-tight">Send<br/>Notification</span>
                         </Link>
                         <Link href="/dashboard/owner/reports" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
                             <FileText className="h-5 w-5 text-cyan-400" />
@@ -307,7 +333,26 @@ export default function OwnerDashboard() {
                             <Receipt className="h-5 w-5 text-amber-400" />
                             <span className="text-xs">Tax Report</span>
                         </Link>
-                        <Link href="/dashboard/settings" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
+                        {/* N2: Previously hidden high-value pages — now promoted */}
+                        <Link href="/dashboard/owner/briefing" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
+                            <Newspaper className="h-5 w-5 text-emerald-400" />
+                            <span className="text-xs">Briefing</span>
+                        </Link>
+                        <Link href="/dashboard/owner/approval-queue" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
+                            <ShoppingBag className="h-5 w-5 text-orange-400" />
+                            <span className="text-xs">Approvals</span>
+                        </Link>
+                        {/* N3: Accounting Export now visible — key for month-end workflow */}
+                        <Link href="/dashboard/owner/accounting-export" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
+                            <Download className="h-5 w-5 text-lime-400" />
+                            <span className="text-xs text-center leading-tight">Acct<br/>Export</span>
+                        </Link>
+                        {/* N4: Customer Segments now visible */}
+                        <Link href="/dashboard/owner/customer-segments" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
+                            <PieChart className="h-5 w-5 text-fuchsia-400" />
+                            <span className="text-xs">Segments</span>
+                        </Link>
+                        <Link href="/owner/settings" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
                             <Settings className="h-5 w-5 text-stone-400" />
                             <span className="text-xs">Settings</span>
                         </Link>

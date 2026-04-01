@@ -32,6 +32,23 @@ interface LocationData {
 
 export default function MonthClosePage() {
     const { data: session } = useSession()
+    const role = (session?.user as any)?.role
+    const canView = ['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR', 'FRANCHISEE'].includes(role)
+    const canClose = ['OWNER', 'PROVIDER'].includes(role)
+
+    if (session !== undefined && !canView) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white flex items-center justify-center p-6">
+                <div className="text-center max-w-md">
+                    <Lock className="h-16 w-16 mx-auto text-red-400 mb-4" />
+                    <h1 className="text-2xl font-bold mb-2">Access Restricted</h1>
+                    <p className="text-stone-400 mb-6">Month-end close is available to Owners only.</p>
+                    <Link href="/dashboard/owner" className="px-6 py-3 bg-stone-800 hover:bg-stone-700 rounded-xl">← Back to Dashboard</Link>
+                </div>
+            </div>
+        )
+    }
+
     const [loading, setLoading] = useState(true)
     const [closing, setClosing] = useState(false)
     const [month, setMonth] = useState(new Date().getMonth())
@@ -119,8 +136,9 @@ export default function MonthClosePage() {
                 </div>
                 <button
                     onClick={handleClose}
-                    disabled={closing || isCurrentMonth}
-                    className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-500 rounded-xl disabled:opacity-50"
+                    disabled={closing || isCurrentMonth || !canClose}
+                    title={!canClose ? 'Only Owners can close a period' : undefined}
+                    className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-500 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {closing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
                     Close {data?.monthName}

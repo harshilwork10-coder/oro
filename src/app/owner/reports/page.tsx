@@ -25,24 +25,23 @@ interface ReportItem {
 const reports: ReportItem[] = [
     // Period Reports
     { id: 'daily', name: 'Daily Sales / Z-Report', description: 'End of day sales summary with all transactions', icon: FileText, href: '/dashboard/reports/z-report', category: 'period', priority: true },
-    { id: 'weekly', name: 'Weekly Summary', description: 'Week-over-week sales trends and comparisons', icon: TrendingUp, href: '/owner/reports/weekly', category: 'period' },
-    { id: 'monthly', name: 'Monthly Summary', description: 'Monthly sales, expenses, and profit overview', icon: Calendar, href: '/owner/reports/monthly', category: 'period' },
-    { id: 'quarterly', name: 'Quarterly Summary', description: 'Quarterly business performance and trends', icon: BarChart3, href: '/owner/reports/quarterly', category: 'period' },
+    { id: 'weekly', name: 'Weekly Summary', description: 'Week-over-week sales trends and comparisons', icon: TrendingUp, href: '/dashboard/owner/reports-hub', category: 'period', comingSoon: true },
+    { id: 'monthly', name: 'Monthly Summary', description: 'Monthly sales, expenses, and profit overview', icon: Calendar, href: '/dashboard/owner/month-close', category: 'period' },
+    { id: 'quarterly', name: 'Quarterly Summary', description: 'Quarterly business performance and trends', icon: BarChart3, href: '/dashboard/owner/reports-hub', category: 'period', comingSoon: true },
 
     // Payment Reports
     { id: 'cash-card', name: 'Cash vs Card Breakdown', description: 'Revenue split by payment method with tip breakdown', icon: CreditCard, href: '/dashboard/reports/sales/cash-card', category: 'payment', priority: true },
-    { id: 'cc-batch', name: 'Credit Card Batch Report', description: 'Transaction time, auth code - for disputes', icon: Receipt, href: '/owner/reports/cc-batch', category: 'payment' },
+    { id: 'cc-batch', name: 'Credit Card Batch Report', description: 'Transaction time, auth code - for disputes', icon: Receipt, href: '/dashboard/reports/transactions', category: 'payment' },
     { id: 'tips', name: 'Tips Report', description: 'Tips collected by stylist/employee', icon: DollarSign, href: '/dashboard/reports/tips', category: 'payment' },
-    { id: 'gift-cards', name: 'Gift Card Report', description: 'Sold, redeemed, outstanding balance', icon: Gift, href: '/owner/reports/gift-cards', category: 'payment' },
+    { id: 'gift-cards', name: 'Gift Card Report', description: 'Sold, redeemed, outstanding balance', icon: Gift, href: '/dashboard/owner/gift-cards', category: 'payment' },
 
     // Employee Reports
     { id: 'employee-sales', name: 'Sales by Employee', description: 'Revenue and transaction count per employee', icon: Users, href: '/dashboard/reports/employee/sales', category: 'employee', priority: true },
     { id: 'commissions', name: 'Commission Payouts', description: 'Stylist commissions and payout history', icon: DollarSign, href: '/dashboard/reports/employee/payouts', category: 'employee' },
     { id: 'hours-wages', name: 'Hours & Wages', description: 'Employee hours worked and wage calculations', icon: Clock, href: '/dashboard/reports/employee/hours-wages', category: 'employee' },
 
-    // Products & Services
-    { id: 'product-sales', name: 'Product Sales Report', description: 'Retail product sales and top sellers', icon: Package, href: '/owner/reports/product-sales', category: 'products' },
-    { id: 'service-sales', name: 'Service Sales Report', description: 'Sales breakdown by service category', icon: BarChart3, href: '/owner/reports/service-sales', category: 'products' },
+    // Products
+    { id: 'product-sales', name: 'Product Sales Report', description: 'Retail product sales and top sellers', icon: Package, href: '/dashboard/reports/inventory/top-sellers', category: 'products' },
     { id: 'top-sellers', name: 'Top Sellers', description: 'Best performing products and services', icon: TrendingUp, href: '/dashboard/reports/inventory/top-sellers', category: 'products' },
 
     // Financial Reports
@@ -125,6 +124,20 @@ export default function ReportsPage() {
                 </div>
             </div>
 
+            {/* D2: Cross-link to financial reports hub */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--surface)] border border-amber-500/20 text-sm">
+                <BarChart3 className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <span className="text-[var(--text-secondary)]">
+                    Need financial KPIs, period summaries, or month-end close?
+                </span>
+                <Link
+                    href="/dashboard/owner/reports-hub"
+                    className="ml-auto flex items-center gap-1 text-amber-400 hover:text-amber-300 font-medium whitespace-nowrap transition-colors"
+                >
+                    Owner Reports Hub →
+                </Link>
+            </div>
+
             {/* Priority Reports */}
             {priorityReports.length > 0 && (
                 <div>
@@ -168,6 +181,31 @@ export default function ReportsPage() {
 
 function ReportCard({ report, isPriority }: { report: ReportItem; isPriority?: boolean }) {
     const Icon = report.icon;
+
+    if (report.comingSoon) {
+        return (
+            <div className="group relative block p-4 rounded-xl border bg-[var(--surface)] border-[var(--border)] opacity-60 cursor-not-allowed">
+                <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-lg bg-[var(--surface-hover)] text-[var(--text-muted)]">
+                        <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-[var(--text-secondary)] truncate">
+                                {report.name}
+                            </h3>
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase bg-stone-600 text-stone-300 rounded">
+                                Coming Soon
+                            </span>
+                        </div>
+                        <p className="text-sm text-[var(--text-muted)] mt-1 line-clamp-2">
+                            {report.description}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <Link
