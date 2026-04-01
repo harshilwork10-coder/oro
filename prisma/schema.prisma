@@ -3581,14 +3581,51 @@ model LoyaltyProgram {
 
   name            String  @default("Rewards")
   isEnabled       Boolean @default(true)
-  pointsPerDollar Decimal @default(1) // Points earned per dollar spent
+  pointsPerDollar Decimal @default(1) // Points earned per dollar spent (global fallback)
   redemptionRatio Decimal @default(0.01) // Dollar value per point (0.01 = 1 cent)
+
+  // Smart Rewards: enable rule-based earning instead of flat rate
+  useSmartRewards Boolean @default(false)
 
   members       LoyaltyMember[]
   pointsHistory PointsTransaction[]
+  rules         LoyaltyRule[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Smart Rewards: Earn rules for category-based rates and exclusions
+model LoyaltyRule {
+  id        String         @id @default(cuid())
+  programId String
+  program   LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  name     String   // "Tobacco Exclusion", "Beer Bonus"
+  type     String   // EXCLUSION, CATEGORY, PRODUCT, GLOBAL
+  isActive Boolean  @default(true)
+
+  // Scope: what does this rule apply to?
+  category String?  // For CATEGORY rules: match against item category
+  upc      String?  // For PRODUCT rules: match against specific UPC
+
+  // Earn mode
+  earnMode        String  @default("PER_DOLLAR") // PER_DOLLAR, PER_UNIT, MULTIPLIER
+  pointsPerDollar Decimal? @db.Decimal(10, 2)    // 2.0 = 2 pts per $1
+  fixedPointsPerUnit Int?                         // 15 = 15 pts per item
+  multiplier      Decimal? @db.Decimal(5, 2)      // 2.0 = 2x base rate
+
+  // Priority (lower = higher priority)
+  priority Int @default(500)
+  // Recommended: EXCLUSION=100, PRODUCT=200, CATEGORY=300, GLOBAL=500
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([programId, isActive])
+  @@index([type])
+  @@index([category])
+  @@index([upc])
 }
 
 // Customer membership in a specific loyalty program
@@ -3659,6 +3696,9 @@ model PointsTransaction {
   points      Int // Positive for earn, negative for redeem
   description String?
 
+  // Structured earn metadata (rule breakdown, excluded amounts)
+  metadata String? // JSON: { breakdown, eligibleTotal, excludedTotal, smartRewardsActive }
+
   // Reference to sale transaction
   transactionId String?
   locationId    String? // Which location the transaction occurred at
@@ -3669,6 +3709,7 @@ model PointsTransaction {
   @@index([programId, createdAt])
   @@index([masterAccountId, createdAt])
   @@index([memberId])
+  @@index([transactionId, type]) // Idempotency: fast duplicate-EARN check
 }
 
 // ============ SERVICE INDUSTRY FEATURES ============

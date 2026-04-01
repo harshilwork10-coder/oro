@@ -8,7 +8,11 @@ import {
     RefreshCw,
     Search,
     User,
-    FileDown
+    FileDown,
+    Trophy,
+    TrendingUp,
+    TrendingDown,
+    Activity
 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import Link from 'next/link'
@@ -21,14 +25,26 @@ interface LoyaltyCustomer {
     lifetimePoints: number
 }
 
+interface LoyaltySummary {
+    date: string
+    pointsIssuedToday: { count: number; total: number }
+    pointsRedeemedToday: { count: number; total: number }
+    netPointsToday: number
+    topRuleHits: { description: string; count: number; totalPoints: number }[]
+    activeMemberCount: number
+    totalOutstandingPoints: number
+}
+
 export default function LoyaltyPointsPage() {
     const { data: session } = useSession()
     const [loading, setLoading] = useState(true)
     const [customers, setCustomers] = useState<LoyaltyCustomer[]>([])
     const [searchTerm, setSearchTerm] = useState('')
+    const [summary, setSummary] = useState<LoyaltySummary | null>(null)
 
     useEffect(() => {
         fetchData()
+        fetchSummary()
     }, [])
 
     const fetchData = async () => {
@@ -43,6 +59,18 @@ export default function LoyaltyPointsPage() {
             console.error('Failed to fetch:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const fetchSummary = async () => {
+        try {
+            const res = await fetch('/api/reports/loyalty-summary')
+            if (res.ok) {
+                const data = await res.json()
+                setSummary(data)
+            }
+        } catch (error) {
+            console.error('Failed to fetch summary:', error)
         }
     }
 
@@ -146,6 +174,67 @@ export default function LoyaltyPointsPage() {
                     <p className="text-lg font-bold text-yellow-400">{totalPoints.toLocaleString()} pts</p>
                 </div>
             </div>
+
+            {/* Daily Operational Summary */}
+            {summary && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <TrendingUp className="w-4 h-4 text-emerald-400" />
+                            <p className="text-emerald-300 text-xs font-medium">Points Issued Today</p>
+                        </div>
+                        <p className="text-2xl font-bold text-emerald-400">{summary.pointsIssuedToday.total.toLocaleString()}</p>
+                        <p className="text-xs text-gray-500 mt-1">{summary.pointsIssuedToday.count} transaction{summary.pointsIssuedToday.count !== 1 ? 's' : ''}</p>
+                    </div>
+
+                    <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <TrendingDown className="w-4 h-4 text-red-400" />
+                            <p className="text-red-300 text-xs font-medium">Points Redeemed Today</p>
+                        </div>
+                        <p className="text-2xl font-bold text-red-400">{summary.pointsRedeemedToday.total.toLocaleString()}</p>
+                        <p className="text-xs text-gray-500 mt-1">{summary.pointsRedeemedToday.count} redemption{summary.pointsRedeemedToday.count !== 1 ? 's' : ''}</p>
+                    </div>
+
+                    <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Activity className="w-4 h-4 text-blue-400" />
+                            <p className="text-blue-300 text-xs font-medium">Net Points Today</p>
+                        </div>
+                        <p className={`text-2xl font-bold ${summary.netPointsToday >= 0 ? 'text-blue-400' : 'text-orange-400'}`}>
+                            {summary.netPointsToday >= 0 ? '+' : ''}{summary.netPointsToday.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Issued minus redeemed</p>
+                    </div>
+
+                    <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Trophy className="w-4 h-4 text-purple-400" />
+                            <p className="text-purple-300 text-xs font-medium">Active Members</p>
+                        </div>
+                        <p className="text-2xl font-bold text-purple-400">{summary.activeMemberCount.toLocaleString()}</p>
+                        <p className="text-xs text-gray-500 mt-1">Last 90 days</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Top Rule Hits */}
+            {summary && summary.topRuleHits.length > 0 && (
+                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+                    <h3 className="text-sm font-semibold text-gray-300 mb-3">Top Earn Sources Today</h3>
+                    <div className="space-y-2">
+                        {summary.topRuleHits.slice(0, 5).map((hit, i) => (
+                            <div key={i} className="flex items-center justify-between">
+                                <span className="text-sm text-gray-400 truncate flex-1">{hit.description}</span>
+                                <div className="flex items-center gap-4 flex-shrink-0 ml-4">
+                                    <span className="text-xs text-gray-500">{hit.count}x</span>
+                                    <span className="text-sm font-medium text-yellow-400">+{hit.totalPoints.toLocaleString()} pts</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Table */}
             <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">

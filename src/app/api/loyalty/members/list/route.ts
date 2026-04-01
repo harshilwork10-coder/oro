@@ -7,9 +7,6 @@ export async function GET(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
         if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
 
         const { searchParams } = new URL(req.url)
         const page = parseInt(searchParams.get('page') || '1')
@@ -21,7 +18,7 @@ export async function GET(req: NextRequest) {
         // Build where clause
         const where: any = {
             program: {
-                franchiseId: user.franchiseId
+                franchiseId: authUser.franchiseId
             }
         }
 

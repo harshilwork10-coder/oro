@@ -179,6 +179,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Lottery', href: '/dashboard/lottery', icon: Ticket, feature: 'lotteryEnabled' as const, industry: ['RETAIL'] as const },
         { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
         { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
+        { name: 'Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy, always: true },
         { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt, always: true },
         { name: 'Reports', href: '/dashboard/reports', icon: BarChart3, always: true },
         // RETAIL only - Pricing Intelligence
@@ -215,6 +216,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Services', href: '/dashboard/services', icon: Briefcase },  // Merged Services+Packages
         { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
         { name: 'Customers', href: '/dashboard/customers', icon: Users },  // Merged Customers+Loyalty+GiftCards
+        { name: 'Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy },
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
         { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
         { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones },
@@ -318,6 +320,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         // Universal
         { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
         { name: 'Customers', href: '/dashboard/customers', icon: UserCircle, always: true },
+        { name: 'Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy, always: true },
         { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt, always: true },
         { name: 'Operations', href: '/dashboard/operations', icon: Clipboard, always: true },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },

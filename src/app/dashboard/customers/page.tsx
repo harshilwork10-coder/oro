@@ -56,8 +56,45 @@ export default function CustomersPage() {
         setShowEnrollModal(true)
     }
 
-    const confirmEnrollment = () => {
-        toast.success(`${selectedCustomer.name} enrolled in loyalty program!`)
+    const confirmEnrollment = async () => {
+        if (!selectedCustomer?.phone) {
+            toast.error('Customer needs a phone number for loyalty enrollment')
+            setShowEnrollModal(false)
+            return
+        }
+        try {
+            const res = await fetch('/api/owner/loyalty', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'enroll',
+                    phone: selectedCustomer.phone.replace(/\D/g, ''),
+                    name: selectedCustomer.name,
+                    email: selectedCustomer.email || undefined
+                })
+            })
+            const data = await res.json()
+            if (res.ok && data.success) {
+                // Update client's loyaltyJoined flag
+                await fetch('/api/clients', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: selectedCustomer.id, loyaltyJoined: true })
+                })
+                // Update local state
+                setCustomers(prev => prev.map(c =>
+                    c.id === selectedCustomer.id
+                        ? { ...c, loyaltyMember: true, points: 0 }
+                        : c
+                ))
+                toast.success(`${selectedCustomer.name} enrolled in loyalty program!`)
+            } else {
+                toast.error(data.error || 'Failed to enroll')
+            }
+        } catch (error) {
+            console.error('Enrollment error:', error)
+            toast.error('Failed to enroll customer')
+        }
         setShowEnrollModal(false)
         setSelectedCustomer(null)
     }

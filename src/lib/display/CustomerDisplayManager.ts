@@ -105,6 +105,23 @@ export class CustomerDisplayManager {
         this.driver?.showThankYou(customerName, total)
     }
 
+    /** Show loyalty points earned + new balance on the customer display */
+    showLoyaltyEarned(pointsEarned: number, newBalance: number, customerName?: string): void {
+        // Use the sendCart channel with a special LOYALTY status payload
+        this.driver?.sendCart({
+            items: [],
+            subtotal: 0,
+            tax: 0,
+            total: 0,
+            status: 'COMPLETED',
+            loyaltyMessage: {
+                pointsEarned,
+                newBalance,
+                customerName
+            }
+        } as any) // Cast to any since loyaltyMessage is an extension
+    }
+
     // ─── Diagnostics ──────────────────────────────────────────────────
 
     async runTestPattern(): Promise<boolean> {

@@ -44,6 +44,11 @@ export interface ReceiptData {
     header?: string;   // Custom receipt header (e.g., greeting, promo message)
     footer?: string;   // Custom receipt footer (e.g., return policy, thank-you message)
     openDrawer?: boolean;
+    // Loyalty Rewards
+    loyaltyPointsEarned?: number;   // Points earned this transaction
+    loyaltyNewBalance?: number;     // New balance after earn
+    loyaltyPointsRedeemed?: number; // Points redeemed this transaction
+    loyaltyCustomerName?: string;   // Member name for receipt
 }
 
 export interface PrintAgentStatus {
@@ -219,7 +224,8 @@ export async function printTestPage(): Promise<{ success: boolean; message?: str
 export function formatReceiptFromTransaction(
     transaction: any,
     storeInfo: { name: string; address?: string; phone?: string; header?: string; footer?: string },
-    cashierName?: string
+    cashierName?: string,
+    loyaltyData?: { pointsEarned?: number; newBalance?: number; pointsRedeemed?: number; customerName?: string }
 ): ReceiptData {
     // Determine if dual pricing should be shown on receipt
     const hasDualPricing = transaction.totalCash !== undefined && transaction.totalCard !== undefined;
@@ -256,7 +262,12 @@ export function formatReceiptFromTransaction(
         barcode: transaction.id || transaction.transactionNumber,
         header: storeInfo.header,
         footer: storeInfo.footer,
-        openDrawer: transaction.paymentMethod === 'CASH'
+        openDrawer: transaction.paymentMethod === 'CASH',
+        // Loyalty data
+        loyaltyPointsEarned: loyaltyData?.pointsEarned,
+        loyaltyNewBalance: loyaltyData?.newBalance,
+        loyaltyPointsRedeemed: loyaltyData?.pointsRedeemed,
+        loyaltyCustomerName: loyaltyData?.customerName,
     };
 }
 

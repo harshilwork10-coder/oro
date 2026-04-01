@@ -26,6 +26,11 @@ interface CartData {
     showDualPricing?: boolean
     status: 'IDLE' | 'ACTIVE' | 'PROCESSING' | 'COMPLETED'
     stationId?: string
+    loyaltyMessage?: {
+        pointsEarned: number
+        newBalance: number
+        customerName?: string
+    }
 }
 
 interface StoreBranding {
@@ -323,7 +328,25 @@ function CustomerDisplayContent() {
                     <p className="text-[clamp(1rem,4vw,1.5rem)] text-gray-300 mb-2">
                         Your total was <span className="text-amber-400 font-bold">{formatCurrency(cart.total)}</span>
                     </p>
-                    <p className="text-[clamp(0.875rem,3vw,1.25rem)] text-gray-400">Have a great day!</p>
+
+                    {/* Loyalty Points Earned */}
+                    {cart.loyaltyMessage && cart.loyaltyMessage.pointsEarned > 0 && (
+                        <div className="mt-[clamp(1rem,3vw,1.5rem)] bg-amber-500/10 border border-amber-500/30 rounded-2xl px-[clamp(1.5rem,5vw,2.5rem)] py-[clamp(0.75rem,2.5vw,1.25rem)] max-w-md mx-auto">
+                            <p className="text-[clamp(1.25rem,4vw,2rem)] font-bold text-amber-400 mb-1">
+                                ⭐ +{cart.loyaltyMessage.pointsEarned} Points Earned!
+                            </p>
+                            <p className="text-[clamp(0.875rem,2.5vw,1.125rem)] text-amber-300/70">
+                                Balance: {cart.loyaltyMessage.newBalance.toLocaleString()} pts
+                            </p>
+                            {cart.loyaltyMessage.customerName && (
+                                <p className="text-[clamp(0.75rem,2vw,1rem)] text-gray-400 mt-1">
+                                    {cart.loyaltyMessage.customerName}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    <p className="text-[clamp(0.875rem,3vw,1.25rem)] text-gray-400 mt-[clamp(0.75rem,2vw,1rem)]">Have a great day!</p>
                 </div>
             </div>
         )

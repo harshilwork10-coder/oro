@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // POST - Earn or redeem points
 export async function POST(req: Request) {
-    const user = session?.user as any
-
+    const user = await getAuthUser(req)
     if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
-        const { phone, type, points, description, transactionId, franchiseId } = await req.json()
+        const { phone, type, points, description, transactionId, franchiseId, metadata } = await req.json()
 
         const cleanPhone = phone?.replace(/\D/g, '')
         if (!cleanPhone) {
@@ -23,6 +23,24 @@ export async function POST(req: Request) {
 
         if (!points || points === 0) {
             return NextResponse.json({ error: 'Points amount required' }, { status: 400 })
+        }
+
+        // ─── IDEMPOTENCY GUARD: Prevent duplicate EARN for same sale ───
+        if (type === 'EARN' && transactionId) {
+            const existing = await prisma.pointsTransaction.findFirst({
+                where: { transactionId, type: 'EARN' }
+            })
+            if (existing) {
+                // Already awarded — return existing data without double-awarding
+                console.log(`[LOYALTY_POINTS] Idempotency guard: EARN already exists for tx ${transactionId}`)
+                return NextResponse.json({
+                    success: true,
+                    type: 'ALREADY_AWARDED',
+                    pointsChange: existing.points,
+                    newBalance: -1, // Caller should not rely on this — it's a duplicate call
+                    idempotencyHit: true
+                })
+            }
         }
 
         // Check for master account (linked/pooled)
@@ -60,7 +78,8 @@ export async function POST(req: Request) {
                     points: pointsChange,
                     description: description || `${type} at location`,
                     transactionId,
-                    franchiseId
+                    franchiseId,
+                    metadata: metadata ? JSON.stringify(metadata) : null
                 }
             })
 
@@ -130,11 +149,13 @@ export async function POST(req: Request) {
         await prisma.pointsTransaction.create({
             data: {
                 programId: member.programId,
+                memberId: member.id,
                 type,
                 points: pointsChange,
                 description: description || `${type} at ${member.program.name}`,
                 transactionId,
-                franchiseId
+                franchiseId,
+                metadata: metadata ? JSON.stringify(metadata) : null
             }
         })
 
@@ -154,8 +175,7 @@ export async function POST(req: Request) {
 
 // GET - Points history
 export async function GET(req: Request) {
-    const user = session?.user as any
-
+    const user = await getAuthUser(req)
     if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -210,4 +230,3 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
 }
-

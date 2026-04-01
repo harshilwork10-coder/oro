@@ -8,12 +8,8 @@ export async function GET(req: Request) {
         const user = await getAuthUser(req)
         if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         const { searchParams } = new URL(req.url)
-        const franchiseId = searchParams.get('franchiseId')
+        const franchiseId = searchParams.get('franchiseId') || user.franchiseId
 
         if (!franchiseId) {
             return NextResponse.json({ error: 'Franchise ID required' }, { status: 400 })
@@ -32,10 +28,10 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     try {
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-// Use session franchiseId — NEVER trust client-provided franchiseId for writes
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        // Use session franchiseId — NEVER trust client-provided franchiseId for writes
         const franchiseId = user.franchiseId
         if (!franchiseId) {
             return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
@@ -72,7 +68,7 @@ export async function POST(req: Request) {
             action: 'LOYALTY_SETTINGS_UPDATE',
             entityType: 'LoyaltyProgram',
             entityId: franchiseId,
-            metadata: { isEnabled, pointsPerDollar, redemptionRatio }
+            details: { isEnabled, pointsPerDollar, redemptionRatio }
         })
 
         return NextResponse.json(loyaltyProgram)
@@ -81,4 +77,3 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Failed to update loyalty program' }, { status: 500 })
     }
 }
-

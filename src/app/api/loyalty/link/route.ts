@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // POST - Link accounts to create/join master account
 export async function POST(req: Request) {
-    const user = session?.user as any
-
+    const user = await getAuthUser(req)
     if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -104,8 +104,7 @@ export async function POST(req: Request) {
 
 // DELETE - Unlink an account from master (returns points to individual)
 export async function DELETE(req: Request) {
-    const user = session?.user as any
-
+    const user = await getAuthUser(req)
     if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -156,4 +155,3 @@ export async function DELETE(req: Request) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
 }
-

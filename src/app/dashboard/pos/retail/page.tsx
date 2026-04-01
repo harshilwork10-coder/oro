@@ -68,6 +68,7 @@ import {
 import { useOfflineMode } from '@/lib/use-offline-mode'
 import { OfflineStatusIndicator } from '@/components/pos/OfflineStatusIndicator'
 import QuickSwitchModal from '@/components/pos/QuickSwitchModal'
+import LoyaltyLookup from '@/components/pos/LoyaltyLookup'
 import { DisplaySetupDialog } from '@/components/pos/DisplaySetupDialog'
 import { CustomerDisplayManager } from '@/lib/display/CustomerDisplayManager'
 import { ScaleIntegration } from '@/lib/hardware/scale-integration'
@@ -170,6 +171,9 @@ export default function RetailPOSPage() {
     const [isLoading, setIsLoading] = useState(false)
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const [showCustomerModal, setShowCustomerModal] = useState(false)
+    const [showLoyaltyLookup, setShowLoyaltyLookup] = useState(false)
+    const [loyaltyPhone, setLoyaltyPhone] = useState<string | null>(null)
+    const [loyaltyPreview, setLoyaltyPreview] = useState<{ totalPoints: number; breakdown: any[]; smartRewardsActive: boolean } | null>(null)
     const [showDiscountModal, setShowDiscountModal] = useState(false)
     const [showQuantityModal, setShowQuantityModal] = useState(false)
     const [showPriceModal, setShowPriceModal] = useState(false)
@@ -867,12 +871,47 @@ export default function RetailPOSPage() {
         localStorage.setItem('retail_customer_display', JSON.stringify(displayData))
     }, [cart, selectedStation, pricingSettings])
 
+    // === LOYALTY PREVIEW: calculate earn points in real-time ===
+    useEffect(() => {
+        if (!loyaltyPhone || cart.length === 0) {
+            setLoyaltyPreview(null)
+            return
+        }
+        const timer = setTimeout(async () => {
+            try {
+                const res = await fetch('/api/loyalty/calculate-earn', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: cart.map(item => ({
+                            name: item.name,
+                            category: item.category || '',
+                            upc: item.barcode || item.sku || '',
+                            price: item.price,
+                            quantity: item.quantity,
+                            isTobacco: item.isTobacco || false
+                        }))
+                    })
+                })
+                if (res.ok) {
+                    const data = await res.json()
+                    setLoyaltyPreview({
+                        totalPoints: data.totalPoints || 0,
+                        breakdown: data.breakdown || [],
+                        smartRewardsActive: data.smartRewardsActive || false
+                    })
+                }
+            } catch { /* silent — preview is non-critical */ }
+        }, 500) // debounce 500ms
+        return () => clearTimeout(timer)
+    }, [cart, loyaltyPhone])
+
     // Keep focus on barcode input (only when no modals are open)
     const anyModalOpen = showDiscountModal || showQuantityModal || showPriceModal || showUniversalSearch
         || showAgeVerification || showQuickAddModal || showScanQuickAddModal || showPaymentModal
         || showTransactionDiscountModal || showPriceCheckInputModal || showPriceCheckModal
         || showCustomerLookup || showCashDropModal || showReceiveStockModal || showRecentTransactions
-        || showEndOfDayWizard || showLotteryModal || showLotteryPayoutModal || showCustomerModal
+        || showEndOfDayWizard || showLotteryModal || showLotteryPayoutModal || showCustomerModal || showLoyaltyLookup
         || showQtyNumpad || showCaseBreakModal || showExitModal || showMoreDepts || showQuickSwitch
         || showPaxModal || showReceiptModal || showStationPairing || showDisplaySetup
     useEffect(() => {
@@ -1496,8 +1535,95 @@ export default function RetailPOSPage() {
                     }
                 }
 
+                // === POST-SALE LOYALTY EARN (via rules engine) ===
+                let loyaltyEarnResult: { pointsEarned: number; newBalance: number } | null = null
+                if (loyaltyPhone && user?.franchiseId) {
+                    try {
+                        // Step 1: Calculate points via Smart Rewards engine
+                        const calcRes = await fetch('/api/loyalty/calculate-earn', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                items: cart.map(item => ({
+                                    name: item.name,
+                                    category: item.category || '',
+                                    upc: item.barcode || item.sku || '',
+                                    price: item.price,
+                                    quantity: item.quantity,
+                                    isTobacco: item.isTobacco || false
+                                }))
+                            })
+                        })
+                        const calcData = await calcRes.json()
+                        const pointsToEarn = calcData.totalPoints || 0
+
+                        // Step 2: Award the calculated points
+                        if (pointsToEarn > 0) {
+                            const earnRes = await fetch('/api/loyalty/points', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    phone: loyaltyPhone,
+                                    type: 'EARN',
+                                    points: pointsToEarn,
+                                    description: `Earned ${pointsToEarn} pts on $${(calcData.eligibleTotal || 0).toFixed(2)} eligible spend`,
+                                    transactionId: transaction.id,
+                                    franchiseId: user.franchiseId,
+                                    metadata: {
+                                        breakdown: calcData.breakdown,
+                                        eligibleTotal: calcData.eligibleTotal,
+                                        excludedTotal: calcData.excludedTotal,
+                                        smartRewardsActive: calcData.smartRewardsActive,
+                                        rulesCount: calcData.rulesCount
+                                    }
+                                })
+                            })
+                            if (earnRes.ok) {
+                                const earnData = await earnRes.json()
+                                loyaltyEarnResult = {
+                                    pointsEarned: earnData.pointsChange || pointsToEarn,
+                                    newBalance: earnData.newBalance || 0
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error('[LOYALTY_EARN]', err)
+                    }
+                }
+
+                // Store loyalty data on last transaction for receipt reprints
+                if (loyaltyEarnResult) {
+                    setLastTransaction((prev: any) => prev ? {
+                        ...prev,
+                        loyaltyPointsEarned: loyaltyEarnResult!.pointsEarned,
+                        loyaltyNewBalance: loyaltyEarnResult!.newBalance
+                    } : prev)
+
+                    // Push loyalty summary to customer display
+                    if (selectedStation) {
+                        fetch('/api/pos/display-sync', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                stationId: selectedStation.id,
+                                cart: {
+                                    items: [],
+                                    subtotal: 0, tax: 0, total: 0,
+                                    status: 'COMPLETED',
+                                    loyaltyMessage: {
+                                        pointsEarned: loyaltyEarnResult!.pointsEarned,
+                                        newBalance: loyaltyEarnResult!.newBalance
+                                    }
+                                }
+                            })
+                        }).catch(console.error)
+                    }
+                }
+
                 setCart([])
                 setSelectedCustomer(null)
+                setLoyaltyPhone(null)
+                setLoyaltyPreview(null)
                 setIdVerifiedForTransaction(false) // Reset ID verification for next transaction
                 setTransactionDiscount(null) // Reset transaction discount
                 setAppliedPromotions([])     // BUG-2 FIX: Clear promo list
@@ -1533,7 +1659,7 @@ export default function RetailPOSPage() {
     }
 
     // Generate professional receipt HTML (reusable for both print and reprint)
-    const generateReceiptHTML = (tx: any) => {
+    const generateReceiptHTML = (tx: any, loyaltyData?: { pointsEarned?: number; pointsRedeemed?: number; newBalance?: number; customerName?: string }) => {
         const storeName = (session?.user as any)?.franchiseName || 'ORO 9 POS'
         const invoiceNum = tx.invoiceNumber || tx.id?.slice(-8)
         const txDate = new Date(tx.createdAt)
@@ -1580,6 +1706,10 @@ export default function RetailPOSPage() {
   .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 13px; }
   .grand-total { font-size: 18px; font-weight: 900; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 6px 0; margin: 4px 0; }
   .payment-badge { display: inline-block; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; margin-top: 4px; }
+  .loyalty-section { background: #f8f4e8; border: 1px dashed #c9a84c; border-radius: 4px; padding: 6px 8px; margin: 8px 0; text-align: center; }
+  .loyalty-section .loyalty-title { font-size: 12px; font-weight: 900; color: #333; margin-bottom: 2px; }
+  .loyalty-section .loyalty-detail { font-size: 11px; color: #555; }
+  .loyalty-section .loyalty-balance { font-size: 13px; font-weight: 700; color: #000; margin-top: 2px; }
   .footer { text-align: center; margin-top: 16px; font-size: 11px; color: #555; }
   .footer .thanks { font-size: 14px; font-weight: 700; color: #000; margin-bottom: 4px; }
   .barcode { text-align: center; font-size: 28px; font-family: 'Libre Barcode 39', 'Courier New', monospace; letter-spacing: 4px; margin: 8px 0; }
@@ -1605,6 +1735,14 @@ export default function RetailPOSPage() {
   <div style="text-align:center;margin:8px 0;">
     <span class="payment-badge">${payMethod}${cardLast4 ? ' •••• ' + cardLast4 : ''}</span>
   </div>
+  ${loyaltyData && (loyaltyData.pointsEarned || loyaltyData.pointsRedeemed || loyaltyData.newBalance) ? `
+  <div class="loyalty-section">
+    <div class="loyalty-title">★ REWARDS ★</div>
+    ${loyaltyData.pointsEarned ? `<div class="loyalty-detail">Points Earned: +${loyaltyData.pointsEarned}</div>` : ''}
+    ${loyaltyData.pointsRedeemed ? `<div class="loyalty-detail">Points Redeemed: -${loyaltyData.pointsRedeemed}</div>` : ''}
+    ${loyaltyData.newBalance !== undefined ? `<div class="loyalty-balance">Balance: ${loyaltyData.newBalance.toLocaleString()} pts</div>` : ''}
+    ${loyaltyData.customerName ? `<div class="loyalty-detail">${loyaltyData.customerName}</div>` : ''}
+  </div>` : ''}
   <hr class="divider">
   <div class="barcode">*${invoiceNum}*</div>
   <div class="footer">
@@ -1628,7 +1766,12 @@ export default function RetailPOSPage() {
             const thermalReceipt = formatReceiptFromTransaction(
                 { ...lastTransaction, items: lastTransaction.lineItems || [] },
                 { name: (session?.user as any)?.franchiseName || 'Store' },
-                session?.user?.name || 'Cashier'
+                session?.user?.name || 'Cashier',
+                {
+                    pointsEarned: lastTransaction.loyaltyPointsEarned,
+                    newBalance: lastTransaction.loyaltyNewBalance,
+                    pointsRedeemed: lastTransaction.loyaltyPointsRedeemed
+                }
             )
             printReceipt(thermalReceipt).catch(console.error)
             setToast({ message: 'Reprinting receipt...', type: 'success' })
@@ -1640,7 +1783,11 @@ export default function RetailPOSPage() {
             setToast({ message: 'Please allow popups to print receipt', type: 'error' })
             return
         }
-        receiptWindow.document.write(generateReceiptHTML(lastTransaction))
+        receiptWindow.document.write(generateReceiptHTML(lastTransaction, {
+            pointsEarned: lastTransaction.loyaltyPointsEarned,
+            newBalance: lastTransaction.loyaltyNewBalance,
+            pointsRedeemed: lastTransaction.loyaltyPointsRedeemed
+        }))
         receiptWindow.document.close()
     }
 
@@ -2648,6 +2795,19 @@ export default function RetailPOSPage() {
                             </div>
                         )}
 
+                        {/* Loyalty Points Preview */}
+                        {loyaltyPreview && loyaltyPreview.totalPoints > 0 && (
+                            <div className="bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-amber-400 flex items-center gap-1.5 text-sm font-medium">⭐ Points to earn</span>
+                                    <span className="font-bold text-amber-400 text-sm">+{loyaltyPreview.totalPoints} pts</span>
+                                </div>
+                                {loyaltyPreview.breakdown.some((b: any) => b.excluded) && (
+                                    <p className="text-xs text-stone-500 mt-1">{loyaltyPreview.breakdown.filter((b: any) => b.excluded).length} item(s) excluded</p>
+                                )}
+                            </div>
+                        )}
+
                         <div className="flex justify-between text-lg">
                             <span className="text-emerald-400">Tax</span>
                             <span className="font-bold">{formatCurrency(tax)}</span>
@@ -2692,11 +2852,12 @@ export default function RetailPOSPage() {
                     <div className="mt-auto p-4 bg-stone-900 border-t border-stone-800">
                         <div className="flex items-center gap-3">
                             <button
-                                onClick={() => setShowCustomerModal(true)}
+                                onClick={() => setShowLoyaltyLookup(true)}
                                 className="flex items-center gap-2 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 rounded-lg text-orange-400 transition-colors"
                             >
                                 <User className="h-5 w-5" />
-                                <span>Customer Info</span>
+                                <span>{selectedCustomer ? `${selectedCustomer.firstName || ''} ${selectedCustomer.lastName || ''}`.trim() : 'Customer / Loyalty'}</span>
+                                {loyaltyPhone && <Trophy className="h-4 w-4 text-yellow-400" />}
                             </button>
                             {/* BUG-1 FIX: Notes button now sets transaction notes */}
                             <button
@@ -3238,7 +3399,12 @@ export default function RetailPOSPage() {
                             const thermalReceipt = formatReceiptFromTransaction(
                                 { ...tx, items: tx.lineItems || [] },
                                 { name: (session?.user as any)?.franchiseName || 'Store' },
-                                session?.user?.name || 'Cashier'
+                                session?.user?.name || 'Cashier',
+                                {
+                                    pointsEarned: tx.loyaltyPointsEarned,
+                                    newBalance: tx.loyaltyNewBalance,
+                                    pointsRedeemed: tx.loyaltyPointsRedeemed
+                                }
                             )
                             printReceipt(thermalReceipt).catch(console.error)
                             setToast({ message: 'Reprinting receipt...', type: 'success' })
@@ -3247,7 +3413,11 @@ export default function RetailPOSPage() {
                         // Fallback: popup receipt
                         const receiptWindow = window.open('', '_blank', 'width=400,height=700')
                         if (receiptWindow) {
-                            receiptWindow.document.write(generateReceiptHTML(tx))
+                            receiptWindow.document.write(generateReceiptHTML(tx, {
+                                pointsEarned: tx.loyaltyPointsEarned,
+                                newBalance: tx.loyaltyNewBalance,
+                                pointsRedeemed: tx.loyaltyPointsRedeemed
+                            }))
                             receiptWindow.document.close()
                         } else {
                             setToast({ message: 'Please allow popups to print receipt', type: 'error' })
@@ -3326,6 +3496,21 @@ export default function RetailPOSPage() {
                     setToast({ message: 'Payment successful!', type: 'success' })
                 }}
             />
+
+            {/* Loyalty Lookup Modal */}
+            {showLoyaltyLookup && user?.franchiseId && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <LoyaltyLookup
+                        franchiseId={user.franchiseId}
+                        orderTotal={total}
+                        onPointsApplied={(dollarValue, pointsUsed) => {
+                            setLoyaltyDiscount(dollarValue)
+                            setToast({ message: `Applied ${pointsUsed} points ($${dollarValue.toFixed(2)} off)`, type: 'success' })
+                        }}
+                        onClose={() => setShowLoyaltyLookup(false)}
+                    />
+                </div>
+            )}
 
             {/* Quick Switch Modal - Toast POS style employee switching */}
             <QuickSwitchModal

@@ -155,9 +155,8 @@ export async function GET(req: NextRequest) {
 // POST - Enroll member, add/redeem points
 export async function POST(req: NextRequest) {
     try {
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const body = await req.json()
         const { action, phone, email, name, points, amount, transactionId, locationId, excludeTobaccoAmount } = body
@@ -394,9 +393,8 @@ export async function POST(req: NextRequest) {
 // PUT - Update program settings
 export async function PUT(req: NextRequest) {
     try {
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         if (!['PROVIDER', 'FRANCHISOR'].includes(user.role)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
