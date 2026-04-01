@@ -1,11 +1,55 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import { ShieldAlert } from 'lucide-react'
+
+/**
+ * FIX 1 — PROVIDER-ONLY HARD GATE
+ * Payment Processors page contains PAX webhook URLs, gateway credentials,
+ * and full payment activity logs. Only PROVIDER role may access this page.
+ * All other roles are immediately redirected to the owner dashboard.
+ */
+export default function PaymentProcessorsPage() {
+    const { data: session, status } = useSession()
+    const router = useRouter()
+    const role = (session?.user as any)?.role
+
+    useEffect(() => {
+        if (status === 'loading') return
+        if (role !== 'PROVIDER') {
+            router.replace('/dashboard/owner')
+        }
+    }, [status, role, router])
+
+    // Show nothing while session is loading or redirect is in flight
+    if (status === 'loading' || role !== 'PROVIDER') {
+        return (
+            <div className="min-h-screen bg-stone-950 text-white flex items-center justify-center">
+                <div className="text-center max-w-md mx-4">
+                    <div className="h-16 w-16 bg-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <ShieldAlert className="h-8 w-8 text-red-400" />
+                    </div>
+                    <p className="text-stone-400 text-sm">Checking access...</p>
+                </div>
+            </div>
+        )
+    }
+
+    // ── PROVIDER-ONLY CONTENT ──────────────────────────────────────────────
+    // Lazy-load the real implementation only when role === 'PROVIDER'
+    return <PaymentProcessorsContent />
+}
+
+// ── Real implementation (only reached by PROVIDER) ─────────────────────────
+
+import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, CreditCard, CheckCircle, XCircle, AlertTriangle, RefreshCw, ExternalLink } from 'lucide-react'
+import { ArrowLeft, CreditCard, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
-export default function PaymentProcessorsPage() {
+function PaymentProcessorsContent() {
     const [config, setConfig] = useState<any>(null)
     const [logs, setLogs] = useState<any>(null)
     const [loading, setLoading] = useState(true)

@@ -55,7 +55,9 @@ export default function PricingRulesPage() {
     const [previewCost, setPreviewCost] = useState('10.00')
     const [previewRule, setPreviewRule] = useState<string>('')
 
+    // FIX 7: Split canEdit — owner can view/map but NOT create/destroy rules
     const canEdit = ['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user?.role)
+    const canDestructiveEdit = ['PROVIDER', 'FRANCHISOR'].includes(user?.role)
 
     const showToast = (message: string, type: 'success' | 'error') => {
         setToast({ message, type })
@@ -237,7 +239,8 @@ export default function PricingRulesPage() {
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <h2 className="text-lg font-semibold">Pricing Rules ({rules.length})</h2>
-                            {canEdit && rules.length === 0 && (
+                            {/* FIX 7: Seed Defaults only for PROVIDER/FRANCHISOR */}
+                            {canDestructiveEdit && rules.length === 0 && (
                                 <button
                                     onClick={handleSeedDefaults}
                                     disabled={saving}
@@ -274,7 +277,8 @@ export default function PricingRulesPage() {
                                                         {cfg.managerOverrideOnly && ' • Manager only'}
                                                     </div>
                                                 </div>
-                                                {canEdit && (
+                                                {/* FIX 7: Delete only for PROVIDER/FRANCHISOR — not OWNER */}
+                                                {canDestructiveEdit && (
                                                     <button
                                                         onClick={() => handleDeleteRule(rule.id)}
                                                         className="p-1.5 text-stone-400 hover:text-red-400 transition-colors"

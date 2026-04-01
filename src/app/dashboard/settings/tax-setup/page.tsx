@@ -84,7 +84,10 @@ export default function TaxSetupPage() {
     // Step C: Department Mappings
     const [mappingChanges, setMappingChanges] = useState<Record<string, string>>({})
 
+    // FIX 7: Split canEdit — owner can VIEW and adjust Dept→Group MAPPING only
+    // Destructive actions (create/delete tax components, create/delete groups) require PROVIDER/FRANCHISOR
     const canEdit = ['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user?.role)
+    const canDestructiveEdit = ['PROVIDER', 'FRANCHISOR'].includes(user?.role)
 
     // ============ DATA FETCHING ============
 
@@ -339,7 +342,8 @@ export default function TaxSetupPage() {
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <h2 className="text-lg font-semibold">Tax Components (up to 6)</h2>
-                            {canEdit && jurisdictions.length < 6 && (
+                            {/* FIX 7: Add Component only for PROVIDER/FRANCHISOR */}
+                            {canDestructiveEdit && jurisdictions.length < 6 && (
                                 <button
                                     onClick={() => setShowNewComp(!showNewComp)}
                                     className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-black rounded-lg font-medium text-sm transition-colors"
@@ -456,7 +460,8 @@ export default function TaxSetupPage() {
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <h2 className="text-lg font-semibold">Tax Groups</h2>
-                            {canEdit && (
+                            {/* FIX 7: New Group only for PROVIDER/FRANCHISOR */}
+                            {canDestructiveEdit && (
                                 <button
                                     onClick={() => setShowNewGroup(!showNewGroup)}
                                     className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-black rounded-lg font-medium text-sm transition-colors"
@@ -565,7 +570,8 @@ export default function TaxSetupPage() {
                                                 <span className="text-lg font-bold text-amber-400">
                                                     {totalRate(g.components).toFixed(2)}%
                                                 </span>
-                                                {canEdit && (
+                                                {/* FIX 7: Edit/Delete/SetDefault only for PROVIDER/FRANCHISOR */}
+                                                {canDestructiveEdit && (
                                                     <div className="flex gap-1">
                                                         {!g.isDefault && (
                                                             <button

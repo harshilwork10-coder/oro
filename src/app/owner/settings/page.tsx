@@ -252,33 +252,40 @@ export default function SettingsPage() {
                         )}
 
                         {activeSection === 'payment' && (
-                            <div className="space-y-6">
-                                <div className="flex items-center justify-between p-4 rounded-lg border border-[var(--border)]">
-                                    <div>
-                                        <h3 className="font-medium text-[var(--text-primary)]">Card Surcharge</h3>
-                                        <p className="text-sm text-[var(--text-muted)]">Apply surcharge for card payments</p>
+                            <div className="space-y-4">
+                                {/* FIX 6: Pricing mode is PROVIDER-controlled.
+                                    Dual Pricing toggle and Surcharge Amount removed.
+                                    Owner sees current effective values, read-only. */}
+                                <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
+                                    <div className="h-9 w-9 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <Shield size={18} className="text-blue-400" />
                                     </div>
-                                    <input type="checkbox" defaultChecked className="w-5 h-5 rounded" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-[var(--text-secondary)] mb-1">Surcharge Amount (%)</label>
-                                    <input
-                                        type="number"
-                                        defaultValue="3.99"
-                                        step="0.01"
-                                        min="0"
-                                        max="10"
-                                        className="w-full max-w-xs bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                                    />
-                                    <p className="text-xs text-[var(--text-muted)] mt-1">Maximum 10%</p>
-                                </div>
-                                <div className="flex items-center justify-between p-4 rounded-lg border border-[var(--border)]">
                                     <div>
-                                        <h3 className="font-medium text-[var(--text-primary)]">Dual Pricing Display</h3>
-                                        <p className="text-sm text-[var(--text-muted)]">Show both cash and card prices</p>
+                                        <h4 className="font-semibold text-blue-200 text-sm">Pricing Mode — Managed by ORO</h4>
+                                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                                            Your store's pricing model and card surcharge are configured by ORO Support to ensure
+                                            compliance with your franchise agreement. To request a change, contact your account manager.
+                                        </p>
                                     </div>
-                                    <input type="checkbox" defaultChecked className="w-5 h-5 rounded" />
                                 </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
+                                        <p className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-1">Current Pricing Mode</p>
+                                        <p className="text-base font-bold text-[var(--text-primary)]">Dual Pricing</p>
+                                        <p className="text-xs text-[var(--text-muted)] mt-0.5">Cash & card prices shown separately</p>
+                                    </div>
+                                    <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
+                                        <p className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-1">Card Surcharge</p>
+                                        <p className="text-base font-bold text-[var(--text-primary)]">3.99%</p>
+                                        <p className="text-xs text-[var(--text-muted)] mt-0.5">Applied automatically at checkout</p>
+                                    </div>
+                                </div>
+
+                                <p className="text-xs text-[var(--text-muted)]">
+                                    Need to change your pricing model?
+                                    <a href="tel:+18005551234" className="text-[var(--primary)] hover:underline ml-1">Contact ORO Support →</a>
+                                </p>
                             </div>
                         )}
 

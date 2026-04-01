@@ -72,10 +72,17 @@ export default function SettingsPage() {
     const { data: session, status } = useSession()
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [savingOperational, setSavingOperational] = useState(false)
     const [message, setMessage] = useState('')
 
-    const isProvider = session?.user?.role === 'PROVIDER'
-    const canEdit = isProvider
+    const role = (session?.user as any)?.role
+    const isProvider = role === 'PROVIDER'
+    // FIX 2: Pricing/Tax controls are PROVIDER-only (hard gate)
+    const canEditPricing = isProvider
+    // FIX 5: Operational settings (tip, receipt, drawer) are OWNER-editable
+    const canEditOperational = isProvider || role === 'OWNER' || role === 'FRANCHISEE' || role === 'FRANCHISOR'
+    // Employee permissions: OWNER+ can manage
+    const canEditPermissions = isProvider || role === 'OWNER' || role === 'FRANCHISOR'
     const industryType = (session?.user as any)?.industryType || 'SERVICE'
 
     // Pricing Settings
@@ -148,6 +155,7 @@ export default function SettingsPage() {
     }
 
     const saveSettings = async () => {
+        if (!isProvider) return // pricing/tax saves are PROVIDER-only
         setSaving(true)
         setMessage('')
         try {
@@ -179,6 +187,40 @@ export default function SettingsPage() {
             setMessage('Error saving settings')
         } finally {
             setSaving(false)
+            setTimeout(() => setMessage(''), 3000)
+        }
+    }
+
+    // FIX 5: Separate save path for operational settings (tip / receipt / drawer)
+    // OWNER, FRANCHISEE, FRANCHISOR, PROVIDER may all save these.
+    const saveOperationalSettings = async () => {
+        if (!canEditOperational) return
+        setSavingOperational(true)
+        setMessage('')
+        try {
+            const res = await fetch('/api/settings/franchise', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tipPromptEnabled: tipEnabled,
+                    tipType,
+                    tipSuggestions: `[${tipSuggestions}]`,
+                    acceptsEbt,
+                    acceptsChecks,
+                    acceptsOnAccount,
+                    receiptPrintMode,
+                    openDrawerOnCash
+                })
+            })
+            if (res.ok) {
+                setMessage('Operational settings saved!')
+            } else {
+                setMessage('Failed to save settings')
+            }
+        } catch (error) {
+            setMessage('Error saving settings')
+        } finally {
+            setSavingOperational(false)
             setTimeout(() => setMessage(''), 3000)
         }
     }
@@ -230,7 +272,7 @@ export default function SettingsPage() {
             <p className="text-stone-400 mb-8">Manage your store configuration, hardware, and preferences.</p>
 
             {/* Provider-Managed Notice */}
-            {!canEdit && (
+            {!canEditPricing && (
                 <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30">
                     <div className="flex items-start gap-3">
                         <div className="h-10 w-10 bg-blue-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -295,74 +337,113 @@ export default function SettingsPage() {
                         <div className="h-12 w-12 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
                             <CreditCard className="h-6 w-6 text-white" />
                         </div>
-                        <div>
+                        <div className="flex-1">
                             <h2 className="text-xl font-bold text-stone-100">Pricing Configuration</h2>
                             <p className="text-sm text-stone-400">Configure card surcharge for your franchise</p>
                         </div>
-                    </div>
-                    <div className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-semibold text-stone-300 mb-3">Pricing Model</label>
-                            <div className="flex gap-4">
-                                <button onClick={() => setPricingModel('STANDARD')} className={`flex-1 p-4 rounded-xl border-2 transition-all ${pricingModel === 'STANDARD' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
-                                    <div className="font-bold text-stone-200">Standard Pricing</div>
-                                    <div className="text-sm text-stone-400">Single price for all payment types</div>
-                                </button>
-                                <button onClick={() => setPricingModel('DUAL_PRICING')} className={`flex-1 p-4 rounded-xl border-2 transition-all ${pricingModel === 'DUAL_PRICING' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
-                                    <div className="font-bold text-stone-200">Dual Pricing</div>
-                                    <div className="text-sm text-stone-400">Separate cash and card prices</div>
-                                </button>
-                            </div>
-                        </div>
-
-                        {pricingModel === 'DUAL_PRICING' && (
-                            <>
-                                <div>
-                                    <label className="block text-sm font-semibold text-stone-300 mb-3">Card Surcharge Type</label>
-                                    <div className="flex gap-4">
-                                        <button onClick={() => setSurchargeType('PERCENTAGE')} className={`flex-1 p-3 rounded-lg border-2 transition-all ${surchargeType === 'PERCENTAGE' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
-                                            <div className="font-semibold text-stone-200">Percentage (%)</div>
-                                        </button>
-                                        <button onClick={() => setSurchargeType('FLAT_AMOUNT')} className={`flex-1 p-3 rounded-lg border-2 transition-all ${surchargeType === 'FLAT_AMOUNT' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
-                                            <div className="font-semibold text-stone-200">Flat Amount ($)</div>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-stone-300 mb-2">{surchargeType === 'PERCENTAGE' ? 'Surcharge Percentage' : 'Surcharge Amount'}</label>
-                                    <div className="relative flex-1 max-w-xs">
-                                        <input type="number" step="0.01" value={surchargeValue} onChange={(e) => setSurchargeValue(e.target.value)} className="w-full px-4 py-3 pr-12 border-2 border-stone-700 bg-stone-800 rounded-lg focus:border-orange-500 focus:outline-none text-lg font-semibold text-stone-100" />
-                                        <span className="absolute right-4 top-3 text-stone-500 text-lg">{surchargeType === 'PERCENTAGE' ? '%' : '$'}</span>
-                                    </div>
-                                </div>
-                                <div className="bg-stone-800/50 p-6 rounded-xl border border-stone-700">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <AlertCircle className="h-5 w-5 text-orange-400" />
-                                        <div className="font-bold text-stone-200">Pricing Preview</div>
-                                    </div>
-                                    <p className="text-stone-400 mb-2">Example: $100 service</p>
-                                    <div className="flex gap-6">
-                                        <div><div className="text-sm text-stone-500">Cash Price</div><div className="text-2xl font-bold text-emerald-400">$100.00</div></div>
-                                        <div><div className="text-sm text-stone-500">Card Price</div><div className="text-2xl font-bold text-blue-400">${calculateCardPrice(100).toFixed(2)}</div></div>
-                                    </div>
-                                </div>
-                            </>
+                        {/* FIX 2: "Managed by ORO" badge for non-PROVIDER */}
+                        {!canEditPricing && (
+                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/15 border border-blue-500/30 rounded-lg text-xs font-semibold text-blue-300">
+                                <Lock className="h-3 w-3" /> Managed by ORO
+                            </span>
                         )}
+                    </div>
 
-                        <div className="mt-6 pt-6 border-t border-stone-700">
-                            <label className="block text-sm font-semibold text-stone-300 mb-2">Sales Tax Rate</label>
-                            <div className="flex items-center gap-4">
-                                <div className="relative flex-1 max-w-xs">
-                                    <input type="number" step="0.01" min="0" max="25" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className="w-full px-4 py-3 pr-12 border-2 border-stone-700 bg-stone-800 rounded-lg focus:border-orange-500 focus:outline-none text-lg font-semibold text-stone-100" />
-                                    <span className="absolute right-4 top-3 text-stone-500 text-lg">%</span>
+                    {canEditPricing ? (
+                        // ── PROVIDER: full editable controls ──────────────────
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-stone-300 mb-3">Pricing Model</label>
+                                <div className="flex gap-4">
+                                    <button onClick={() => setPricingModel('STANDARD')} className={`flex-1 p-4 rounded-xl border-2 transition-all ${pricingModel === 'STANDARD' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
+                                        <div className="font-bold text-stone-200">Standard Pricing</div>
+                                        <div className="text-sm text-stone-400">Single price for all payment types</div>
+                                    </button>
+                                    <button onClick={() => setPricingModel('DUAL_PRICING')} className={`flex-1 p-4 rounded-xl border-2 transition-all ${pricingModel === 'DUAL_PRICING' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
+                                        <div className="font-bold text-stone-200">Dual Pricing</div>
+                                        <div className="text-sm text-stone-400">Separate cash and card prices</div>
+                                    </button>
                                 </div>
-                                <div className="text-sm text-stone-400">Example: $100 item &rarr; ${(100 * (1 + parseFloat(taxRate || '0') / 100)).toFixed(2)} with tax</div>
+                            </div>
+
+                            {pricingModel === 'DUAL_PRICING' && (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-stone-300 mb-3">Card Surcharge Type</label>
+                                        <div className="flex gap-4">
+                                            <button onClick={() => setSurchargeType('PERCENTAGE')} className={`flex-1 p-3 rounded-lg border-2 transition-all ${surchargeType === 'PERCENTAGE' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
+                                                <div className="font-semibold text-stone-200">Percentage (%)</div>
+                                            </button>
+                                            <button onClick={() => setSurchargeType('FLAT_AMOUNT')} className={`flex-1 p-3 rounded-lg border-2 transition-all ${surchargeType === 'FLAT_AMOUNT' ? 'border-orange-500 bg-orange-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
+                                                <div className="font-semibold text-stone-200">Flat Amount ($)</div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-stone-300 mb-2">{surchargeType === 'PERCENTAGE' ? 'Surcharge Percentage' : 'Surcharge Amount'}</label>
+                                        <div className="relative flex-1 max-w-xs">
+                                            <input type="number" step="0.01" value={surchargeValue} onChange={(e) => setSurchargeValue(e.target.value)} className="w-full px-4 py-3 pr-12 border-2 border-stone-700 bg-stone-800 rounded-lg focus:border-orange-500 focus:outline-none text-lg font-semibold text-stone-100" />
+                                            <span className="absolute right-4 top-3 text-stone-500 text-lg">{surchargeType === 'PERCENTAGE' ? '%' : '$'}</span>
+                                        </div>
+                                    </div>
+                                    <div className="bg-stone-800/50 p-6 rounded-xl border border-stone-700">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <AlertCircle className="h-5 w-5 text-orange-400" />
+                                            <div className="font-bold text-stone-200">Pricing Preview</div>
+                                        </div>
+                                        <p className="text-stone-400 mb-2">Example: $100 service</p>
+                                        <div className="flex gap-6">
+                                            <div><div className="text-sm text-stone-500">Cash Price</div><div className="text-2xl font-bold text-emerald-400">$100.00</div></div>
+                                            <div><div className="text-sm text-stone-500">Card Price</div><div className="text-2xl font-bold text-blue-400">${calculateCardPrice(100).toFixed(2)}</div></div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="mt-6 pt-6 border-t border-stone-700">
+                                <label className="block text-sm font-semibold text-stone-300 mb-2">Sales Tax Rate</label>
+                                <div className="flex items-center gap-4">
+                                    <div className="relative flex-1 max-w-xs">
+                                        <input type="number" step="0.01" min="0" max="25" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className="w-full px-4 py-3 pr-12 border-2 border-stone-700 bg-stone-800 rounded-lg focus:border-orange-500 focus:outline-none text-lg font-semibold text-stone-100" />
+                                        <span className="absolute right-4 top-3 text-stone-500 text-lg">%</span>
+                                    </div>
+                                    <div className="text-sm text-stone-400">Example: $100 item &rarr; ${(100 * (1 + parseFloat(taxRate || '0') / 100)).toFixed(2)} with tax</div>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    ) : (
+                        // ── NON-PROVIDER: read-only display only ──────────────
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="bg-stone-800/60 border border-stone-700 rounded-xl p-4">
+                                    <p className="text-xs text-stone-500 uppercase tracking-wide mb-1">Pricing Model</p>
+                                    <p className="text-lg font-bold text-stone-100">
+                                        {pricingModel === 'DUAL_PRICING' ? 'Dual Pricing' :
+                                         pricingModel === 'CASH_DISCOUNT' ? 'Cash Discount' : 'Standard Pricing'}
+                                    </p>
+                                </div>
+                                {pricingModel !== 'STANDARD' && (
+                                    <div className="bg-stone-800/60 border border-stone-700 rounded-xl p-4">
+                                        <p className="text-xs text-stone-500 uppercase tracking-wide mb-1">Card Surcharge</p>
+                                        <p className="text-lg font-bold text-stone-100">
+                                            {surchargeValue}{surchargeType === 'PERCENTAGE' ? '%' : ' flat'}
+                                        </p>
+                                    </div>
+                                )}
+                                <div className="bg-stone-800/60 border border-stone-700 rounded-xl p-4">
+                                    <p className="text-xs text-stone-500 uppercase tracking-wide mb-1">Sales Tax Rate</p>
+                                    <p className="text-lg font-bold text-stone-100">{taxRate}%</p>
+                                </div>
+                            </div>
+                            <p className="text-xs text-stone-500 flex items-center gap-1.5">
+                                <Lock className="h-3 w-3" />
+                                These values are configured by ORO Support. To request changes, contact your account manager.
+                            </p>
+                        </div>
+                    )}
                 </div>
 
-                {/* Tip Settings */}
+                {/* ── Tip Settings — FIX 5: OWNER editable ─────────────────── */}
                 <div className="glass-panel rounded-2xl p-6 mb-6">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="h-12 w-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
@@ -375,25 +456,36 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex items-center justify-between p-4 bg-stone-800/50 rounded-xl">
                         <div><div className="font-semibold text-stone-200">Enable Tip Prompt</div><div className="text-sm text-stone-400">Show tip options on customer display during checkout</div></div>
-                        <button onClick={() => setTipEnabled(!tipEnabled)} className={`relative w-14 h-8 rounded-full transition-all ${tipEnabled ? 'bg-green-500' : 'bg-stone-600'}`}>
+                        <button
+                            onClick={() => canEditOperational && setTipEnabled(!tipEnabled)}
+                            disabled={!canEditOperational}
+                            className={`relative w-14 h-8 rounded-full transition-all ${tipEnabled ? 'bg-green-500' : 'bg-stone-600'} ${!canEditOperational ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
                             <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-all ${tipEnabled ? 'left-7' : 'left-1'}`} />
                         </button>
                     </div>
                     {tipEnabled && (
                         <div className="mt-4 space-y-4">
                             <div className="flex gap-4">
-                                <button onClick={() => setTipType('PERCENT')} className={`flex-1 p-3 rounded-lg border-2 transition-all ${tipType === 'PERCENT' ? 'border-green-500 bg-green-500/10' : 'border-stone-700'}`}><div className="font-semibold text-stone-200">Percentage (%)</div></button>
-                                <button onClick={() => setTipType('DOLLAR')} className={`flex-1 p-3 rounded-lg border-2 transition-all ${tipType === 'DOLLAR' ? 'border-green-500 bg-green-500/10' : 'border-stone-700'}`}><div className="font-semibold text-stone-200">Dollar Amount ($)</div></button>
+                                <button onClick={() => canEditOperational && setTipType('PERCENT')} disabled={!canEditOperational} className={`flex-1 p-3 rounded-lg border-2 transition-all ${tipType === 'PERCENT' ? 'border-green-500 bg-green-500/10' : 'border-stone-700'} ${!canEditOperational ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="font-semibold text-stone-200">Percentage (%)</div></button>
+                                <button onClick={() => canEditOperational && setTipType('DOLLAR')} disabled={!canEditOperational} className={`flex-1 p-3 rounded-lg border-2 transition-all ${tipType === 'DOLLAR' ? 'border-green-500 bg-green-500/10' : 'border-stone-700'} ${!canEditOperational ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="font-semibold text-stone-200">Dollar Amount ($)</div></button>
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-stone-300 mb-2">Tip Suggestions ({tipType === 'PERCENT' ? 'percentages' : 'dollar amounts'})</label>
-                                <input type="text" value={tipSuggestions} onChange={(e) => setTipSuggestions(e.target.value)} placeholder={tipType === 'PERCENT' ? '15,18,20,25' : '2,5,10,15'} className="w-full max-w-sm px-4 py-3 border-2 border-stone-700 bg-stone-800 rounded-lg focus:border-green-500 focus:outline-none text-stone-100" />
+                                <input
+                                    type="text"
+                                    value={tipSuggestions}
+                                    onChange={(e) => setTipSuggestions(e.target.value)}
+                                    disabled={!canEditOperational}
+                                    placeholder={tipType === 'PERCENT' ? '15,18,20,25' : '2,5,10,15'}
+                                    className="w-full max-w-sm px-4 py-3 border-2 border-stone-700 bg-stone-800 rounded-lg focus:border-green-500 focus:outline-none text-stone-100 disabled:opacity-50"
+                                />
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* Receipt Printing */}
+                {/* ── Receipt Printing — FIX 5: OWNER editable ──────────────── */}
                 <div className="glass-panel rounded-2xl p-6 mb-6">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="h-12 w-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
@@ -412,7 +504,12 @@ export default function SettingsPage() {
                             { id: 'CARD_AND_EBT', label: 'Card & EBT', desc: 'Card and EBT only' },
                             { id: 'NONE', label: 'Never', desc: 'Use Last Receipt button' },
                         ].map(mode => (
-                            <button key={mode.id} onClick={() => setReceiptPrintMode(mode.id)} className={`p-3 rounded-lg border-2 transition-all text-left ${receiptPrintMode === mode.id ? 'border-purple-500 bg-purple-500/10' : 'border-stone-700 hover:border-stone-600'}`}>
+                            <button
+                                key={mode.id}
+                                onClick={() => canEditOperational && setReceiptPrintMode(mode.id)}
+                                disabled={!canEditOperational}
+                                className={`p-3 rounded-lg border-2 transition-all text-left ${receiptPrintMode === mode.id ? 'border-purple-500 bg-purple-500/10' : 'border-stone-700 hover:border-stone-600'} ${!canEditOperational ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
                                 <div className="font-semibold text-sm text-stone-200">{mode.label}</div>
                                 <div className="text-xs text-stone-500">{mode.desc}</div>
                             </button>
@@ -424,14 +521,34 @@ export default function SettingsPage() {
                             <div><div className="font-bold text-stone-200">Open Drawer on Cash</div><div className="text-sm text-stone-400">Automatically open cash drawer</div></div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" checked={openDrawerOnCash} onChange={(e) => setOpenDrawerOnCash(e.target.checked)} className="sr-only peer" />
+                            <input
+                                type="checkbox"
+                                checked={openDrawerOnCash}
+                                onChange={(e) => canEditOperational && setOpenDrawerOnCash(e.target.checked)}
+                                disabled={!canEditOperational}
+                                className="sr-only peer"
+                            />
                             <div className="w-11 h-6 bg-stone-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                         </label>
                     </div>
                 </div>
 
-                {/* Save Button */}
-                {canEdit && (
+                {/* ── Save Buttons — FIX 2 + FIX 5 ──────────────────────────── */}
+                {/* Operational settings save: OWNER / PROVIDER */}
+                {canEditOperational && (
+                    <div className="mb-4">
+                        <button
+                            onClick={saveOperationalSettings}
+                            disabled={savingOperational}
+                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all disabled:opacity-50 shadow-lg"
+                        >
+                            <Save className="h-5 w-5" />
+                            {savingOperational ? 'Saving...' : 'Save Tip & Receipt Settings'}
+                        </button>
+                    </div>
+                )}
+                {/* Provider-only full save */}
+                {canEditPricing && (
                     <div className="mb-6">
                         <button onClick={saveSettings} disabled={saving} className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 shadow-lg">
                             <Save className="h-6 w-6" />
@@ -440,7 +557,7 @@ export default function SettingsPage() {
                     </div>
                 )}
 
-                {/* Employee Permissions */}
+                {/* ── Employee Permissions — FIX 5: OWNER editable ────────── */}
                 <div className="glass-panel rounded-2xl p-6">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
@@ -469,13 +586,13 @@ export default function SettingsPage() {
                                             <div className="text-sm text-stone-500">{employee.email}</div>
                                         </td>
                                         <td className="p-3 text-center">
-                                            <input type="checkbox" checked={employee.canManageShifts || false} onChange={(e) => updateEmployeePermission(employee.id, 'canManageShifts', e.target.checked)} className="h-5 w-5 text-orange-500 rounded focus:ring-orange-500" />
+                                            <input type="checkbox" checked={employee.canManageShifts || false} onChange={(e) => canEditPermissions && updateEmployeePermission(employee.id, 'canManageShifts', e.target.checked)} disabled={!canEditPermissions} className="h-5 w-5 text-orange-500 rounded focus:ring-orange-500 disabled:opacity-50" />
                                         </td>
                                         <td className="p-3 text-center">
-                                            <input type="checkbox" checked={employee.canClockIn !== false} onChange={(e) => updateEmployeePermission(employee.id, 'canClockIn', e.target.checked)} className="h-5 w-5 text-blue-500 rounded focus:ring-blue-500" />
+                                            <input type="checkbox" checked={employee.canClockIn !== false} onChange={(e) => canEditPermissions && updateEmployeePermission(employee.id, 'canClockIn', e.target.checked)} disabled={!canEditPermissions} className="h-5 w-5 text-blue-500 rounded focus:ring-blue-500 disabled:opacity-50" />
                                         </td>
                                         <td className="p-3 text-center">
-                                            <input type="checkbox" checked={employee.canClockOut !== false} onChange={(e) => updateEmployeePermission(employee.id, 'canClockOut', e.target.checked)} className="h-5 w-5 text-blue-500 rounded focus:ring-blue-500" />
+                                            <input type="checkbox" checked={employee.canClockOut !== false} onChange={(e) => canEditPermissions && updateEmployeePermission(employee.id, 'canClockOut', e.target.checked)} disabled={!canEditPermissions} className="h-5 w-5 text-blue-500 rounded focus:ring-blue-500 disabled:opacity-50" />
                                         </td>
                                     </tr>
                                 ))}

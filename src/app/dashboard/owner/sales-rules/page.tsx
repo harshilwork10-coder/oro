@@ -36,6 +36,8 @@ interface LocationSetting {
 
 export default function SalesRulesPage() {
     const { data: session } = useSession()
+    const role = (session?.user as any)?.role
+    const canApplyToAll = role === 'OWNER' || role === 'PROVIDER'
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [locations, setLocations] = useState<LocationSetting[]>([])
@@ -138,13 +140,16 @@ export default function SalesRulesPage() {
                         {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                         Save
                     </button>
-                    <button
-                        onClick={() => handleSave(true)}
-                        disabled={saving}
-                        className="flex items-center gap-2 px-4 py-2 bg-stone-700 hover:bg-stone-600 rounded-xl"
-                    >
-                        Apply to All Stores
-                    </button>
+                    {/* FIX 4: Role-gate — only OWNER / PROVIDER may blast-write to all locations */}
+                    {canApplyToAll && (
+                        <button
+                            onClick={() => handleSave(true)}
+                            disabled={saving}
+                            className="flex items-center gap-2 px-4 py-2 bg-stone-700 hover:bg-stone-600 rounded-xl"
+                        >
+                            Apply to All Stores
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -193,15 +198,15 @@ export default function SalesRulesPage() {
 
                         <div className="space-y-4">
                             <div>
+                                {/* FIX 3: Alcohol minimum age locked to 21 — US federal law */}
                                 <label className="text-sm text-stone-400">Minimum Age</label>
-                                <select
-                                    value={settings.alcohol.minimumAge}
-                                    onChange={(e) => updateAlcohol('minimumAge', parseInt(e.target.value))}
-                                    className="w-full mt-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3"
-                                >
-                                    <option value={21}>21 years</option>
-                                    <option value={18}>18 years</option>
-                                </select>
+                                <div className="w-full mt-1 bg-stone-800/50 border border-stone-700 rounded-xl px-4 py-3 flex items-center justify-between">
+                                    <span className="text-stone-100 font-semibold">21 years</span>
+                                    <span className="text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded-lg font-medium">Federal Law</span>
+                                </div>
+                                <p className="text-xs text-stone-500 mt-1.5">
+                                    Federal law (21 U.S.C. § 1) prohibits alcohol sales to persons under 21. This value is locked and cannot be changed.
+                                </p>
                             </div>
 
                             <div className="p-4 bg-stone-800 rounded-xl">
