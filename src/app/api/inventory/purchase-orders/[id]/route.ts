@@ -11,10 +11,6 @@ export async function PUT(
         const user = await getAuthUser(request)
         if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         const { id } = await params
         const { status } = await request.json()
 
@@ -39,7 +35,6 @@ export async function PUT(
         const purchaseOrder = await prisma.$transaction(async (tx) => {
             // If marking as RECEIVED, update product stock
             if (status === 'RECEIVED' && existingPO.status !== 'RECEIVED') {
-                // Update stock for each item
                 for (const item of existingPO.items) {
                     await tx.product.update({
                         where: { id: item.productId },
@@ -48,7 +43,6 @@ export async function PUT(
                         }
                     })
 
-                    // Create stock adjustment record
                     await tx.stockAdjustment.create({
                         data: {
                             productId: item.productId,
@@ -88,6 +82,7 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const user = await getAuthUser(request)
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

@@ -25,6 +25,8 @@ export default function SafeManagementPage() {
     }
     const [history, setHistory] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [formError, setFormError] = useState('')
     const [showForm, setShowForm] = useState(false)
     const [formType, setFormType] = useState<'SAFE_COUNT' | 'SAFE_DROP' | 'BANK_DEPOSIT'>('SAFE_COUNT')
     const [amount, setAmount] = useState('')
@@ -51,15 +53,50 @@ export default function SafeManagementPage() {
     }
 
     const handleSubmit = async () => {
-        const body: any = { type: formType, notes }
-        if (formType === 'SAFE_COUNT') body.denominations = denominations
-        else body.amount = parseFloat(amount)
+        setFormError('')
 
-        await fetch('/api/pos/safe-count', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-        setShowForm(false)
-        setAmount('')
-        setNotes('')
-        fetchHistory()
+        // FIX 4: Validate before submitting
+        if (formType === 'SAFE_COUNT') {
+            if (calcTotal() <= 0) {
+                setFormError('Please enter at least one denomination count.')
+                return
+            }
+        } else {
+            const parsed = parseFloat(amount)
+            if (!amount || isNaN(parsed) || parsed <= 0) {
+                setFormError('Amount must be greater than $0.00.')
+                return
+            }
+        }
+
+        setSaving(true)
+        try {
+            const body: any = { type: formType, notes }
+            if (formType === 'SAFE_COUNT') body.denominations = denominations
+            else body.amount = parseFloat(amount)
+
+            const res = await fetch('/api/pos/safe-count', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            })
+
+            if (res.ok) {
+                setShowForm(false)
+                setAmount('')
+                setNotes('')
+                setFormError('')
+                setDenominations({ hundreds: 0, fifties: 0, twenties: 0, tens: 0, fives: 0, ones: 0, quarters: 0, dimes: 0, nickels: 0, pennies: 0 })
+                fetchHistory()
+            } else {
+                const err = await res.json()
+                setFormError(err.error || 'Failed to save entry.')
+            }
+        } catch (e) {
+            setFormError('Network error. Please try again.')
+        } finally {
+            setSaving(false)
+        }
     }
 
     return (
@@ -94,18 +131,46 @@ export default function SafeManagementPage() {
                             {Object.entries(denominations).map(([k, v]) => (
                                 <div key={k}>
                                     <label className="text-xs text-stone-400 capitalize">{k}</label>
-                                    <input type="number" min="0" value={v} onChange={e => setDenominations(p => ({ ...p, [k]: parseInt(e.target.value) || 0 }))}
+                                    <input type="number" min="0" value={v} onChange={e => { setDenominations(p => ({ ...p, [k]: parseInt(e.target.value) || 0 })); setFormError('') }}
                                         className="w-full bg-stone-800 border border-stone-600 rounded-lg px-3 py-2 text-center" />
                                 </div>
                             ))}
-                            <div className="col-span-5 text-right text-xl font-bold text-emerald-400">Total: {formatCurrency(calcTotal())}</div>
+                            <div className={`col-span-5 text-right text-xl font-bold ${
+                                calcTotal() > 0 ? 'text-emerald-400' : 'text-stone-500'
+                            }`}>Total: {formatCurrency(calcTotal())}</div>
                         </div>
                     ) : (
-                        <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount"
-                            className="w-full bg-stone-800 border border-stone-600 rounded-lg px-4 py-3 mb-4" />
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={amount}
+                            onChange={e => { setAmount(e.target.value); setFormError('') }}
+                            placeholder="Amount ($)"
+                            className={`w-full bg-stone-800 border rounded-lg px-4 py-3 mb-4 ${
+                                formError && (!amount || parseFloat(amount) <= 0)
+                                    ? 'border-red-500'
+                                    : 'border-stone-600'
+                            }`}
+                        />
                     )}
                     <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes (optional)" className="w-full bg-stone-800 border border-stone-600 rounded-lg px-4 py-3 mb-4" />
-                    <button onClick={handleSubmit} className="px-6 py-3 bg-amber-600 hover:bg-amber-500 rounded-xl font-semibold">Submit</button>
+
+                    {/* FIX 4: Inline error + loading state */}
+                    {formError && (
+                        <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg mb-3">
+                            <span>⚠</span> {formError}
+                        </div>
+                    )}
+
+                    <button
+                        onClick={handleSubmit}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-500 rounded-xl font-semibold disabled:opacity-50"
+                    >
+                        {saving && <RefreshCw className="h-4 w-4 animate-spin" />}
+                        {saving ? 'Saving…' : 'Submit'}
+                    </button>
                 </div>
             )}
 

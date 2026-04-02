@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
-    ArrowLeft, Shield, RefreshCw, AlertTriangle, Eye, Lock,
-    TrendingUp, DollarSign, User, Store, Clock, Filter,
-    AlertCircle, ChevronRight, X, CheckCircle
+    ArrowLeft, Shield, RefreshCw, AlertTriangle, Lock,
+    TrendingUp, DollarSign, User, Store, Filter,
+    AlertCircle, X, CheckCircle
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
@@ -14,6 +14,7 @@ interface SuspiciousCashier {
     id: string
     name: string
     location: string
+    locationId?: string
     totalTransactions: number
     voids: number
     refunds: number
@@ -28,6 +29,7 @@ interface Alert {
     amount: number
     employeeName: string
     locationName: string
+    locationId?: string
     reason: string
     time: string
 }
@@ -40,6 +42,11 @@ interface Summary {
     refundAmount: number
     voidRate: number
     refundRate: number
+}
+
+interface Location {
+    id: string
+    name: string
 }
 
 export default function LPAuditDashboard() {
@@ -64,7 +71,7 @@ export default function LPAuditDashboard() {
     const [suspiciousCashiers, setSuspiciousCashiers] = useState<SuspiciousCashier[]>([])
     const [recentAlerts, setRecentAlerts] = useState<Alert[]>([])
     const [summary, setSummary] = useState<Summary | null>(null)
-    const [dateRange, setDateRange] = useState<{ start: string, end: string, days: number } | null>(null)
+    const [locations, setLocations] = useState<Location[]>([])
     const [selectedDays, setSelectedDays] = useState(7)
     const [selectedLocation, setSelectedLocation] = useState('all')
     const [selectedCashier, setSelectedCashier] = useState<SuspiciousCashier | null>(null)
@@ -82,7 +89,20 @@ export default function LPAuditDashboard() {
             setSuspiciousCashiers(data.suspiciousCashiers || [])
             setRecentAlerts(data.recentAlerts || [])
             setSummary(data.summary || null)
-            setDateRange(data.dateRange || null)
+
+            // Build unique location list from response data
+            const locMap = new Map<string, Location>()
+            ;(data.suspiciousCashiers || []).forEach((c: SuspiciousCashier) => {
+                if (c.locationId) locMap.set(c.locationId, { id: c.locationId, name: c.location })
+            })
+            ;(data.recentAlerts || []).forEach((a: Alert) => {
+                if (a.locationId) locMap.set(a.locationId, { id: a.locationId, name: a.locationName })
+            })
+            // Also accept a locations array from the API if provided
+            if (data.locations?.length) {
+                data.locations.forEach((l: Location) => locMap.set(l.id, l))
+            }
+            setLocations(Array.from(locMap.values()))
         } catch (error) {
             console.error('Failed to fetch:', error)
         } finally {
@@ -118,7 +138,23 @@ export default function LPAuditDashboard() {
                         <p className="text-stone-400">Track suspicious activity and cashier performance</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap justify-end">
+                    {/* FIX 1: Location filter — was dead code, now renders */}
+                    {locations.length > 0 && (
+                        <div className="flex items-center gap-2 bg-stone-800/80 border border-stone-700 rounded-lg px-3 py-2">
+                            <Store className="h-4 w-4 text-stone-500" />
+                            <select
+                                value={selectedLocation}
+                                onChange={(e) => setSelectedLocation(e.target.value)}
+                                className="bg-transparent text-sm text-stone-200 outline-none cursor-pointer"
+                            >
+                                <option value="all">All Locations</option>
+                                {locations.map(loc => (
+                                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <select
                         value={selectedDays}
                         onChange={(e) => setSelectedDays(parseInt(e.target.value))}
@@ -138,6 +174,22 @@ export default function LPAuditDashboard() {
                     </button>
                 </div>
             </div>
+
+            {/* Active filter pill */}
+            {selectedLocation !== 'all' && (
+                <div className="flex items-center gap-2 mb-4">
+                    <span className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-red-500/15 border border-red-500/30 text-red-300 rounded-full">
+                        <Filter className="h-3 w-3" />
+                        {locations.find(l => l.id === selectedLocation)?.name || 'Filtered'}
+                        <button
+                            onClick={() => setSelectedLocation('all')}
+                            className="ml-1 hover:text-white"
+                        >
+                            <X className="h-3 w-3" />
+                        </button>
+                    </span>
+                </div>
+            )}
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -201,6 +253,9 @@ export default function LPAuditDashboard() {
                         <div className="text-center py-8">
                             <CheckCircle className="h-12 w-12 mx-auto text-emerald-500 mb-2" />
                             <p className="text-stone-400">No suspicious activity detected</p>
+                            {selectedLocation !== 'all' && (
+                                <p className="text-xs text-stone-600 mt-1">Try switching to All Locations</p>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -225,12 +280,13 @@ export default function LPAuditDashboard() {
                                             </p>
                                         </div>
                                     </div>
+                                    {/* FIX: bar width = actual riskScore (capped at 100), not riskScore×5 */}
                                     <div className="mt-3 bg-black/30 rounded-full h-2 overflow-hidden">
                                         <div
                                             className={`h-full ${cashier.riskLevel === 'HIGH' ? 'bg-red-500' :
                                                     cashier.riskLevel === 'MEDIUM' ? 'bg-amber-500' : 'bg-blue-500'
                                                 }`}
-                                            style={{ width: `${Math.min(cashier.riskScore * 5, 100)}%` }}
+                                            style={{ width: `${Math.min(cashier.riskScore, 100)}%` }}
                                         />
                                     </div>
                                     <p className="text-xs mt-1 opacity-70">
@@ -253,6 +309,9 @@ export default function LPAuditDashboard() {
                         <div className="text-center py-8">
                             <CheckCircle className="h-12 w-12 mx-auto text-emerald-500 mb-2" />
                             <p className="text-stone-400">No recent alerts</p>
+                            {selectedLocation !== 'all' && (
+                                <p className="text-xs text-stone-600 mt-1">Try switching to All Locations</p>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-3 max-h-[400px] overflow-y-auto">
@@ -317,7 +376,7 @@ export default function LPAuditDashboard() {
                                 <p className="text-sm opacity-70 mt-1">Score: {selectedCashier.riskScore.toFixed(2)}%</p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-3">
                                 <div className="bg-stone-800 rounded-xl p-4 text-center">
                                     <p className="text-3xl font-bold text-red-400">{selectedCashier.voids}</p>
                                     <p className="text-sm text-stone-400">Voids</p>
@@ -326,11 +385,30 @@ export default function LPAuditDashboard() {
                                     <p className="text-3xl font-bold text-amber-400">{selectedCashier.refunds}</p>
                                     <p className="text-sm text-stone-400">Refunds</p>
                                 </div>
+                                <div className="bg-stone-800 rounded-xl p-4 text-center">
+                                    <p className="text-3xl font-bold text-purple-400">{selectedCashier.overrides || 0}</p>
+                                    <p className="text-sm text-stone-400">Overrides</p>
+                                </div>
                             </div>
 
                             <div className="bg-stone-800 rounded-xl p-4">
                                 <p className="text-stone-400 text-sm">Total Transactions</p>
                                 <p className="text-2xl font-bold">{selectedCashier.totalTransactions}</p>
+                            </div>
+
+                            {/* Risk interpretation hint */}
+                            <div className={`text-xs px-3 py-2 rounded-lg ${
+                                selectedCashier.riskLevel === 'HIGH'
+                                    ? 'bg-red-500/10 text-red-300 border border-red-500/20'
+                                    : selectedCashier.riskLevel === 'MEDIUM'
+                                    ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                                    : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'
+                            }`}>
+                                {selectedCashier.riskLevel === 'HIGH'
+                                    ? 'Review this cashier\'s recent transactions. Consider requesting a supervisor sign-off for future voids.'
+                                    : selectedCashier.riskLevel === 'MEDIUM'
+                                    ? 'Elevated activity. Monitor over the next 7 days.'
+                                    : 'Within normal range. Flagged for informational tracking only.'}
                             </div>
                         </div>
                         <div className="p-5 border-t border-stone-700">
@@ -347,4 +425,3 @@ export default function LPAuditDashboard() {
         </div>
     )
 }
-

@@ -51,6 +51,7 @@ export default function MonthClosePage() {
 
     const [loading, setLoading] = useState(true)
     const [closing, setClosing] = useState(false)
+    const [showCloseConfirm, setShowCloseConfirm] = useState(false) // FIX 5: styled modal
     const [month, setMonth] = useState(new Date().getMonth())
     const [year, setYear] = useState(new Date().getFullYear())
     const [data, setData] = useState<any>(null)
@@ -72,6 +73,15 @@ export default function MonthClosePage() {
     useEffect(() => {
         fetchData()
     }, [month, year])
+
+    // Escape key handler for close confirmation modal
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && showCloseConfirm) setShowCloseConfirm(false)
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [showCloseConfirm])
 
     const prevMonth = () => {
         if (month === 0) {
@@ -96,8 +106,8 @@ export default function MonthClosePage() {
     }
 
     const handleClose = async () => {
-        if (!confirm(`Are you sure you want to close ${data?.monthName} ${year}? This action marks the month as closed for accounting.`)) return
-
+        // FIX 5: No native confirm() — caller must show the styling modal first
+        setShowCloseConfirm(false)
         setClosing(true)
         try {
             const res = await fetch('/api/owner/month-close', {
@@ -108,6 +118,9 @@ export default function MonthClosePage() {
             const result = await res.json()
             if (res.ok) {
                 setMessage('✓ ' + result.message)
+                fetchData() // re-fetch to reflect isClosed state
+            } else {
+                setMessage(result.error || 'Failed to close month')
             }
         } catch (error) {
             setMessage('Failed to close month')
@@ -134,20 +147,77 @@ export default function MonthClosePage() {
                         <p className="text-stone-400">Review and close monthly accounting period</p>
                     </div>
                 </div>
-                <button
-                    onClick={handleClose}
-                    disabled={closing || isCurrentMonth || !canClose}
-                    title={!canClose ? 'Only Owners can close a period' : undefined}
-                    className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-500 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {closing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-                    Close {data?.monthName}
-                </button>
+                {/* FIX 5: Replace close button with badge if month is already closed */}
+                {data?.isClosed ? (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
+                        <CheckCircle className="h-5 w-5 text-emerald-400" />
+                        <span className="text-emerald-400 font-semibold">Closed</span>
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => setShowCloseConfirm(true)}
+                        disabled={closing || isCurrentMonth || !canClose}
+                        title={!canClose ? 'Only Owners can close a period' : isCurrentMonth ? 'Cannot close current month' : undefined}
+                        className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-500 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {closing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                        Close {data?.monthName}
+                    </button>
+                )}
             </div>
 
             {message && (
                 <div className={`mb-4 p-3 rounded-xl ${message.startsWith('✓') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                     {message}
+                </div>
+            )}
+
+            {/* FIX 5: Styled close confirmation modal */}
+            {showCloseConfirm && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowCloseConfirm(false) }}>
+                    <div className="bg-stone-900 rounded-2xl w-full max-w-md border border-pink-500/30">
+                        <div className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <Lock className="h-8 w-8 text-pink-400" />
+                                <div>
+                                    <h2 className="text-xl font-bold">Close {data?.monthName} {year}?</h2>
+                                    <p className="text-stone-400 text-sm">This marks the period as closed for accounting.</p>
+                                </div>
+                            </div>
+                            <div className="bg-stone-800 rounded-xl p-4 mb-4 space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-stone-400">Total Sales</span>
+                                    <span className="font-bold">{formatCurrency(data?.summary?.totalSales || 0)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-stone-400">Transactions</span>
+                                    <span className="font-bold">{(data?.summary?.totalTransactions || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-stone-400">Cash</span>
+                                    <span className="font-bold text-green-400">{formatCurrency(data?.summary?.cashSales || 0)}</span>
+                                </div>
+                            </div>
+                            <p className="text-xs text-stone-500 mb-4">
+                                ⚠ Once closed, this period cannot be re-opened from the portal.
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowCloseConfirm(false)}
+                                    className="flex-1 py-3 bg-stone-700 hover:bg-stone-600 rounded-xl"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleClose}
+                                    className="flex-1 py-3 bg-pink-600 hover:bg-pink-500 rounded-xl font-semibold flex items-center justify-center gap-2"
+                                >
+                                    <Lock className="h-4 w-4" />
+                                    Yes, Close Period
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 

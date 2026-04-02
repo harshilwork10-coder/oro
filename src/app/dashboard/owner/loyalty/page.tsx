@@ -118,8 +118,12 @@ export default function LoyaltyPage() {
     const toggleSmartRewards = async (enabled: boolean) => {
         if (!program) return
         const updated = { ...program, useSmartRewards: enabled }; setProgram(updated)
-        try { await fetch('/api/owner/loyalty', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) }); setMessage(enabled ? '✓ Smart Rewards on' : '✓ Smart Rewards off') }
-        catch { setMessage('Toggle failed') }
+        try {
+            await fetch('/api/owner/loyalty', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) })
+            setMessage(enabled ? '✓ Smart Rewards on' : '✓ Smart Rewards off')
+            // FIX 5a: Force re-fetch so all stats reflect the updated state
+            fetchData()
+        } catch { setMessage('Toggle failed') }
     }
 
     // ── Activity search ──
@@ -162,9 +166,16 @@ export default function LoyaltyPage() {
 
     const submitAdjust = async () => {
         if (!adjustMemberId || !adjustPoints || !adjustReason.trim()) return
+
+        // FIX 5b: Max adjustment guard — prevents runaway point grants/removals
+        const pts = parseInt(adjustPoints)
+        const MAX_ADJUST = 10000
+        if (isNaN(pts) || pts === 0) { setMessage('Points must be a non-zero number.'); return }
+        if (Math.abs(pts) > MAX_ADJUST) { setMessage(`Adjustment capped at ±${MAX_ADJUST.toLocaleString()} pts. Contact your provider for larger corrections.`); return }
+
         setAdjustLoading(true); setAdjustResult(null)
         try {
-            const res = await fetch('/api/loyalty/adjust', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId: adjustMemberId, points: parseInt(adjustPoints), reason: adjustReason.trim() }) })
+            const res = await fetch('/api/loyalty/adjust', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId: adjustMemberId, points: pts, reason: adjustReason.trim() }) })
             const d = await res.json()
             if (res.ok) { setAdjustResult(d); setAdjustPoints(''); setAdjustReason(''); setMessage(`✓ ${d.adjustment > 0 ? '+' : ''}${d.adjustment} pts applied`) }
             else { setAdjustResult({ error: d.error }) }

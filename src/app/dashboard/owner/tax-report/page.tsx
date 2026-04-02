@@ -115,9 +115,13 @@ export default function TaxReportPage() {
                     onChange={(e) => setYear(parseInt(e.target.value))}
                     className="bg-stone-800 border border-stone-700 rounded-xl px-4 py-3"
                 >
-                    {[2024, 2025, 2026].map(y => (
-                        <option key={y} value={y}>{y}</option>
-                    ))}
+                {/* FIX 6: Dynamic year list — 2024 to currentYear+1, never needs manual update */}
+                {Array.from(
+                    { length: new Date().getFullYear() - 2024 + 2 },
+                    (_, i) => 2024 + i
+                ).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                ))}
                 </select>
 
                 {period === 'monthly' && (

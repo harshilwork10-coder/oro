@@ -27,7 +27,7 @@ export default function InventoryAlertsPage() {
     const [alerts, setAlerts] = useState<Alert[]>([])
     const [loading, setLoading] = useState(true)
 
-    const locationId = 'your-location-id' // Replace with session.user.locationId
+    const locationId = (session?.user as any)?.locationId
 
     useEffect(() => {
         if (status === 'authenticated') {
@@ -37,7 +37,8 @@ export default function InventoryAlertsPage() {
 
     async function fetchAlerts() {
         try {
-            const res = await fetch(`/api/inventory/alerts?locationId=${locationId}`)
+            const params = locationId ? `?locationId=${locationId}` : ''
+            const res = await fetch(`/api/inventory/alerts${params}`)
             if (res.ok) {
                 const data = await res.json()
                 setAlerts(data)

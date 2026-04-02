@@ -73,6 +73,7 @@ export default function CashManagementPage() {
     const [formExpected, setFormExpected] = useState('')
     const [formNote, setFormNote] = useState('')
     const [saving, setSaving] = useState(false)
+    const [formError, setFormError] = useState('')
 
     const fetchData = async () => {
         setLoading(true)
@@ -108,7 +109,22 @@ export default function CashManagementPage() {
     }, [])
 
     const handleSubmit = async () => {
-        if (!selectedLocation || !formAmount) return
+        setFormError('')
+
+        // FIX 3: Validate amount > 0 before any API call
+        const amount = parseFloat(formAmount)
+        if (!selectedLocation) { setFormError('Please select a location.'); return }
+        if (!formAmount || isNaN(amount) || amount <= 0) {
+            setFormError('Amount must be greater than $0.00.')
+            return
+        }
+        if (showLogModal === 'count') {
+            const expected = parseFloat(formExpected)
+            if (formExpected && (isNaN(expected) || expected < 0)) {
+                setFormError('Expected amount must be a valid positive number.')
+                return
+            }
+        }
 
         setSaving(true)
         try {
@@ -118,11 +134,11 @@ export default function CashManagementPage() {
                 body: JSON.stringify({
                     type: showLogModal === 'count' ? 'COUNT' : showLogModal === 'drop' ? 'DROP' : 'DEPOSIT',
                     locationId: selectedLocation,
-                    countedCash: showLogModal === 'count' ? parseFloat(formAmount) : undefined,
-                    expectedCash: showLogModal === 'count' ? parseFloat(formExpected) : undefined,
-                    amount: showLogModal === 'drop' ? parseFloat(formAmount) : undefined,
-                    depositedAmount: showLogModal === 'deposit' ? parseFloat(formAmount) : undefined,
-                    expectedAmount: showLogModal === 'deposit' ? parseFloat(formExpected) : undefined,
+                    countedCash: showLogModal === 'count' ? amount : undefined,
+                    expectedCash: showLogModal === 'count' ? (formExpected ? parseFloat(formExpected) : undefined) : undefined,
+                    amount: showLogModal === 'drop' ? amount : undefined,
+                    depositedAmount: showLogModal === 'deposit' ? amount : undefined,
+                    expectedAmount: showLogModal === 'deposit' ? (formExpected ? parseFloat(formExpected) : undefined) : undefined,
                     note: formNote
                 })
             })
@@ -132,13 +148,26 @@ export default function CashManagementPage() {
                 setFormAmount('')
                 setFormExpected('')
                 setFormNote('')
+                setFormError('')
                 fetchData()
+            } else {
+                const err = await res.json()
+                setFormError(err.error || 'Failed to save. Please try again.')
             }
         } catch (error) {
+            setFormError('Network error. Please try again.')
             console.error('Submit failed:', error)
         } finally {
             setSaving(false)
         }
+    }
+
+    const handleCloseModal = () => {
+        setShowLogModal(null)
+        setFormAmount('')
+        setFormExpected('')
+        setFormNote('')
+        setFormError('')
     }
 
     return (
@@ -358,7 +387,7 @@ export default function CashManagementPage() {
                     <div className="bg-stone-900 rounded-2xl w-full max-w-md">
                         <div className="flex items-center justify-between p-5 border-b border-stone-700">
                             <h2 className="text-xl font-bold capitalize">Log {showLogModal}</h2>
-                            <button onClick={() => setShowLogModal(null)} className="p-2 hover:bg-stone-800 rounded-lg">
+                            <button onClick={handleCloseModal} className="p-2 hover:bg-stone-800 rounded-lg">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
@@ -397,12 +426,45 @@ export default function CashManagementPage() {
                                 </label>
                                 <input
                                     type="number"
+                                    min="0.01"
+                                    step="0.01"
                                     value={formAmount}
-                                    onChange={(e) => setFormAmount(e.target.value)}
+                                    onChange={(e) => { setFormAmount(e.target.value); setFormError('') }}
                                     placeholder="0.00"
-                                    className="w-full mt-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3 text-xl"
+                                    className={`w-full mt-1 bg-stone-800 border rounded-xl px-4 py-3 text-xl ${
+                                        formError && (!formAmount || parseFloat(formAmount) <= 0)
+                                            ? 'border-red-500'
+                                            : 'border-stone-700'
+                                    }`}
                                 />
                             </div>
+
+                            {/* FIX 3: Live variance preview for COUNT modal */}
+                            {showLogModal === 'count' && formAmount && formExpected && (
+                                (() => {
+                                    const counted = parseFloat(formAmount)
+                                    const expected = parseFloat(formExpected)
+                                    if (!isNaN(counted) && !isNaN(expected)) {
+                                        const variance = counted - expected
+                                        return (
+                                            <div className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium ${
+                                                variance === 0
+                                                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                                                    : variance > 0
+                                                    ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
+                                                    : 'bg-red-500/10 border border-red-500/30 text-red-400'
+                                            }`}>
+                                                <span>Variance</span>
+                                                <span className="font-bold">
+                                                    {variance > 0 ? '+' : ''}{formatCurrency(variance)}
+                                                    {variance === 0 ? ' ✓ Balanced' : variance > 0 ? ' Over' : ' Short'}
+                                                </span>
+                                            </div>
+                                        )
+                                    }
+                                    return null
+                                })()
+                            )}
 
                             {showLogModal === 'deposit' && (
                                 <div>
@@ -428,21 +490,30 @@ export default function CashManagementPage() {
                                 />
                             </div>
                         </div>
-                        <div className="p-5 border-t border-stone-700 flex gap-2">
-                            <button
-                                onClick={() => setShowLogModal(null)}
-                                className="flex-1 py-3 bg-stone-700 hover:bg-stone-600 rounded-xl"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleSubmit}
-                                disabled={saving || !selectedLocation || !formAmount}
-                                className="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {saving && <RefreshCw className="h-4 w-4 animate-spin" />}
-                                Save
-                            </button>
+                        <div className="p-5 border-t border-stone-700 space-y-3">
+                            {/* FIX 3: Inline validation error */}
+                            {formError && (
+                                <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">
+                                    <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                                    {formError}
+                                </div>
+                            )}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleCloseModal}
+                                    className="flex-1 py-3 bg-stone-700 hover:bg-stone-600 rounded-xl"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={saving}
+                                    className="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {saving && <RefreshCw className="h-4 w-4 animate-spin" />}
+                                    {saving ? 'Saving…' : 'Save'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

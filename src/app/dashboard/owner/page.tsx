@@ -21,7 +21,7 @@ interface LocationSummary {
     card: number
     lowStock: number
     activeStaff: number
-    status: 'online' | 'offline' | 'warning'
+    status: 'active' | 'warning' | 'idle'
 }
 
 interface Exception {
@@ -72,17 +72,29 @@ export default function OwnerDashboard() {
             const exData = await exRes.json()
 
             // Transform data
-            const locations = storeData.locations?.map((loc: any) => ({
-                id: loc.location.id,
-                name: loc.location.name,
-                todaySales: loc.today.sales,
-                transactions: loc.today.transactions,
-                cash: loc.today.cash,
-                card: loc.today.card,
-                lowStock: loc.inventory.lowStock,
-                activeStaff: loc.staff.count,
-                status: 'online' // TODO: Add real status tracking
-            })) || []
+            const locations = storeData.locations?.map((loc: any) => {
+                // FIX 1: Derive status from real data — no heartbeat endpoint exists
+                // 'active'  = has sales or transactions today
+                // 'warning' = has low-stock issues but otherwise transacting
+                // 'idle'    = no sales and no transactions (could be closed, off-shift, etc.)
+                const hasSales = (loc.today.sales || 0) > 0 || (loc.today.transactions || 0) > 0
+                const hasLowStock = (loc.inventory.lowStock || 0) > 5
+                const status: 'active' | 'warning' | 'idle' =
+                    hasSales && hasLowStock ? 'warning'
+                    : hasSales ? 'active'
+                    : 'idle'
+                return {
+                    id: loc.location.id,
+                    name: loc.location.name,
+                    todaySales: loc.today.sales,
+                    transactions: loc.today.transactions,
+                    cash: loc.today.cash,
+                    card: loc.today.card,
+                    lowStock: loc.inventory.lowStock,
+                    activeStaff: loc.staff.count,
+                    status,
+                }
+            }) || []
 
             setData({
                 locations,
@@ -184,7 +196,7 @@ export default function OwnerDashboard() {
                     </div>
                     <p className="text-3xl font-bold">{data?.summary?.totalLocations || 0}</p>
                     <p className="text-sm text-blue-400 mt-2">
-                        {(data?.locations || []).filter(l => l.status === 'online').length} of {data?.summary?.totalLocations || 0} online
+                        {(data?.locations || []).filter(l => l.status === 'active' || l.status === 'warning').length} of {data?.summary?.totalLocations || 0} active today
                     </p>
                 </div>
 
@@ -372,10 +384,14 @@ export default function OwnerDashboard() {
                             <div>
                                 <h4 className="font-bold text-lg">{loc.name}</h4>
                                 <div className="flex items-center gap-2 mt-1">
-                                    <span className={`w-2 h-2 rounded-full ${loc.status === 'online' ? 'bg-emerald-500' :
-                                        loc.status === 'warning' ? 'bg-amber-500' : 'bg-red-500'
-                                        }`} />
-                                    <span className="text-sm text-stone-500 capitalize">{loc.status}</span>
+                                    <span className={`w-2 h-2 rounded-full ${
+                                        loc.status === 'active' ? 'bg-emerald-500' :
+                                        loc.status === 'warning' ? 'bg-amber-500' : 'bg-stone-500'
+                                    }`} />
+                                    <span className={`text-sm capitalize ${
+                                        loc.status === 'active' ? 'text-emerald-400' :
+                                        loc.status === 'warning' ? 'text-amber-400' : 'text-stone-500'
+                                    }`}>{loc.status === 'active' ? 'Active today' : loc.status === 'warning' ? 'Low stock' : 'No sales today'}</span>
                                 </div>
                             </div>
                             <div className="flex items-center gap-1 text-stone-400">

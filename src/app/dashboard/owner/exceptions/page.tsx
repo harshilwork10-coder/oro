@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
     ArrowLeft, AlertTriangle, AlertCircle, Info, RefreshCw,
@@ -23,18 +24,21 @@ interface Exception {
 
 export default function ExceptionsCenter() {
     const { data: session } = useSession()
+    const searchParams = useSearchParams()
     const [exceptions, setExceptions] = useState<Exception[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'CRITICAL' | 'WARNING' | 'INFO'>('all')
+    const [typeFilter, setTypeFilter] = useState<string>('')
     const [counts, setCounts] = useState({ critical: 0, warning: 0, info: 0, total: 0 })
     const [selectedLocation, setSelectedLocation] = useState('all')
-    const [locations, setLocations] = useState<{ id: string, name: string }[]>([])
+    const [locations, setLocations] = useState<{ id: string, name: string }[]>([])  
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true)
         try {
             const params = new URLSearchParams()
             if (selectedLocation !== 'all') params.set('locationId', selectedLocation)
+            if (typeFilter) params.set('type', typeFilter)
 
             const res = await fetch(`/api/owner/exceptions?${params}`)
             const data = await res.json()
@@ -55,13 +59,34 @@ export default function ExceptionsCenter() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [selectedLocation, typeFilter])
+
+    // FIX 2: Read URL query params on mount — so inventory hub low-stock links work
+    useEffect(() => {
+        const urlFilter = searchParams.get('filter')
+        const urlSeverity = searchParams.get('severity')
+        const urlLocation = searchParams.get('locationId')
+        const urlType = searchParams.get('type')
+
+        // Map common inbound filter values to our severity states
+        const severityMap: Record<string, 'all' | 'CRITICAL' | 'WARNING' | 'INFO'> = {
+            LOW_STOCK: 'WARNING',
+            CRITICAL: 'CRITICAL',
+            WARNING: 'WARNING',
+            INFO: 'INFO',
+        }
+
+        if (urlFilter && severityMap[urlFilter]) setFilter(severityMap[urlFilter])
+        if (urlSeverity && severityMap[urlSeverity]) setFilter(severityMap[urlSeverity])
+        if (urlLocation) setSelectedLocation(urlLocation)
+        if (urlType) setTypeFilter(urlType)
+    }, [searchParams])
 
     useEffect(() => {
         fetchData()
-        const interval = setInterval(fetchData, 30000) // Refresh every 30 seconds
+        const interval = setInterval(fetchData, 30000)
         return () => clearInterval(interval)
-    }, [selectedLocation])
+    }, [fetchData])
 
     const handleAcknowledge = async (exceptionId: string) => {
         try {
@@ -92,6 +117,10 @@ export default function ExceptionsCenter() {
     const filteredExceptions = filter === 'all'
         ? exceptions
         : exceptions.filter(ex => ex.severity === filter)
+
+    // Active filter indicator for display
+    const urlFilter = searchParams.get('filter')
+    const inboundFilterLabel = urlFilter === 'LOW_STOCK' ? 'Low Stock Items' : null
 
     const getSeverityIcon = (severity: string) => {
         switch (severity) {
@@ -134,6 +163,20 @@ export default function ExceptionsCenter() {
                     Refresh
                 </button>
             </div>
+
+            {/* Inbound filter banner — shows when user arrived via a deep link (e.g. inventory low-stock) */}
+            {inboundFilterLabel && (
+                <div className="mb-4 flex items-center gap-2 text-sm px-4 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300">
+                    <Filter className="h-4 w-4" />
+                    Filtered to: <strong>{inboundFilterLabel}</strong>
+                    <button
+                        onClick={() => { setFilter('all'); setTypeFilter('') }}
+                        className="ml-auto text-xs underline hover:text-white"
+                    >
+                        Clear filter
+                    </button>
+                </div>
+            )}
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

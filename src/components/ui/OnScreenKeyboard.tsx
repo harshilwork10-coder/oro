@@ -50,6 +50,19 @@ export default function OnScreenKeyboard({
         }
     }, [isShift, value, onSubmit, onClose])
 
+    // Keyboard shortcut support: Escape to close
+    useEffect(() => {
+        if (!isOpen) return
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                onClose()
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [isOpen, onClose])
+
     if (!isOpen) return null
 
     // Number row
@@ -90,7 +103,7 @@ export default function OnScreenKeyboard({
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
             <div className="bg-stone-900 rounded-t-2xl w-full max-w-2xl p-4 shadow-2xl">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">

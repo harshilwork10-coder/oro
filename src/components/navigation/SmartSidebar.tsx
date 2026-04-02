@@ -15,8 +15,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
     LayoutDashboard, ShoppingCart, Package, BarChart3, Users, Settings,
-    DollarSign, Shield, Building2, CalendarClock, Bell, Tag,
-    FileText, Truck, ClipboardList, Receipt, Banknote,
+    DollarSign, Shield, Building2, CalendarClock,
+    FileText, ClipboardList, Receipt, Banknote,
     ChevronDown, ChevronRight, Store, Palette, GraduationCap
 } from 'lucide-react'
 
@@ -33,11 +33,8 @@ const NAV_ITEMS: NavItem[] = [
     { label: 'POS', href: '/pos', icon: ShoppingCart, roles: ['CASHIER', 'MANAGER', 'OWNER', 'ADMIN'] },
     {
         label: 'Inventory', icon: Package, roles: ['MANAGER', 'OWNER', 'ADMIN'], children: [
-            { label: 'Products', href: '/dashboard/inventory/products', icon: Package, roles: ['MANAGER', 'OWNER', 'ADMIN'] },
-            { label: 'Matrix Items', href: '/dashboard/inventory/matrix-items', icon: Tag, roles: ['OWNER', 'ADMIN'] },
-            { label: 'Kit/Bundles', href: '/dashboard/inventory/kit-bundles', icon: Package, roles: ['OWNER', 'ADMIN'] },
+            { label: 'Product Manager', href: '/dashboard/inventory/retail', icon: Package, roles: ['MANAGER', 'OWNER', 'ADMIN'] },
             { label: 'Physical Count', href: '/dashboard/inventory/physical-count', icon: ClipboardList, roles: ['MANAGER', 'OWNER'] },
-            { label: 'Vendor Returns', href: '/dashboard/inventory/vendor-returns', icon: Truck, roles: ['OWNER', 'ADMIN'] },
         ]
     },
     {

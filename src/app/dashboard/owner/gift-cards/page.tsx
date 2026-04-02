@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
@@ -40,6 +40,8 @@ export default function GiftCardsPage() {
     const [newCard, setNewCard] = useState<any>(null)
     const [saving, setSaving] = useState(false)
     const [message, setMessage] = useState('')
+    // FIX 4: Deactivate confirmation state
+    const [confirmDeactivateId, setConfirmDeactivateId] = useState<string | null>(null)
 
     const fetchData = async () => {
         setLoading(true)
@@ -59,6 +61,15 @@ export default function GiftCardsPage() {
     useEffect(() => {
         fetchData()
     }, [])
+
+    // Escape key handler for issue modal
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && showIssue) setShowIssue(false)
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [showIssue])
 
     const searchCard = async () => {
         if (!searchCode || searchCode.length < 4) return
@@ -104,21 +115,35 @@ export default function GiftCardsPage() {
     }
 
     const toggleCardStatus = async (cardId: string, isActive: boolean) => {
+        // FIX 4: Deactivation requires confirmation — reactivation is direct
+        if (!isActive) {
+            // Reactivating: do it immediately
+            try {
+                const res = await fetch('/api/owner/gift-cards', {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cardId, isActive: true })
+                })
+                if (res.ok) { fetchData(); setSearchResult((prev: any) => prev ? { ...prev, giftCard: { ...prev.giftCard, isActive: true } } : prev) }
+            } catch { console.error('Toggle failed') }
+            return
+        }
+        // Deactivating: show confirm overlay first
+        setConfirmDeactivateId(cardId)
+    }
+
+    const executeDeactivate = async (cardId: string) => {
+        setConfirmDeactivateId(null)
         try {
             const res = await fetch('/api/owner/gift-cards', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cardId, isActive })
+                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cardId, isActive: false })
             })
             if (res.ok) {
                 fetchData()
-                if (searchResult?.giftCard?.id === cardId) {
-                    setSearchResult({ ...searchResult, giftCard: { ...searchResult.giftCard, isActive } })
-                }
+                setSearchResult((prev: any) => prev ? { ...prev, giftCard: { ...prev.giftCard, isActive: false } } : prev)
+                setMessage('✓ Card deactivated')
             }
-        } catch (error) {
-            console.error('Toggle failed')
-        }
+        } catch { console.error('Toggle failed') }
     }
 
     const copyCode = (code: string) => {
@@ -212,8 +237,9 @@ export default function GiftCardsPage() {
                             type="text"
                             value={searchCode}
                             onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
-                            placeholder="Enter gift card code..."
-                            className="w-full pl-12 pr-4 py-4 bg-stone-900 border border-stone-700 rounded-2xl text-lg font-mono"
+                            onKeyDown={(e) => { if (e.key === 'Enter') searchCard() }}
+                            placeholder="Enter gift card code... (Enter to search)"
+                            className="w-full pl-12 pr-4 py-4 bg-stone-900 border border-stone-700 rounded-2xl text-lg font-mono focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                         />
                     </div>
                     <button
@@ -263,7 +289,7 @@ export default function GiftCardsPage() {
                             </div>
 
                             <button
-                                onClick={() => toggleCardStatus(searchResult.giftCard.id, !searchResult.giftCard.isActive)}
+                                onClick={() => toggleCardStatus(searchResult.giftCard.id, searchResult.giftCard.isActive)}
                                 className={`w-full py-3 rounded-xl ${searchResult.giftCard.isActive
                                         ? 'bg-red-600 hover:bg-red-500'
                                         : 'bg-emerald-600 hover:bg-emerald-500'
@@ -271,6 +297,29 @@ export default function GiftCardsPage() {
                             >
                                 {searchResult.giftCard.isActive ? 'Deactivate Card' : 'Reactivate Card'}
                             </button>
+
+                            {/* FIX 4: Styled confirm overlay for deactivation */}
+                            {confirmDeactivateId === searchResult.giftCard.id && (
+                                <div className="mt-3 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                                    <p className="text-sm text-red-300 font-medium mb-3">
+                                        ⚠ Deactivate this gift card? It will no longer be usable at any location.
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setConfirmDeactivateId(null)}
+                                            className="flex-1 py-2 bg-stone-700 hover:bg-stone-600 rounded-xl text-sm"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => executeDeactivate(searchResult.giftCard.id)}
+                                            className="flex-1 py-2 bg-red-600 hover:bg-red-500 rounded-xl text-sm font-semibold"
+                                        >
+                                            Yes, Deactivate
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="text-center py-8">
@@ -324,7 +373,7 @@ export default function GiftCardsPage() {
 
             {/* Issue Modal */}
             {showIssue && (
-                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowIssue(false) }}>
                     <div className="bg-stone-900 rounded-2xl w-full max-w-md">
                         <div className="p-5 border-b border-stone-700">
                             <h2 className="text-xl font-bold">Issue Gift Card</h2>
@@ -370,7 +419,8 @@ export default function GiftCardsPage() {
                                                 value={issueAmount}
                                                 onChange={(e) => setIssueAmount(e.target.value)}
                                                 placeholder="25.00"
-                                                className="w-full pl-10 pr-4 py-3 bg-stone-800 border border-stone-700 rounded-xl text-xl"
+                                                autoFocus
+                                                className="w-full pl-10 pr-4 py-3 bg-stone-800 border border-stone-700 rounded-xl text-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                                             />
                                         </div>
                                     </div>

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
     Package, AlertTriangle, ClipboardList, ArrowLeftRight, Truck, Upload, Wrench,
     ArrowRight, Zap, Tag, FileSpreadsheet, RotateCcw, Barcode, PackageCheck,
-    PackageMinus, PackageSearch, Scale, Layers, GitBranch, Printer, PackageX
+    PackageMinus, PackageSearch, Scale, Printer
 } from 'lucide-react'
 
 const tabs = [
@@ -23,8 +23,7 @@ const tabContent: Record<string, { title: string; cards: { name: string; href: s
         title: 'Inventory Alerts',
         cards: [
             { name: 'Low Stock', href: '/dashboard/inventory/alerts', icon: AlertTriangle, desc: 'Products below reorder point' },
-            { name: 'Slow Movers', href: '/dashboard/inventory/slow-movers', icon: PackageSearch, desc: 'Products not selling' },
-            { name: 'Expiry Tracking', href: '/dashboard/inventory/expiry', icon: PackageX, desc: 'Products near expiration' },
+            { name: 'Slow Movers', href: '/dashboard/inventory/alerts', icon: PackageSearch, desc: 'Products not selling (view in Alerts)' },
             { name: 'Smart Ordering', href: '/dashboard/inventory/smart-ordering', icon: Zap, desc: 'AI-powered reorder suggestions' },
         ]
     },
@@ -32,8 +31,7 @@ const tabContent: Record<string, { title: string; cards: { name: string; href: s
         title: 'Purchase Orders',
         cards: [
             { name: 'Purchase Orders', href: '/dashboard/inventory/purchase-orders', icon: ClipboardList, desc: 'Create & manage POs' },
-            { name: 'Order Templates', href: '/dashboard/inventory/order-templates', icon: FileSpreadsheet, desc: 'Saved order lists' },
-            { name: 'Reorder Suggestions', href: '/dashboard/inventory/reorder', icon: RotateCcw, desc: 'Based on sales velocity' },
+            { name: 'Reorder Suggestions', href: '/dashboard/inventory/reorder-suggestions', icon: RotateCcw, desc: 'Based on sales velocity' },
             { name: 'Auto Reorder', href: '/dashboard/inventory/auto-reorder', icon: Zap, desc: 'Automatic PO generation' },
         ]
     },
@@ -43,16 +41,14 @@ const tabContent: Record<string, { title: string; cards: { name: string; href: s
             { name: 'Adjustments', href: '/dashboard/inventory/adjustments', icon: ArrowLeftRight, desc: 'Manual stock adjustments' },
             { name: 'Physical Count', href: '/dashboard/inventory/physical-count', icon: Barcode, desc: 'Cycle counts & full audits' },
             { name: 'Shrink Report', href: '/dashboard/inventory/shrink', icon: PackageMinus, desc: 'Track inventory loss' },
-            { name: 'Waste Log', href: '/dashboard/inventory/waste', icon: PackageX, desc: 'Damaged & expired items' },
+            { name: 'Waste Log', href: '/dashboard/inventory/waste-log', icon: PackageMinus, desc: 'Damaged & expired items' },
         ]
     },
     suppliers: {
         title: 'Supplier Management',
         cards: [
             { name: 'Suppliers', href: '/dashboard/owner/vendors', icon: Truck, desc: 'Vendor directory' },
-            { name: 'Consignment', href: '/dashboard/inventory/consignment', icon: PackageCheck, desc: 'Consignment tracking' },
-            { name: 'Vendor Returns', href: '/dashboard/inventory/vendor-returns', icon: RotateCcw, desc: 'RMA & credits' },
-            { name: 'Backorder', href: '/dashboard/inventory/backorder', icon: PackageSearch, desc: 'Pending deliveries' },
+            { name: 'Suppliers (Inv)', href: '/dashboard/inventory/suppliers', icon: Truck, desc: 'Supplier directory' },
         ]
     },
     imports: {
@@ -69,12 +65,9 @@ const tabContent: Record<string, { title: string; cards: { name: string; href: s
     advanced: {
         title: 'Advanced Inventory',
         cards: [
-            { name: 'Case Break', href: '/dashboard/inventory/case-break', icon: Package, desc: 'Split cases to units' },
-            { name: 'Kit Bundles', href: '/dashboard/inventory/kits', icon: Layers, desc: 'Bundle products' },
-            { name: 'Matrix Items', href: '/dashboard/inventory/matrix', icon: GitBranch, desc: 'Size/color variants' },
             { name: 'Tag-Along', href: '/dashboard/inventory/tag-along', icon: PackageCheck, desc: 'Auto-add paired products' },
             { name: 'Transfers', href: '/dashboard/owner/transfers', icon: ArrowLeftRight, desc: 'Transfer between locations' },
-            { name: 'Print Labels', href: '/dashboard/inventory/labels', icon: Printer, desc: 'Shelf & barcode labels' },
+            { name: 'Print Labels', href: '/dashboard/labels', icon: Printer, desc: 'Shelf & barcode labels' },
             { name: 'Duplicate UPC', href: '/dashboard/inventory/duplicate-upc', icon: Barcode, desc: 'Find duplicate barcodes' },
         ]
     },

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
@@ -54,10 +54,13 @@ export default function TransfersPage() {
     const [fromLocationId, setFromLocationId] = useState('')
     const [toLocationId, setToLocationId] = useState('')
     const [reason, setReason] = useState('')
-    const [newItems, setNewItems] = useState<{ itemId: string, name: string, quantity: number }[]>([])
+    const [newItems, setNewItems] = useState<{ itemId: string, name: string, quantity: number, availableStock: number }[]>([])
     const [searchQuery, setSearchQuery] = useState('')
     const [searchResults, setSearchResults] = useState<{ id: string, name: string, sku: string, stock: number }[]>([])
     const [saving, setSaving] = useState(false)
+    const fromSelectRef = useRef<HTMLSelectElement>(null)
+    // FIX 3b: Partial receive state
+    const [receiveQtys, setReceiveQtys] = useState<Record<string, number>>({})
 
     const fetchData = async () => {
         setLoading(true)
@@ -102,13 +105,19 @@ export default function TransfersPage() {
             return
         }
         try {
-            const res = await fetch(`/api/products?search=${encodeURIComponent(query)}&limit=10`)
+            // FIX 3a: scope stock query to the from-location when selected
+            const params = new URLSearchParams()
+            params.set('search', query)
+            params.set('limit', '10')
+            if (fromLocationId) params.set('locationId', fromLocationId)
+
+            const res = await fetch(`/api/products?${params}`)
             const data = await res.json()
             setSearchResults(data.products?.map((p: any) => ({
                 id: p.id,
                 name: p.name,
                 sku: p.sku || '',
-                stock: p.stock || 0
+                stock: p.locationStock ?? p.stock ?? 0  // prefer location-scoped stock
             })) || [])
         } catch (error) {
             console.error('Search failed:', error)
@@ -124,6 +133,26 @@ export default function TransfersPage() {
         const timer = setTimeout(() => searchProducts(searchQuery), 300)
         return () => clearTimeout(timer)
     }, [searchQuery])
+
+    // Escape key handler for modals
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (selectedTransfer) setSelectedTransfer(null)
+                else if (showNewModal) setShowNewModal(false)
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [showNewModal, selectedTransfer])
+
+    // Enter key on product search selects first result
+    const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && searchResults.length > 0) {
+            e.preventDefault()
+            addItem(searchResults[0])
+        }
+    }
 
     const handleCreateTransfer = async () => {
         if (!fromLocationId || !toLocationId || newItems.length === 0) {
@@ -185,15 +214,44 @@ export default function TransfersPage() {
 
     const addItem = (product: { id: string, name: string, sku: string, stock: number }) => {
         if (newItems.find(i => i.itemId === product.id)) {
-            // Increment quantity
             setNewItems(newItems.map(i =>
                 i.itemId === product.id ? { ...i, quantity: i.quantity + 1 } : i
             ))
         } else {
-            setNewItems([...newItems, { itemId: product.id, name: product.name, quantity: 1 }])
+            setNewItems([...newItems, { itemId: product.id, name: product.name, quantity: 1, availableStock: product.stock }])
         }
         setSearchQuery('')
         setSearchResults([])
+    }
+
+    // FIX 3b: When opening a transfer detail in IN_TRANSIT, pre-fill received qtys
+    const openTransfer = (transfer: Transfer) => {
+        setSelectedTransfer(transfer)
+        if (transfer.status === 'IN_TRANSIT') {
+            const qtys: Record<string, number> = {}
+            transfer.items.forEach(item => { qtys[item.id] = item.quantitySent })
+            setReceiveQtys(qtys)
+        }
+    }
+
+    const handlePartialReceive = async (transferId: string) => {
+        setSaving(true)
+        try {
+            const res = await fetch('/api/owner/transfers', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ transferId, action: 'RECEIVE', receivedQtys: receiveQtys })
+            })
+            if (res.ok) {
+                fetchData()
+                setSelectedTransfer(null)
+                setReceiveQtys({})
+            } else {
+                const d = await res.json()
+                alert(d.error || 'Receive failed')
+            }
+        } catch { alert('Network error') }
+        finally { setSaving(false) }
     }
 
     const getStatusIcon = (status: string) => {
@@ -242,7 +300,10 @@ export default function TransfersPage() {
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </button>
                     <button
-                        onClick={() => setShowNewModal(true)}
+                        onClick={() => {
+                            setShowNewModal(true)
+                            setTimeout(() => fromSelectRef.current?.focus(), 100)
+                        }}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl"
                     >
                         <Plus className="h-4 w-4" />
@@ -288,7 +349,7 @@ export default function TransfersPage() {
                     {transfers.map(transfer => (
                         <button
                             key={transfer.id}
-                            onClick={() => setSelectedTransfer(transfer)}
+                            onClick={() => openTransfer(transfer)}
                             className="w-full bg-stone-900/80 border border-stone-700 hover:border-blue-500/30 rounded-2xl p-5 text-left transition-all"
                         >
                             <div className="flex items-center justify-between">
@@ -320,7 +381,7 @@ export default function TransfersPage() {
 
             {/* New Transfer Modal */}
             {showNewModal && (
-                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowNewModal(false) }}>
                     <div className="bg-stone-900 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between p-5 border-b border-stone-700">
                             <h2 className="text-xl font-bold">New Transfer</h2>
@@ -334,9 +395,10 @@ export default function TransfersPage() {
                                 <div>
                                     <label className="text-sm text-stone-400">From Location</label>
                                     <select
+                                        ref={fromSelectRef}
                                         value={fromLocationId}
                                         onChange={(e) => setFromLocationId(e.target.value)}
-                                        className="w-full mt-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3"
+                                        className="w-full mt-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
                                         <option value="">Select...</option>
                                         {locations.map(loc => (
@@ -383,8 +445,9 @@ export default function TransfersPage() {
                                         type="text"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        placeholder="Search products by name or barcode..."
-                                        className="w-full pl-10 pr-4 py-3 bg-stone-800 border border-stone-700 rounded-xl"
+                                        onKeyDown={handleSearchKeyDown}
+                                        placeholder="Search products... (Enter to add first)"
+                                        className="w-full pl-10 pr-4 py-3 bg-stone-800 border border-stone-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
 
@@ -405,14 +468,28 @@ export default function TransfersPage() {
                                 )}
                             </div>
 
-                            {/* Selected Items */}
+                            {/* FIX 3a: Show from-location stock availability in the item list */}
                             {newItems.length > 0 && (
                                 <div>
                                     <label className="text-sm text-stone-400">Items to Transfer ({newItems.length})</label>
                                     <div className="mt-2 space-y-2">
                                         {newItems.map(item => (
                                             <div key={item.itemId} className="flex items-center justify-between bg-stone-800 rounded-xl p-3">
-                                                <span>{item.name}</span>
+                                                <div>
+                                                    <span className="font-medium">{item.name}</span>
+                                                    {item.availableStock !== undefined && (
+                                                        <p className={`text-xs mt-0.5 ${
+                                                            item.quantity > item.availableStock
+                                                                ? 'text-red-400'
+                                                                : 'text-stone-500'
+                                                        }`}>
+                                                            {item.quantity > item.availableStock
+                                                                ? `⚠ Only ${item.availableStock} available at ${locations.find(l => l.id === fromLocationId)?.name || 'source'}`
+                                                                : `${item.availableStock} available`
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={() => setNewItems(newItems.map(i =>
@@ -423,7 +500,13 @@ export default function TransfersPage() {
                                                     >
                                                         -
                                                     </button>
-                                                    <span className="w-8 text-center">{item.quantity}</span>
+                                                    <span className="text-xs text-stone-400">Qty:</span>
+                                                    <input type="number" min={1}
+                                                        value={item.quantity}
+                                                        onChange={(e) => setNewItems(newItems.map(i =>
+                                                            i.itemId === item.itemId ? { ...i, quantity: Math.max(1, parseInt(e.target.value) || 1) } : i
+                                                        ))}
+                                                        className="w-16 text-center bg-stone-700 border border-stone-600 rounded-lg px-1 py-1 text-sm focus:ring-2 focus:ring-blue-500" />
                                                     <button
                                                         onClick={() => setNewItems(newItems.map(i =>
                                                             i.itemId === item.itemId ? { ...i, quantity: i.quantity + 1 } : i
@@ -467,7 +550,7 @@ export default function TransfersPage() {
 
             {/* Transfer Detail Modal */}
             {selectedTransfer && (
-                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setSelectedTransfer(null) }}>
                     <div className="bg-stone-900 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between p-5 border-b border-stone-700">
                             <div>
@@ -496,9 +579,40 @@ export default function TransfersPage() {
                                 <p className="text-sm text-stone-400 mb-2">Items ({selectedTransfer.totalItems})</p>
                                 <div className="space-y-2">
                                     {selectedTransfer.items.map(item => (
-                                        <div key={item.id} className="flex justify-between text-sm">
-                                            <span>{item.itemName}</span>
-                                            <span>x{item.quantitySent}</span>
+                                        <div key={item.id} className="text-sm">
+                                            {/* FIX 3b: Partial receive qty input for IN_TRANSIT */}
+                                            {selectedTransfer.status === 'IN_TRANSIT' ? (
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="flex-1">{item.itemName}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-stone-500 text-xs">Sent: {item.quantitySent}</span>
+                                                        <span className="text-stone-600">→</span>
+                                                        <span className="text-xs text-stone-400">Rcvd:</span>
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            max={item.quantitySent}
+                                                            value={receiveQtys[item.id] ?? item.quantitySent}
+                                                            onChange={(e) => setReceiveQtys(prev => ({ ...prev, [item.id]: parseInt(e.target.value) || 0 }))}
+                                                            className={`w-16 bg-stone-700 border rounded-lg px-2 py-1 text-center text-sm ${
+                                                                (receiveQtys[item.id] ?? item.quantitySent) < item.quantitySent
+                                                                    ? 'border-amber-500/60 text-amber-400'
+                                                                    : 'border-stone-600'
+                                                            }`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex justify-between">
+                                                    <span>{item.itemName}</span>
+                                                    <span className="text-stone-400">
+                                                        ×{item.quantitySent}
+                                                        {item.quantityReceived != null && item.quantityReceived !== item.quantitySent && (
+                                                            <span className="ml-2 text-amber-400">(rcvd: {item.quantityReceived})</span>
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -506,6 +620,15 @@ export default function TransfersPage() {
                                     <span>Total Value</span>
                                     <span>{formatCurrency(Number(selectedTransfer.totalValue))}</span>
                                 </div>
+                                {/* Warn if any shortfall */}
+                                {selectedTransfer.status === 'IN_TRANSIT' && Object.entries(receiveQtys).some(([id, qty]) => {
+                                    const item = selectedTransfer.items.find(i => i.id === id)
+                                    return item && qty < item.quantitySent
+                                }) && (
+                                    <div className="mt-3 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-lg">
+                                        ⚠ Partial receive detected — transfer will be flagged as DISCREPANCY.
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -527,15 +650,37 @@ export default function TransfersPage() {
                                     </button>
                                 </>
                             )}
+                            {/* FIX 3b: Partial receive — pass receiveQtys */}
                             {selectedTransfer.status === 'IN_TRANSIT' && (
                                 <button
-                                    onClick={() => handleAction(selectedTransfer.id, 'RECEIVE')}
-                                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl"
+                                    onClick={() => handlePartialReceive(selectedTransfer.id)}
+                                    disabled={saving}
+                                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
-                                    Mark Received
+                                    {saving && <RefreshCw className="h-4 w-4 animate-spin" />}
+                                    {saving ? 'Saving…' : Object.entries(receiveQtys).some(([id, qty]) => {
+                                        const item = selectedTransfer.items.find(i => i.id === id)
+                                        return item && qty < item.quantitySent
+                                    }) ? 'Mark Partial Receive' : 'Mark Received'}
                                 </button>
                             )}
-                            {['RECEIVED', 'DISCREPANCY', 'CANCELLED'].includes(selectedTransfer.status) && (
+                            {selectedTransfer.status === 'DISCREPANCY' && (
+                                <>
+                                    <button
+                                        onClick={() => setSelectedTransfer(null)}
+                                        className="flex-1 py-3 bg-stone-700 hover:bg-stone-600 rounded-xl"
+                                    >
+                                        Close
+                                    </button>
+                                    <button
+                                        onClick={() => handleAction(selectedTransfer.id, 'RESOLVE_DISCREPANCY')}
+                                        className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 rounded-xl"
+                                    >
+                                        Mark Resolved
+                                    </button>
+                                </>
+                            )}
+                            {['RECEIVED', 'CANCELLED'].includes(selectedTransfer.status) && (
                                 <button
                                     onClick={() => setSelectedTransfer(null)}
                                     className="flex-1 py-3 bg-stone-700 hover:bg-stone-600 rounded-xl"

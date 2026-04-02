@@ -618,32 +618,35 @@ export default function RetailInventoryPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-stone-500">SKU <span className="text-blue-400">(Tap to type)</span></label>
-                                    <div
-                                        onClick={() => { setKeyboardField('sku'); setShowKeyboard(true); }}
-                                        className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded cursor-pointer hover:border-orange-500 transition-colors min-h-[42px] flex items-center"
-                                    >
-                                        {editProduct.sku || <span className="text-stone-500">Tap to enter SKU...</span>}
-                                    </div>
+                                    <label className="text-xs text-stone-500">SKU</label>
+                                    <input
+                                        type="text"
+                                        value={editProduct.sku || ''}
+                                        onChange={(e) => updateField('sku', e.target.value || null)}
+                                        className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded cursor-text hover:border-orange-500 transition-colors min-h-[42px] focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        placeholder="e.g., LIQ-001"
+                                    />
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label className="text-xs text-stone-500">Size <span className="text-purple-400">(AI)</span></label>
-                                        <div
-                                            onClick={() => { setKeyboardField('size'); setShowKeyboard(true); }}
-                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded cursor-pointer hover:border-orange-500 transition-colors min-h-[42px] flex items-center"
-                                        >
-                                            {editProduct.size || <span className="text-stone-500">750ml, 12 oz...</span>}
-                                        </div>
+                                        <label className="text-xs text-stone-500">Size</label>
+                                        <input
+                                            type="text"
+                                            value={editProduct.size || ''}
+                                            onChange={(e) => updateField('size', e.target.value || null)}
+                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded hover:border-orange-500 transition-colors min-h-[42px] focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                            placeholder="750ml, 12 oz..."
+                                        />
                                     </div>
                                     <div>
                                         <label className="text-xs text-stone-500">Type</label>
-                                        <div
-                                            onClick={() => { setKeyboardField('productType'); setShowKeyboard(true); }}
-                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded cursor-pointer hover:border-orange-500 transition-colors min-h-[42px] flex items-center"
-                                        >
-                                            {editProduct.productType || <span className="text-stone-500">Whiskey, Lager...</span>}
-                                        </div>
+                                        <input
+                                            type="text"
+                                            value={editProduct.productType || ''}
+                                            onChange={(e) => updateField('productType', e.target.value || null)}
+                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded hover:border-orange-500 transition-colors min-h-[42px] focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                            placeholder="Whiskey, Lager..."
+                                        />
                                     </div>
                                 </div>
                                 <div>
@@ -663,22 +666,24 @@ export default function RetailInventoryPage() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label className="text-xs text-stone-500">Brand <span className="text-purple-400">(AI)</span></label>
-                                        <div
-                                            onClick={() => { setKeyboardField('brand'); setShowKeyboard(true); }}
-                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded cursor-pointer hover:border-orange-500 transition-colors min-h-[42px] flex items-center"
-                                        >
-                                            {editProduct.brand || <span className="text-stone-500">Bulleit, Coca-Cola...</span>}
-                                        </div>
+                                        <label className="text-xs text-stone-500">Brand</label>
+                                        <input
+                                            type="text"
+                                            value={editProduct.brand || ''}
+                                            onChange={(e) => updateField('brand', e.target.value || null)}
+                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded hover:border-orange-500 transition-colors min-h-[42px] focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                            placeholder="Bulleit, Coca-Cola..."
+                                        />
                                     </div>
                                     <div>
-                                        <label className="text-xs text-stone-500">Supplier / Distributor <span className="text-blue-400">(Tap)</span></label>
-                                        <div
-                                            onClick={() => { setKeyboardField('vendor'); setShowKeyboard(true); }}
-                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded cursor-pointer hover:border-orange-500 transition-colors min-h-[42px] flex items-center"
-                                        >
-                                            {editProduct.vendor || <span className="text-stone-500">Enter supplier...</span>}
-                                        </div>
+                                        <label className="text-xs text-stone-500">Supplier / Distributor</label>
+                                        <input
+                                            type="text"
+                                            value={editProduct.vendor || ''}
+                                            onChange={(e) => updateField('vendor', e.target.value || null)}
+                                            className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded hover:border-orange-500 transition-colors min-h-[42px] focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                            placeholder="Enter supplier..."
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -690,28 +695,46 @@ export default function RetailInventoryPage() {
 
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-xs text-stone-500">Cost (You Pay) — Tap to enter</label>
-                                    <button
-                                        onClick={() => { setNumpadField('cost'); setShowNumpad(true); }}
-                                        className="w-full px-3 py-3 bg-stone-800 border border-stone-600 rounded text-left text-lg flex items-center gap-2 hover:border-green-500 transition-colors"
-                                    >
-                                        <DollarSign className="h-5 w-5 text-stone-500" />
-                                        <span className={editProduct.cost ? 'text-white' : 'text-stone-500'}>
-                                            {editProduct.cost ? Number(editProduct.cost).toFixed(2) : '0.00'}
-                                        </span>
-                                    </button>
+                                    <label className="text-xs text-stone-500">Cost (You Pay)</label>
+                                    <div className="flex items-center gap-1">
+                                        <DollarSign className="h-5 w-5 text-stone-500 flex-shrink-0" />
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={editProduct.cost ?? ''}
+                                            onChange={(e) => updateField('cost', e.target.value !== '' ? parseFloat(e.target.value) : null)}
+                                            className="w-full px-3 py-3 bg-stone-800 border border-stone-600 rounded text-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                            placeholder="0.00"
+                                        />
+                                        <button
+                                            onClick={() => { setNumpadField('cost'); setShowNumpad(true); }}
+                                            className="p-2 bg-stone-700 hover:bg-stone-600 rounded text-stone-400 flex-shrink-0" title="Open numpad"
+                                        >
+                                            ⌨
+                                        </button>
+                                    </div>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-stone-500">Price (Customer Pays) — Tap to enter</label>
-                                    <button
-                                        onClick={() => { setNumpadField('price'); setShowNumpad(true); }}
-                                        className="w-full px-3 py-4 bg-stone-800 border border-orange-500 rounded text-left text-2xl font-bold flex items-center gap-2 hover:bg-stone-700 transition-colors"
-                                    >
-                                        <DollarSign className="h-6 w-6 text-orange-400" />
-                                        <span className="text-orange-400">
-                                            {Number(editProduct.price).toFixed(2)}
-                                        </span>
-                                    </button>
+                                    <label className="text-xs text-stone-500">Price (Customer Pays)</label>
+                                    <div className="flex items-center gap-1">
+                                        <DollarSign className="h-6 w-6 text-orange-400 flex-shrink-0" />
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={editProduct.price || ''}
+                                            onChange={(e) => updateField('price', parseFloat(e.target.value) || 0)}
+                                            className="w-full px-3 py-4 bg-stone-800 border border-orange-500 rounded text-2xl font-bold text-orange-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                            placeholder="0.00"
+                                        />
+                                        <button
+                                            onClick={() => { setNumpadField('price'); setShowNumpad(true); }}
+                                            className="p-2 bg-stone-700 hover:bg-stone-600 rounded text-stone-400 flex-shrink-0" title="Open numpad"
+                                        >
+                                            ⌨
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Profit Display */}
@@ -752,16 +775,26 @@ export default function RetailInventoryPage() {
 
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-xs text-stone-500">Current Stock — Tap to enter exact</label>
-                                    <button
-                                        onClick={() => { setNumpadField('stock'); setShowNumpad(true); }}
-                                        className={`w-full px-3 py-4 bg-stone-800 border rounded text-4xl font-bold text-center hover:bg-stone-700 transition-colors ${isLowStock
-                                            ? 'border-red-500 text-red-400'
-                                            : 'border-stone-600 text-white'
-                                            }`}
-                                    >
-                                        {editProduct.stock}
-                                    </button>
+                                    <label className="text-xs text-stone-500">Current Stock</label>
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={editProduct.stock}
+                                            onChange={(e) => updateField('stock', Math.max(0, parseInt(e.target.value) || 0))}
+                                            className={`w-full px-3 py-4 bg-stone-800 border rounded text-4xl font-bold text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isLowStock
+                                                ? 'border-red-500 text-red-400'
+                                                : 'border-stone-600 text-white'
+                                                }`}
+                                            placeholder="0"
+                                        />
+                                        <button
+                                            onClick={() => { setNumpadField('stock'); setShowNumpad(true); }}
+                                            className="p-2 bg-stone-700 hover:bg-stone-600 rounded text-stone-400 flex-shrink-0" title="Open numpad"
+                                        >
+                                            ⌨
+                                        </button>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="text-xs text-stone-500">Reorder Point (Alert When Below)</label>

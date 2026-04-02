@@ -114,3 +114,56 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to create purchase order' }, { status: 500 })
     }
 }
+
+// PUT /api/inventory/purchase-orders - Update status (body: { id, status })
+export async function PUT(req: NextRequest) {
+    try {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const { id, status } = await req.json()
+        if (!id || !status) return NextResponse.json({ error: 'id and status required' }, { status: 400 })
+
+        const existingPO = await prisma.purchaseOrder.findFirst({
+            where: { id, franchiseId: user.franchiseId },
+            include: { items: { include: { product: true } } }
+        })
+        if (!existingPO) return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
+
+        const purchaseOrder = await prisma.$transaction(async (tx) => {
+            // If marking as RECEIVED, atomically increment product stock
+            if (status === 'RECEIVED' && existingPO.status !== 'RECEIVED') {
+                for (const item of existingPO.items) {
+                    await tx.product.update({
+                        where: { id: item.productId },
+                        data: { stock: { increment: item.quantity } }
+                    })
+                    await tx.stockAdjustment.create({
+                        data: {
+                            productId: item.productId,
+                            locationId: existingPO.locationId,
+                            quantity: item.quantity,
+                            reason: 'RESTOCK',
+                            notes: `Received from PO #${id.slice(-6).toUpperCase()}`,
+                            performedBy: user.id || user.email || 'system'
+                        }
+                    })
+                }
+            }
+
+            return await tx.purchaseOrder.update({
+                where: { id },
+                data: { status },
+                include: {
+                    supplier: true,
+                    items: { include: { product: true } }
+                }
+            })
+        })
+
+        return NextResponse.json({ purchaseOrder })
+    } catch (error) {
+        console.error('Failed to update purchase order:', error)
+        return NextResponse.json({ error: 'Failed to update purchase order' }, { status: 500 })
+    }
+}
