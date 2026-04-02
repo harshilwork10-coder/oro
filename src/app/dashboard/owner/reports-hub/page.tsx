@@ -52,7 +52,7 @@ export default function OwnerReportsHubPage() {
     ]
 
     const reportLinks = [
-        { href: '/owner/reports', icon: BarChart2, label: 'All Sales Reports', desc: 'Searchable index of all report types: period, payment, employee, product', color: 'from-blue-500 to-cyan-500' },
+        { href: '/dashboard/reports', icon: BarChart2, label: 'All Sales Reports', desc: 'Searchable index of all report types: period, payment, employee, product', color: 'from-blue-500 to-cyan-500' },
         { href: '/dashboard/owner/tax-report', icon: Calculator, label: 'Tax Report', desc: 'Tax collected by period and jurisdiction', color: 'from-amber-500 to-orange-500' },
         { href: '/dashboard/owner/cash', icon: DollarSign, label: 'Cash Accountability', desc: 'Drawer summary, deposits, and variance', color: 'from-emerald-500 to-teal-500' },
         { href: '/dashboard/owner/lp-audit', icon: FileText, label: 'Loss Prevention Audit', desc: 'Voids, refunds, no-sales by employee', color: 'from-red-500 to-rose-500' },

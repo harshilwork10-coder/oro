@@ -1,9 +1,35 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Shield, DollarSign, Save, CheckCircle } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { Shield, DollarSign, Save, CheckCircle, ShieldAlert } from 'lucide-react';
 
 export default function RefundThresholdsPage() {
+    const { data: session, status } = useSession();
+    const router = useRouter();
+    const role = (session?.user as any)?.role;
+
+    useEffect(() => {
+        if (status === 'loading') return;
+        if (!['OWNER', 'ADMIN', 'PROVIDER'].includes(role)) {
+            router.replace('/dashboard');
+        }
+    }, [status, role, router]);
+
+    if (status === 'loading' || !['OWNER', 'ADMIN', 'PROVIDER'].includes(role)) {
+        return (
+            <div className="min-h-screen bg-stone-950 text-white flex items-center justify-center">
+                <div className="text-center max-w-md mx-4">
+                    <div className="h-16 w-16 bg-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <ShieldAlert className="h-8 w-8 text-red-400" />
+                    </div>
+                    <p className="text-stone-400 text-sm">Checking access...</p>
+                </div>
+            </div>
+        );
+    }
+
     const [config, setConfig] = useState({ requireManagerPinAbove: '', refundLimitPerDay: '', allowNegativeStock: false, autoLockMinutes: '3' });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);

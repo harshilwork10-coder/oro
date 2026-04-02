@@ -5,10 +5,10 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
     Store, DollarSign, AlertTriangle, Package, RefreshCw,
-    TrendingUp, TrendingDown, Users, ArrowRight, Clock,
-    Wallet, AlertCircle, Send, Settings, FileText, BarChart3,
-    Shield, Tag, Truck, Scan, Calendar, Award, Gift, Bell, Receipt,
-    Newspaper, ShoppingBag, PieChart, FileSearch, Download
+    TrendingUp, TrendingDown, Users, ArrowRight,
+    Wallet, AlertCircle, Send, BarChart3,
+    Shield, Calendar, Gift,
+    Newspaper, ShoppingBag
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
@@ -150,19 +150,14 @@ export default function OwnerDashboard() {
                 </button>
             </div>
 
-            {/* Persistent subnav — N1 */}
+            {/* Persistent subnav — 5 items (owner command center hubs) */}
             <nav className="flex items-center gap-1 mb-8 overflow-x-auto pb-1 border-b border-stone-800 scrollbar-hide">
                 {[
                     { href: '/dashboard/owner', label: 'Overview', icon: Store },
                     { href: '/dashboard/owner/briefing', label: 'Briefing', icon: Newspaper },
                     { href: '/dashboard/owner/inventory', label: 'Inventory', icon: Package },
                     { href: '/dashboard/owner/reports-hub', label: 'Reports', icon: BarChart3 },
-                    { href: '/dashboard/owner/approval-queue', label: 'Approvals', icon: ShoppingBag },
-                    { href: '/dashboard/owner/lp-audit', label: 'LP Audit', icon: Shield },
-                    { href: '/dashboard/owner/month-close', label: 'Month End', icon: Calendar },
-                    { href: '/dashboard/owner/accounting-export', label: 'Export', icon: Download },
-                    { href: '/dashboard/owner/notifications', label: 'Send Notification', icon: Bell },
-                    { href: '/owner/settings', label: 'Settings', icon: Settings },
+                    { href: '/dashboard/owner/approval-queue', label: 'Operations', icon: ShoppingBag },
                 ].map(({ href, label, icon: Icon }) => (
                     <Link
                         key={href}
@@ -279,7 +274,7 @@ export default function OwnerDashboard() {
                     )}
                 </div>
 
-                {/* Quick Actions */}
+                {/* Quick Actions — 8 high-frequency operations */}
                 <div className="bg-stone-900/80 border border-stone-700 rounded-2xl p-5">
                     <h3 className="font-bold mb-4">Quick Actions</h3>
                     <div className="grid grid-cols-4 gap-2">
@@ -289,84 +284,31 @@ export default function OwnerDashboard() {
                         </Link>
                         <Link href="/dashboard/owner/transfers" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
                             <Send className="h-5 w-5 text-blue-400" />
-                            <span className="text-xs">Transfer</span>
+                            <span className="text-xs">Transfers</span>
                         </Link>
                         <Link href="/dashboard/owner/cash" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
                             <Wallet className="h-5 w-5 text-green-400" />
                             <span className="text-xs">Cash</span>
                         </Link>
+                        <Link href="/dashboard/owner/approval-queue" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
+                            <ShoppingBag className="h-5 w-5 text-orange-400" />
+                            <span className="text-xs">Approvals</span>
+                        </Link>
+                        <Link href="/dashboard/owner/reports-hub" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
+                            <BarChart3 className="h-5 w-5 text-purple-400" />
+                            <span className="text-xs">Reports</span>
+                        </Link>
                         <Link href="/dashboard/owner/lp-audit" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
                             <Shield className="h-5 w-5 text-red-400" />
                             <span className="text-xs">LP Audit</span>
-                        </Link>
-                        <Link href="/dashboard/owner/bulk-pricing" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <Tag className="h-5 w-5 text-amber-400" />
-                            <span className="text-xs">Pricing</span>
-                        </Link>
-                        <Link href="/dashboard/owner/vendors" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <Truck className="h-5 w-5 text-cyan-400" />
-                            <span className="text-xs">Vendors</span>
-                        </Link>
-                        <Link href="/dashboard/owner/compare" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <BarChart3 className="h-5 w-5 text-purple-400" />
-                            <span className="text-xs">Compare</span>
-                        </Link>
-                        <Link href="/dashboard/owner/id-logs" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <Scan className="h-5 w-5 text-indigo-400" />
-                            <span className="text-xs">ID Logs</span>
-                        </Link>
-                        <Link href="/dashboard/owner/sales-rules" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <Clock className="h-5 w-5 text-rose-400" />
-                            <span className="text-xs">Rules</span>
-                        </Link>
-                        <Link href="/dashboard/owner/month-close" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <Calendar className="h-5 w-5 text-pink-400" />
-                            <span className="text-xs">Month End</span>
-                        </Link>
-                        {/* Exceptions tile removed — already the hero stat card above */}
-                        <Link href="/dashboard/owner/loyalty" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <Award className="h-5 w-5 text-yellow-400" />
-                            <span className="text-xs">Loyalty</span>
                         </Link>
                         <Link href="/dashboard/owner/gift-cards" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
                             <Gift className="h-5 w-5 text-pink-400" />
                             <span className="text-xs">Gift Cards</span>
                         </Link>
-                        {/* D4: Renamed from "Notify" → "Send Notification" */}
-                        <Link href="/dashboard/owner/notifications" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <Bell className="h-5 w-5 text-violet-400" />
-                            <span className="text-xs text-center leading-tight">Send<br/>Notification</span>
-                        </Link>
-                        <Link href="/dashboard/owner/reports" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <FileText className="h-5 w-5 text-cyan-400" />
-                            <span className="text-xs">Reports</span>
-                        </Link>
-                        <Link href="/dashboard/owner/tax-report" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <Receipt className="h-5 w-5 text-amber-400" />
-                            <span className="text-xs">Tax Report</span>
-                        </Link>
-                        {/* N2: Previously hidden high-value pages — now promoted */}
-                        <Link href="/dashboard/owner/briefing" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <Newspaper className="h-5 w-5 text-emerald-400" />
-                            <span className="text-xs">Briefing</span>
-                        </Link>
-                        <Link href="/dashboard/owner/approval-queue" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <ShoppingBag className="h-5 w-5 text-orange-400" />
-                            <span className="text-xs">Approvals</span>
-                        </Link>
-                        {/* N3: Accounting Export now visible — key for month-end workflow */}
-                        <Link href="/dashboard/owner/accounting-export" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <Download className="h-5 w-5 text-lime-400" />
-                            <span className="text-xs text-center leading-tight">Acct<br/>Export</span>
-                        </Link>
-                        {/* N4: Customer Segments now visible */}
-                        <Link href="/dashboard/owner/customer-segments" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <PieChart className="h-5 w-5 text-fuchsia-400" />
-                            <span className="text-xs">Segments</span>
-                        </Link>
-                        <Link href="/owner/settings" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
-                            <Settings className="h-5 w-5 text-stone-400" />
-                            <span className="text-xs">Settings</span>
+                        <Link href="/dashboard/owner/month-close" className="flex flex-col items-center gap-1 p-3 bg-stone-800 hover:bg-stone-700 rounded-xl transition-all">
+                            <Calendar className="h-5 w-5 text-pink-400" />
+                            <span className="text-xs">Month End</span>
                         </Link>
                     </div>
                 </div>

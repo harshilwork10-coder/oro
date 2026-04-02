@@ -50,20 +50,21 @@ const NAV_ITEMS: NavItem[] = [
     { label: 'Employees', href: '/dashboard/employees', icon: Users, roles: ['MANAGER', 'OWNER', 'ADMIN'] },
     {
         label: 'Operations', icon: Banknote, roles: ['OWNER', 'ADMIN'], children: [
-            { label: 'Safe Management', href: '/dashboard/owner/safe-management', icon: Banknote, roles: ['OWNER'] },
             { label: 'Approval Queue', href: '/dashboard/owner/approval-queue', icon: ClipboardList, roles: ['OWNER', 'MANAGER'] },
+            { label: 'Safe Management', href: '/dashboard/owner/safe-management', icon: Banknote, roles: ['OWNER'] },
             { label: 'Accounting Export', href: '/dashboard/owner/accounting-export', icon: FileText, roles: ['OWNER'] },
-            { label: 'Scheduled Reports', href: '/dashboard/owner/scheduled-reports', icon: CalendarClock, roles: ['OWNER'] },
+            { label: 'Employee Discounts', href: '/dashboard/owner/employee-discounts', icon: DollarSign, roles: ['OWNER'] },
         ]
     },
     {
         label: 'Settings', icon: Settings, roles: ['OWNER', 'ADMIN', 'PROVIDER'], children: [
-            { label: 'Store Hours', href: '/dashboard/owner/store-hours', icon: CalendarClock, roles: ['OWNER'] },
-            { label: 'Receipt Template', href: '/dashboard/owner/receipt-template', icon: Receipt, roles: ['OWNER'] },
-            { label: 'Payment Processors', href: '/dashboard/settings/payment-processors', icon: DollarSign, roles: ['OWNER', 'ADMIN'] },
+            { label: 'Business Info', href: '/dashboard/settings/business', icon: Store, roles: ['OWNER', 'ADMIN'] },
+            { label: 'Store Hours', href: '/dashboard/settings/store-hours', icon: CalendarClock, roles: ['OWNER'] },
             { label: 'Appearance', href: '/dashboard/settings/appearance', icon: Palette, roles: ['OWNER', 'ADMIN'] },
-            { label: 'Training Mode', href: '/dashboard/owner/training-mode', icon: GraduationCap, roles: ['OWNER'] },
-            { label: 'Stations', href: '/dashboard/settings/stations', icon: Store, roles: ['OWNER', 'ADMIN'] },
+            { label: 'Receipt Template', href: '/dashboard/settings/receipt-template', icon: Receipt, roles: ['OWNER'] },
+            { label: 'Training Mode', href: '/dashboard/settings/training-mode', icon: GraduationCap, roles: ['OWNER'] },
+            { label: 'Payment Processors', href: '/dashboard/settings/payment-processors', icon: DollarSign, roles: ['ADMIN', 'PROVIDER'] },
+            { label: 'Stations', href: '/dashboard/settings/stations', icon: Store, roles: ['ADMIN', 'PROVIDER'] },
         ]
     },
     { label: 'Franchise', href: '/dashboard/franchise', icon: Building2, roles: ['ADMIN', 'PROVIDER'] },
