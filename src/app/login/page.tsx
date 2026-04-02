@@ -224,7 +224,7 @@ export default function LoginPage() {
                         <div className="text-center">
                             <p className="text-orange-100/90 text-lg font-medium mt-2 flex items-center justify-center gap-2">
                                 <Sparkles className="h-4 w-4" />
-                                Ultimate Business Solutions
+                                The POS You Never Outgrow
                             </p>
                         </div>
                     </div>
@@ -291,7 +291,7 @@ export default function LoginPage() {
                             </div>
                         </div>
                         <h1 className="text-4xl font-black bg-gradient-to-r from-orange-400 via-amber-400 to-orange-400 bg-clip-text text-transparent">ORO 9</h1>
-                        <p className="text-stone-400 text-sm">Ultimate Business Solutions</p>
+                        <p className="text-stone-400 text-sm">The POS You Never Outgrow</p>
                     </div>
 
                     {/* Login Card */}
@@ -492,7 +492,7 @@ export default function LoginPage() {
                     </div>
 
                     <p className="mt-8 text-center text-sm text-stone-600">
-                        © 2025 ORO 9 POS System. All rights reserved.
+                        © 2025 ORO 9 — The POS You Never Outgrow
                     </p>
                 </div>
             </div>

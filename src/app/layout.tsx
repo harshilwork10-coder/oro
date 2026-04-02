@@ -6,8 +6,8 @@ import { Providers } from "./providers";
 const outfit = Outfit({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'ORO 9 | The Gold Standard in POS',
-  description: 'Complete franchise and business management platform with insights that see everything',
+  title: 'ORO 9 | The POS You Never Outgrow',
+  description: 'One system. Any store. Any scale. Complete franchise and business management platform.',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
