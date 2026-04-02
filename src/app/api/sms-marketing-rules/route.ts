@@ -8,20 +8,8 @@ export async function GET(req: NextRequest) {
         const authUser = await getAuthUser(req)
         if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!authUser?.email) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
-        const user = await prisma.user.findUnique({
-            where: { email: user.email }
-        })
-
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'No franchise assigned' }, { status: 400 })
-        }
-
         const rules = await prisma.smsMarketingRule.findMany({
-            where: { franchiseId: user.franchiseId },
+            where: { franchiseId: authUser.franchiseId },
             orderBy: { createdAt: 'desc' }
         })
 
@@ -35,20 +23,10 @@ export async function GET(req: NextRequest) {
 // POST - Create or update a marketing rule
 export async function POST(req: NextRequest) {
     try {
-        if (!authUser?.email) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const user = await prisma.user.findUnique({
-            where: { email: user.email }
-        })
-
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'No franchise assigned' }, { status: 400 })
-        }
-
-        // Check if owner/manager
-        if (!['OWNER', 'MULTI_LOCATION_OWNER', 'MANAGER'].includes(user.role)) {
+        if (!['OWNER', 'MULTI_LOCATION_OWNER', 'MANAGER', 'PROVIDER'].includes(authUser.role)) {
             return NextResponse.json({ error: 'Only owners can manage rules' }, { status: 403 })
         }
 
@@ -56,7 +34,6 @@ export async function POST(req: NextRequest) {
         const { id, name, ruleType, isActive, daysInactive, discountType, discountValue, validityDays, messageTemplate } = body
 
         if (id) {
-            // Security: Verify rule belongs to user's franchise
             const existingRule = await prisma.smsMarketingRule.findUnique({
                 where: { id },
                 select: { franchiseId: true }
@@ -66,30 +43,19 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: 'Rule not found' }, { status: 404 })
             }
 
-            if (existingRule.franchiseId !== user.franchiseId) {
+            if (existingRule.franchiseId !== authUser.franchiseId) {
                 return NextResponse.json({ error: 'Access denied' }, { status: 403 })
             }
 
-            // Update existing rule
             const rule = await prisma.smsMarketingRule.update({
                 where: { id },
-                data: {
-                    name,
-                    ruleType,
-                    isActive,
-                    daysInactive,
-                    discountType,
-                    discountValue,
-                    validityDays,
-                    messageTemplate
-                }
+                data: { name, ruleType, isActive, daysInactive, discountType, discountValue, validityDays, messageTemplate }
             })
             return NextResponse.json(rule)
         } else {
-            // Create new rule
             const rule = await prisma.smsMarketingRule.create({
                 data: {
-                    franchiseId: user.franchiseId,
+                    franchiseId: authUser.franchiseId,
                     name,
                     ruleType,
                     isActive: isActive ?? true,
@@ -111,9 +77,8 @@ export async function POST(req: NextRequest) {
 // DELETE - Delete a rule
 export async function DELETE(req: NextRequest) {
     try {
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
@@ -122,7 +87,6 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: 'Rule ID required' }, { status: 400 })
         }
 
-        // Security: Verify rule belongs to user's franchise
         const rule = await prisma.smsMarketingRule.findUnique({
             where: { id },
             select: { franchiseId: true }
@@ -132,18 +96,14 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: 'Rule not found' }, { status: 404 })
         }
 
-        if (rule.franchiseId !== user.franchiseId && user.role !== 'PROVIDER') {
+        if (rule.franchiseId !== authUser.franchiseId && authUser.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
-        await prisma.smsMarketingRule.delete({
-            where: { id }
-        })
-
+        await prisma.smsMarketingRule.delete({ where: { id } })
         return NextResponse.json({ success: true })
     } catch (error) {
         console.error('Error deleting rule:', error)
         return NextResponse.json({ error: 'Failed to delete rule' }, { status: 500 })
     }
 }
-

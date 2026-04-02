@@ -8,13 +8,6 @@ export async function GET(req: NextRequest) {
         const user = await getAuthUser(req)
         if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
-        }
-
         const jurisdictions = await prisma.taxJurisdiction.findMany({
             where: {
                 franchiseId: user.franchiseId
@@ -42,12 +35,8 @@ if (!user.franchiseId) {
 // POST - Create new tax jurisdiction
 export async function POST(req: NextRequest) {
     try {
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-if (!user.franchiseId) {
-            return NextResponse.json({ error: 'No franchise associated' }, { status: 400 })
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const body = await req.json()
         const { name, type, code, salesTaxRate, description, priority, exciseTaxRules } = body
@@ -60,7 +49,6 @@ if (!user.franchiseId) {
             return NextResponse.json({ error: 'Type is required' }, { status: 400 })
         }
 
-        // Create jurisdiction with excise rules
         const jurisdiction = await prisma.taxJurisdiction.create({
             data: {
                 franchiseId: user.franchiseId,
@@ -93,4 +81,3 @@ if (!user.franchiseId) {
         return NextResponse.json({ error: 'Failed to create jurisdiction' }, { status: 500 })
     }
 }
-

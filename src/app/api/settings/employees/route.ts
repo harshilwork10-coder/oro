@@ -1,28 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 // GET: Fetch all employees in franchise
 export async function GET(req: NextRequest) {
-    const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    if (!authUser?.email) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     try {
-        const user = await prisma.user.findUnique({
-            where: { email: user.email }
-        })
-
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'No franchise found' }, { status: 404 })
-        }
+        const authUser = await getAuthUser(req)
+        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const employees = await prisma.user.findMany({
             where: {
-                franchiseId: user.franchiseId,
+                franchiseId: authUser.franchiseId,
                 role: 'EMPLOYEE'
             },
             select: {
@@ -41,4 +29,3 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Internal error' }, { status: 500 })
     }
 }
-
