@@ -1,15 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
-import { prisma } from '@/lib/prisma'
 
 export async function GET(req: Request) {
     try {
         const user = await getAuthUser(req)
         if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
 
         const { searchParams } = new URL(req.url)
         const locationId = searchParams.get('locationId')
@@ -55,15 +50,13 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     try {
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const body = await req.json()
         const { productId, reorderPoint } = body
 
         // In real app: Update InventoryItem reorderPoint
-        // Debug log removed
 
         return NextResponse.json({ success: true })
     } catch (error) {
@@ -71,4 +64,3 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Failed to update reorder point' }, { status: 500 })
     }
 }
-
