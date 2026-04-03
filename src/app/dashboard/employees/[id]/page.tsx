@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
     ArrowLeft, Loader2, DollarSign, TrendingUp, Calendar,
@@ -64,6 +65,9 @@ function SourceBadge({ source }: { source?: string }) {
 export default function EmployeeDetailPage() {
     const params = useParams()
     const employeeId = params.id as string
+    const { data: session } = useSession()
+    const industryType = (session?.user as any)?.industryType || 'SERVICE'
+    const isService = industryType === 'SERVICE'
     const [data, setData] = useState<EmployeeStats | null>(null)
     const [loading, setLoading] = useState(true)
     const [period, setPeriod] = useState<'today' | 'week' | 'month'>('month')
@@ -134,15 +138,17 @@ export default function EmployeeDetailPage() {
                         </div>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <Link
-                        href={`/dashboard/employees/${employeeId}/commission`}
-                        className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
-                    >
-                        <Settings className="h-4 w-4" />
-                        Commission Config
-                    </Link>
-                </div>
+                {isService && (
+                    <div className="flex gap-2">
+                        <Link
+                            href={`/dashboard/employees/${employeeId}/commission`}
+                            className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                        >
+                            <Settings className="h-4 w-4" />
+                            Commission Config
+                        </Link>
+                    </div>
+                )}
             </div>
 
             {/* Period Tabs */}
@@ -161,8 +167,8 @@ export default function EmployeeDetailPage() {
                 ))}
             </div>
 
-            {/* Compensation Banner */}
-            {compensation && (
+            {/* Compensation Banner - Service industry only (commission-based) */}
+            {isService && compensation && (
                 <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/20 rounded-xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <CreditCard className="h-5 w-5 text-orange-400" />

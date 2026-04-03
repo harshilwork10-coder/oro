@@ -122,8 +122,8 @@ export default function DealsPage() {
 
     return (
         <div className="min-h-screen bg-stone-950 text-stone-100">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-pink-600/20 via-purple-600/20 to-blue-600/20 border-b border-stone-800">
+            {/* Header - Sticky so users always know which page they're on */}
+            <div className="sticky top-0 z-30 bg-gradient-to-r from-pink-600/20 via-purple-600/20 to-blue-600/20 border-b border-stone-800 backdrop-blur-xl bg-stone-950/80">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div className="flex items-center gap-3 sm:gap-4 min-w-0">

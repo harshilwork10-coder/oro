@@ -4,12 +4,16 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useSession } from 'next-auth/react'
 import { Plus, Search, MoreVertical, Shield, User, Mail, Calendar, DollarSign, Key, X, Eye, EyeOff, Hash, AlertTriangle, Trash2, Scissors } from 'lucide-react'
 import EmployeeModal from '@/components/employees/EmployeeModal'
 import AssignServicesModal from '@/components/employees/AssignServicesModal'
 import { useToast } from '@/components/providers/ToastProvider'
 
 export default function EmployeesPage() {
+    const { data: session } = useSession()
+    const industryType = (session?.user as any)?.industryType || 'SERVICE'
+    const isService = industryType === 'SERVICE'
     const toast = useToast()
     const [employees, setEmployees] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
@@ -294,28 +298,32 @@ export default function EmployeesPage() {
                                                 <Shield className="h-4 w-4 text-blue-400" />
                                                 Edit Permissions
                                             </button>
-                                            <button
-                                                onClick={() => {
-                                                    setOpenMenuId(null)
-                                                    window.location.href = `/dashboard/employees/${employee.id}/commission`
-                                                }}
-                                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-stone-800 transition-colors flex items-center gap-3"
-                                                style={{ color: '#e7e5e4' }}
-                                            >
-                                                <DollarSign className="h-4 w-4 text-orange-400" />
-                                                Configure Commission
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setOpenMenuId(null)
-                                                    setServicesModal({ open: true, employee })
-                                                }}
-                                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-stone-800 transition-colors flex items-center gap-3"
-                                                style={{ color: '#e7e5e4' }}
-                                            >
-                                                <Scissors className="h-4 w-4 text-pink-400" />
-                                                Assign Services
-                                            </button>
+                                            {isService && (
+                                                <>
+                                                    <button
+                                                        onClick={() => {
+                                                            setOpenMenuId(null)
+                                                            window.location.href = `/dashboard/employees/${employee.id}/commission`
+                                                        }}
+                                                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-stone-800 transition-colors flex items-center gap-3"
+                                                        style={{ color: '#e7e5e4' }}
+                                                    >
+                                                        <DollarSign className="h-4 w-4 text-orange-400" />
+                                                        Configure Commission
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setOpenMenuId(null)
+                                                            setServicesModal({ open: true, employee })
+                                                        }}
+                                                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-stone-800 transition-colors flex items-center gap-3"
+                                                        style={{ color: '#e7e5e4' }}
+                                                    >
+                                                        <Scissors className="h-4 w-4 text-pink-400" />
+                                                        Assign Services
+                                                    </button>
+                                                </>
+                                            )}
                                             <button
                                                 onClick={() => {
                                                     setOpenMenuId(null)

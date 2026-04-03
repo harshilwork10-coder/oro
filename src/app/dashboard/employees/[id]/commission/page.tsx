@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
     Save,
@@ -45,7 +46,16 @@ interface PaymentConfig {
 export default function CommissionConfigPage() {
     const params = useParams()
     const router = useRouter()
+    const { data: session } = useSession()
+    const industryType = (session?.user as any)?.industryType || 'SERVICE'
     const employeeId = params.id as string
+
+    // Commission is salon/service-only — redirect retail users
+    useEffect(() => {
+        if (industryType === 'RETAIL') {
+            router.replace('/dashboard/employees')
+        }
+    }, [industryType, router])
 
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
