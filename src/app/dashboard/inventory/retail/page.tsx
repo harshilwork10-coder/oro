@@ -100,6 +100,7 @@ export default function RetailInventoryPage() {
     // Product insights state
     const [insights, setInsights] = useState<any>(null)
     const [loadingInsights, setLoadingInsights] = useState(false)
+    const [coverageDays, setCoverageDays] = useState(14)
 
     // Quick action modal states
     const [showReceiveModal, setShowReceiveModal] = useState(false)
@@ -153,11 +154,12 @@ export default function RetailInventoryPage() {
     }, [products])
 
     // Fetch product insights (order history, velocity, suggestions)
-    const fetchProductInsights = async (productId: string) => {
+    const fetchProductInsights = async (productId: string, days?: number) => {
         setLoadingInsights(true)
         setInsights(null)
         try {
-            const res = await fetch(`/api/inventory/product-insights?productId=${productId}`)
+            const td = days ?? coverageDays
+            const res = await fetch(`/api/inventory/product-insights?productId=${productId}&targetDays=${td}`)
             if (res.ok) {
                 const data = await res.json()
                 setInsights(data)
@@ -826,9 +828,29 @@ export default function RetailInventoryPage() {
                                                 <Brain className="h-4 w-4" />
                                                 AI Insights
                                             </h4>
-                                            {loadingInsights && (
-                                                <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
-                                            )}
+                                            <div className="flex items-center gap-2">
+                                                {loadingInsights && (
+                                                    <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                                                )}
+                                                <select
+                                                    value={coverageDays}
+                                                    onChange={(e) => {
+                                                        const days = parseInt(e.target.value)
+                                                        setCoverageDays(days)
+                                                        if (editProduct?.id && editProduct.id !== 'new') {
+                                                            fetchProductInsights(editProduct.id, days)
+                                                        }
+                                                    }}
+                                                    className="bg-stone-800 border border-stone-700 text-stone-300 text-xs rounded px-2 py-1 focus:ring-purple-500 focus:border-purple-500"
+                                                    title="Order coverage window"
+                                                >
+                                                    <option value={7}>7d cover</option>
+                                                    <option value={14}>14d cover</option>
+                                                    <option value={21}>21d cover</option>
+                                                    <option value={30}>30d cover</option>
+                                                    <option value={60}>60d cover</option>
+                                                </select>
+                                            </div>
                                         </div>
                                         {!loadingInsights && !insights && (
                                             <div className="text-xs text-stone-500 text-center py-2">No data yet</div>

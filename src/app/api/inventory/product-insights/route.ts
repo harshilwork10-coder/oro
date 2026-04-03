@@ -80,7 +80,7 @@ export async function GET(request: Request) {
         const unitsSold = salesSinceOrder._sum?.quantity || 0
         const velocity = unitsSold / daysSinceOrder
         const daysOfStock = velocity > 0 ? Math.round(product.stock / velocity) : 999
-        const targetDays = 14
+        const targetDays = Math.min(90, Math.max(7, parseInt(searchParams.get('targetDays') || '14', 10)))
         const suggestedOrderQty = Math.max(0, Math.ceil(velocity * targetDays - product.stock))
 
         let allTimeSales: any = { _sum: { quantity: 0, total: null } }
