@@ -106,6 +106,34 @@ export async function GET(request: Request) {
             })
         } catch { /* OK */ }
 
+        // Weekly sold (last 7 days)
+        let weeklySales: any = { _sum: { quantity: 0 }, _count: 0 }
+        try {
+            weeklySales = await prisma.transactionLineItem.aggregate({
+                where: {
+                    productId,
+                    createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+                    transaction: { status: 'COMPLETED' }
+                },
+                _sum: { quantity: true, total: true },
+                _count: true
+            })
+        } catch { /* OK */ }
+
+        // Monthly sold (last 30 days)
+        let monthlySales: any = { _sum: { quantity: 0 }, _count: 0 }
+        try {
+            monthlySales = await prisma.transactionLineItem.aggregate({
+                where: {
+                    productId,
+                    createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+                    transaction: { status: 'COMPLETED' }
+                },
+                _sum: { quantity: true, total: true },
+                _count: true
+            })
+        } catch { /* OK */ }
+
         return NextResponse.json({
             product: {
                 id: product.id,
@@ -140,6 +168,16 @@ export async function GET(request: Request) {
                 revenue: allTimeSales._sum?.total ? Number(allTimeSales._sum.total) : 0
             },
             lastSaleDate: lastSale?.createdAt || null,
+            weeklySold: {
+                units: weeklySales._sum?.quantity || 0,
+                revenue: weeklySales._sum?.total ? Number(weeklySales._sum.total) : 0,
+                transactions: weeklySales._count || 0
+            },
+            monthlySold: {
+                units: monthlySales._sum?.quantity || 0,
+                revenue: monthlySales._sum?.total ? Number(monthlySales._sum.total) : 0,
+                transactions: monthlySales._count || 0
+            },
             suggestion: {
                 orderQty: suggestedOrderQty,
                 coversDays: targetDays,
@@ -157,6 +195,8 @@ export async function GET(request: Request) {
             velocity: { unitsPerDay: 0, daysOfStock: 999, isLow: false },
             allTimeSales: { units: 0, revenue: 0 },
             lastSaleDate: null,
+            weeklySold: { units: 0, revenue: 0, transactions: 0 },
+            monthlySold: { units: 0, revenue: 0, transactions: 0 },
             suggestion: { orderQty: 0, coversDays: 14, estimatedCost: null }
         }, { status: 200 })
     }

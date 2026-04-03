@@ -29,7 +29,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-    { label: 'Dashboard', href: '/dashboard/owner/home', icon: LayoutDashboard, roles: ['OWNER', 'MANAGER', 'ADMIN', 'PROVIDER'] },
+    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['OWNER', 'MANAGER', 'ADMIN', 'PROVIDER'] },
     { label: 'POS', href: '/pos', icon: ShoppingCart, roles: ['CASHIER', 'MANAGER', 'OWNER', 'ADMIN'] },
     {
         label: 'Inventory', icon: Package, roles: ['MANAGER', 'OWNER', 'ADMIN'], children: [

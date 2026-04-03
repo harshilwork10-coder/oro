@@ -19,7 +19,7 @@ export default function PaymentProcessorsPage() {
     useEffect(() => {
         if (status === 'loading') return
         if (role !== 'PROVIDER') {
-            router.replace('/dashboard/owner')
+            router.replace('/dashboard')
         }
     }, [status, role, router])
 

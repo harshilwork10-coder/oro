@@ -835,6 +835,30 @@ export default function RetailInventoryPage() {
                                         )}
                                         {insights && !loadingInsights && (
                                             <div className="space-y-2 text-sm">
+                                                {/* Weekly & Monthly Sales - Key ordering data */}
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="bg-stone-800 rounded p-2">
+                                                        <div className="text-stone-500 text-xs">Week (7d)</div>
+                                                        <div className="text-blue-400 font-bold">{insights.weeklySold?.units ?? 0} sold</div>
+                                                        <div className="text-stone-500 text-xs">${Number(insights.weeklySold?.revenue || 0).toFixed(2)}</div>
+                                                    </div>
+                                                    <div className="bg-stone-800 rounded p-2">
+                                                        <div className="text-stone-500 text-xs">Month (30d)</div>
+                                                        <div className="text-emerald-400 font-bold">{insights.monthlySold?.units ?? 0} sold</div>
+                                                        <div className="text-stone-500 text-xs">${Number(insights.monthlySold?.revenue || 0).toFixed(2)}</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Last Sale Date */}
+                                                <div className="bg-stone-800 rounded p-2">
+                                                    <div className="text-stone-500 text-xs">Last Sale</div>
+                                                    <div className="text-stone-200">
+                                                        {insights.lastSaleDate
+                                                            ? new Date(insights.lastSaleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                                            : 'Never sold'}
+                                                    </div>
+                                                </div>
+
                                                 {/* Last Order */}
                                                 {insights.lastOrder ? (
                                                     <div className="bg-stone-800 rounded p-2">
@@ -855,17 +879,6 @@ export default function RetailInventoryPage() {
                                                     </div>
                                                 )}
 
-                                                {/* Sales Since Order */}
-                                                {insights.salesSinceOrder && (
-                                                    <div className="bg-stone-800 rounded p-2">
-                                                        <div className="text-stone-500 text-xs">Sales (since last order)</div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-blue-400">{insights.salesSinceOrder.units ?? 0} sold</span>
-                                                            <span className="text-green-400">${Number(insights.salesSinceOrder.revenue || 0).toFixed(2)}</span>
-                                                        </div>
-                                                    </div>
-                                                )}
-
                                                 {/* Velocity */}
                                                 {insights.velocity && (
                                                     <div className="bg-stone-800 rounded p-2">
@@ -878,6 +891,17 @@ export default function RetailInventoryPage() {
                                                             }>
                                                                 {insights.velocity.daysOfStock ?? '—'} days left
                                                             </span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* All-Time Stats */}
+                                                {insights.allTimeSales && (insights.allTimeSales.units > 0) && (
+                                                    <div className="bg-stone-800 rounded p-2">
+                                                        <div className="text-stone-500 text-xs">All-Time</div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-stone-300">{insights.allTimeSales.units} sold</span>
+                                                            <span className="text-green-400">${Number(insights.allTimeSales.revenue || 0).toFixed(2)}</span>
                                                         </div>
                                                     </div>
                                                 )}
