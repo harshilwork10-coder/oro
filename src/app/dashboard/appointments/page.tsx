@@ -51,15 +51,25 @@ export default function AppointmentsPage() {
         if (status === 'authenticated') {
             fetchAppointments()
         }
-    }, [status, currentDate])
+    }, [status, currentDate, view])
 
     async function fetchAppointments() {
         try {
             const start = new Date(currentDate)
             start.setHours(0, 0, 0, 0)
 
-            const end = new Date(currentDate)
-            end.setHours(23, 59, 59, 999)
+            let end: Date
+            if (view === 'week') {
+                // Get the start of the week (Sunday)
+                const dayOfWeek = start.getDay()
+                start.setDate(start.getDate() - dayOfWeek)
+                end = new Date(start)
+                end.setDate(end.getDate() + 6)
+                end.setHours(23, 59, 59, 999)
+            } else {
+                end = new Date(currentDate)
+                end.setHours(23, 59, 59, 999)
+            }
 
             const res = await fetch(`/api/appointments?startDate=${start.toISOString()}&endDate=${end.toISOString()}`)
             if (res.ok) {
@@ -281,116 +291,185 @@ export default function AppointmentsPage() {
                 </div>
             </div>
 
-            {/* Calendar Grid (Day View) */}
+            {/* Calendar Grid */}
             <div className="flex-1 bg-stone-900/50 border border-white/10 border-t-0 rounded-b-xl overflow-y-auto relative">
-                {/* Time Grid */}
-                <div className="min-h-[800px] relative">
-                    {Array.from({ length: 13 }).map((_, i) => {
-                        const hour = i + 8
-                        const isPast = new Date().getHours() > hour && currentDate.toDateString() === new Date().toDateString()
-
+                {view === 'week' ? (
+                    /* ══════ WEEK VIEW ══════ */
+                    (() => {
+                        // Compute the week's Sunday
+                        const weekStart = new Date(currentDate)
+                        weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+                        weekStart.setHours(0, 0, 0, 0)
+                        const days = Array.from({ length: 7 }, (_, i) => {
+                            const d = new Date(weekStart)
+                            d.setDate(d.getDate() + i)
+                            return d
+                        })
                         return (
-                            <div key={hour} className="flex border-b border-white/5 h-20">
-                                <div className="w-20 border-r border-white/5 p-2 text-xs text-stone-500 text-right">
-                                    {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                            <div className="grid grid-cols-7 min-h-[600px]">
+                                {days.map((day, i) => {
+                                    const isToday = day.toDateString() === new Date().toDateString()
+                                    const isSelected = day.toDateString() === currentDate.toDateString()
+                                    const dayAppts = appointments.filter(a => {
+                                        const d = new Date(a.startTime)
+                                        return d.toDateString() === day.toDateString()
+                                    }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+
+                                    return (
+                                        <div key={i} className={`border-r border-white/5 last:border-r-0 flex flex-col ${isSelected ? 'bg-purple-500/5' : ''}`}>
+                                            {/* Day header */}
+                                            <button
+                                                onClick={() => { setCurrentDate(new Date(day)); setView('day') }}
+                                                className={`sticky top-0 z-10 p-2 text-center border-b border-white/10 hover:bg-white/5 transition-colors ${isToday ? 'bg-purple-500/20' : 'bg-stone-900/80'} backdrop-blur-sm`}
+                                            >
+                                                <p className="text-[10px] text-stone-500 uppercase">{day.toLocaleDateString('en-US', { weekday: 'short' })}</p>
+                                                <p className={`text-lg font-bold ${isToday ? 'text-purple-400' : 'text-white'}`}>{day.getDate()}</p>
+                                                {dayAppts.length > 0 && (
+                                                    <span className="text-[10px] text-stone-400">{dayAppts.length} appt{dayAppts.length > 1 ? 's' : ''}</span>
+                                                )}
+                                            </button>
+                                            {/* Appointments list */}
+                                            <div className="flex-1 p-1 space-y-1 overflow-y-auto">
+                                                {dayAppts.map(apt => {
+                                                    const t = new Date(apt.startTime)
+                                                    return (
+                                                        <div
+                                                            key={apt.id}
+                                                            onClick={() => setSelectedAppointment(apt)}
+                                                            className={`p-1.5 rounded-lg cursor-pointer text-xs transition-all hover:brightness-110
+                                                                ${apt.status === 'SCHEDULED' ? 'bg-emerald-600/80' : ''}
+                                                                ${apt.status === 'PENDING_APPROVAL' ? 'bg-amber-600/80' : ''}
+                                                                ${apt.status === 'CANCELLED' ? 'bg-red-600/50 opacity-60' : ''}
+                                                                ${apt.status === 'COMPLETED' ? 'bg-blue-600/80' : ''}
+                                                                ${apt.status === 'NO_SHOW' ? 'bg-orange-600/80' : ''}
+                                                            `}
+                                                        >
+                                                            <p className="text-white font-semibold truncate">{t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
+                                                            <p className="text-white/80 truncate">{apt.client.firstName} {apt.client.lastName?.charAt(0)}.</p>
+                                                            <p className="text-white/60 truncate">{apt.service.name}</p>
+                                                        </div>
+                                                    )
+                                                })}
+                                                {dayAppts.length === 0 && (
+                                                    <p className="text-stone-600 text-[10px] text-center mt-4">No appts</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )
+                    })()
+                ) : (
+                    /* ══════ DAY VIEW ══════ */
+                    <div className="min-h-[800px] relative">
+                        {Array.from({ length: 13 }).map((_, i) => {
+                            const hour = i + 8
+                            const isPast = new Date().getHours() > hour && currentDate.toDateString() === new Date().toDateString()
+
+                            return (
+                                <div key={hour} className="flex border-b border-white/5 h-20">
+                                    <div className="w-20 border-r border-white/5 p-2 text-xs text-stone-500 text-right">
+                                        {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                                    </div>
+                                    <div
+                                        className={`flex-1 relative ${!isPast ? 'cursor-pointer hover:bg-purple-500/10' : 'opacity-50'} transition-colors group`}
+                                        onClick={() => {
+                                            if (!isPast) {
+                                                const selectedTime = new Date(currentDate)
+                                                selectedTime.setHours(hour, 0, 0, 0)
+                                                setSelectedTime(selectedTime)
+                                                setShowBookingModal(true)
+                                            }
+                                        }}
+                                    >
+                                        {!isPast && (
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <span className="px-3 py-1 bg-purple-600 text-white text-xs rounded-full font-medium flex items-center gap-1">
+                                                    <Plus className="h-3 w-3" />
+                                                    Quick Book
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
+                            )
+                        })}
+
+                        {/* Appointments - Simple Clean Design */}
+                        {appointments.map((apt) => {
+                            const start = new Date(apt.startTime)
+                            const startHour = start.getHours()
+                            const startMin = start.getMinutes()
+
+                            // Fixed height cards positioned at their start time
+                            const top = ((startHour - 8) * 80) + ((startMin / 60) * 80) + 2
+                            const fixedHeight = 38 // Fixed small height
+
+                            if (startHour < 8 || startHour > 20) return null
+
+                            const formattedTime = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+
+                            return (
                                 <div
-                                    className={`flex-1 relative ${!isPast ? 'cursor-pointer hover:bg-purple-500/10' : 'opacity-50'} transition-colors group`}
-                                    onClick={() => {
-                                        if (!isPast) {
-                                            const selectedTime = new Date(currentDate)
-                                            selectedTime.setHours(hour, 0, 0, 0)
-                                            setSelectedTime(selectedTime)
-                                            setShowBookingModal(true)
-                                        }
+                                    key={apt.id}
+                                    style={{
+                                        top: `${top}px`,
+                                        height: `${fixedHeight}px`,
+                                        left: '90px',
+                                        right: '20px',
                                     }}
+                                    onClick={() => setSelectedAppointment(apt)}
+                                    className={`
+                                        absolute cursor-pointer rounded-lg overflow-hidden
+                                        ${apt.status === 'SCHEDULED' ? 'bg-emerald-600' : ''}
+                                        ${apt.status === 'PENDING_APPROVAL' ? 'bg-amber-600' : ''}
+                                        ${apt.status === 'CANCELLED' ? 'bg-red-600 opacity-50' : ''}
+                                        ${apt.status === 'COMPLETED' ? 'bg-blue-600' : ''}
+                                        hover:brightness-110 transition-all
+                                    `}
                                 >
-                                    {!isPast && (
-                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <span className="px-3 py-1 bg-purple-600 text-white text-xs rounded-full font-medium flex items-center gap-1">
-                                                <Plus className="h-3 w-3" />
-                                                Quick Book
+                                    {/* Simple Clean Card Content */}
+                                    <div className="h-full p-3 flex items-center justify-between">
+                                        {/* Left: Customer & Service */}
+                                        <div className="flex items-center gap-4">
+                                            {/* Time Badge */}
+                                            <div className="bg-black/20 px-3 py-1.5 rounded-lg">
+                                                <span className="text-white font-bold text-lg">
+                                                    {formattedTime}
+                                                </span>
+                                            </div>
+
+                                            {/* Customer Info */}
+                                            <div>
+                                                <p className="text-white font-bold text-lg">
+                                                    {apt.client.firstName} {apt.client.lastName}
+                                                </p>
+                                                <p className="text-white/80 text-sm flex items-center gap-2">
+                                                    {apt.service.name} • {apt.employee.name}
+                                                    {getSourceBadge(apt.source)}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Right: Status & Price */}
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-white/90 font-semibold">
+                                                ${apt.service.price}
+                                            </span>
+                                            <span className="bg-white/20 px-2 py-1 rounded text-white text-xs font-medium">
+                                                {apt.status === 'SCHEDULED' ? '✓ Confirmed' :
+                                                    apt.status === 'PENDING_APPROVAL' ? '⏳ Pending' :
+                                                        apt.status === 'NO_SHOW' ? '⚠ No-Show' :
+                                                        apt.status === 'CANCELLED' ? '✕ Cancelled' : '★ Done'}
                                             </span>
                                         </div>
-                                    )}
-                                </div>
-                            </div>
-                        )
-                    })}
-
-                    {/* Appointments - Simple Clean Design */}
-                    {appointments.map((apt) => {
-                        const start = new Date(apt.startTime)
-                        const startHour = start.getHours()
-                        const startMin = start.getMinutes()
-
-                        // Fixed height cards positioned at their start time
-                        const top = ((startHour - 8) * 80) + ((startMin / 60) * 80) + 2
-                        const fixedHeight = 38 // Fixed small height
-
-                        if (startHour < 8 || startHour > 20) return null
-
-                        const formattedTime = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-
-                        return (
-                            <div
-                                key={apt.id}
-                                style={{
-                                    top: `${top}px`,
-                                    height: `${fixedHeight}px`,
-                                    left: '90px',
-                                    right: '20px',
-                                }}
-                                onClick={() => setSelectedAppointment(apt)}
-                                className={`
-                                    absolute cursor-pointer rounded-lg overflow-hidden
-                                    ${apt.status === 'SCHEDULED' ? 'bg-emerald-600' : ''}
-                                    ${apt.status === 'PENDING_APPROVAL' ? 'bg-amber-600' : ''}
-                                    ${apt.status === 'CANCELLED' ? 'bg-red-600 opacity-50' : ''}
-                                    ${apt.status === 'COMPLETED' ? 'bg-blue-600' : ''}
-                                    hover:brightness-110 transition-all
-                                `}
-                            >
-                                {/* Simple Clean Card Content */}
-                                <div className="h-full p-3 flex items-center justify-between">
-                                    {/* Left: Customer & Service */}
-                                    <div className="flex items-center gap-4">
-                                        {/* Time Badge */}
-                                        <div className="bg-black/20 px-3 py-1.5 rounded-lg">
-                                            <span className="text-white font-bold text-lg">
-                                                {formattedTime}
-                                            </span>
-                                        </div>
-
-                                        {/* Customer Info */}
-                                        <div>
-                                            <p className="text-white font-bold text-lg">
-                                                {apt.client.firstName} {apt.client.lastName}
-                                            </p>
-                                            <p className="text-white/80 text-sm flex items-center gap-2">
-                                                {apt.service.name} • {apt.employee.name}
-                                                {getSourceBadge(apt.source)}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Right: Status & Price */}
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-white/90 font-semibold">
-                                            ${apt.service.price}
-                                        </span>
-                                        <span className="bg-white/20 px-2 py-1 rounded text-white text-xs font-medium">
-                                            {apt.status === 'SCHEDULED' ? '✓ Confirmed' :
-                                                apt.status === 'PENDING_APPROVAL' ? '⏳ Pending' :
-                                                    apt.status === 'NO_SHOW' ? '⚠ No-Show' :
-                                                    apt.status === 'CANCELLED' ? '✕ Cancelled' : '★ Done'}
-                                        </span>
                                     </div>
                                 </div>
-                            </div>
-                        )
-                    })}
-                </div>
+                            )
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* Appointment Details Modal */}

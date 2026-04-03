@@ -191,8 +191,30 @@ export default function RetentionDashboardPage() {
     })
 
     useEffect(() => {
-        // Simulate loading
-        setTimeout(() => setLoading(false), 500)
+        async function loadRetention() {
+            try {
+                const res = await fetch('/api/settings/retention')
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.config) {
+                        const c = data.config
+                        if (c.fairDiscountSystem) setFairDiscountSystem(c.fairDiscountSystem)
+                        if (c.vip) { setVipEnabled(c.vip.enabled); if (c.vip.tiers) setVipTiers(c.vip.tiers) }
+                        if (c.packages) { setPackagesEnabled(c.packages.enabled); if (c.packages.items) setPackages(c.packages.items) }
+                        if (c.streaks) { setStreaksEnabled(c.streaks.enabled); if (c.streaks.config) setStreakConfig(c.streaks.config) }
+                        if (c.birthday) { setBirthdayEnabled(c.birthday.enabled); if (c.birthday.config) setBirthdayConfig(c.birthday.config) }
+                        if (c.referral) { setReferralEnabled(c.referral.enabled); if (c.referral.config) setReferralConfig(c.referral.config) }
+                        if (c.lapsing) { setLapsingEnabled(c.lapsing.enabled); if (c.lapsing.config) setLapsingConfig(c.lapsing.config) }
+                        if (c.prebook) { setPrebookEnabled(c.prebook.enabled); if (c.prebook.config) setPrebookConfig(c.prebook.config) }
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load retention settings:', error)
+            } finally {
+                setLoading(false)
+            }
+        }
+        loadRetention()
     }, [])
 
     // Apply smart recommendations
@@ -217,7 +239,6 @@ export default function RetentionDashboardPage() {
     const handleSave = async () => {
         setSaving(true)
         try {
-            // Save all retention settings
             const settings = {
                 fairDiscountSystem,
                 vip: { enabled: vipEnabled, tiers: vipTiers },
@@ -228,10 +249,17 @@ export default function RetentionDashboardPage() {
                 lapsing: { enabled: lapsingEnabled, config: lapsingConfig },
                 prebook: { enabled: prebookEnabled, config: prebookConfig }
             }
-            // Settings validated for API save
-            // API save pending integration
-            await new Promise(r => setTimeout(r, 1000))
-            setToast({ message: 'Settings saved successfully!', type: 'success' })
+            const res = await fetch('/api/settings/retention', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            })
+            if (res.ok) {
+                setToast({ message: 'Settings saved successfully!', type: 'success' })
+            } else {
+                const data = await res.json()
+                setToast({ message: data.error || 'Failed to save', type: 'error' })
+            }
         } catch (error) {
             console.error('Error saving:', error)
             setToast({ message: 'Failed to save settings', type: 'error' })

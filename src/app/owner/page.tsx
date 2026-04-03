@@ -6,7 +6,7 @@ import {
     DollarSign, TrendingUp, ShoppingCart, Users, Calendar, Clock,
     Package, Scissors, BarChart3, ArrowUpRight, ArrowDownRight, Loader2,
     AlertCircle, AlertTriangle, Zap, ExternalLink, FileText, MapPin,
-    Shield, Gift, Wallet, Truck, BookOpen, Receipt
+    Shield, Gift, Wallet, Truck, BookOpen, Receipt, Globe, Smartphone, Phone, Footprints
 } from 'lucide-react';
 import AIInsightsCard from '@/components/dashboard/AIInsightsCard';
 import ActivityFeed from '@/components/dashboard/ActivityFeed';
@@ -95,6 +95,9 @@ export default function OwnerDashboard() {
     const [topProducts, setTopProducts] = useState<any[]>([]);
     const [pricingAlerts, setPricingAlerts] = useState<any[]>([]);
     const [nextActions, setNextActions] = useState<any[]>([]);
+
+    // Salon-specific dashboard data
+    const [salonDash, setSalonDash] = useState<any>(null);
 
     // Sales trend chart data
     const [salesTrend, setSalesTrend] = useState<{ date: string; revenue: number; transactions: number }[]>([]);
@@ -185,6 +188,13 @@ export default function OwnerDashboard() {
                 const scRes = await fetch('/api/owner/store-comparison?days=7');
                 if (scRes.ok) { const d = await scRes.json(); setStoreComparison(d); }
             } catch { /* ignore */ }
+            // Salon owner dashboard (no-show + source insights)
+            if (currentLocation?.type === 'salon' || currentLocation?.type === 'both') {
+                try {
+                    const sdRes = await fetch(`/api/salon/owner-dashboard?franchiseId=${currentLocation.id}`);
+                    if (sdRes.ok) { const d = await sdRes.json(); setSalonDash(d); }
+                } catch { /* ignore */ }
+            }
         }
         fetchWidgets();
     }, [currentLocation?.id, period]);
@@ -667,6 +677,93 @@ export default function OwnerDashboard() {
                                 <span>{a.title || a.message || a.description}</span>
                             </a>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Salon Insights: No-Show Summary + Booking Source Chart */}
+            {isSalon && salonDash && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* No-Show Summary */}
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                        <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4">
+                            <AlertTriangle size={16} className="text-orange-400" />
+                            Appointment Health
+                        </h3>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="text-center p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                                <p className="text-2xl font-bold text-emerald-400">{salonDash.appointments?.completed ?? 0}</p>
+                                <p className="text-xs text-stone-400 mt-1">Completed</p>
+                            </div>
+                            <div className="text-center p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                                <p className="text-2xl font-bold text-orange-400">{salonDash.noShowCount ?? 0}</p>
+                                <p className="text-xs text-stone-400 mt-1">No-Shows</p>
+                            </div>
+                            <div className="text-center p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                                <p className="text-2xl font-bold text-red-400">{salonDash.appointments?.cancelled ?? 0}</p>
+                                <p className="text-xs text-stone-400 mt-1">Cancelled</p>
+                            </div>
+                        </div>
+                        {(salonDash.noShowCount ?? 0) > 0 && (
+                            <div className="mt-3 p-2.5 rounded-lg bg-orange-500/5 border border-orange-500/15">
+                                <p className="text-xs text-orange-300">
+                                    ⚠ {salonDash.noShowCount} no-show{salonDash.noShowCount > 1 ? 's' : ''} today — consider enabling no-show charges in Settings → Salon Features
+                                </p>
+                            </div>
+                        )}
+                        <div className="mt-3 flex items-center justify-between text-xs text-stone-500">
+                            <span>Total: {salonDash.appointments?.total ?? 0} appointments</span>
+                            <span>Pending: {salonDash.pendingApprovals ?? 0}</span>
+                        </div>
+                    </div>
+
+                    {/* Booking Source Chart */}
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                        <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4">
+                            <Globe size={16} className="text-blue-400" />
+                            Booking Sources
+                        </h3>
+                        {(() => {
+                            const sources = salonDash.sources || { online: 0, pos: 0, phone: 0, walkIn: 0 };
+                            const total = sources.online + sources.pos + sources.phone + sources.walkIn;
+                            if (total === 0) return (
+                                <div className="text-center py-6">
+                                    <Globe size={28} className="mx-auto text-stone-600 mb-2" />
+                                    <p className="text-sm text-stone-500">No bookings today</p>
+                                </div>
+                            );
+                            const items = [
+                                { label: 'Online', count: sources.online, icon: Globe, color: 'bg-blue-500', textColor: 'text-blue-400' },
+                                { label: 'POS', count: sources.pos, icon: Smartphone, color: 'bg-emerald-500', textColor: 'text-emerald-400' },
+                                { label: 'Phone', count: sources.phone, icon: Phone, color: 'bg-purple-500', textColor: 'text-purple-400' },
+                                { label: 'Walk-in', count: sources.walkIn, icon: Footprints, color: 'bg-amber-500', textColor: 'text-amber-400' },
+                            ];
+                            return (
+                                <div className="space-y-3">
+                                    {items.map(s => {
+                                        const pct = total > 0 ? Math.round((s.count / total) * 100) : 0;
+                                        const Icon = s.icon;
+                                        return (
+                                            <div key={s.label}>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <div className="flex items-center gap-2 text-sm">
+                                                        <Icon size={14} className={s.textColor} />
+                                                        <span className="text-[var(--text-secondary)]">{s.label}</span>
+                                                    </div>
+                                                    <span className="text-sm font-medium text-[var(--text-primary)]">{s.count} ({pct}%)</span>
+                                                </div>
+                                                <div className="w-full bg-stone-800 rounded-full h-2">
+                                                    <div className={`${s.color} h-2 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    <div className="pt-2 border-t border-stone-800 flex items-center justify-between text-xs text-stone-500">
+                                        <span>Total bookings: {total}</span>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             )}

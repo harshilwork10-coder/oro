@@ -737,6 +737,9 @@ model FranchiseSettings {
   enableBarberProfiles  Boolean @default(true) // Public barber profiles
   enableIndividualLinks Boolean @default(true) // Barber-specific booking links
 
+  // Retention Suite Configuration (JSON blob)
+  retentionConfig String? @db.Text // Full retention suite settings as JSON
+
   // ========== VOID / REFUND LIMITS ==========
   voidLimitPerDay       Decimal? @db.Decimal(12, 2) // Max $ void per cashier per day (null = unlimited)
   refundLimitPerDay     Decimal? @db.Decimal(12, 2) // Max $ refund per cashier per day (null = unlimited)
