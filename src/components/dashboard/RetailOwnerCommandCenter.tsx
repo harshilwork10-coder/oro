@@ -5,7 +5,8 @@ import Link from 'next/link'
 import {
     Users, DollarSign, TrendingUp, AlertCircle, Phone, CreditCard,
     Gift, Ticket, ShieldAlert, Sparkles, ChevronDown, ChevronUp,
-    Wifi, WifiOff, Receipt, ShoppingBag, ArrowRight, MapPin
+    Wifi, WifiOff, Receipt, ShoppingBag, ArrowRight, MapPin,
+    Package, AlertTriangle, Skull, Truck, BarChart3
 } from 'lucide-react'
 import RequestExpansionModal from '@/components/modals/RequestExpansionModal'
 import ConsultationRequestModal from '@/components/modals/ConsultationRequestModal'
@@ -33,6 +34,8 @@ export default function RetailOwnerCommandCenter({ session }: Props) {
     const [exceptionCount, setExceptionCount] = useState(0)
     const [approvalCount, setApprovalCount] = useState(0)
     const [openIssueCount, setOpenIssueCount] = useState(0)
+    const [cashHealth, setCashHealth] = useState<any>(null)
+    const [cashHealthTab, setCashHealthTab] = useState<'traps' | 'reorder' | 'freeze'>('reorder')
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -143,6 +146,14 @@ export default function RetailOwnerCommandCenter({ session }: Props) {
         fetchInvoiceStats()
         fetchExceptions()
         fetchApprovals()
+        // Cash Health
+        const fetchCashHealth = async () => {
+            try {
+                const res = await fetch('/api/inventory/cash-health')
+                if (res.ok) setCashHealth(await res.json())
+            } catch { /* Graceful */ }
+        }
+        fetchCashHealth()
     }, [])
 
     // Derived data
@@ -315,6 +326,133 @@ export default function RetailOwnerCommandCenter({ session }: Props) {
                     </Link>
                 </div>
             </div>
+
+            {/* ═══ INVENTORY CASH INTELLIGENCE ═══ */}
+            {cashHealth && (
+                <div className="glass-panel p-5 rounded-2xl">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 className="text-sm font-semibold text-stone-300 flex items-center gap-2">
+                                <BarChart3 className="h-4 w-4 text-purple-400" />
+                                Inventory Cash Intelligence
+                            </h2>
+                            <p className="text-[10px] text-stone-500 uppercase tracking-widest mt-0.5">Money on Shelf</p>
+                        </div>
+                        <Link href="/dashboard/inventory/retail" className="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1">
+                            Manage <ArrowRight className="h-3 w-3" />
+                        </Link>
+                    </div>
+
+                    {/* 6 KPI Cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+                        <div className="bg-stone-800/50 rounded-xl p-3 border border-stone-700/50">
+                            <div className="flex items-center gap-2 mb-1">
+                                <DollarSign className="h-3.5 w-3.5 text-stone-400" />
+                                <span className="text-[10px] text-stone-500 uppercase tracking-wide">Cash on Shelf</span>
+                            </div>
+                            <p className="text-xl font-bold text-stone-100">${(cashHealth.kpi?.costOnHand || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-stone-800/50 rounded-xl p-3 border border-amber-500/20">
+                            <div className="flex items-center gap-2 mb-1">
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+                                <span className="text-[10px] text-stone-500 uppercase tracking-wide">Money at Risk</span>
+                            </div>
+                            <p className="text-xl font-bold text-amber-400">${(cashHealth.kpi?.atRiskCost || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-stone-800/50 rounded-xl p-3 border border-red-500/20">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Skull className="h-3.5 w-3.5 text-red-400" />
+                                <span className="text-[10px] text-stone-500 uppercase tracking-wide">Dead Stock Cost</span>
+                            </div>
+                            <p className="text-xl font-bold text-red-400">${(cashHealth.kpi?.deadStockCost || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-stone-800/50 rounded-xl p-3 border border-blue-500/20">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Truck className="h-3.5 w-3.5 text-blue-400" />
+                                <span className="text-[10px] text-stone-500 uppercase tracking-wide">On-Order Cost</span>
+                            </div>
+                            <p className="text-xl font-bold text-blue-400">${(cashHealth.kpi?.onOrderCost || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-stone-800/50 rounded-xl p-3 border border-amber-500/20">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Package className="h-3.5 w-3.5 text-amber-400" />
+                                <span className="text-[10px] text-stone-500 uppercase tracking-wide">Low Stock SKUs</span>
+                            </div>
+                            <p className="text-xl font-bold text-amber-400">{cashHealth.kpi?.lowStockCount || 0}</p>
+                        </div>
+                        <div className="bg-stone-800/50 rounded-xl p-3 border border-red-500/20">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Skull className="h-3.5 w-3.5 text-red-400" />
+                                <span className="text-[10px] text-stone-500 uppercase tracking-wide">No-Sale 30d SKUs</span>
+                            </div>
+                            <p className="text-xl font-bold text-red-400">{cashHealth.kpi?.noSale30dCount || 0}</p>
+                        </div>
+                    </div>
+
+                    {/* 3-Tab Drilldown */}
+                    <div className="border-t border-stone-700/50 pt-3">
+                        <div className="flex gap-1 mb-3">
+                            {[{ key: 'reorder' as const, label: '🟢 Reorder Now', count: cashHealth.reorderNow?.length || 0 },
+                              { key: 'traps' as const, label: '💰 Cash Traps', count: cashHealth.cashTraps?.length || 0 },
+                              { key: 'freeze' as const, label: '🔴 Freeze', count: cashHealth.freezeReorder?.length || 0 }].map(tab => (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => setCashHealthTab(tab.key)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                        cashHealthTab === tab.key
+                                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                                            : 'bg-stone-800/50 text-stone-500 border border-stone-700/50 hover:text-stone-300'
+                                    }`}
+                                >
+                                    {tab.label} {tab.count > 0 && <span className="ml-1 text-[10px] opacity-70">({tab.count})</span>}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Tab Content */}
+                        {(() => {
+                            const list = cashHealthTab === 'reorder' ? cashHealth.reorderNow
+                                : cashHealthTab === 'traps' ? cashHealth.cashTraps
+                                : cashHealth.freezeReorder
+                            if (!list || list.length === 0) {
+                                return <div className="text-xs text-stone-500 text-center py-4">No items in this category</div>
+                            }
+                            return (
+                                <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
+                                    {list.map((item: any) => (
+                                        <div key={item.id} className="flex items-center justify-between p-2.5 bg-stone-800/50 rounded-lg border border-stone-700/30 hover:border-stone-600/50 transition-colors">
+                                            <div className="flex-1 min-w-0 mr-3">
+                                                <p className="text-sm font-medium text-stone-200 truncate">{item.name}</p>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className="text-[10px] text-stone-500">{item.stock} on hand</span>
+                                                    <span className="text-[10px] text-stone-600">•</span>
+                                                    <span className="text-[10px] text-stone-500">${item.costOnHand?.toFixed(0) || '0'} cost</span>
+                                                    <span className="text-[10px] text-stone-600">•</span>
+                                                    <span className={`text-[10px] ${item.daysSinceLastSale > 30 ? 'text-red-400' : item.daysSinceLastSale > 14 ? 'text-yellow-400' : 'text-stone-500'}`}>
+                                                        {item.daysSinceLastSale < 999 ? `${item.daysSinceLastSale}d since sale` : 'Never sold'}
+                                                    </span>
+                                                    <span className="text-[10px] text-stone-600">•</span>
+                                                    <span className={`text-[10px] ${item.daysOfSupply < 7 ? 'text-red-400' : item.daysOfSupply < 14 ? 'text-yellow-400' : 'text-stone-500'}`}>
+                                                        {item.daysOfSupply < 999 ? `${item.daysOfSupply}d supply` : '∞'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                                                item.reorderStatus === 'REFILL' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                item.reorderStatus === 'WATCH' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                item.reorderStatus === 'FREEZE' ? 'bg-orange-500/20 text-orange-400' :
+                                                'bg-red-500/20 text-red-400'
+                                            }`}>
+                                                {item.suggestedAction}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        })()}
+                    </div>
+                </div>
+            )}
 
             {/* BOTTOM ROW - Low Stock + Recent Transactions */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

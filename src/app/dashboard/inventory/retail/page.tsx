@@ -820,13 +820,13 @@ export default function RetailInventoryPage() {
                                     </div>
                                 )}
 
-                                {/* Product Insights Panel */}
+                                {/* ═══ INVENTORY CASH INTELLIGENCE PANEL ═══ */}
                                 {!isNewProduct && (
                                     <div className="mt-4 pt-4 border-t border-stone-700">
                                         <div className="flex items-center justify-between mb-3">
                                             <h4 className="text-sm font-semibold text-purple-400 flex items-center gap-2">
                                                 <Brain className="h-4 w-4" />
-                                                AI Insights
+                                                Cash Intelligence
                                             </h4>
                                             <div className="flex items-center gap-2">
                                                 {loadingInsights && (
@@ -852,100 +852,210 @@ export default function RetailInventoryPage() {
                                                 </select>
                                             </div>
                                         </div>
+
                                         {!loadingInsights && !insights && (
                                             <div className="text-xs text-stone-500 text-center py-2">No data yet</div>
                                         )}
+
                                         {insights && !loadingInsights && (
-                                            <div className="space-y-2 text-sm">
-                                                {/* Weekly & Monthly Sales - Key ordering data */}
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="bg-stone-800 rounded p-2">
-                                                        <div className="text-stone-500 text-xs">Week (7d)</div>
-                                                        <div className="text-blue-400 font-bold">{insights.weeklySold?.units ?? 0} sold</div>
-                                                        <div className="text-stone-500 text-xs">${Number(insights.weeklySold?.revenue || 0).toFixed(2)}</div>
-                                                    </div>
-                                                    <div className="bg-stone-800 rounded p-2">
-                                                        <div className="text-stone-500 text-xs">Month (30d)</div>
-                                                        <div className="text-emerald-400 font-bold">{insights.monthlySold?.units ?? 0} sold</div>
-                                                        <div className="text-stone-500 text-xs">${Number(insights.monthlySold?.revenue || 0).toFixed(2)}</div>
-                                                    </div>
-                                                </div>
+                                            <div className="space-y-3 text-sm">
 
-                                                {/* Last Sale Date */}
-                                                <div className="bg-stone-800 rounded p-2">
-                                                    <div className="text-stone-500 text-xs">Last Sale</div>
-                                                    <div className="text-stone-200">
-                                                        {insights.lastSaleDate
-                                                            ? new Date(insights.lastSaleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                                                            : 'Never sold'}
-                                                    </div>
-                                                </div>
-
-                                                {/* Last Order */}
-                                                {insights.lastOrder ? (
-                                                    <div className="bg-stone-800 rounded p-2">
-                                                        <div className="text-stone-500 text-xs">Last Order</div>
-                                                        <div className="flex justify-between">
-                                                            <span>{insights.lastOrder.daysAgo} days ago</span>
-                                                            <span className="text-green-400">
-                                                                {insights.lastOrder.quantity} @ ${Number(insights.lastOrder.unitCost || 0).toFixed(2)}
-                                                            </span>
+                                                {/* ─── ZONE 1: HISTORY ─── */}
+                                                <div className="space-y-1.5">
+                                                    <div className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">History</div>
+                                                    <div className="grid grid-cols-2 gap-1.5">
+                                                        <div className="bg-stone-800 rounded p-2">
+                                                            <div className="text-stone-500 text-xs">Week (7d)</div>
+                                                            <div className="text-blue-400 font-bold">{insights.weeklySold?.units ?? 0} sold</div>
+                                                            <div className="text-stone-500 text-xs">${Number(insights.weeklySold?.revenue || 0).toFixed(2)}</div>
                                                         </div>
-                                                        {insights.lastOrder.supplier && (
-                                                            <div className="text-stone-500 text-xs">{insights.lastOrder.supplier}</div>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <div className="bg-stone-800 rounded p-2 text-stone-500 text-xs">
-                                                        No purchase orders found
-                                                    </div>
-                                                )}
-
-                                                {/* Velocity */}
-                                                {insights.velocity && (
-                                                    <div className="bg-stone-800 rounded p-2">
-                                                        <div className="text-stone-500 text-xs">Velocity</div>
-                                                        <div className="flex justify-between">
-                                                            <span>{insights.velocity.unitsPerDay ?? 0}/day</span>
-                                                            <span className={
-                                                                (insights.velocity.daysOfStock ?? 99) < 7 ? 'text-red-400' :
-                                                                    (insights.velocity.daysOfStock ?? 99) < 14 ? 'text-yellow-400' : 'text-green-400'
-                                                            }>
-                                                                {insights.velocity.daysOfStock ?? '—'} days left
-                                                            </span>
+                                                        <div className="bg-stone-800 rounded p-2">
+                                                            <div className="text-stone-500 text-xs">Month (30d)</div>
+                                                            <div className="text-emerald-400 font-bold">{insights.monthlySold?.units ?? 0} sold</div>
+                                                            <div className="text-stone-500 text-xs">${Number(insights.monthlySold?.revenue || 0).toFixed(2)}</div>
                                                         </div>
                                                     </div>
-                                                )}
-
-                                                {/* All-Time Stats */}
-                                                {insights.allTimeSales && (insights.allTimeSales.units > 0) && (
-                                                    <div className="bg-stone-800 rounded p-2">
-                                                        <div className="text-stone-500 text-xs">All-Time</div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-stone-300">{insights.allTimeSales.units} sold</span>
-                                                            <span className="text-green-400">${Number(insights.allTimeSales.revenue || 0).toFixed(2)}</span>
+                                                    <div className="grid grid-cols-2 gap-1.5">
+                                                        <div className="bg-stone-800 rounded p-2">
+                                                            <div className="text-stone-500 text-xs">Last Sale</div>
+                                                            <div className="text-stone-200 text-xs">
+                                                                {insights.lastSaleDate
+                                                                    ? new Date(insights.lastSaleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                                                    : 'Never sold'}
+                                                            </div>
+                                                        </div>
+                                                        <div className="bg-stone-800 rounded p-2">
+                                                            <div className="text-stone-500 text-xs">All-Time</div>
+                                                            <div className="text-stone-200 text-xs">{insights.allTimeSales?.units ?? 0} sold</div>
+                                                            <div className="text-stone-500 text-xs">${Number(insights.allTimeSales?.revenue || 0).toFixed(2)}</div>
                                                         </div>
                                                     </div>
-                                                )}
-
-                                                {/* AI Suggestion */}
-                                                {insights.suggestion?.orderQty > 0 && (
-                                                    <div className="bg-purple-500/20 border border-purple-500/50 rounded p-2">
-                                                        <div className="flex items-center gap-1 text-purple-400 text-xs">
-                                                            <Sparkles className="h-3 w-3" />
-                                                            Suggested Order
-                                                        </div>
-                                                        <div className="text-lg font-bold text-purple-400">
-                                                            {insights.suggestion.orderQty} units
-                                                        </div>
-                                                        <div className="text-stone-500 text-xs">
-                                                            Covers {insights.suggestion.coversDays ?? '?'} days
-                                                            {insights.suggestion.estimatedCost > 0 && (
-                                                                <span> • ~${Number(insights.suggestion.estimatedCost).toFixed(2)}</span>
+                                                    {insights.lastOrder ? (
+                                                        <div className="bg-stone-800 rounded p-2">
+                                                            <div className="text-stone-500 text-xs">Last Order</div>
+                                                            <div className="flex justify-between text-xs">
+                                                                <span className="text-stone-300">{insights.lastOrder.daysAgo}d ago</span>
+                                                                <span className="text-green-400">
+                                                                    {insights.lastOrder.quantity} @ ${Number(insights.lastOrder.unitCost || 0).toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                            {insights.lastOrder.supplier && (
+                                                                <div className="text-stone-500 text-[10px]">{insights.lastOrder.supplier}</div>
                                                             )}
                                                         </div>
+                                                    ) : (
+                                                        <div className="bg-stone-800 rounded p-2 text-stone-500 text-xs">
+                                                            No purchase orders found
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* ─── ZONE 2: CURRENT POSITION ─── */}
+                                                <div className="border-t border-stone-700/50 pt-2 space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">Position</div>
+                                                        {/* Reorder Status Badge */}
+                                                        {insights.cashIntel && (
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                                                                insights.cashIntel.reorderStatus === 'REFILL' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                insights.cashIntel.reorderStatus === 'WATCH' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                                insights.cashIntel.reorderStatus === 'FREEZE' ? 'bg-orange-500/20 text-orange-400' :
+                                                                'bg-red-500/20 text-red-400'
+                                                            }`}>
+                                                                {insights.cashIntel.reorderStatus === 'REFILL' ? '🟢 Reorder' :
+                                                                 insights.cashIntel.reorderStatus === 'WATCH' ? '🟡 Hold' :
+                                                                 insights.cashIntel.reorderStatus === 'FREEZE' ? '🟠 Stop Buying' :
+                                                                 '🔴 Dead — Markdown'}
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                )}
+
+                                                    <div className="grid grid-cols-2 gap-1.5">
+                                                        <div className="bg-stone-800 rounded p-2">
+                                                            <div className="text-stone-500 text-xs">Cash on Shelf</div>
+                                                            <div className="text-stone-100 font-bold">${(insights.cashIntel?.costOnHand ?? 0).toFixed(2)}</div>
+                                                        </div>
+                                                        <div className="bg-stone-800 rounded p-2">
+                                                            <div className="text-stone-500 text-xs">Days of Supply</div>
+                                                            <div className={`font-bold ${
+                                                                (insights.cashIntel?.daysOfSupply ?? 999) < 7 ? 'text-red-400' :
+                                                                (insights.cashIntel?.daysOfSupply ?? 999) < 14 ? 'text-yellow-400' : 'text-emerald-400'
+                                                            }`}>{insights.cashIntel?.daysOfSupply ?? '—'} days</div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-1.5">
+                                                        <div className="bg-stone-800 rounded p-2">
+                                                            <div className="text-stone-500 text-xs">Money at Risk</div>
+                                                            <div className={`font-bold ${(insights.cashIntel?.moneyAtRisk ?? 0) > 0 ? 'text-amber-400' : 'text-stone-500'}`}>
+                                                                {(insights.cashIntel?.moneyAtRisk ?? 0) > 0
+                                                                    ? `$${(insights.cashIntel.moneyAtRisk).toFixed(2)}`
+                                                                    : '$0.00'}
+                                                            </div>
+                                                        </div>
+                                                        <div className="bg-stone-800 rounded p-2">
+                                                            <div className="text-stone-500 text-xs">Sell-Through</div>
+                                                            <div className={`font-bold ${
+                                                                (insights.cashIntel?.sellThrough ?? 0) >= 80 ? 'text-emerald-400' :
+                                                                (insights.cashIntel?.sellThrough ?? 0) >= 50 ? 'text-yellow-400' : 'text-red-400'
+                                                            }`}>{insights.cashIntel?.sellThrough ?? 0}%</div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Dead Stock Risk Bar */}
+                                                    {insights.cashIntel && insights.cashIntel.deadStockRisk > 0 && (
+                                                        <div className="bg-stone-800 rounded p-2">
+                                                            <div className="flex items-center justify-between mb-1">
+                                                                <span className="text-stone-500 text-xs">Dead Stock Risk</span>
+                                                                <span className={`text-xs font-bold ${
+                                                                    insights.cashIntel.deadStockRisk >= 70 ? 'text-red-400' :
+                                                                    insights.cashIntel.deadStockRisk >= 50 ? 'text-orange-400' :
+                                                                    insights.cashIntel.deadStockRisk >= 25 ? 'text-yellow-400' : 'text-stone-400'
+                                                                }`}>{insights.cashIntel.deadStockRisk}/100</span>
+                                                            </div>
+                                                            <div className="h-1.5 bg-stone-700 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={`h-full rounded-full transition-all ${
+                                                                        insights.cashIntel.deadStockRisk >= 70 ? 'bg-red-500' :
+                                                                        insights.cashIntel.deadStockRisk >= 50 ? 'bg-orange-500' :
+                                                                        insights.cashIntel.deadStockRisk >= 25 ? 'bg-yellow-500' : 'bg-emerald-500'
+                                                                    }`}
+                                                                    style={{ width: `${insights.cashIntel.deadStockRisk}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Velocity */}
+                                                    <div className="bg-stone-800 rounded p-2">
+                                                        <div className="text-stone-500 text-xs">Velocity (weighted)</div>
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-stone-300">{insights.cashIntel?.weightedVelocity ?? insights.velocity?.unitsPerDay ?? 0}/day</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Last Order Regret */}
+                                                    {insights.cashIntel?.lastOrderRegret?.units > 0 && (
+                                                        <div className="bg-stone-800 rounded p-2">
+                                                            <div className="text-stone-500 text-xs">Still Sitting</div>
+                                                            <div className="flex justify-between text-xs">
+                                                                <span className="text-stone-300">{insights.cashIntel.lastOrderRegret.units} units from last order</span>
+                                                                <span className="text-amber-400">${insights.cashIntel.lastOrderRegret.cost.toFixed(2)}</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* ─── ZONE 3: ACTION ─── */}
+                                                <div className="border-t border-stone-700/50 pt-2 space-y-1.5">
+                                                    <div className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">Action</div>
+
+                                                    {/* Suggested Action — primary CTA */}
+                                                    {insights.cashIntel && (
+                                                        <div className={`rounded p-2.5 border ${
+                                                            insights.cashIntel.reorderStatus === 'REFILL' ? 'bg-emerald-500/10 border-emerald-500/30' :
+                                                            insights.cashIntel.reorderStatus === 'EXIT' ? 'bg-red-500/10 border-red-500/30' :
+                                                            insights.cashIntel.reorderStatus === 'FREEZE' ? 'bg-orange-500/10 border-orange-500/30' :
+                                                            'bg-stone-800 border-stone-700'
+                                                        }`}>
+                                                            <div className={`flex items-center gap-1.5 text-xs font-bold ${
+                                                                insights.cashIntel.reorderStatus === 'REFILL' ? 'text-emerald-400' :
+                                                                insights.cashIntel.reorderStatus === 'EXIT' ? 'text-red-400' :
+                                                                insights.cashIntel.reorderStatus === 'FREEZE' ? 'text-orange-400' :
+                                                                'text-yellow-400'
+                                                            }`}>
+                                                                <Sparkles className="h-3 w-3" />
+                                                                {insights.cashIntel.suggestedAction}
+                                                            </div>
+                                                            {insights.suggestion?.orderQty > 0 && insights.cashIntel.reorderStatus === 'REFILL' && (
+                                                                <div className="text-stone-500 text-[10px] mt-1">
+                                                                    Covers {insights.suggestion.coversDays}d
+                                                                    {insights.suggestion.estimatedCost > 0 && (
+                                                                        <span> • ~${Number(insights.suggestion.estimatedCost).toFixed(2)}</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Transfer Before Buy — multi-location only */}
+                                                    {insights.cashIntel?.transferSuggestion && (
+                                                        <div className="bg-blue-500/10 border border-blue-500/30 rounded p-2.5">
+                                                            <div className="flex items-center gap-1.5 text-xs font-bold text-blue-400">
+                                                                <Zap className="h-3 w-3" />
+                                                                Smart Reallocation
+                                                            </div>
+                                                            <div className="text-xs text-stone-300 mt-1">
+                                                                {insights.cashIntel.transferSuggestion.label}
+                                                            </div>
+                                                            {insights.cashIntel.transferSuggestion.savesOrderCost > 0 && (
+                                                                <div className="text-[10px] text-emerald-400 mt-0.5">
+                                                                    Saves ${insights.cashIntel.transferSuggestion.savesOrderCost.toFixed(2)} in ordering cost
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
