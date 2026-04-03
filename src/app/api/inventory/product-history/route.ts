@@ -25,28 +25,28 @@ export async function GET(request: Request) {
 
         const limit = parseInt(searchParams.get('limit') || '50')
 
-        // Fetch all event sources in parallel
+        // Fetch all event sources in parallel (gracefully handle missing models)
+        const safeQuery = async (fn: () => Promise<any[]>) => {
+            try { return await fn() } catch { return [] }
+        }
+
         const [adjustments, priceLogs, costHistory, invoiceItems] = await Promise.all([
-            // Stock adjustments
-            (prisma as any).stockAdjustment.findMany({
+            safeQuery(() => (prisma as any).stockAdjustment.findMany({
                 where: { productId },
                 orderBy: { createdAt: 'desc' },
                 take: limit
-            }),
-            // Price change logs (Ticket 3)
-            (prisma as any).priceChangeLog.findMany({
+            })),
+            safeQuery(() => (prisma as any).priceChangeLog.findMany({
                 where: { productId },
                 orderBy: { createdAt: 'desc' },
                 take: limit
-            }),
-            // Cost history (from invoice imports + manual)
-            (prisma as any).productCostHistory.findMany({
+            })),
+            safeQuery(() => (prisma as any).productCostHistory.findMany({
                 where: { productId },
                 orderBy: { createdAt: 'desc' },
                 take: limit
-            }),
-            // Vendor invoice items matched to this product
-            (prisma as any).vendorInvoiceItem.findMany({
+            })),
+            safeQuery(() => (prisma as any).vendorInvoiceItem.findMany({
                 where: { matchedProductId: productId },
                 include: {
                     vendorInvoice: {
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
                 },
                 orderBy: { createdAt: 'desc' },
                 take: limit
-            })
+            }))
         ])
 
         // Merge into unified timeline
