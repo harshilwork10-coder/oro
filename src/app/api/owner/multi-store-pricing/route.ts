@@ -13,12 +13,11 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-const { searchParams } = new URL(req.url)
+
+        const { searchParams } = new URL(req.url)
         const search = searchParams.get('search') || ''
         const categoryId = searchParams.get('categoryId') || ''
         const limit = parseInt(searchParams.get('limit') || '50')
@@ -93,9 +92,9 @@ const { searchParams } = new URL(req.url)
             take: limit
         })
 
-        // Fetch all location-specific prices for these products in one query
+        // Fetch all location-specific price overrides for these products
         const productIds = products.map(p => p.id)
-        const locationProducts = await prisma.locationProduct.findMany({
+        const locationOverrides = await prisma.locationItemOverride.findMany({
             where: {
                 productId: { in: productIds },
                 locationId: { in: locations.map(l => l.id) }
@@ -103,14 +102,14 @@ const { searchParams } = new URL(req.url)
         })
 
         // Build a lookup map: productId -> locationId -> price data
-        const priceMap = new Map<string, Map<string, { price: number; costPrice: number }>>()
-        for (const lp of locationProducts) {
-            if (!priceMap.has(lp.productId)) {
-                priceMap.set(lp.productId, new Map())
+        const priceMap = new Map<string, Map<string, { price: number }>>()
+        for (const lo of locationOverrides) {
+            if (!lo.productId) continue // skip non-product overrides
+            if (!priceMap.has(lo.productId)) {
+                priceMap.set(lo.productId, new Map())
             }
-            priceMap.get(lp.productId)!.set(lp.locationId, {
-                price: Number(lp.price),
-                costPrice: Number(lp.costPrice)
+            priceMap.get(lo.productId)!.set(lo.locationId, {
+                price: lo.priceOverride ? Number(lo.priceOverride) : 0
             })
         }
 
@@ -124,7 +123,7 @@ const { searchParams } = new URL(req.url)
                     locationName: loc.name,
                     price: override?.price ?? defaultPrice,
                     hasOverride: !!override,
-                    costPrice: override?.costPrice ?? Number(product.cost || 0)
+                    costPrice: Number(product.cost || 0)
                 }
             })
 
@@ -166,10 +165,12 @@ const { searchParams } = new URL(req.url)
 // POST — Update price at specific locations
 export async function POST(req: NextRequest) {
     try {
+        const user = await getAuthUser(req)
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-const body = await req.json()
+
+        const body = await req.json()
         const { updates } = body
         // updates: Array<{ productId, locationIds: string[], newPrice: number }>
 
@@ -217,22 +218,21 @@ const body = await req.json()
 
             if (!product) continue
 
-            // Upsert LocationProduct for each selected location
+            // Upsert LocationItemOverride for each selected location
             for (const locationId of locationIds) {
-                await prisma.locationProduct.upsert({
+                await prisma.locationItemOverride.upsert({
                     where: {
                         locationId_productId: { locationId, productId }
                     },
                     update: {
-                        price: newPrice,
+                        priceOverride: newPrice,
                         updatedAt: new Date()
                     },
                     create: {
                         locationId,
                         productId,
-                        price: newPrice,
-                        costPrice: product.cost ?? 0,
-                        stock: product.stock ?? 0
+                        franchiseId,
+                        priceOverride: newPrice
                     }
                 })
                 totalUpdated++
@@ -254,6 +254,7 @@ const body = await req.json()
 // DELETE — Remove location override (revert to default franchise price)
 export async function DELETE(req: NextRequest) {
     try {
+        const user = await getAuthUser(req)
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -266,7 +267,7 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: 'productId and locationId required' }, { status: 400 })
         }
 
-        await prisma.locationProduct.deleteMany({
+        await prisma.locationItemOverride.deleteMany({
             where: { productId, locationId }
         })
 

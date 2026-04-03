@@ -8,15 +8,11 @@ export async function GET(
     { params }: { params: Promise<{ franchisorId: string }> }
 ) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { franchisorId } = await params
 
     try {
-        if (!user?.email) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         // Only PROVIDER can access other franchisors' configs
         if (user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -82,6 +78,7 @@ export async function PATCH(
     const { franchisorId } = await params
 
     try {
+        const user = await getAuthUser(req)
         if (!user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
