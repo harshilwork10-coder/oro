@@ -9,7 +9,8 @@ import {
     ChevronLeft, ChevronRight, Barcode, DollarSign,
     Percent, AlertTriangle, Check, X, ArrowLeft, Folder, Tag, Gift,
     Brain, Sparkles, Loader2, TrendingUp, Clock, ShoppingBag, Zap,
-    PackagePlus, History as HistoryIcon, Printer, ClipboardList
+    PackagePlus, History as HistoryIcon, Printer, ClipboardList,
+    ChevronDown, ChevronUp
 } from 'lucide-react'
 import Toast from '@/components/ui/Toast'
 import DepartmentManagerModal from '@/components/modals/DepartmentManagerModal'
@@ -101,6 +102,7 @@ export default function RetailInventoryPage() {
     const [insights, setInsights] = useState<any>(null)
     const [loadingInsights, setLoadingInsights] = useState(false)
     const [coverageDays, setCoverageDays] = useState(14)
+    const [insightsExpanded, setInsightsExpanded] = useState(false)
 
     // Quick action modal states
     const [showReceiveModal, setShowReceiveModal] = useState(false)
@@ -121,6 +123,10 @@ export default function RetailInventoryPage() {
                 if (list.length > 0) {
                     setEditProduct(list[0])
                     setCurrentIndex(0)
+                    // Fetch insights for the first product immediately
+                    if (list[0].id !== 'new') {
+                        setTimeout(() => fetchProductInsights(list[0].id), 100)
+                    }
                 }
             }
 
@@ -823,7 +829,11 @@ export default function RetailInventoryPage() {
                                 {/* ═══ INVENTORY CASH INTELLIGENCE PANEL ═══ */}
                                 {!isNewProduct && (
                                     <div className="mt-4 pt-4 border-t border-stone-700">
-                                        <div className="flex items-center justify-between mb-3">
+                                        {/* Clickable Header — always visible */}
+                                        <button
+                                            onClick={() => setInsightsExpanded(!insightsExpanded)}
+                                            className="w-full flex items-center justify-between mb-1 hover:opacity-80 transition-opacity"
+                                        >
                                             <h4 className="text-sm font-semibold text-purple-400 flex items-center gap-2">
                                                 <Brain className="h-4 w-4" />
                                                 Cash Intelligence
@@ -832,25 +842,61 @@ export default function RetailInventoryPage() {
                                                 {loadingInsights && (
                                                     <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
                                                 )}
-                                                <select
-                                                    value={coverageDays}
-                                                    onChange={(e) => {
-                                                        const days = parseInt(e.target.value)
-                                                        setCoverageDays(days)
-                                                        if (editProduct?.id && editProduct.id !== 'new') {
-                                                            fetchProductInsights(editProduct.id, days)
-                                                        }
-                                                    }}
-                                                    className="bg-stone-800 border border-stone-700 text-stone-300 text-xs rounded px-2 py-1 focus:ring-purple-500 focus:border-purple-500"
-                                                    title="Order coverage window"
-                                                >
-                                                    <option value={7}>7d cover</option>
-                                                    <option value={14}>14d cover</option>
-                                                    <option value={21}>21d cover</option>
-                                                    <option value={30}>30d cover</option>
-                                                    <option value={60}>60d cover</option>
-                                                </select>
+                                                {/* Collapsed: show reorder badge + key data inline */}
+                                                {!insightsExpanded && insights?.cashIntel && (
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                                        insights.cashIntel.reorderStatus === 'REFILL' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                        insights.cashIntel.reorderStatus === 'WATCH' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                        insights.cashIntel.reorderStatus === 'FREEZE' ? 'bg-orange-500/20 text-orange-400' :
+                                                        'bg-red-500/20 text-red-400'
+                                                    }`}>
+                                                        {insights.cashIntel.reorderStatus === 'REFILL' ? 'Reorder' :
+                                                         insights.cashIntel.reorderStatus === 'WATCH' ? 'Hold' :
+                                                         insights.cashIntel.reorderStatus === 'FREEZE' ? 'Stop' : 'Dead'}
+                                                    </span>
+                                                )}
+                                                {insightsExpanded
+                                                    ? <ChevronUp className="h-4 w-4 text-stone-500" />
+                                                    : <ChevronDown className="h-4 w-4 text-stone-500" />
+                                                }
                                             </div>
+                                        </button>
+
+                                        {/* Collapsed mini-summary — key numbers at a glance */}
+                                        {!insightsExpanded && insights?.cashIntel && (
+                                            <div className="flex items-center gap-3 text-[10px] text-stone-500 mt-1 mb-1">
+                                                <span>${(insights.cashIntel.costOnHand ?? 0).toFixed(0)} on shelf</span>
+                                                <span>•</span>
+                                                <span>{insights.cashIntel.daysOfSupply ?? '—'}d supply</span>
+                                                <span>•</span>
+                                                <span>{insights.cashIntel.weightedVelocity ?? 0}/day</span>
+                                            </div>
+                                        )}
+
+                                        {/* Expanded: full 3-zone panel */}
+                                        {insightsExpanded && (
+                                            <>
+                                        {/* Coverage days selector */}
+                                        <div className="flex justify-end mb-2 mt-1">
+                                            <select
+                                                value={coverageDays}
+                                                onChange={(e) => {
+                                                    const days = parseInt(e.target.value)
+                                                    setCoverageDays(days)
+                                                    if (editProduct?.id && editProduct.id !== 'new') {
+                                                        fetchProductInsights(editProduct.id, days)
+                                                    }
+                                                }}
+                                                className="bg-stone-800 border border-stone-700 text-stone-300 text-xs rounded px-2 py-1 focus:ring-purple-500 focus:border-purple-500"
+                                                title="Order coverage window"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <option value={7}>7d cover</option>
+                                                <option value={14}>14d cover</option>
+                                                <option value={21}>21d cover</option>
+                                                <option value={30}>30d cover</option>
+                                                <option value={60}>60d cover</option>
+                                            </select>
                                         </div>
 
                                         {!loadingInsights && !insights && (
@@ -1057,6 +1103,8 @@ export default function RetailInventoryPage() {
                                                     )}
                                                 </div>
                                             </div>
+                                        )}
+                                    </>
                                         )}
                                     </div>
                                 )}
