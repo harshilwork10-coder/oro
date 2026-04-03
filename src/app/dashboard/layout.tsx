@@ -51,7 +51,7 @@ export default function DashboardLayout({
                 {!hideSidebar && <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />}
                 {hideSidebar && sidebarOpen && <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />}
 
-                <div className="flex flex-1 flex-col overflow-hidden relative">
+                <div className="flex flex-1 flex-col overflow-hidden relative min-w-0">
                     {/* Ambient Background Glow */}
                     <div className="absolute top-0 left-0 w-full h-96 blur-[100px] pointer-events-none" style={{ backgroundColor: 'var(--theme-accent-muted)' }} />
 

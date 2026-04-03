@@ -124,39 +124,41 @@ export default function DealsPage() {
         <div className="min-h-screen bg-stone-950 text-stone-100">
             {/* Header */}
             <div className="bg-gradient-to-r from-pink-600/20 via-purple-600/20 to-blue-600/20 border-b border-stone-800">
-                <div className="max-w-7xl mx-auto px-6 py-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                             <Link
                                 href="/dashboard"
-                                className="p-2 hover:bg-stone-800 rounded-lg transition-colors"
+                                className="p-2 hover:bg-stone-800 rounded-lg transition-colors flex-shrink-0"
                             >
                                 <ArrowLeft className="h-5 w-5" />
                             </Link>
-                            <div>
+                            <div className="min-w-0">
                                 <div className="flex items-center gap-3">
-                                    <Gift className="h-8 w-8 text-pink-400" />
-                                    <h1 className="text-2xl font-bold">Promotions & Deals</h1>
+                                    <Gift className="h-6 w-6 sm:h-8 sm:w-8 text-pink-400 flex-shrink-0" />
+                                    <h1 className="text-xl sm:text-2xl font-bold truncate">Promotions & Deals</h1>
                                 </div>
-                                <p className="text-stone-400 mt-1">
-                                    Manage Mix & Match, BOGO, discounts, and more
+                                <p className="text-stone-400 mt-1 text-sm truncate">
+                                    Manage Mix & Match, BOGO, Discounts
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                             <Link
                                 href="/dashboard/deals/manufacturer"
-                                className="px-4 py-2.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-400 rounded-xl flex items-center gap-2 font-medium"
+                                className="px-3 sm:px-4 py-2 sm:py-2.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-400 rounded-xl flex items-center gap-2 font-medium text-sm"
                             >
                                 <FileUp className="h-4 w-4" />
-                                Import Buydowns
+                                <span className="hidden sm:inline">Import Buydowns</span>
+                                <span className="sm:hidden">Import</span>
                             </Link>
                             <button
                                 onClick={() => setShowModal(true)}
-                                className="px-6 py-3 bg-pink-600 hover:bg-pink-500 rounded-xl flex items-center gap-2 font-medium shadow-lg shadow-pink-600/20"
+                                className="px-4 sm:px-6 py-2.5 sm:py-3 bg-pink-600 hover:bg-pink-500 rounded-xl flex items-center gap-2 font-medium shadow-lg shadow-pink-600/20 text-sm sm:text-base"
                             >
                                 <Plus className="h-5 w-5" />
-                                Create Deal
+                                <span className="hidden sm:inline">Create Deal</span>
+                                <span className="sm:hidden">Create</span>
                             </button>
                         </div>
                     </div>
@@ -164,7 +166,7 @@ export default function DealsPage() {
             </div>
 
             {/* Stats */}
-            <div className="max-w-7xl mx-auto px-6 py-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
                         <div className="flex items-center gap-3">
