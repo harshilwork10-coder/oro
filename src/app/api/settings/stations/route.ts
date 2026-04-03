@@ -84,7 +84,9 @@ const { searchParams } = new URL(req.url)
 
 // POST - Create new station
 export async function POST(req: NextRequest) {
-    if (!user) {
+    try {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 const { locationId, name, pairingCode: providedCode, paymentMode, terminalId } = await req.json()
@@ -138,15 +140,21 @@ const { locationId, name, pairingCode: providedCode, paymentMode, terminalId } =
         entityType: 'Station',
         entityId: station.id,
         franchiseId: user.franchiseId,
-        metadata: { name, pairingCode, locationId, paymentMode: paymentMode || 'CASH_ONLY' }
+        details: { name, pairingCode, locationId, paymentMode: paymentMode || 'CASH_ONLY' }
     })
 
     return NextResponse.json({ station })
+    } catch (error) {
+        console.error('[stations] POST error:', error)
+        return NextResponse.json({ error: 'Failed to create station' }, { status: 500 })
+    }
 }
 
 // DELETE - Delete a station
 export async function DELETE(req: NextRequest) {
-    if (!user) {
+    try {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 const { searchParams } = new URL(req.url)
@@ -185,15 +193,21 @@ const { searchParams } = new URL(req.url)
         entityType: 'Station',
         entityId: id,
         franchiseId: user.franchiseId,
-        metadata: { locationId: station.locationId }
+        details: { locationId: station.locationId }
     })
 
     return NextResponse.json({ success: true })
+    } catch (error) {
+        console.error('[stations] DELETE error:', error)
+        return NextResponse.json({ error: 'Failed to delete station' }, { status: 500 })
+    }
 }
 
 // PATCH - Update station name
 export async function PATCH(req: NextRequest) {
-    if (!user) {
+    try {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 const { searchParams } = new URL(req.url)
@@ -244,9 +258,13 @@ const { searchParams } = new URL(req.url)
         entityType: 'Station',
         entityId: id,
         franchiseId: user.franchiseId,
-        metadata: { name, paymentMode, terminalId }
+        details: { name, paymentMode, terminalId }
     })
 
     return NextResponse.json({ station: updatedStation })
+    } catch (error) {
+        console.error('[stations] PATCH error:', error)
+        return NextResponse.json({ error: 'Failed to update station' }, { status: 500 })
+    }
 }
 
