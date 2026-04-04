@@ -4,12 +4,25 @@ import { prisma } from '@/lib/prisma'
 import { invalidateLocationCache } from '@/lib/cache'
 
 export async function GET(req: NextRequest) {
+    const ROUTE_TAG = '[BUSINESS_CONFIG_GET]'
+    let step = 'init'
     try {
+        step = 'auth'
+        console.log(`${ROUTE_TAG} Entered route`)
         const authUser = await getAuthUser(req)
+        console.log(`${ROUTE_TAG} Auth result:`, {
+            hasUser: !!authUser,
+            role: authUser?.role,
+            email: authUser?.email ? '***@***' : null,
+            franchiseId: authUser?.franchiseId || null,
+        })
+
         if (!authUser?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        step = 'prisma-user-query'
+        console.log(`${ROUTE_TAG} Querying user by email...`)
         // Get user with all possible relationships to find config
         const user = await prisma.user.findUnique({
             where: { email: authUser.email },
@@ -38,6 +51,17 @@ export async function GET(req: NextRequest) {
             }
         })
 
+        console.log(`${ROUTE_TAG} User query result:`, {
+            userId: user?.id || null,
+            hasFranchisor: !!user?.franchisor,
+            hasFranchise: !!user?.franchise,
+            hasFranchisorConfig: !!user?.franchisor?.config,
+            hasFranchiseFranchisor: !!user?.franchise?.franchisor,
+            hasFranchiseConfig: !!user?.franchise?.franchisor?.config,
+            hasSettings: !!user?.franchise?.settings,
+        })
+
+        step = 'resolve-config'
         // Try to find config: first check direct franchisor, then via franchise
         const franchisorConfig = user?.franchisor?.config
         const franchiseConfig = user?.franchise?.franchisor?.config
@@ -54,6 +78,7 @@ export async function GET(req: NextRequest) {
         const liveSettings = user?.franchise?.settings
 
         if (!targetConfig && !user?.franchisor && !user?.franchise?.franchisor) {
+            console.log(`${ROUTE_TAG} No franchisor/franchise found — returning defaults`)
             // Return default config for users without a franchisor/franchise
             return NextResponse.json({
                 taxRate: 0.08,
@@ -65,6 +90,7 @@ export async function GET(req: NextRequest) {
             })
         }
 
+        step = 'derive-posmode'
         // Determine posMode from franchisor's industryType (RETAIL → 'RETAIL', SERVICE → 'SALON')
         const franchisor = user?.franchisor || user?.franchise?.franchisor
         const industryType = franchisor?.industryType || 'SERVICE'
@@ -104,6 +130,7 @@ export async function GET(req: NextRequest) {
             updatedAt: new Date()
         }
 
+        step = 'overlay-live-settings'
         // ════════════════════════════════════════════════════════════════════
         // OVERLAY: Live runtime pricing/tax/tip from FranchiseSettings
         // Reconciliation: FranchiseSettings value wins if populated,
@@ -158,15 +185,25 @@ export async function GET(req: NextRequest) {
             }
         }
 
+        step = 'serialize-response'
+        console.log(`${ROUTE_TAG} Returning config (posMode=${derivedPosMode}, hasOverlay=${Object.keys(liveOverlay).length > 0})`)
         return NextResponse.json({
             ...config,
             posMode: derivedPosMode, // Always derive, never trust stored value
             ...liveOverlay // FranchiseSettings fields override BusinessConfig
         })
 
-    } catch (error) {
-        console.error('Error fetching business config:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    } catch (error: any) {
+        console.error(`${ROUTE_TAG} CRASH at step="${step}":`, error?.message, error?.stack)
+        // FAIL-SAFE: Return structured error with diagnostic info, prevent client retry loops
+        return NextResponse.json({
+            error: 'Internal Server Error',
+            _debug: {
+                step,
+                message: error?.message || 'Unknown error',
+                name: error?.name || 'Error',
+            }
+        }, { status: 500 })
     }
 }
 

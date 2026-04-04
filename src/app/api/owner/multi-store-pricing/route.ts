@@ -11,8 +11,19 @@ import { prisma } from '@/lib/prisma'
 
 // GET — Fetch products with their price at each location
 export async function GET(req: NextRequest) {
+    const ROUTE_TAG = '[MULTI_STORE_PRICING_GET]'
+    let step = 'init'
     try {
+        step = 'auth'
+        console.log(`${ROUTE_TAG} Entered route`)
         const user = await getAuthUser(req)
+        console.log(`${ROUTE_TAG} Auth result:`, {
+            hasUser: !!user,
+            role: user?.role,
+            userId: user?.id || null,
+            franchiseId: user?.franchiseId || null,
+        })
+
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -21,7 +32,9 @@ export async function GET(req: NextRequest) {
         const search = searchParams.get('search') || ''
         const categoryId = searchParams.get('categoryId') || ''
         const limit = parseInt(searchParams.get('limit') || '50')
+        console.log(`${ROUTE_TAG} Query params:`, { search: search || '(none)', categoryId: categoryId || '(none)', limit })
 
+        step = 'resolve-franchise'
         // Get franchise info
         const dbUser = await prisma.user.findUnique({
             where: { id: user.id },
@@ -42,17 +55,34 @@ export async function GET(req: NextRequest) {
         if (!franchiseId && dbUser?.franchisor?.franchises?.[0]?.id) {
             franchiseId = dbUser.franchisor.franchises[0].id
         }
+
+        // OWNER/FRANCHISOR fallback: if user doesn't have direct franchiseId or franchisor link,
+        // try resolving via the auth user's franchiseId (which may have been resolved in getAuthUser)
+        if (!franchiseId && user.franchiseId && user.franchiseId !== '__SYSTEM__') {
+            franchiseId = user.franchiseId
+        }
+
+        console.log(`${ROUTE_TAG} Franchise resolution:`, {
+            directFranchiseId: dbUser?.franchiseId || null,
+            franchisorFranchiseId: dbUser?.franchisor?.franchises?.[0]?.id || null,
+            authFranchiseId: user.franchiseId || null,
+            resolved: franchiseId || null,
+        })
+
         if (!franchiseId) {
             return NextResponse.json({ error: 'No franchise found' }, { status: 400 })
         }
 
+        step = 'query-locations'
         // Get all locations for this franchise
         const locations = await prisma.location.findMany({
             where: { franchiseId },
             select: { id: true, name: true, address: true },
             orderBy: { name: 'asc' }
         })
+        console.log(`${ROUTE_TAG} Found ${locations.length} locations`)
 
+        step = 'build-product-query'
         // Build product query
         const whereClause: any = {
             franchiseId,
@@ -72,6 +102,7 @@ export async function GET(req: NextRequest) {
             whereClause.categoryId = categoryId
         }
 
+        step = 'query-products'
         // Fetch products
         const products = await prisma.product.findMany({
             where: whereClause,
@@ -91,16 +122,20 @@ export async function GET(req: NextRequest) {
             orderBy: { name: 'asc' },
             take: limit
         })
+        console.log(`${ROUTE_TAG} Found ${products.length} products`)
 
+        step = 'query-overrides'
         // Fetch all location-specific price overrides for these products
         const productIds = products.map(p => p.id)
-        const locationOverrides = await prisma.locationItemOverride.findMany({
+        const locationOverrides = productIds.length > 0 ? await prisma.locationItemOverride.findMany({
             where: {
                 productId: { in: productIds },
                 locationId: { in: locations.map(l => l.id) }
             }
-        })
+        }) : []
+        console.log(`${ROUTE_TAG} Found ${locationOverrides.length} overrides`)
 
+        step = 'build-price-map'
         // Build a lookup map: productId -> locationId -> price data
         const priceMap = new Map<string, Map<string, { price: number }>>()
         for (const lo of locationOverrides) {
@@ -113,6 +148,7 @@ export async function GET(req: NextRequest) {
             })
         }
 
+        step = 'serialize-response'
         // Combine into response
         const enrichedProducts = products.map(product => {
             const defaultPrice = Number(product.price)
@@ -142,6 +178,7 @@ export async function GET(req: NextRequest) {
             }
         })
 
+        step = 'query-categories'
         // Fetch categories for filter dropdown
         const categories = await prisma.productCategory.findMany({
             where: { franchiseId, isActive: true },
@@ -149,6 +186,7 @@ export async function GET(req: NextRequest) {
             orderBy: { name: 'asc' }
         })
 
+        console.log(`${ROUTE_TAG} Returning ${enrichedProducts.length} products, ${locations.length} locations, ${categories.length} categories`)
         return NextResponse.json({
             products: enrichedProducts,
             locations,
@@ -156,9 +194,17 @@ export async function GET(req: NextRequest) {
             total: enrichedProducts.length
         })
 
-    } catch (error) {
-        console.error('[MULTI_STORE_PRICING_GET]', error)
-        return NextResponse.json({ error: 'Failed to fetch pricing data' }, { status: 500 })
+    } catch (error: any) {
+        console.error(`${ROUTE_TAG} CRASH at step="${step}":`, error?.message, error?.stack)
+        // FAIL-SAFE: Return structured error with diagnostic info
+        return NextResponse.json({
+            error: 'Failed to fetch pricing data',
+            _debug: {
+                step,
+                message: error?.message || 'Unknown error',
+                name: error?.name || 'Error',
+            }
+        }, { status: 500 })
     }
 }
 
@@ -197,6 +243,10 @@ export async function POST(req: NextRequest) {
         let franchiseId = dbUser?.franchiseId
         if (!franchiseId && dbUser?.franchisor?.franchises?.[0]?.id) {
             franchiseId = dbUser.franchisor.franchises[0].id
+        }
+        // OWNER/FRANCHISOR fallback
+        if (!franchiseId && user.franchiseId && user.franchiseId !== '__SYSTEM__') {
+            franchiseId = user.franchiseId
         }
         if (!franchiseId) {
             return NextResponse.json({ error: 'No franchise found' }, { status: 400 })

@@ -83,14 +83,31 @@ export async function getAuthUser(request?: NextRequest | Request): Promise<Auth
         // PROVIDER and ADMIN users operate above the franchise hierarchy — they have no franchiseId
         const role = session.user.role ?? 'EMPLOYEE'
         const isSystemRole = role === 'PROVIDER' || role === 'ADMIN'
+        // OWNER and FRANCHISOR own a Franchisor entity — they may not have a direct franchiseId
+        const isElevatedRole = role === 'OWNER' || role === 'FRANCHISOR'
         
-        if (isSystemRole || session.user.franchiseId) {
+        if (isSystemRole || isElevatedRole || session.user.franchiseId) {
+            let resolvedFranchiseId = session.user.franchiseId ?? ''
+
+            // For OWNER/FRANCHISOR without a direct franchiseId, look up via Franchisor chain
+            if (!resolvedFranchiseId && isElevatedRole) {
+                try {
+                    const franchisor = await prisma.franchisor.findFirst({
+                        where: { ownerId: session.user.id },
+                        select: { franchises: { select: { id: true }, take: 1 } }
+                    })
+                    resolvedFranchiseId = franchisor?.franchises?.[0]?.id ?? ''
+                } catch (e) {
+                    console.error('[AUTH] Failed to resolve OWNER/FRANCHISOR franchiseId:', e)
+                }
+            }
+
             return {
                 id: session.user.id,
                 email: session.user.email ?? undefined,
                 name: session.user.name ?? undefined,
                 role,
-                franchiseId: session.user.franchiseId ?? (isSystemRole ? '__SYSTEM__' : ''),
+                franchiseId: resolvedFranchiseId || (isSystemRole ? '__SYSTEM__' : ''),
                 locationId: session.user.locationId ?? undefined
             }
         }

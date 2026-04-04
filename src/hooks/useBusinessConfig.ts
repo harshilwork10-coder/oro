@@ -2,7 +2,14 @@
 
 import useSWR from 'swr'
 
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+const fetcher = async (url: string) => {
+    const res = await fetch(url)
+    if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(errBody?.error || `HTTP ${res.status}`)
+    }
+    return res.json()
+}
 
 export interface BusinessConfig {
     id: string | null
