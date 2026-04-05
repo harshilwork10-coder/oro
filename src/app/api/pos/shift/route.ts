@@ -12,7 +12,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch fresh user data to ensure we have the latest locationId
-    // This handles cases where location was assigned after login (stale session)
     const dbUser = await prisma.user.findUnique({
         where: { id: user.id },
         select: { id: true, locationId: true, franchiseId: true }
@@ -29,11 +28,9 @@ export async function POST(req: NextRequest) {
         const { action, amount, notes, stationId, stationName } = body
 
         if (action === 'OPEN') {
-            // Get locationId - either from user or from franchise's first location
             let finalLocationId = locationId
 
             if (!finalLocationId && user.franchiseId) {
-                // Franchise owner without location - use first location
                 const firstLocation = await prisma.location.findFirst({
                     where: { franchiseId: user.franchiseId }
                 })
@@ -84,7 +81,6 @@ export async function POST(req: NextRequest) {
                 }
             })
 
-            // Audit log
             await auditLog({
                 userId: user.id,
                 userEmail: user.email,
@@ -110,17 +106,67 @@ export async function POST(req: NextRequest) {
             })
             if (!currentSession) return NextResponse.json({ error: 'No open shift found' }, { status: 404 })
 
+            // ===== EXPECTED CASH CALCULATION (server-side truth) =====
+            const sessionId = currentSession.id
+            const startingCash = Number(currentSession.startingCash || 0)
+
+            // Cash sales during this shift
+            const cashSalesAgg = await prisma.transaction.aggregate({
+                where: { cashDrawerSessionId: sessionId, status: 'COMPLETED', paymentMethod: 'CASH' },
+                _sum: { total: true }
+            })
+            const cashSales = Number(cashSalesAgg._sum.total || 0)
+
+            // Cash refunds during this shift (negative totals, so abs)
+            const cashRefundsAgg = await prisma.transaction.aggregate({
+                where: { cashDrawerSessionId: sessionId, type: { in: ['REFUND', 'VOID', 'CORRECTION'] }, paymentMethod: 'CASH' },
+                _sum: { total: true }
+            })
+            const cashRefunds = Math.abs(Number(cashRefundsAgg._sum.total || 0))
+
+            // Cash drops
+            const cashDropsAgg = await prisma.cashDrop.aggregate({
+                where: { sessionId },
+                _sum: { amount: true }
+            })
+            const cashDrops = Number(cashDropsAgg._sum.amount || 0)
+
+            // Paid in/out
+            const paidInAgg = await prisma.drawerActivity.aggregate({
+                where: { shiftId: sessionId, type: 'PAID_IN' },
+                _sum: { amount: true }
+            })
+            const paidIn = Number(paidInAgg._sum.amount || 0)
+
+            const paidOutAgg = await prisma.drawerActivity.aggregate({
+                where: { shiftId: sessionId, type: 'PAID_OUT' },
+                _sum: { amount: true }
+            })
+            const paidOut = Number(paidOutAgg._sum.amount || 0)
+
+            // Split payment cash portions
+            const splitCashAgg = await prisma.transaction.aggregate({
+                where: { cashDrawerSessionId: sessionId, status: 'COMPLETED', paymentMethod: 'SPLIT' },
+                _sum: { cashAmount: true }
+            })
+            const splitCash = Number(splitCashAgg._sum.cashAmount || 0)
+
+            const expectedCash = Math.round((startingCash + cashSales + splitCash - cashRefunds - cashDrops - paidOut + paidIn) * 100) / 100
+            const endingCash = Number(amount || 0)
+            const variance = Math.round((endingCash - expectedCash) * 100) / 100
+
             const closedSession = await prisma.cashDrawerSession.update({
                 where: { id: currentSession.id },
                 data: {
                     endingCash: amount,
+                    expectedCash,
+                    variance,
                     endTime: new Date(),
                     status: 'CLOSED',
                     notes: notes ? `${currentSession.notes || ''}\n${notes}` : currentSession.notes
                 }
             })
 
-            // Audit log
             await auditLog({
                 userId: user.id,
                 userEmail: user.email,
@@ -130,14 +176,28 @@ export async function POST(req: NextRequest) {
                 entityId: currentSession.id,
                 franchiseId: user.franchiseId,
                 locationId: locationId || undefined,
-                metadata: { startingCash: Number(currentSession.startingCash), endingCash: amount }
+                metadata: {
+                    startingCash,
+                    endingCash,
+                    expectedCash,
+                    variance,
+                    cashSales,
+                    cashRefunds,
+                    cashDrops,
+                    paidIn,
+                    paidOut,
+                    splitCash,
+                }
             })
 
-            return NextResponse.json(closedSession)
+            return NextResponse.json({
+                ...closedSession,
+                breakdown: { startingCash, cashSales, splitCash, cashRefunds, cashDrops, paidIn, paidOut, expectedCash, endingCash, variance }
+            })
         }
 
         if (action === 'DROP') {
-            // Handle cash drop: record amount in current open session
+            // Record cash drop in the current open shift
             const currentSession = await prisma.cashDrawerSession.findFirst({
                 where: {
                     ...(locationId ? { locationId } : {}),
@@ -146,8 +206,40 @@ export async function POST(req: NextRequest) {
                 },
             })
             if (!currentSession) return NextResponse.json({ error: 'No open shift found for drop' }, { status: 404 })
-            // For simplicity, we just acknowledge the drop. Extend schema as needed.
-            return NextResponse.json({ message: 'Cash drop recorded', amount })
+
+            if (!amount || amount <= 0) {
+                return NextResponse.json({ error: 'Drop amount must be greater than 0' }, { status: 400 })
+            }
+
+            // P0 FIX: Persist cash drop to CashDrop model (was previously NOT saved)
+            const cashDrop = await prisma.cashDrop.create({
+                data: {
+                    sessionId: currentSession.id,
+                    amount: amount,
+                    reason: notes || 'SAFE_DROP',
+                    droppedBy: user.id
+                }
+            })
+
+            await auditLog({
+                userId: user.id,
+                userEmail: user.email,
+                userRole: user.role,
+                action: 'CASH_DROP',
+                entityType: 'CashDrop',
+                entityId: cashDrop.id,
+                franchiseId: user.franchiseId,
+                locationId: locationId || undefined,
+                metadata: { amount, shiftId: currentSession.id, reason: notes || 'SAFE_DROP' }
+            })
+
+            return NextResponse.json({
+                success: true,
+                id: cashDrop.id,
+                message: 'Cash drop recorded',
+                amount,
+                sessionId: currentSession.id
+            })
         }
 
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -234,7 +326,6 @@ export async function GET(req: NextRequest) {
             ...currentSession,
             cashTotal: cashSales,
             expectedCash: startingCash + cashSales,
-            // Also add these aliases for frontend compatibility
             openingAmount: startingCash,
             cashSales: cashSales
         }
@@ -244,5 +335,3 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ shift: shiftData, shiftRequirement })
 }
-
-

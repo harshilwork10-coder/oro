@@ -1,0 +1,68 @@
+--- ORO 9 MONEY MOVEMENT VERIFICATION ---
+Server: http://localhost:3001
+User: test@test.com (FRANCHISOR)
+User: cmndhrjuk000081mg6ala0khp
+Franchise: cmndhrjxv000681mg0hzvjhfz
+Location: cmndhrjzr000881mgsr6tkso5
+
+--- TEST 1: EXCHANGE DISABLED ---
+[PASS] EXCHANGE-503: Returns 503
+
+--- TEST 2: STORE CREDIT ---
+[PASS] SC-ISSUE: Code=SC-MNKLZHO0GE4F Balance=$25
+[PASS] SC-REDEEM: Balance after=$15
+[PASS] SC-OVER-BLOCKED: undefined
+
+--- TEST 3: CASH DROP ---
+[PASS] CASH-DROP: Saved id=cmnklzkev000bwmqs50d9ccuv amount=$75
+[PASS] CASH-DROP-DB: Found in DB, amount=$75
+
+--- TEST 4: GIFT CARD ---
+[FAIL] GC-CREATE: {"error":"Failed to create gift card"}
+
+--- TEST 5: REFUND ---
+[SKIP] REFUND: No completed transactions found
+
+--- TEST 6: PAID IN/OUT ---
+[FAIL] PAID-IN: No active shift. Open a shift first.
+[FAIL] PAID-OUT: No active shift. Open a shift first.
+
+--- TEST 7: SHIFT CLOSE ---
+[PASS] SHIFT-CLOSE: Closed, ending=$350
+
+--- TEST 8: VOID ---
+[SKIP] VOID: No completed tx to void
+
+--- TEST 9: RECONCILIATION ---
+-------- DAILY RECONCILIATION --------
+Sales:       $0.00 (0)
+Refunds:     $0.00 (0)
+Voids:       $0.00 (0)
+Net Revenue: $0.00
+Cash Sales:  $0.00
+Card Sales:  $0.00
+GC Liability:$0.00
+SC Liability:$15.00
+Cash Drops:  $75.00 (1)
+--------------------------------------
+[PASS] RECON-SALES: $0.00
+[PASS] RECON-REFUNDS: $0.00
+[PASS] RECON-VOIDS: $0.00
+[PASS] RECON-GC-LIABILITY: $0.00
+[PASS] RECON-SC-LIABILITY: $15.00
+[PASS] RECON-DROPS: $75.00
+
+========== FINAL RESULTS ==========
+PASSED:  13
+FAILED:  3
+WARNED:  0
+SKIPPED: 2
+
+-- FAILURES --
+  X GC-CREATE: {"error":"Failed to create gift card"}
+  X PAID-IN: No active shift. Open a shift first.
+  X PAID-OUT: No active shift. Open a shift first.
+
+====================================
+VERDICT: FAILURES FOUND - FIX REQUIRED
+====================================

@@ -5,7 +5,19 @@ import { logActivity } from '@/lib/auditLog'
 
 /**
  * POST /api/pos/store-credit — Issue store credit (from return, goodwill, rain check)
- * GET /api/pos/store-credit — Lookup store credit by code or customer
+ * 
+ * Uses the GiftCard model with actual schema fields:
+ *   - code: unique identifier
+ *   - franchiseId: scoping
+ *   - initialAmount: amount at creation
+ *   - currentBalance: spendable balance
+ *   - purchaserId: optional customer link
+ *   - recipientEmail: optional
+ *   - isActive: boolean
+ *   - expiresAt: optional expiry
+ * 
+ * NOTE: The GiftCard model does NOT have 'type', 'issuedById', 'customerId', 'notes', or 'initialBalance'.
+ * Store credits are distinguished from gift cards by their code prefix: 'SC-'
  */
 export async function POST(request: NextRequest) {
     const user = await getAuthUser(request)
@@ -15,22 +27,22 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const { customerId, amount, reason, expiresInDays } = body
 
-        if (!amount || amount <= 0) return NextResponse.json({ error: 'Amount required' }, { status: 400 })
+        if (!amount || amount <= 0) return NextResponse.json({ error: 'Amount must be greater than 0' }, { status: 400 })
+        if (amount > 10000) return NextResponse.json({ error: 'Store credit cannot exceed $10,000' }, { status: 400 })
 
         const code = 'SC-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase()
 
+        // Use ONLY fields that exist in the GiftCard schema
         const credit = await prisma.giftCard.create({
             data: {
                 franchiseId: user.franchiseId,
                 code,
-                initialBalance: amount,
+                initialAmount: amount,
                 currentBalance: amount,
-                type: 'STORE_CREDIT',
-                issuedById: user.id,
-                customerId: customerId || null,
+                purchaserId: customerId || null,
+                recipientEmail: null,
+                isActive: true,
                 expiresAt: expiresInDays ? new Date(Date.now() + expiresInDays * 86400000) : null,
-                notes: reason || 'Store credit issued',
-                isActive: true
             }
         })
 
@@ -38,7 +50,15 @@ export async function POST(request: NextRequest) {
             userId: user.id, userEmail: user.email, userRole: user.role,
             franchiseId: user.franchiseId,
             action: 'STORE_CREDIT_ISSUED', entityType: 'GiftCard', entityId: credit.id,
-            details: { amount, reason, code, customerId }
+            details: {
+                amount,
+                reason: reason || 'Store credit issued',
+                code,
+                customerId: customerId || null,
+                issuedBy: user.id,
+                issuedByName: user.name || user.email,
+                expiresInDays: expiresInDays || null
+            }
         })
 
         return NextResponse.json({ storeCredit: credit }, { status: 201 })
@@ -57,9 +77,13 @@ export async function GET(request: NextRequest) {
     const customerId = searchParams.get('customerId')
 
     try {
-        const where: any = { franchiseId: user.franchiseId, type: 'STORE_CREDIT' }
+        // Store credits are GiftCards with code starting with 'SC-'
+        const where: any = {
+            franchiseId: user.franchiseId,
+            code: { startsWith: 'SC-' }
+        }
         if (code) where.code = code
-        if (customerId) where.customerId = customerId
+        if (customerId) where.purchaserId = customerId
 
         const credits = await prisma.giftCard.findMany({
             where,

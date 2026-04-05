@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json()
-        // Extract PAX card details for industry-standard refund tracking
         const {
             originalTransactionId,
             refundType,
@@ -42,9 +41,9 @@ export async function POST(req: NextRequest) {
             reasonNote,
             refundMethod,
             cashDrawerSessionId,
-            authCode,      // PAX authorization code
-            cardLast4,     // Last 4 digits of card
-            gatewayTxId    // PAX transaction ID
+            authCode,
+            cardLast4,
+            gatewayTxId
         } = body
 
         // Validate structured reason code (forward-only enforcement)
@@ -52,9 +51,6 @@ export async function POST(req: NextRequest) {
             const codeCheck = validateReasonCode(reasonCode, reasonNote, REFUND_REASON_CODES)
             if (!codeCheck.valid) return badRequestResponse(codeCheck.error)
         }
-
-        // NOTE: Shift requirement is handled on transaction create, not on refund
-        // Refunds just need a valid reference to original transaction
 
         // Check shift if provided
         if (cashDrawerSessionId) {
@@ -81,6 +77,15 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 })
         }
 
+        // ===== P0 FIX: REFUND-ON-REFUND GUARD =====
+        // Reject if the transaction being refunded is ITSELF a refund (has an originalTransactionId)
+        if (originalTx.originalTransactionId) {
+            return NextResponse.json({
+                error: 'Cannot refund a refund transaction. Only original sales can be refunded.'
+            }, { status: 400 })
+        }
+
+        // Check status — only COMPLETED or PARTIALLY_REFUNDED can be refunded
         if (originalTx.status !== 'COMPLETED' && originalTx.status !== 'PARTIALLY_REFUNDED') {
             return NextResponse.json({
                 error: `Cannot refund transaction with status: ${originalTx.status}`
@@ -88,12 +93,11 @@ export async function POST(req: NextRequest) {
         }
 
         // ===== S1-6: DUPLICATE REFUND TIME-WINDOW DETECTION =====
-        // Reject if same transaction was refunded within the last 60 seconds
         const recentDuplicateRefund = await prisma.transaction.findFirst({
             where: {
                 originalTransactionId: originalTx.id,
                 status: 'REFUNDED',
-                createdAt: { gte: new Date(Date.now() - 60_000) } // Within 60 seconds
+                createdAt: { gte: new Date(Date.now() - 60_000) }
             }
         })
         if (recentDuplicateRefund) {
@@ -103,7 +107,6 @@ export async function POST(req: NextRequest) {
         }
 
         // ===== S1-5: REFUND APPROVAL THRESHOLDS =====
-        // Check per-franchise config for daily limits and per-refund manager PIN requirement
         const isManager = user.role === 'OWNER' || user.role === 'FRANCHISOR'
         if (!isManager) {
             const franchise = await prisma.franchise.findUnique({
@@ -112,10 +115,8 @@ export async function POST(req: NextRequest) {
             })
             const config = franchise?.franchisor?.config as any
 
-            // Check per-refund threshold (requires manager PIN above this amount)
             if (config?.requireManagerPinAbove) {
                 const threshold = Number(config.requireManagerPinAbove)
-                // Calculate refund total from items to check against threshold
                 const estimatedRefundTotal = items.reduce((sum: number, ri: any) => {
                     const origItem = originalTx.lineItems.find(li => li.id === ri.lineItemId)
                     if (origItem) return sum + Number(origItem.price) * ri.quantity
@@ -130,7 +131,6 @@ export async function POST(req: NextRequest) {
                 }
             }
 
-            // Check daily refund limit per employee
             if (config?.refundLimitPerDay) {
                 const dailyLimit = Number(config.refundLimitPerDay)
                 const todayStart = new Date()
@@ -154,8 +154,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Map requested refund items to actual line items and CHECK LIMITS
-        // preventing double refunds (refunding same item multiple times)
+        // Fetch ALL previous refunds for this original transaction
         const previousRefunds = await prisma.transaction.findMany({
             where: {
                 originalTransactionId: originalTx.id,
@@ -164,36 +163,21 @@ export async function POST(req: NextRequest) {
             include: { lineItems: true }
         })
 
+        // ===== P0 FIX: TOTAL REFUND DOLLAR-AMOUNT CEILING =====
+        // Sum all previous refund totals (they are negative, so we use Math.abs)
+        const totalPreviouslyRefunded = previousRefunds.reduce(
+            (sum, r) => sum + Math.abs(Number(r.total)), 0
+        )
+        const originalPaidTotal = Math.abs(Number(originalTx.total))
+
+        // Map requested refund items and check per-item limits
         const refundLineItems = items.map((refundItem: any) => {
             const originalLineItem = originalTx.lineItems.find(li => li.id === refundItem.lineItemId)
             if (!originalLineItem) {
                 throw new Error(`Line item ${refundItem.lineItemId} not found`)
             }
 
-            // Calculate how many have already been refunded
-            let previouslyRefundedQty = 0
-            for (const prevRefund of previousRefunds) {
-                // Find matching line item in previous refund (by product/service ID match usually, or we can assume proportional logic if tracking not explicit)
-                // Since refund creates NEW line items, we must match by product/service ID or explicit reference if avail.
-                // Current schema might not link refundLineItem -> originalLineItem directly.
-                // Fallback: Match by productId/serviceId and price? Or just assume sequentially?
-                // BETTER: The requested `refundItem` has `lineItemId` which is the ID of the line item in Original Transaction.
-                // But the `previousRefunds` line items are NEW records. They don't point back to the specific original line item ID easily unless we stored it.
-                // ... Inspecting schema needed?
-                // Wait, if we don't link them, we can't enforce strict per-line-item limits easily.
-                // BUT we can enforce verification by Product/Service ID aggregation.
-                const match = prevRefund.lineItems.find(pli =>
-                    (pli.productId === originalLineItem.productId && originalLineItem.productId) ||
-                    (pli.serviceId === originalLineItem.serviceId && originalLineItem.serviceId)
-                )
-                if (match) {
-                    previouslyRefundedQty += Math.abs(match.quantity) // Refund quantities are stored as negative? Check existing logic: yes "quantity: -item.quantityToRefund"
-                }
-            }
-
-            // Simplified check: Use aggregation of ALL refunds for this transaction vs Original Total Items?
-            // Actually, let's just protect against total quantity overflow for the specific Product/Service in this transaction.
-
+            // Calculate how many have already been refunded for this product/service
             const totalOriginalQty = originalTx.lineItems
                 .filter(li => li.productId === originalLineItem.productId && li.serviceId === originalLineItem.serviceId)
                 .reduce((sum, li) => sum + li.quantity, 0)
@@ -238,13 +222,23 @@ export async function POST(req: NextRequest) {
         const refundTax = refundSubtotal * (isNaN(taxRate) ? 0 : taxRate)
         const refundTotal = refundSubtotal + refundTax
 
+        // ===== P0 FIX: ENFORCE TOTAL REFUND <= ORIGINAL TOTAL =====
+        if (totalPreviouslyRefunded + refundTotal > originalPaidTotal + 0.01) {
+            return NextResponse.json({
+                error: `Refund of $${refundTotal.toFixed(2)} would exceed remaining refundable amount. Original: $${originalPaidTotal.toFixed(2)}, Already refunded: $${totalPreviouslyRefunded.toFixed(2)}, Remaining: $${(originalPaidTotal - totalPreviouslyRefunded).toFixed(2)}`,
+                originalTotal: originalPaidTotal,
+                alreadyRefunded: totalPreviouslyRefunded,
+                remaining: originalPaidTotal - totalPreviouslyRefunded,
+                requested: refundTotal
+            }, { status: 400 })
+        }
+
         // ===== ATOMIC TRANSACTION BLOCK =====
-        // All refund operations are wrapped for rollback safety
         const refundTx = await prisma.$transaction(async (tx) => {
-            // Create Refund Transaction (Negative values)
-            // Include PAX card data for industry-standard audit trail
+            // P0 FIX: Set type to REFUND (was defaulting to SALE)
             const refundTransaction = await tx.transaction.create({
                 data: {
+                    type: 'REFUND',
                     franchiseId: user.franchiseId,
                     clientId: originalTx.clientId,
                     employeeId: user.id,
@@ -255,12 +249,10 @@ export async function POST(req: NextRequest) {
                     tax: -refundTax,
                     total: -refundTotal,
                     voidReason: reasonCode ? `[${reasonCode}] ${reasonNote || reason || ''}`.trim() : (reason || 'No reason provided'),
-                    cashDrawerSessionId: cashDrawerSessionId, // USE CURRENT SESSION ID
-                    // ====== INDUSTRY-STANDARD CARD DATA STORAGE ======
-                    authCode: authCode || null,        // PAX authorization code
-                    cardLast4: cardLast4 || originalTx.cardLast4,  // Card last 4 (from PAX or original)
-                    gatewayTxId: gatewayTxId || null,  // PAX transaction ID
-                    // =================================================
+                    cashDrawerSessionId: cashDrawerSessionId,
+                    authCode: authCode || null,
+                    cardLast4: cardLast4 || originalTx.cardLast4,
+                    gatewayTxId: gatewayTxId || null,
                     lineItems: {
                         create: refundItems
                     }
@@ -275,7 +267,6 @@ export async function POST(req: NextRequest) {
                     data: { status: 'REFUNDED' }
                 })
             } else {
-                // Partial refund — mark so history/reports distinguish it
                 await tx.transaction.update({
                     where: { id: originalTx.id },
                     data: { status: 'PARTIALLY_REFUNDED' }
@@ -312,7 +303,7 @@ export async function POST(req: NextRequest) {
         })
         // ===== END ATOMIC TRANSACTION BLOCK =====
 
-        // ===== AUDIT LOG - Record this refund for legal protection =====
+        // ===== AUDIT LOG =====
         await logActivity({
             userId: user.id,
             userEmail: user.email,
@@ -329,10 +320,11 @@ export async function POST(req: NextRequest) {
                 reasonCode: reasonCode || null,
                 reasonNote: reasonNote || null,
                 reason: reason || 'No reason provided',
-                itemsRefunded: items.length
+                itemsRefunded: items.length,
+                totalPreviouslyRefunded,
+                remainingAfterThisRefund: originalPaidTotal - totalPreviouslyRefunded - refundTotal
             }
         })
-        // =============================================================
 
         return NextResponse.json({ ...refundTx, storeCreditCode: refundTx.storeCreditCode || null })
     } catch (error) {
@@ -340,4 +332,3 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
 }
-

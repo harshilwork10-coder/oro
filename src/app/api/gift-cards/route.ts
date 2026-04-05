@@ -20,7 +20,8 @@ async function resolveAuth(req: NextRequest): Promise<{ franchiseId: string; rol
         return null // Invalid token
     }
 
-    // Fall back to NextAuth web session
+    // Fall back to NextAuth session or JWT Bearer
+    const user = await getAuthUser(req)
     if (!user?.franchiseId) return null
     return { franchiseId: user.franchiseId, role: user.role }
 }
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest) {
             action: 'GIFT_CARD_CREATE',
             entityType: 'GiftCard',
             entityId: giftCard.id,
-            metadata: { code, initialAmount: parseFloat(initialAmount), franchiseId: targetFranchiseId }
+            details: { code, initialAmount: parseFloat(initialAmount), franchiseId: targetFranchiseId }
         })
 
         return NextResponse.json(giftCard, { status: 201 })

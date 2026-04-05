@@ -34,6 +34,20 @@ export const VOID_REASON_CODES = [
     { code: 'OTHER', label: 'Other (specify)' },
 ] as const
 
+// ===================== CORRECTION (late fix) =====================
+export const CORRECTION_REASON_CODES = [
+    { code: 'WRONG_PRICE_CHARGED', label: 'Wrong Price Charged' },
+    { code: 'WRONG_ITEM_SOLD', label: 'Wrong Item Sold' },
+    { code: 'WRONG_QUANTITY', label: 'Wrong Quantity' },
+    { code: 'DUPLICATE_SALE', label: 'Duplicate Sale Entry' },
+    { code: 'TAX_ERROR', label: 'Tax Calculation Error' },
+    { code: 'DISCOUNT_NOT_APPLIED', label: 'Discount Not Applied' },
+    { code: 'CUSTOMER_DISPUTE', label: 'Customer Dispute (late)' },
+    { code: 'ACCOUNTING_CORRECTION', label: 'Accounting Correction' },
+    { code: 'MANAGER_DISCRETION', label: 'Manager Discretion' },
+    { code: 'OTHER', label: 'Other (specify)' },
+] as const
+
 // ===================== NO-SALE =====================
 export const NO_SALE_REASON_CODES = [
     { code: 'MAKE_CHANGE', label: 'Make Change' },

@@ -29,6 +29,7 @@ enum TransactionStatus {
   REFUNDED
   VOIDED
   PARTIALLY_REFUNDED
+  CORRECTED            // Has a correction child entry (late fix)
 }
 
 enum PaymentMethod {
@@ -43,7 +44,8 @@ enum PaymentMethod {
 enum TransactionType {
   SALE        // Regular sale (positive amount)
   REFUND      // Refund (negative, linked to original)
-  VOID        // Void (cancels before settlement)
+  VOID        // Void (cancels before settlement, creates child row)
+  CORRECTION  // Late reversal (post-settlement, post-day, creates child row)
   TIP_ADJUST  // Tip adjustment after sale
   PAYIN       // Cash added to drawer
   PAYOUT      // Cash removed from drawer
@@ -2068,13 +2070,24 @@ model Transaction {
   cardLast4   String? // Last 4 digits of card
   cardType    String? // Visa, MasterCard, etc.
 
-  status String @default("COMPLETED") // COMPLETED, REFUNDED, VOIDED
+  // Settlement Awareness (ledger-safe correction model)
+  captureStatus    String?   // AUTHORIZED | CAPTURED | SETTLED | UNKNOWN
+  settledAt        DateTime? // When batch was settled (from PAX/processor)
+  settlementBatch  String?   // Batch ID from processor
+
+  status String @default("COMPLETED") // COMPLETED, REFUNDED, VOIDED, CORRECTED, PARTIALLY_REFUNDED
   source String @default("WEB_POS")    // ANDROID_POS, WEB_POS, API (POS compliance)
 
-  // Void Tracking (Audit Trail)
+  // Void Tracking (Audit Trail) — legacy fields for backward compat
   voidedById String? // User who voided this transaction
   voidedAt   DateTime? // When the transaction was voided
   voidReason String? // Optional reason for voiding
+
+  // Correction Tracking (new ledger-safe model)
+  correctionType       String?   // VOID | REFUND | CORRECTION — what kind of reversal
+  correctionReasonCode String?   // From CORRECTION_REASON_CODES
+  correctionApprovedBy String?   // Manager userId who approved
+  correctionApprovedAt DateTime? // When approval happened
 
   cashDrawerSessionId String?
   cashDrawerSession   CashDrawerSession? @relation(fields: [cashDrawerSessionId], references: [id])

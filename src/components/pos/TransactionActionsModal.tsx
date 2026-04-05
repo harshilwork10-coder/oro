@@ -471,20 +471,28 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
 
                                 <button
                                     onClick={() => setAction('refund')}
-                                    disabled={transaction.status !== 'COMPLETED' && transaction.status !== 'PARTIALLY_REFUNDED'}
+                                    disabled={
+                                        !['COMPLETED', 'PARTIALLY_REFUNDED'].includes(transaction.status) ||
+                                        !!(transaction as any).originalTransactionId
+                                    }
                                     className="flex flex-col items-center gap-2 p-4 bg-emerald-900/20 hover:bg-emerald-900/30 border border-emerald-500/30 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <RotateCcw className="h-6 w-6 text-emerald-400" />
-                                    <span className="text-emerald-400 font-medium">Refund</span>
+                                    <span className="text-emerald-400 font-medium">
+                                        {(transaction as any).originalTransactionId ? 'Refund (N/A)' :
+                                         transaction.status === 'REFUNDED' ? 'Already Refunded' :
+                                         transaction.status === 'VOIDED' ? 'Voided' : 'Refund'}
+                                    </span>
                                 </button>
 
+                                {/* EXCHANGE DISABLED — Route returns 503 until rewritten for financial compliance */}
                                 <button
-                                    onClick={() => setAction('exchange')}
-                                    disabled={transaction.status !== 'COMPLETED' && transaction.status !== 'PARTIALLY_REFUNDED'}
-                                    className="flex flex-col items-center gap-2 p-4 bg-cyan-900/20 hover:bg-cyan-900/30 border border-cyan-500/30 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={true}
+                                    className="flex flex-col items-center gap-2 p-4 bg-stone-900/50 border border-stone-800 rounded-xl opacity-40 cursor-not-allowed"
+                                    title="Exchange is being upgraded for financial compliance"
                                 >
-                                    <ArrowLeftRight className="h-6 w-6 text-cyan-400" />
-                                    <span className="text-cyan-400 font-medium">Exchange</span>
+                                    <ArrowLeftRight className="h-6 w-6 text-stone-500" />
+                                    <span className="text-stone-500 font-medium text-xs">Coming Soon</span>
                                 </button>
 
                                 <button
@@ -749,72 +757,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                         </div>
                     )}
 
-                    {action === 'exchange' && (
-                        <div className="space-y-4">
-                            <div className="text-center">
-                                <div className="w-16 h-16 rounded-full bg-cyan-500/20 mx-auto flex items-center justify-center">
-                                    <ArrowLeftRight className="h-8 w-8 text-cyan-400" />
-                                </div>
-                                <h3 className="text-xl font-bold text-white mt-3">Exchange Items</h3>
-                                <p className="text-stone-400 text-sm mt-1">
-                                    Select items to return from this transaction. The customer can pick new items at the register — any price difference will be calculated.
-                                </p>
-                            </div>
-
-                            {/* Select Return Items */}
-                            <div className="space-y-2">
-                                <p className="text-stone-400 text-sm font-medium">Items to return:</p>
-                                {transaction.lineItems.map((item) => {
-                                    const isSelected = selectedItems.has(item.id)
-                                    const itemName = item.service?.name || item.product?.name || 'Item'
-                                    return (
-                                        <div
-                                            key={item.id}
-                                            className={`p-3 rounded-xl border cursor-pointer transition-all ${isSelected
-                                                ? 'bg-cyan-900/20 border-cyan-500/50'
-                                                : 'bg-stone-950 border-stone-800 hover:border-stone-700'
-                                                }`}
-                                            onClick={() => toggleItemSelection(item.id, item.quantity)}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    {isSelected ? (
-                                                        <CheckSquare className="h-5 w-5 text-cyan-400" />
-                                                    ) : (
-                                                        <Square className="h-5 w-5 text-stone-600" />
-                                                    )}
-                                                    <div>
-                                                        <p className="text-white font-medium">{itemName}</p>
-                                                        <p className="text-stone-500 text-sm">
-                                                            {item.quantity} x {formatCurrency(item.price)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-white font-bold">
-                                                    {formatCurrency(item.total)}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-
-                            {/* Exchange Value Summary */}
-                            {selectedItems.size > 0 && (
-                                <div className="bg-stone-950 rounded-xl p-4 border border-cyan-500/30">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-stone-400">Return Credit Value</span>
-                                        <span className="text-2xl font-bold text-cyan-400">
-                                            {formatCurrency(calculateRefundAmount())}
-                                        </span>
-                                    </div>
-                                    <p className="text-stone-500 text-xs mt-2">
-                                        New items will be added at the register. Customer pays the difference or receives store credit for overpayment.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    {/* EXCHANGE PANEL REMOVED — Route disabled for financial compliance */}
 
                     {action === 'delete' && (
                         <div className="space-y-4 text-center">
