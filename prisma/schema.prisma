@@ -4028,6 +4028,7 @@ model TobaccoScanDeal {
   // Rules
   requiresScanReporting Boolean @default(true)
   stackable             Boolean @default(false)
+  requiresLoyalty       Boolean @default(false) // If true, POS prompts for loyalty ID
 
   // Import metadata
   sourceFile      String?  // PDF filename this was imported from
@@ -4143,6 +4144,7 @@ model TobaccoScanEvent {
   // ─── Channel 7: Multipack Desc + Loyalty ───────────────────────
   mfgMultipackDesc String?                       // RMSC field 32: "RJR MP"
   loyaltyId        String?                       // RMSC field 33 (HASHED before storage)
+  loyaltyStatus    String   @default("NONE")     // NONE | PRESENT | REQUIRED_MISSING
   offerCode        String?                       // RMSC field 34: offer code "10201"
 
   // ─── Derived Totals (for fast queries) ─────────────────────────

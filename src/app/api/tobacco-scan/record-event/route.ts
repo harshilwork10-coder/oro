@@ -79,14 +79,16 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // Verify referenced deals exist (if any)
+    // Verify referenced deals exist (if any) and load loyalty requirements
     const dealIds = [...new Set(events.map((e: any) => e.dealId).filter(Boolean))]
+    const dealsMap = new Map<string, { id: string; requiresLoyalty: boolean }>()
     if (dealIds.length > 0) {
       const deals = await prisma.tobaccoScanDeal.findMany({
         where: { id: { in: dealIds }, franchiseId: user.franchiseId },
+        select: { id: true, requiresLoyalty: true },
       })
-      const validDealIds = new Set(deals.map(d => d.id))
-      const invalidDeals = dealIds.filter((id: string) => !validDealIds.has(id))
+      for (const d of deals) dealsMap.set(d.id, d)
+      const invalidDeals = dealIds.filter((id: string) => !dealsMap.has(id))
       if (invalidDeals.length > 0) {
         return NextResponse.json({
           error: `Invalid deal IDs: ${invalidDeals.join(', ')}`,
@@ -228,18 +230,47 @@ export async function POST(req: NextRequest) {
             mfgBuydownDesc: event.mfgBuydownDesc || null,
             mfgBuydownAmt: event.mfgBuydownAmt || 0,
 
-            // Channel 7: Multipack desc + loyalty
+            // Channel 7: Multipack desc + loyalty (3-case resolution)
             mfgMultipackDesc: event.mfgMultipackDesc || null,
             loyaltyId: event.loyaltyId ? hashLoyaltyId(event.loyaltyId) : null,
+            loyaltyStatus: (() => {
+              const hasLoyalty = !!event.loyaltyId
+              const dealRequiresLoyalty = event.dealId ? dealsMap.get(event.dealId)?.requiresLoyalty : false
+              if (hasLoyalty) return 'PRESENT'
+              if (dealRequiresLoyalty) return 'REQUIRED_MISSING'
+              return 'NONE'
+            })(),
             offerCode: event.offerCode || null,
 
             // Derived totals
             discountApplied,
             reimbursementExpected,
 
-            claimStatus: claimEligible ? 'UNCLAIMED' : 'DENIED',
+            claimStatus: (() => {
+              if (!claimEligible) return 'DENIED'
+              // Deal requires loyalty but customer skipped → pending review
+              const dealRequiresLoyalty = event.dealId ? dealsMap.get(event.dealId)?.requiresLoyalty : false
+              if (dealRequiresLoyalty && !event.loyaltyId) return 'UNCLAIMED' // still claimable, but flagged
+              return 'UNCLAIMED'
+            })(),
           },
         })
+
+        // Override claim eligibility for REQUIRED_MISSING loyalty
+        const dealRequiresLoyalty = event.dealId ? dealsMap.get(event.dealId)?.requiresLoyalty : false
+        if (dealRequiresLoyalty && !event.loyaltyId && claimEligible) {
+          // Mark as needing review — still in DB, not blocked, but flagged
+          await tx.tobaccoScanEvent.update({
+            where: { id: scanEvent.id },
+            data: {
+              claimEligible: false,
+              exclusionReason: 'LOYALTY_REQUIRED_MISSING',
+            },
+          })
+          scanEvent.claimEligible = false
+          scanEvent.exclusionReason = 'LOYALTY_REQUIRED_MISSING'
+        }
+
         created.push(scanEvent)
       }
 

@@ -82,6 +82,7 @@ export interface RmscRow {
   // Channel 7: Multipack desc + loyalty (fields 32-34)
   mfgMultipackDesc: string
   loyaltyId: string         // Raw value from file (hash separately)
+  loyaltyStatus: 'NONE' | 'PRESENT' | 'REQUIRED_MISSING'
   couponDesc: string        // Offer code
 
   // Derived
@@ -197,6 +198,11 @@ export function hashLoyaltyId(rawId: string): string {
   return createHash('sha256').update(rawId.trim()).digest('hex').substring(0, 20).toUpperCase()
 }
 
+/** Resolve loyalty status from parsed data. REQUIRED_MISSING is set at record-event time. */
+function resolveLoyaltyStatus(loyaltyId: string): 'NONE' | 'PRESENT' {
+  return loyaltyId && loyaltyId.trim() !== '' ? 'PRESENT' : 'NONE'
+}
+
 // ─── Pipe-Delimited Parser (BigLake/SmokeForLess) ─────────────────
 
 function parsePipeLine(line: string, lineNum: number): RmscRow | null {
@@ -258,6 +264,7 @@ function parsePipeLine(line: string, lineNum: number): RmscRow | null {
     isPromoUpc,
     claimEligible,
     exclusionReason,
+    loyaltyStatus: resolveLoyaltyStatus(row.loyaltyId || ''),
   } as RmscRow
 }
 
@@ -322,6 +329,7 @@ function parseCsvLine(fields: string[], lineNum: number): RmscRow | null {
     isPromoUpc,
     claimEligible,
     exclusionReason,
+    loyaltyStatus: resolveLoyaltyStatus(row.loyaltyId || ''),
   } as RmscRow
 }
 
