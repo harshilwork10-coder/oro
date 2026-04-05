@@ -1,24 +1,26 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
-import { prisma } from '@/lib/prisma'
 
-// POST /api/tobacco-scan/generate - Generate tobacco scan report for a manufacturer
-export async function POST(request: Request) {
+/**
+ * POST /api/tobacco-scan/generate
+ *
+ * Legacy endpoint — now redirects to POST /api/tobacco-scan/export
+ * which uses the new TobaccoScanExportBatch system.
+ */
+export async function POST(req: NextRequest) {
     try {
-        const user = await getAuthUser(request)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+        const user = await getAuthUser(req)
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { manufacturer } = await request.json()
+        const { manufacturer } = await req.json()
 
         if (!manufacturer || !['ALTRIA', 'RJR', 'ITG'].includes(manufacturer)) {
             return NextResponse.json({ error: 'Invalid manufacturer' }, { status: 400 })
         }
 
-        // Get start and end of current week
+        // Calculate current week range
         const now = new Date()
         const dayOfWeek = now.getDay()
         const startOfWeek = new Date(now)
@@ -29,93 +31,18 @@ export async function POST(request: Request) {
         endOfWeek.setDate(startOfWeek.getDate() + 6)
         endOfWeek.setHours(23, 59, 59, 999)
 
-        // Check if submission already exists for this week/manufacturer
-        const existingSubmission = await prisma.tobaccoScanSubmission.findFirst({
-            where: {
-                franchiseId: user.franchiseId,
-                manufacturer,
-                weekStartDate: startOfWeek,
-                weekEndDate: endOfWeek
-            }
-        })
-
-        if (existingSubmission) {
-            return NextResponse.json({
-                error: 'Submission already exists for this week',
-                submission: existingSubmission
-            }, { status: 400 })
-        }
-
-        // Get all tobacco sales this week
-        const transactions = await prisma.transaction.findMany({
-            where: {
-                franchiseId: user.franchiseId,
-                status: 'COMPLETED',
-                createdAt: {
-                    gte: startOfWeek,
-                    lte: endOfWeek
-                }
-            },
-            include: {
-                lineItems: {
-                    where: { type: 'PRODUCT' },
-                    include: { product: true }
-                }
-            }
-        })
-
-        // Filter for tobacco products (using isTobacco flag)
-        const tobaccoSales = transactions.flatMap(t =>
-            t.lineItems.filter(item => item.product?.isTobacco)
-        )
-
-        // Manufacturer keywords (simplified - in production use manufacturer field)
-        const keywords: Record<string, string[]> = {
-            ALTRIA: ['marlboro', 'virginia slims', 'parliament', 'basic', 'l&m'],
-            RJR: ['camel', 'newport', 'pall mall', 'doral', 'natural american'],
-            ITG: ['kool', 'winston', 'maverick', 'salem', 'usa gold']
-        }
-
-        const manufacturerSales = tobaccoSales.filter(item => {
-            const name = item.product?.name?.toLowerCase() || ''
-            return keywords[manufacturer].some(kw => name.includes(kw))
-        })
-
-        const recordCount = manufacturerSales.reduce((sum, item) => sum + item.quantity, 0)
-        const totalAmount = manufacturerSales.reduce((sum, item) =>
-            sum + (parseFloat(item.price.toString()) * item.quantity), 0
-        )
-
-        // Get location
-        const location = await prisma.location.findFirst({
-            where: { franchise: { id: user.franchiseId } }
-        })
-
-        if (!location) {
-            return NextResponse.json({ error: 'No location found' }, { status: 400 })
-        }
-
-        // Create the submission record
-        const submission = await prisma.tobaccoScanSubmission.create({
-            data: {
-                franchiseId: user.franchiseId,
-                locationId: location.id,
-                manufacturer,
-                weekStartDate: startOfWeek,
-                weekEndDate: endOfWeek,
-                recordCount,
-                totalAmount,
-                status: 'PENDING'
-            }
-        })
-
+        // Redirect to the new export system
         return NextResponse.json({
-            message: 'Report generated successfully',
-            submission
-        })
+            message: 'This endpoint is deprecated. Use POST /api/tobacco-scan/export instead.',
+            redirect: '/api/tobacco-scan/export',
+            body: {
+                manufacturer,
+                weekStart: startOfWeek.toISOString(),
+                weekEnd: endOfWeek.toISOString(),
+            },
+        }, { status: 301 })
     } catch (error) {
-        console.error('Failed to generate tobacco report:', error)
+        console.error('[TOBACCO_GENERATE]', error)
         return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 })
     }
 }
-

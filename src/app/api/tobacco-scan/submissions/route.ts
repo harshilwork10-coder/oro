@@ -1,27 +1,53 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-// GET /api/tobacco-scan/submissions - List all tobacco scan submissions
+/**
+ * GET /api/tobacco-scan/submissions
+ *
+ * Legacy endpoint — now returns export batches from the new TobaccoScanExportBatch model.
+ * Maintained for backward compatibility with existing UI.
+ */
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const submissions = await prisma.tobaccoScanSubmission.findMany({
+        const batches = await prisma.tobaccoScanExportBatch.findMany({
             where: { franchiseId: user.franchiseId },
-            orderBy: { weekStartDate: 'desc' },
-            take: 20
+            include: {
+                _count: { select: { events: true } },
+            },
+            orderBy: { weekStart: 'desc' },
+            take: 20,
         })
+
+        // Map to legacy submission format for backward compatibility
+        const submissions = batches.map(batch => ({
+            id: batch.id,
+            franchiseId: batch.franchiseId,
+            manufacturer: batch.manufacturer,
+            weekStartDate: batch.weekStart,
+            weekEndDate: batch.weekEnd,
+            recordCount: batch.eventCount,
+            totalAmount: Number(batch.totalReimbursement),
+            status: batch.status === 'GENERATED' ? 'PENDING' :
+                    batch.status === 'SUBMITTED' ? 'SUBMITTED' :
+                    batch.status === 'PAID' ? 'CONFIRMED' :
+                    batch.status,
+            submittedAt: batch.submittedAt,
+            confirmedAt: batch.paidAt,
+            fileUrl: null,
+            notes: batch.exportFileName,
+            createdAt: batch.createdAt,
+            updatedAt: batch.updatedAt,
+        }))
 
         return NextResponse.json({ submissions })
     } catch (error) {
-        console.error('Failed to fetch tobacco submissions:', error)
+        console.error('[TOBACCO_SUBMISSIONS]', error)
         return NextResponse.json({ error: 'Failed to fetch submissions' }, { status: 500 })
     }
 }
-

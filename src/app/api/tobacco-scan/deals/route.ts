@@ -1,78 +1,142 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-// GET /api/tobacco-scan/deals - List all tobacco deals
+/**
+ * GET  /api/tobacco-scan/deals — List all TobaccoScanDeals for franchise
+ * POST /api/tobacco-scan/deals — Create a new TobaccoScanDeal with UPCs
+ */
+
+// ─── List Deals ──────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
-    try {
-        const user = await getAuthUser(request)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
-        const deals = await prisma.tobaccoDeal.findMany({
-            where: { franchiseId: user.franchiseId },
-            orderBy: [{ isActive: 'desc' }, { startDate: 'desc' }]
-        })
-
-        return NextResponse.json({ deals })
-    } catch (error) {
-        console.error('Failed to fetch tobacco deals:', error)
-        return NextResponse.json({ error: 'Failed to fetch deals' }, { status: 500 })
+  try {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const { searchParams } = new URL(req.url)
+    const status = searchParams.get('status') // ACTIVE, PAUSED, EXPIRED, etc.
+    const manufacturer = searchParams.get('manufacturer') // ALTRIA, RJR, ITG
+
+    const where: any = { franchiseId: user.franchiseId }
+    if (status) where.status = status
+    if (manufacturer) where.manufacturer = manufacturer
+
+    const deals = await prisma.tobaccoScanDeal.findMany({
+      where,
+      include: {
+        eligibleUpcs: true,
+        _count: {
+          select: { scanEvents: true },
+        },
+      },
+      orderBy: [
+        { status: 'asc' },  // ACTIVE first
+        { startDate: 'desc' },
+      ],
+    })
+
+    // Enrich with scan event stats per deal
+    const enriched = deals.map((deal) => ({
+      ...deal,
+      upcCount: deal.eligibleUpcs.length,
+      totalScans: deal._count.scanEvents,
+    }))
+
+    return NextResponse.json({ deals: enriched })
+  } catch (error) {
+    console.error('[TOBACCO_DEALS_GET]', error)
+    return NextResponse.json({ error: 'Failed to fetch tobacco deals' }, { status: 500 })
+  }
 }
 
-// POST /api/tobacco-scan/deals - Create new tobacco deal
-export async function POST(request: Request) {
-    try {
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
-        const body = await request.json()
-        const {
-            manufacturer,
-            dealName,
-            dealType,
-            buyQuantity,
-            getFreeQuantity,
-            discountType,
-            discountAmount,
-            applicableUpcs,
-            startDate,
-            endDate
-        } = body
-
-        if (!dealName || !dealType || !discountType) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-        }
-
-        // For penny deals, set discount to 0.01 (item price - 0.01 is the discount)
-        const finalDiscountAmount = dealType === 'PENNY_DEAL' ? 0.01 : (discountAmount || 0)
-
-        const deal = await prisma.tobaccoDeal.create({
-            data: {
-                franchiseId: user.franchiseId,
-                manufacturer: manufacturer || 'ALL',
-                dealName,
-                dealType,
-                buyQuantity: buyQuantity || null,
-                getFreeQuantity: getFreeQuantity || null,
-                discountType: dealType === 'PENNY_DEAL' ? 'PENNY' : discountType,
-                discountAmount: finalDiscountAmount,
-                applicableUpcs: applicableUpcs || null,
-                startDate: startDate ? new Date(startDate) : new Date(),
-                endDate: endDate ? new Date(endDate) : null,
-                isActive: true
-            }
-        })
-
-        return NextResponse.json({ deal })
-    } catch (error) {
-        console.error('Failed to create tobacco deal:', error)
-        return NextResponse.json({ error: 'Failed to create deal' }, { status: 500 })
+// ─── Create Deal ─────────────────────────────────────────────────
+export async function POST(req: NextRequest) {
+  try {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-}
 
+    const body = await req.json()
+    const {
+      manufacturer,
+      programCode,
+      dealName,
+      type = 'BUYDOWN',
+      appliesToLevel = 'PACK',
+      minQty = 1,
+      maxQty,
+      customerLimitPerTxn,
+      rewardType = 'FIXED_AMOUNT',
+      rewardValue,
+      reimbursementPerUnit,
+      storeIds = [],
+      startDate,
+      endDate,
+      status = 'ACTIVE',
+      requiresScanReporting = true,
+      stackable = false,
+      manufacturerPLU,
+      sourceFile,
+      // UPC list
+      upcs = [],  // [{ upc, productName?, packOrCarton?, itemId? }]
+    } = body
+
+    // Validation
+    if (!manufacturer || !dealName || rewardValue === undefined) {
+      return NextResponse.json({
+        error: 'manufacturer, dealName, and rewardValue are required',
+      }, { status: 400 })
+    }
+
+    if (!startDate) {
+      return NextResponse.json({
+        error: 'startDate is required',
+      }, { status: 400 })
+    }
+
+    const deal = await prisma.tobaccoScanDeal.create({
+      data: {
+        franchiseId: user.franchiseId,
+        manufacturer,
+        programCode: programCode || null,
+        dealName,
+        type,
+        appliesToLevel,
+        minQty,
+        maxQty: maxQty || null,
+        customerLimitPerTxn: customerLimitPerTxn || null,
+        rewardType,
+        rewardValue,
+        reimbursementPerUnit: reimbursementPerUnit ?? rewardValue, // Default: same as discount
+        storeIds,
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : null,
+        status,
+        requiresScanReporting,
+        stackable,
+        manufacturerPLU: manufacturerPLU || null,
+        sourceFile: sourceFile || null,
+        // Create UPC entries
+        eligibleUpcs: upcs.length > 0 ? {
+          create: upcs.map((u: any) => ({
+            upc: u.upc,
+            productName: u.productName || null,
+            packOrCarton: u.packOrCarton || 'PACK',
+            itemId: u.itemId || null,
+          })),
+        } : undefined,
+      },
+      include: {
+        eligibleUpcs: true,
+      },
+    })
+
+    return NextResponse.json({ deal }, { status: 201 })
+  } catch (error) {
+    console.error('[TOBACCO_DEALS_POST]', error)
+    return NextResponse.json({ error: 'Failed to create tobacco deal' }, { status: 500 })
+  }
+}

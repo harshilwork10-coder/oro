@@ -1,24 +1,27 @@
 /**
- * Tobacco Scan Submissions Report API
+ * Tobacco Scan Report API
  *
- * GET — Track tobacco scan data submissions to manufacturers (Altria, RJR, ITG)
+ * GET — Track tobacco scan deal submissions (export batches) to manufacturers.
+ * Uses TobaccoScanExportBatch as source of truth.
  */
 
-import {NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        if (!user?.franchiseId) return NextResponse.json({ error: 'No franchise' }, { status: 400 })
+        if (!user?.franchiseId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
         const { searchParams } = new URL(req.url)
         const days = parseInt(searchParams.get('days') || '90')
         const manufacturer = searchParams.get('manufacturer')
         const status = searchParams.get('status')
-        const since = new Date(); since.setDate(since.getDate() - days)
+        const since = new Date()
+        since.setDate(since.getDate() - days)
 
         const where: Record<string, unknown> = {
             franchiseId: user.franchiseId,
@@ -27,54 +30,61 @@ export async function GET(req: NextRequest) {
         if (manufacturer) where.manufacturer = manufacturer
         if (status) where.status = status
 
-        const submissions = await prisma.tobaccoScanSubmission.findMany({
+        const batches = await prisma.tobaccoScanExportBatch.findMany({
             where,
-            include: { location: { select: { name: true } } },
-            orderBy: { weekStartDate: 'desc' }
+            include: {
+                _count: { select: { events: true } },
+            },
+            orderBy: { weekStart: 'desc' }
         })
 
-        const results = submissions.map(s => ({
-            id: s.id,
-            manufacturer: s.manufacturer,
-            location: s.location?.name || 'Unknown',
-            weekStart: s.weekStartDate,
-            weekEnd: s.weekEndDate,
-            recordCount: s.recordCount,
-            totalAmount: s.totalAmount ? Math.round(Number(s.totalAmount) * 100) / 100 : null,
-            status: s.status,
-            submittedAt: s.submittedAt,
-            confirmedAt: s.confirmedAt,
-            notes: s.notes
+        const results = batches.map(b => ({
+            id: b.id,
+            manufacturer: b.manufacturer,
+            weekStart: b.weekStart,
+            weekEnd: b.weekEnd,
+            recordCount: b.eventCount,
+            totalDiscount: Number(b.totalDiscount),
+            totalReimbursement: Number(b.totalReimbursement),
+            status: b.status,
+            submittedAt: b.submittedAt,
+            paidAt: b.paidAt,
+            paidAmount: b.paidAmount ? Number(b.paidAmount) : null,
+            exportFileName: b.exportFileName,
+            exportFormat: b.exportFormat,
         }))
 
         // Summary by manufacturer
-        const byManufacturer: Record<string, { count: number; confirmed: number; pending: number; totalAmount: number }> = {}
-        for (const s of results) {
-            if (!byManufacturer[s.manufacturer]) byManufacturer[s.manufacturer] = { count: 0, confirmed: 0, pending: 0, totalAmount: 0 }
-            byManufacturer[s.manufacturer].count++
-            if (s.status === 'CONFIRMED') byManufacturer[s.manufacturer].confirmed++
-            if (s.status === 'PENDING') byManufacturer[s.manufacturer].pending++
-            byManufacturer[s.manufacturer].totalAmount += s.totalAmount || 0
+        const byManufacturer: Record<string, { count: number; paid: number; pending: number; totalReimbursement: number }> = {}
+        for (const r of results) {
+            if (!byManufacturer[r.manufacturer]) {
+                byManufacturer[r.manufacturer] = { count: 0, paid: 0, pending: 0, totalReimbursement: 0 }
+            }
+            byManufacturer[r.manufacturer].count++
+            if (r.status === 'PAID') byManufacturer[r.manufacturer].paid++
+            if (r.status === 'GENERATED' || r.status === 'SUBMITTED') byManufacturer[r.manufacturer].pending++
+            byManufacturer[r.manufacturer].totalReimbursement += r.totalReimbursement
         }
 
-        // Round
+        // Round totals
         for (const key of Object.keys(byManufacturer)) {
-            byManufacturer[key].totalAmount = Math.round(byManufacturer[key].totalAmount * 100) / 100
+            byManufacturer[key].totalReimbursement = Math.round(byManufacturer[key].totalReimbursement * 100) / 100
         }
 
         return NextResponse.json({
-            submissions: results,
+            batches: results,
             summary: {
                 total: results.length,
                 byManufacturer,
-                pending: results.filter(s => s.status === 'PENDING').length,
-                confirmed: results.filter(s => s.status === 'CONFIRMED').length,
-                rejected: results.filter(s => s.status === 'REJECTED').length
+                generated: results.filter(r => r.status === 'GENERATED').length,
+                submitted: results.filter(r => r.status === 'SUBMITTED').length,
+                paid: results.filter(r => r.status === 'PAID').length,
+                rejected: results.filter(r => r.status === 'REJECTED').length,
             },
-            periodDays: days
+            periodDays: days,
         })
     } catch (error) {
-        console.error('[TOBACCO_SCAN_GET]', error)
+        console.error('[TOBACCO_SCAN_REPORT]', error)
         return NextResponse.json({ error: 'Failed to generate tobacco scan report' }, { status: 500 })
     }
 }

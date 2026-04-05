@@ -1,12 +1,17 @@
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { NextRequest, NextResponse } from 'next/server'
-// GET - Generate manufacturer rebate report
+
+/**
+ * GET /api/reports/manufacturer-rebate
+ *
+ * Generate manufacturer rebate report using TobaccoScanEvent data.
+ * Supports JSON and CSV output.
+ */
 export async function GET(req: NextRequest) {
     try {
-        const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        if (!user?.id || !user?.franchiseId) {
+        const user = await getAuthUser(req)
+        if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -25,7 +30,7 @@ export async function GET(req: NextRequest) {
         const end = new Date(endDate)
         end.setHours(23, 59, 59, 999)
 
-        // Get franchise info for report header
+        // Get franchise info
         const franchise = await prisma.franchise.findUnique({
             where: { id: user.franchiseId },
             include: { locations: { take: 1 } }
@@ -33,146 +38,112 @@ export async function GET(req: NextRequest) {
 
         const location = franchise?.locations[0]
 
-        // Get active deals for this period
-        const dealWhere: any = {
-            franchiseId: user.franchiseId,
-            isActive: true,
-            startDate: { lte: end },
-            OR: [
-                { endDate: { gte: start } },
-                { endDate: null }
-            ]
+        // Query scan events (the real reimbursement truth)
+        const where: any = {
+            tobaccoDeal: {
+                franchiseId: user.franchiseId,
+            },
+            soldAt: { gte: start, lte: end },
         }
 
         if (manufacturer) {
-            dealWhere.manufacturer = manufacturer
+            where.tobaccoDeal.manufacturer = manufacturer
         }
 
-        const deals = await prisma.tobaccoDeal.findMany({
-            where: dealWhere
-        })
-
-        if (deals.length === 0) {
-            return NextResponse.json({
-                error: 'No deals found for this period',
-                reportData: []
-            })
-        }
-
-        // Get sales in the date range that might match deals
-        const sales = await prisma.itemLineItem.findMany({
-            where: {
-                transaction: {
-                    franchiseId: user.franchiseId,
-                    createdAt: { gte: start, lte: end },
-                    status: 'COMPLETED'
-                }
-            },
+        const scanEvents = await prisma.tobaccoScanEvent.findMany({
+            where,
             include: {
-                transaction: true,
-                item: true
-            }
+                tobaccoDeal: {
+                    select: {
+                        dealName: true,
+                        manufacturer: true,
+                        type: true,
+                        rewardValue: true,
+                        reimbursementPerUnit: true,
+                        manufacturerPLU: true,
+                    },
+                },
+            },
+            orderBy: { soldAt: 'asc' },
         })
 
-        // Build report data - match sales to deals by name/brand AND check deal validity dates
-        const reportRows = sales.map(sale => {
-            const item = sale.item
-            const saleDate = sale.transaction.createdAt
+        // Build report rows from scan events
+        const reportRows = scanEvents.map(event => ({
+            date: event.soldAt.toISOString().split('T')[0],
+            upc: event.upc,
+            dealName: event.tobaccoDeal.dealName,
+            manufacturer: event.tobaccoDeal.manufacturer,
+            dealType: event.tobaccoDeal.type,
+            packOrCarton: event.packOrCarton,
+            qty: event.qty,
+            regularPrice: Number(event.regularPrice).toFixed(2),
+            discountApplied: Number(event.discountApplied).toFixed(2),
+            reimbursementExpected: Number(event.reimbursementExpected).toFixed(2),
+            claimStatus: event.claimStatus,
+            plu: event.tobaccoDeal.manufacturerPLU || '',
+        }))
 
-            // Find matching deal by item name or brand
-            const deal = deals.find(d => {
-                const nameMatch = d.dealName?.toLowerCase().includes(item?.name?.toLowerCase() || '') ||
-                    item?.name?.toLowerCase().includes(d.dealName?.toLowerCase() || '')
-
-                if (!nameMatch) return false
-
-                // CRITICAL: Check if sale date is within deal validity period
-                const dealStart = new Date(d.startDate)
-                const dealEnd = d.endDate ? new Date(d.endDate) : new Date('2099-12-31')
-
-                return saleDate >= dealStart && saleDate <= dealEnd
-            })
-
-            if (!deal) return null // Skip if no valid deal or sale outside deal period
-
-            return {
-                date: saleDate.toISOString().split('T')[0],
-                upc: item?.barcode || item?.sku || '',
-                itemName: item?.name || 'Unknown',
-                unitSize: item?.size || '',
-                unitPrice: Number(item?.price || 0).toFixed(2),
-                salePrice: Number(sale.unitPrice || item?.price || 0).toFixed(2),
-                itemSold: sale.quantity,
-                saleAmount: (Number(sale.unitPrice || item?.price || 0) * sale.quantity).toFixed(2),
-                mfgDiscount: Number(deal.discountAmount).toFixed(2),
-                outletDeal: deal.dealName?.match(/PLU\s*(\d+)/)?.[1] || '',
-                dealValidFrom: deal.startDate.toISOString().split('T')[0],
-                dealValidTo: deal.endDate?.toISOString().split('T')[0] || 'Ongoing'
+        // Aggregate by manufacturer
+        const byManufacturer = reportRows.reduce((acc: Record<string, any>, row) => {
+            if (!acc[row.manufacturer]) {
+                acc[row.manufacturer] = { totalQty: 0, totalDiscount: 0, totalReimbursement: 0, events: 0 }
             }
-        }).filter(Boolean)
-
-        // Aggregate by date + item
-        const aggregated = reportRows.reduce((acc: any, row: any) => {
-            const key = `${row.date}_${row.upc}`
-            if (!acc[key]) {
-                acc[key] = { ...row }
-            } else {
-                acc[key].itemSold += row.itemSold
-                acc[key].saleAmount = (parseFloat(acc[key].saleAmount) + parseFloat(row.saleAmount)).toFixed(2)
-            }
+            acc[row.manufacturer].totalQty += row.qty
+            acc[row.manufacturer].totalDiscount += parseFloat(row.discountApplied) * row.qty
+            acc[row.manufacturer].totalReimbursement += parseFloat(row.reimbursementExpected) * row.qty
+            acc[row.manufacturer].events += 1
             return acc
         }, {})
 
-        const finalRows = Object.values(aggregated)
-
         // Calculate totals
         const totals = {
-            totalItems: finalRows.reduce((sum: number, r: any) => sum + r.itemSold, 0),
-            totalSales: finalRows.reduce((sum: number, r: any) => sum + parseFloat(r.saleAmount), 0).toFixed(2),
-            totalRebate: finalRows.reduce((sum: number, r: any) => sum + (parseFloat(r.mfgDiscount) * r.itemSold), 0).toFixed(2)
+            totalEvents: reportRows.length,
+            totalItems: reportRows.reduce((sum, r) => sum + r.qty, 0),
+            totalDiscount: reportRows.reduce((sum, r) => sum + parseFloat(r.discountApplied) * r.qty, 0).toFixed(2),
+            totalRebate: reportRows.reduce((sum, r) => sum + parseFloat(r.reimbursementExpected) * r.qty, 0).toFixed(2),
         }
 
         if (format === 'csv') {
             const storeName = franchise?.name || 'Store'
-            const headers = ['Date', 'UPC', 'ItemName', 'Unit Size', 'Unit Price', 'Sale Price', 'Item Sold', 'Sale Amount', 'MFG Discount', 'Outlet Deal']
+            const headers = ['Date', 'UPC', 'Deal', 'Manufacturer', 'Type', 'Pack/Carton', 'Qty', 'Regular Price', 'Discount', 'Reimbursement', 'Claim Status', 'PLU']
             const csvRows = [
-                `${storeName} Mix and Match Report`,
+                `${storeName} Manufacturer Rebate Report`,
                 `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`,
                 `${location?.address || ''} ${location?.name || ''}`,
                 `Manufacturer: ${manufacturer || 'All'}`,
                 '',
                 headers.join(','),
-                ...finalRows.map((r: any) =>
-                    [r.date, r.upc, `"${r.itemName}"`, r.unitSize, r.unitPrice, r.salePrice, r.itemSold, r.saleAmount, r.mfgDiscount, r.outletDeal].join(',')
+                ...reportRows.map(r =>
+                    [r.date, r.upc, `"${r.dealName}"`, r.manufacturer, r.dealType, r.packOrCarton, r.qty, r.regularPrice, r.discountApplied, r.reimbursementExpected, r.claimStatus, r.plu].join(',')
                 ),
                 '',
+                `Total Events,${totals.totalEvents}`,
                 `Total Items Sold,${totals.totalItems}`,
-                `Total Sales,$${totals.totalSales}`,
-                `Total Rebate,$${totals.totalRebate}`
+                `Total Customer Discount,$${totals.totalDiscount}`,
+                `Total Expected Reimbursement,$${totals.totalRebate}`,
             ]
 
             return new NextResponse(csvRows.join('\n'), {
                 headers: {
                     'Content-Type': 'text/csv',
-                    'Content-Disposition': `attachment; filename="rebate-report-${startDate}-${endDate}.csv"`
-                }
+                    'Content-Disposition': `attachment; filename="rebate-report-${startDate}-${endDate}.csv"`,
+                },
             })
         }
 
         return NextResponse.json({
             report: {
-                title: `${franchise?.name || 'Store'} Mix and Match Report`,
+                title: `${franchise?.name || 'Store'} Manufacturer Rebate Report`,
                 dateRange: `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`,
                 location: location?.name || '',
-                manufacturer: manufacturer || 'All'
+                manufacturer: manufacturer || 'All',
             },
-            data: finalRows,
-            totals
+            data: reportRows,
+            byManufacturer,
+            totals,
         })
-
     } catch (error) {
-        console.error('Error generating rebate report:', error)
+        console.error('[MANUFACTURER_REBATE_REPORT]', error)
         return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 })
     }
 }
-

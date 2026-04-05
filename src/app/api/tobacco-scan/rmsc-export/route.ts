@@ -92,11 +92,11 @@ export async function GET(req: NextRequest) {
             orderBy: { createdAt: 'asc' }
         })
 
-        // Get active deals for promo matching
-        const tobaccoDeals = await prisma.tobaccoDeal.findMany({
+        // Get active tobacco scan deals for promo matching
+        const tobaccoScanDeals = await prisma.tobaccoScanDeal.findMany({
             where: {
                 franchiseId: user.franchiseId,
-                isActive: true,
+                status: 'ACTIVE',
                 startDate: { lte: endOfWeek },
                 OR: [
                     { endDate: null },
@@ -105,11 +105,11 @@ export async function GET(req: NextRequest) {
             }
         })
 
-        const dealMatches: TobaccoDealMatch[] = tobaccoDeals.map(d => ({
+        const dealMatches: TobaccoDealMatch[] = tobaccoScanDeals.map(d => ({
             manufacturer: d.manufacturer,
             dealName: d.dealName,
-            dealType: d.dealType,
-            discountAmount: Number(d.discountAmount),
+            dealType: d.type,
+            discountAmount: Number(d.rewardValue),
         }))
 
         // Build RMSC rows from transactions

@@ -1,142 +1,134 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-// GET /api/tobacco-scan/rebate-estimate - Calculate estimated rebates
+/**
+ * GET /api/tobacco-scan/rebate-estimate
+ *
+ * Returns the reimbursement pipeline using REAL TobaccoScanEvent data.
+ * Shows unclaimed, exported, submitted, and paid totals.
+ */
 export async function GET(req: NextRequest) {
-    try {
-        const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        if (!user?.franchiseId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
-        // Get manufacturer configs with rebate rates
-        const configs = await prisma.manufacturerConfig.findMany({
-            where: { franchiseId: user.franchiseId, isActive: true }
-        })
-
-        // Get current week dates
-        const now = new Date()
-        const dayOfWeek = now.getDay()
-        const startOfWeek = new Date(now)
-        startOfWeek.setDate(now.getDate() - dayOfWeek)
-        startOfWeek.setHours(0, 0, 0, 0)
-
-        const endOfWeek = new Date(startOfWeek)
-        endOfWeek.setDate(startOfWeek.getDate() + 6)
-        endOfWeek.setHours(23, 59, 59, 999)
-
-        // Get start of month
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
-
-        // Get tobacco transactions this week
-        const weeklyTransactions = await prisma.transaction.findMany({
-            where: {
-                franchiseId: user.franchiseId,
-                status: 'COMPLETED',
-                createdAt: { gte: startOfWeek, lte: endOfWeek }
-            },
-            include: {
-                lineItems: {
-                    where: { type: 'PRODUCT' },
-                    include: { product: true }
-                }
-            }
-        })
-
-        // Get tobacco transactions this month
-        const monthlyTransactions = await prisma.transaction.findMany({
-            where: {
-                franchiseId: user.franchiseId,
-                status: 'COMPLETED',
-                createdAt: { gte: startOfMonth, lte: endOfMonth }
-            },
-            include: {
-                lineItems: {
-                    where: { type: 'PRODUCT' },
-                    include: { product: true }
-                }
-            }
-        })
-
-        // Count tobacco items
-        const countTobaccoItems = (transactions: any[]) => {
-            let packCount = 0
-            let cartonCount = 0
-
-            for (const tx of transactions) {
-                for (const item of tx.lineItems) {
-                    if (item.product?.isTobacco) {
-                        // Simple heuristic: if price > $50, it's likely a carton
-                        const price = parseFloat(item.price?.toString() || '0')
-                        if (price > 50) {
-                            cartonCount += item.quantity
-                        } else {
-                            packCount += item.quantity
-                        }
-                    }
-                }
-            }
-
-            return { packCount, cartonCount }
-        }
-
-        const weeklyStats = countTobaccoItems(weeklyTransactions)
-        const monthlyStats = countTobaccoItems(monthlyTransactions)
-
-        // Calculate rebates using configured rates (or defaults)
-        const defaultPackRate = 0.04
-        const defaultCartonRate = 0.40
-
-        // Average across manufacturers or use defaults
-        const avgPackRate = configs.length > 0
-            ? configs.reduce((sum, c) => sum + parseFloat(c.rebatePerPack?.toString() || '0.04'), 0) / configs.length
-            : defaultPackRate
-        const avgCartonRate = configs.length > 0
-            ? configs.reduce((sum, c) => sum + parseFloat(c.rebatePerCarton?.toString() || '0.40'), 0) / configs.length
-            : defaultCartonRate
-        const totalLoyaltyBonus = configs.reduce((sum, c) => sum + parseFloat(c.loyaltyBonus?.toString() || '0'), 0)
-
-        const weeklyRebate = (weeklyStats.packCount * avgPackRate) + (weeklyStats.cartonCount * avgCartonRate)
-        const monthlyRebate = (monthlyStats.packCount * avgPackRate) + (monthlyStats.cartonCount * avgCartonRate) + totalLoyaltyBonus
-
-        // Get active deals count
-        const activeDeals = await prisma.tobaccoDeal.count({
-            where: {
-                franchiseId: user.franchiseId,
-                isActive: true,
-                OR: [
-                    { endDate: null },
-                    { endDate: { gte: now } }
-                ]
-            }
-        })
-
-        return NextResponse.json({
-            weekly: {
-                packCount: weeklyStats.packCount,
-                cartonCount: weeklyStats.cartonCount,
-                estimatedRebate: weeklyRebate
-            },
-            monthly: {
-                packCount: monthlyStats.packCount,
-                cartonCount: monthlyStats.cartonCount,
-                loyaltyBonus: totalLoyaltyBonus,
-                estimatedRebate: monthlyRebate
-            },
-            rates: {
-                packRate: avgPackRate,
-                cartonRate: avgCartonRate
-            },
-            activeDeals,
-            configuredManufacturers: configs.length
-        })
-    } catch (error) {
-        console.error('Failed to calculate rebate estimate:', error)
-        return NextResponse.json({ error: 'Failed to calculate estimate' }, { status: 500 })
+  try {
+    const user = await getAuthUser(req)
+    if (!user?.franchiseId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-}
 
+    const now = new Date()
+
+    // Get current week range
+    const dayOfWeek = now.getDay()
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(now.getDate() - dayOfWeek)
+    startOfWeek.setHours(0, 0, 0, 0)
+    const endOfWeek = new Date(startOfWeek)
+    endOfWeek.setDate(startOfWeek.getDate() + 6)
+    endOfWeek.setHours(23, 59, 59, 999)
+
+    // Get current month range
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+
+    // Reimbursement pipeline by claim status (ALL TIME)
+    const pipeline = await prisma.tobaccoScanEvent.groupBy({
+      by: ['claimStatus'],
+      where: {
+        tobaccoDeal: { franchiseId: user.franchiseId },
+      },
+      _sum: {
+        discountApplied: true,
+        reimbursementExpected: true,
+        qty: true,
+      },
+      _count: true,
+    })
+
+    const pipelineMap: Record<string, { count: number; qty: number; discount: number; reimbursement: number }> = {}
+    for (const row of pipeline) {
+      pipelineMap[row.claimStatus] = {
+        count: row._count,
+        qty: row._sum.qty || 0,
+        discount: Number(row._sum.discountApplied || 0),
+        reimbursement: Number(row._sum.reimbursementExpected || 0),
+      }
+    }
+
+    // This week's scan events
+    const weeklyStats = await prisma.tobaccoScanEvent.aggregate({
+      where: {
+        tobaccoDeal: { franchiseId: user.franchiseId },
+        soldAt: { gte: startOfWeek, lte: endOfWeek },
+      },
+      _sum: {
+        discountApplied: true,
+        reimbursementExpected: true,
+        qty: true,
+      },
+      _count: true,
+    })
+
+    // This month's scan events
+    const monthlyStats = await prisma.tobaccoScanEvent.aggregate({
+      where: {
+        tobaccoDeal: { franchiseId: user.franchiseId },
+        soldAt: { gte: startOfMonth, lte: endOfMonth },
+      },
+      _sum: {
+        discountApplied: true,
+        reimbursementExpected: true,
+        qty: true,
+      },
+      _count: true,
+    })
+
+    // Active deals count
+    const activeDeals = await prisma.tobaccoScanDeal.count({
+      where: {
+        franchiseId: user.franchiseId,
+        status: 'ACTIVE',
+        startDate: { lte: now },
+        OR: [
+          { endDate: null },
+          { endDate: { gte: now } },
+        ],
+      },
+    })
+
+    // Manufacturer configs
+    const configs = await prisma.manufacturerConfig.findMany({
+      where: { franchiseId: user.franchiseId, isActive: true },
+    })
+
+    // Base scan-data rebate estimate (from ManufacturerConfig rates)
+    const totalLoyaltyBonus = configs.reduce((s, c) => s + Number(c.loyaltyBonus || 0), 0)
+
+    return NextResponse.json({
+      pipeline: {
+        unclaimed: pipelineMap['UNCLAIMED'] || { count: 0, qty: 0, discount: 0, reimbursement: 0 },
+        exported: pipelineMap['EXPORTED'] || { count: 0, qty: 0, discount: 0, reimbursement: 0 },
+        submitted: pipelineMap['SUBMITTED'] || { count: 0, qty: 0, discount: 0, reimbursement: 0 },
+        paid: pipelineMap['PAID'] || { count: 0, qty: 0, discount: 0, reimbursement: 0 },
+        denied: pipelineMap['DENIED'] || { count: 0, qty: 0, discount: 0, reimbursement: 0 },
+      },
+      weekly: {
+        scanCount: weeklyStats._count,
+        totalQty: weeklyStats._sum.qty || 0,
+        totalDiscount: Number(weeklyStats._sum.discountApplied || 0),
+        totalReimbursement: Number(weeklyStats._sum.reimbursementExpected || 0),
+      },
+      monthly: {
+        scanCount: monthlyStats._count,
+        totalQty: monthlyStats._sum.qty || 0,
+        totalDiscount: Number(monthlyStats._sum.discountApplied || 0),
+        totalReimbursement: Number(monthlyStats._sum.reimbursementExpected || 0),
+        loyaltyBonus: totalLoyaltyBonus,
+      },
+      activeDeals,
+      configuredManufacturers: configs.length,
+    })
+  } catch (error) {
+    console.error('[TOBACCO_REBATE_ESTIMATE]', error)
+    return NextResponse.json({ error: 'Failed to calculate estimate' }, { status: 500 })
+  }
+}
