@@ -242,6 +242,11 @@ export async function POST(req: NextRequest) {
             })(),
             offerCode: event.offerCode || null,
 
+            // Two-layer discount breakdown
+            baseAllowanceApplied: event.baseAllowanceApplied || 0,
+            loyaltyBonusApplied: event.loyaltyBonusApplied || 0,
+            storeLoyaltyBlocked: event.storeLoyaltyBlocked || false,
+
             // Derived totals
             discountApplied,
             reimbursementExpected,

@@ -20,6 +20,8 @@ export interface CartItem {
   price: number                 // Shelf price per unit
   packOrCarton: 'PACK' | 'CARTON'
   lineItemIndex?: number        // Position in cart for UI mapping
+  hasLoyaltyId?: boolean        // Whether customer provided manufacturer loyalty ID
+  hasStoreLoyalty?: boolean     // Whether customer has store loyalty active
 }
 
 // ─── Output Types ─────────────────────────────────────────────────
@@ -37,6 +39,11 @@ export interface DealMatch {
   reimbursementPerUnit: number
   totalReimbursement: number
   packOrCarton: 'PACK' | 'CARTON'
+  // Two-layer discount breakdown
+  baseAllowanceApplied: number  // Layer 1: base manufacturer allowance per unit
+  loyaltyBonusApplied: number   // Layer 2: manufacturer loyalty bonus per unit
+  storeLoyaltyBlocked: boolean  // True if store loyalty was suppressed for this deal
+  stackPolicy: string           // STACK | REPLACE | MAX_ONLY
 }
 
 export interface MatchResult {
@@ -49,6 +56,81 @@ export interface MatchResult {
 
 export type DealWithUpcs = TobaccoScanDeal & {
   eligibleUpcs: TobaccoScanDealUPC[]
+}
+
+// ─── Two-Layer Discount Resolver ──────────────────────────────────
+
+export interface LayerResult {
+  baseAllowanceApplied: number
+  loyaltyBonusApplied: number
+  effectiveDiscount: number     // What customer actually gets off
+  storeLoyaltyBlocked: boolean
+}
+
+/**
+ * Resolve two-layer tobacco discount with stack policy.
+ *
+ * Layer 1: baseAllowance — always applied if deal matches
+ * Layer 2: loyaltyBonus — only applied if customer has manufacturer loyalty ID
+ *
+ * Stack policies:
+ *   STACK    → base + bonus (e.g., 0.50 + 1.00 = 1.50)
+ *   REPLACE  → bonus replaces base (e.g., 1.00)
+ *   MAX_ONLY → max(base, bonus) (e.g., 1.00)
+ */
+export function resolveStackPolicy(
+  baseAllowance: number,
+  loyaltyBonus: number,
+  stackPolicy: string,
+  hasLoyaltyId: boolean,
+  hasStoreLoyalty: boolean,
+  allowStoreLoyaltyStack: boolean,
+): LayerResult {
+  const baseApplied = baseAllowance
+
+  // If no loyalty ID, only base allowance applies
+  if (!hasLoyaltyId || loyaltyBonus <= 0) {
+    return {
+      baseAllowanceApplied: baseApplied,
+      loyaltyBonusApplied: 0,
+      effectiveDiscount: baseApplied,
+      storeLoyaltyBlocked: hasStoreLoyalty && !allowStoreLoyaltyStack,
+    }
+  }
+
+  // Both layers active — apply stack policy
+  let effective: number
+  let loyaltyApplied: number
+
+  switch (stackPolicy) {
+    case 'STACK':
+      loyaltyApplied = loyaltyBonus
+      effective = baseApplied + loyaltyApplied
+      break
+    case 'REPLACE':
+      loyaltyApplied = loyaltyBonus
+      effective = loyaltyApplied  // Bonus replaces base
+      break
+    case 'MAX_ONLY':
+      if (loyaltyBonus >= baseApplied) {
+        loyaltyApplied = loyaltyBonus
+        effective = loyaltyApplied
+      } else {
+        loyaltyApplied = 0
+        effective = baseApplied
+      }
+      break
+    default:
+      loyaltyApplied = loyaltyBonus
+      effective = baseApplied + loyaltyApplied
+  }
+
+  return {
+    baseAllowanceApplied: stackPolicy === 'REPLACE' ? 0 : baseApplied,
+    loyaltyBonusApplied: loyaltyApplied,
+    effectiveDiscount: effective,
+    storeLoyaltyBlocked: hasStoreLoyalty && !allowStoreLoyaltyStack,
+  }
 }
 
 // ─── Matcher ──────────────────────────────────────────────────────
@@ -125,27 +207,43 @@ export function matchTobaccoDeals(
         qtyApplied = Math.min(qtyApplied, remaining)
       }
 
-      // Calculate discount per unit
+      // Calculate discount per unit — use two-layer resolver when applicable
+      const baseAllowance = Number(deal.baseAllowance)
+      const loyaltyBonus = Number(deal.loyaltyBonus)
       const rewardValue = Number(deal.rewardValue)
       let discountPerUnit: number
+      let layerResult: LayerResult | null = null
 
-      switch (deal.rewardType) {
-        case 'FIXED_AMOUNT':
-          discountPerUnit = rewardValue
-          break
-        case 'PERCENTAGE':
-          discountPerUnit = Math.round(item.price * (rewardValue / 100) * 100) / 100
-          break
-        case 'PENNY_DEAL':
-          discountPerUnit = Math.max(0, item.price - 0.01)
-          break
-        case 'FREE_UNIT':
-          // For MULTIBUY: buy minQty, get 1 free → discount = price of 1 unit spread
-          discountPerUnit = item.price
-          qtyApplied = Math.floor(effectiveQty / deal.minQty) // Only free units
-          break
-        default:
-          discountPerUnit = rewardValue
+      if (baseAllowance > 0 || loyaltyBonus > 0) {
+        // Two-layer tobacco discount model
+        layerResult = resolveStackPolicy(
+          baseAllowance,
+          loyaltyBonus,
+          deal.stackPolicy,
+          item.hasLoyaltyId || false,
+          item.hasStoreLoyalty || false,
+          deal.allowStoreLoyaltyStack,
+        )
+        discountPerUnit = layerResult.effectiveDiscount
+      } else {
+        // Legacy single-layer discount
+        switch (deal.rewardType) {
+          case 'FIXED_AMOUNT':
+            discountPerUnit = rewardValue
+            break
+          case 'PERCENTAGE':
+            discountPerUnit = Math.round(item.price * (rewardValue / 100) * 100) / 100
+            break
+          case 'PENNY_DEAL':
+            discountPerUnit = Math.max(0, item.price - 0.01)
+            break
+          case 'FREE_UNIT':
+            discountPerUnit = item.price
+            qtyApplied = Math.floor(effectiveQty / deal.minQty)
+            break
+          default:
+            discountPerUnit = rewardValue
+        }
       }
 
       // Cap discount at item price (can't discount below $0)
@@ -166,6 +264,11 @@ export function matchTobaccoDeals(
         reimbursementPerUnit,
         totalReimbursement: Math.round(reimbursementPerUnit * qtyApplied * 100) / 100,
         packOrCarton: item.packOrCarton,
+        // Two-layer breakdown
+        baseAllowanceApplied: layerResult?.baseAllowanceApplied ?? discountPerUnit,
+        loyaltyBonusApplied: layerResult?.loyaltyBonusApplied ?? 0,
+        storeLoyaltyBlocked: layerResult?.storeLoyaltyBlocked ?? false,
+        stackPolicy: deal.stackPolicy,
       }
 
       itemMatches.push(match)

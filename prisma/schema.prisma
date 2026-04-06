@@ -4013,6 +4013,21 @@ model TobaccoScanDeal {
   rewardType  String   @default("FIXED_AMOUNT")
   rewardValue Decimal  @db.Decimal(12, 2)
 
+  // ─── Two-Layer Discount Model ──────────────────────────────────
+  // Layer 1: Base manufacturer allowance (always applied)
+  baseAllowance    Decimal  @default(0) @db.Decimal(8, 2)
+  // Layer 2: Manufacturer loyalty bonus (only when customer ID present)
+  loyaltyBonus     Decimal  @default(0) @db.Decimal(8, 2)
+
+  // How layers combine when both apply:
+  //   STACK     = baseAllowance + loyaltyBonus (e.g., 0.50 + 1.00 = 1.50)
+  //   REPLACE   = loyaltyBonus replaces baseAllowance (e.g., 1.00)
+  //   MAX_ONLY  = max(baseAllowance, loyaltyBonus) (e.g., 1.00)
+  stackPolicy      String   @default("STACK") // STACK | REPLACE | MAX_ONLY
+
+  // Whether normal store loyalty points/rewards can stack on top of this tobacco deal
+  allowStoreLoyaltyStack Boolean @default(false)
+
   // Reimbursement (what manufacturer pays store back per unit)
   // Usually = rewardValue. Sometimes higher (manufacturer covers margin loss too).
   reimbursementPerUnit Decimal @default(0) @db.Decimal(12, 2)
@@ -4148,8 +4163,11 @@ model TobaccoScanEvent {
   offerCode        String?                       // RMSC field 34: offer code "10201"
 
   // ─── Derived Totals (for fast queries) ─────────────────────────
-  discountApplied     Decimal  @db.Decimal(12, 2) // Sum of all customer-facing discounts
-  reimbursementExpected Decimal @db.Decimal(12, 2) // buydown + mfg multipack + mfg disc
+  baseAllowanceApplied  Decimal  @default(0) @db.Decimal(8, 2) // Layer 1 amount actually applied
+  loyaltyBonusApplied   Decimal  @default(0) @db.Decimal(8, 2) // Layer 2 amount actually applied
+  storeLoyaltyBlocked   Boolean  @default(false) // True if store loyalty was suppressed
+  discountApplied       Decimal  @db.Decimal(12, 2) // Sum of all customer-facing discounts
+  reimbursementExpected Decimal  @db.Decimal(12, 2) // buydown + mfg multipack + mfg disc
 
   // ─── Claim Tracking ────────────────────────────────────────────
   exportBatchId   String?
