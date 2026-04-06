@@ -3615,6 +3615,7 @@ model LoyaltyProgram {
   members       LoyaltyMember[]
   pointsHistory PointsTransaction[]
   rules         LoyaltyRule[]
+  redeemTiers   LoyaltyRedeemTier[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3651,6 +3652,29 @@ model LoyaltyRule {
   @@index([type])
   @@index([category])
   @@index([upc])
+}
+
+// ─── Tiered Redemption Rules ──────────────────────────────────────
+// Allows owners to define "100 pts = $10", "500 pts = $50", etc.
+model LoyaltyRedeemTier {
+  id        String         @id @default(cuid())
+  programId String
+  program   LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  name            String                          // "Bronze Reward", "Gold Reward"
+  pointsRequired  Int                             // 100, 500
+  rewardType      String  @default("AMOUNT_OFF")  // AMOUNT_OFF | PERCENT_OFF | FREE_ITEM
+  rewardValue     Decimal @db.Decimal(10, 2)      // 10.00, 50.00
+  minBasketAmount Decimal? @db.Decimal(10, 2)     // Optional: min cart total to redeem
+  maxPerDay       Int?                            // Optional: daily cap per member
+  isActive        Boolean @default(true)
+  sortOrder       Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([programId, isActive])
+  @@index([pointsRequired])
 }
 
 // Customer membership in a specific loyalty program
