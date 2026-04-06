@@ -339,14 +339,40 @@ export default function LoyaltyPage() {
                     </div>
 
                     <div className="bg-stone-900/80 border border-stone-700 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center justify-between">
                             <div>
                                 <h3 className="text-sm font-semibold text-stone-300">Base Earn Rate</h3>
                                 <p className="text-xs text-stone-500 mt-0.5">All eligible purchases earn at this rate unless overridden by a Smart Rewards rule below.</p>
                             </div>
-                            <div className="text-right">
-                                <p className="text-2xl font-bold text-yellow-400">{Number(program?.pointsPerDollar || 1)} pt</p>
-                                <p className="text-xs text-stone-500">per $1 spent</p>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 rounded-lg px-3 py-2">
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        min="0.1"
+                                        max="100"
+                                        value={program?.pointsPerDollar ?? 1}
+                                        onChange={e => setProgram({ ...program, pointsPerDollar: parseFloat(e.target.value) || 1 })}
+                                        className="w-16 bg-transparent text-2xl font-bold text-yellow-400 text-right outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                    <span className="text-xs text-stone-500 whitespace-nowrap">pts / $1</span>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        if (!program) return
+                                        setSaving(true)
+                                        try {
+                                            const res = await fetch('/api/owner/loyalty', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(program) })
+                                            if (res.ok) { setMessage('✓ Base rate saved'); fetchData() }
+                                            else setMessage('Save failed')
+                                        } catch { setMessage('Save failed') }
+                                        finally { setSaving(false) }
+                                    }}
+                                    disabled={saving}
+                                    className="px-3 py-2 bg-yellow-600 hover:bg-yellow-500 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                                >
+                                    {saving ? '…' : 'Save'}
+                                </button>
                             </div>
                         </div>
                     </div>
