@@ -175,6 +175,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Services', href: '/dashboard/services', icon: Briefcase, feature: 'usesServices' as const, industry: ['SERVICE'] as const },
         { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag, feature: 'usesInventory' as const },
         { name: 'Deals', href: '/dashboard/deals', icon: Gift, industry: ['RETAIL'] as const },
+        // RETAIL only - Tobacco Scan Data (manufacturer rebates)
+        { name: 'Scan Data', href: '/dashboard/owner/tobacco-scan', icon: Cigarette, industry: ['RETAIL'] as const },
         // RETAIL only - Lottery management
         { name: 'Lottery', href: '/dashboard/lottery', icon: Ticket, feature: 'lotteryEnabled' as const, industry: ['RETAIL'] as const },
         { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
@@ -312,6 +314,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/products', icon: ShoppingBag, always: true },
         // RETAIL only
         { name: 'Deals', href: '/dashboard/deals', icon: Gift, industry: ['RETAIL'] as const },
+        { name: 'Scan Data', href: '/dashboard/owner/tobacco-scan', icon: Cigarette, industry: ['RETAIL'] as const },
         { name: 'Lottery', href: '/dashboard/lottery', icon: Ticket, feature: 'lotteryEnabled' as const, industry: ['RETAIL'] as const },
         // SERVICE only
         { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar, industry: ['SERVICE'] as const },
