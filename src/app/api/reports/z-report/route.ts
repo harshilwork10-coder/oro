@@ -16,10 +16,6 @@ export async function GET(req: NextRequest) {
         const authUser = await getAuthUser(req)
         if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!authUser) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         const searchParams = req.nextUrl.searchParams
         const dateParam = searchParams.get('date')
         const date = dateParam ? new Date(dateParam) : new Date()
@@ -31,9 +27,8 @@ export async function GET(req: NextRequest) {
         endOfDay.setHours(23, 59, 59, 999)
 
         // Get user's location/franchise for filtering
-        const userId = user.id
         const user = await prisma.user.findUnique({
-            where: { id: userId },
+            where: { id: authUser.id },
             select: { locationId: true, franchiseId: true, role: true }
         })
 
