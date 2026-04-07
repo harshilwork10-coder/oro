@@ -10,8 +10,24 @@ import {
 import { useState, useEffect } from 'react'
 
 // Settings hub card grid
-const settingsCategories = [
+interface SettingsCard {
+    name: string
+    href: string
+    icon: any
+    desc: string
+    providerOnly?: boolean  // Hide from Owner/Franchisee — Provider infrastructure
+}
+
+interface SettingsCategory {
+    id: string
+    title: string
+    providerOnly?: boolean  // Entire category hidden from owners
+    cards: SettingsCard[]
+}
+
+const settingsCategories: SettingsCategory[] = [
     {
+        id: 'store',
         title: 'Store & Business',
         cards: [
             { name: 'Business Info', href: '/dashboard/settings/business', icon: Store, desc: 'Store name, address, contact' },
@@ -20,38 +36,42 @@ const settingsCategories = [
         ]
     },
     {
+        id: 'taxes',
         title: 'Taxes & Pricing',
+        providerOnly: true,  // Owner doesn't configure tax jurisdictions or pricing engines
         cards: [
-            { name: 'Tax Setup', href: '/dashboard/settings/tax-setup', icon: Landmark, desc: 'Tax rates & categories' },
-            { name: 'Pricing Rules', href: '/dashboard/settings/pricing-rules', icon: Percent, desc: 'Markups, rounding, rules' },
-            { name: 'Bottle Deposit', href: '/dashboard/settings/bottle-deposit', icon: Tag, desc: 'Container deposit reqs' },
+            { name: 'Tax Setup', href: '/dashboard/settings/tax-setup', icon: Landmark, desc: 'Tax rates & categories', providerOnly: true },
+            { name: 'Pricing Rules', href: '/dashboard/settings/pricing-rules', icon: Percent, desc: 'Markups, rounding, rules', providerOnly: true },
+            { name: 'Bottle Deposit', href: '/dashboard/settings/bottle-deposit', icon: Tag, desc: 'Container deposit reqs', providerOnly: true },
         ]
     },
     {
+        id: 'hardware',
         title: 'Hardware',
         cards: [
             { name: 'Printers', href: '/dashboard/settings/printers', icon: Printer, desc: 'Receipt & label printers' },
             { name: 'Stations', href: '/dashboard/settings/stations', icon: Monitor, desc: 'POS station management' },
-            { name: 'POS Layout', href: '/dashboard/settings/pos-layout', icon: Sliders, desc: 'Screen layout & buttons' },
         ]
     },
     {
-        title: 'Appearance & Security',
+        id: 'look',
+        title: 'Appearance',
         cards: [
             { name: 'Branding', href: '/dashboard/settings/branding', icon: Palette, desc: 'Logo, colors, theme' },
             { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Eye, desc: 'Theme & display options' },
-            { name: 'Security', href: '/dashboard/settings/security', icon: Shield, desc: 'Passwords, 2FA, access' },
         ]
     },
     {
-        title: 'Features & Controls',
+        id: 'controls',
+        title: 'Controls',
         cards: [
-            { name: 'Feature Toggles', href: '/dashboard/settings/features', icon: ToggleRight, desc: 'Enable/disable features' },
             { name: 'Training Mode', href: '/dashboard/settings/training-mode', icon: GraduationCap, desc: 'Practice mode for staff' },
             { name: 'Operational Controls', href: '/dashboard/settings/operational-controls', icon: Sliders, desc: 'Drawer limits, return rules' },
+            { name: 'Receipt Template', href: '/dashboard/settings/receipt-template', icon: Receipt, desc: 'Customize receipts' },
         ]
     },
     {
+        id: 'communication',
         title: 'Communication',
         cards: [
             { name: 'SMS Marketing', href: '/dashboard/settings/sms-marketing', icon: MessageSquare, desc: 'Text campaigns' },
@@ -60,10 +80,14 @@ const settingsCategories = [
         ]
     },
     {
-        title: 'Payments',
+        id: 'provider-infra',
+        title: 'Provider Infrastructure',
+        providerOnly: true,  // Entire section hidden from owners
         cards: [
-            { name: 'Payment Processors', href: '/dashboard/settings/payment-processors', icon: CreditCard, desc: 'Gateway configuration' },
-            { name: 'Receipt Template', href: '/dashboard/settings/receipt-template', icon: Receipt, desc: 'Customize receipts' },
+            { name: 'Payment Processors', href: '/dashboard/settings/payment-processors', icon: CreditCard, desc: 'Gateway configuration', providerOnly: true },
+            { name: 'Feature Toggles', href: '/dashboard/settings/features', icon: ToggleRight, desc: 'Enable/disable features', providerOnly: true },
+            { name: 'POS Layout', href: '/dashboard/settings/pos-layout', icon: Sliders, desc: 'Screen layout & buttons', providerOnly: true },
+            { name: 'Security Policies', href: '/dashboard/settings/security', icon: Shield, desc: '2FA, session policies', providerOnly: true },
         ]
     },
 ]
@@ -257,12 +281,21 @@ export default function SettingsPage() {
         return (<div className="p-8"><div className="animate-pulse">Loading settings...</div></div>)
     }
 
-    // Filter categories by industry
-    const filteredCategories = settingsCategories.filter(cat => {
-        // Salon features only for SERVICE
-        if (cat.title === 'Salon Features' && industryType !== 'SERVICE') return false
-        return true
-    })
+    // Filter categories by role + industry
+    const filteredCategories = settingsCategories
+        .filter(cat => {
+            // Hide provider-only categories from non-providers
+            if (cat.providerOnly && !isProvider) return false
+            // Salon features only for SERVICE
+            if (cat.title === 'Salon Features' && industryType !== 'SERVICE') return false
+            return true
+        })
+        .map(cat => ({
+            ...cat,
+            // Also filter individual provider-only cards within visible categories
+            cards: cat.cards.filter(card => !(card.providerOnly && !isProvider))
+        }))
+        .filter(cat => cat.cards.length > 0) // Remove empty categories
 
     return (
         <div className="p-8 max-w-6xl mx-auto">
@@ -271,25 +304,8 @@ export default function SettingsPage() {
             </h1>
             <p className="text-stone-400 mb-8">Manage your store configuration, hardware, and preferences.</p>
 
-            {/* Provider-Managed Notice */}
-            {!canEditPricing && (
-                <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30">
-                    <div className="flex items-start gap-3">
-                        <div className="h-10 w-10 bg-blue-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <Lock className="h-5 w-5 text-blue-400" />
-                        </div>
-                        <div>
-                            <h3 className="font-semibold text-blue-200">Settings Managed by Your Provider</h3>
-                            <p className="text-sm text-stone-400 mt-1">
-                                Core settings are configured by our support team. Need changes? Contact support.
-                            </p>
-                            <a href="tel:+18005551234" className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
-                                <Phone className="h-4 w-4" /> Contact Support
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            )}
+
+
 
             {message && (
                 <div className={`mb-6 p-4 rounded-lg ${message.includes('saved') || message.includes('updated') ? 'bg-emerald-900/30 border border-emerald-500/30 text-emerald-400' : 'bg-red-900/30 border border-red-500/30 text-red-400'}`}>
@@ -327,11 +343,12 @@ export default function SettingsPage() {
                 ))}
             </div>
 
-            {/* ========== INLINE QUICK SETTINGS (preserved from original) ========== */}
+            {/* ========== INLINE QUICK SETTINGS ========== */}
             <div className="border-t border-stone-800 pt-8">
                 <h2 className="text-lg font-bold text-stone-200 mb-6">Quick Settings</h2>
 
-                {/* Pricing Configuration */}
+                {/* Pricing Configuration — Provider only */}
+                {isProvider && (
                 <div className="glass-panel rounded-2xl p-6 mb-6">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="h-12 w-12 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
@@ -341,15 +358,9 @@ export default function SettingsPage() {
                             <h2 className="text-xl font-bold text-stone-100">Pricing Configuration</h2>
                             <p className="text-sm text-stone-400">Configure card surcharge for your franchise</p>
                         </div>
-                        {/* FIX 2: "Managed by ORO" badge for non-PROVIDER */}
-                        {!canEditPricing && (
-                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/15 border border-blue-500/30 rounded-lg text-xs font-semibold text-blue-300">
-                                <Lock className="h-3 w-3" /> Managed by ORO
-                            </span>
-                        )}
                     </div>
 
-                    {canEditPricing ? (
+                    {canEditPricing && (
                         // ── PROVIDER: full editable controls ──────────────────
                         <div className="space-y-6">
                             <div>
@@ -411,37 +422,9 @@ export default function SettingsPage() {
                                 </div>
                             </div>
                         </div>
-                    ) : (
-                        // ── NON-PROVIDER: read-only display only ──────────────
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="bg-stone-800/60 border border-stone-700 rounded-xl p-4">
-                                    <p className="text-xs text-stone-500 uppercase tracking-wide mb-1">Pricing Model</p>
-                                    <p className="text-lg font-bold text-stone-100">
-                                        {pricingModel === 'DUAL_PRICING' ? 'Dual Pricing' :
-                                         pricingModel === 'CASH_DISCOUNT' ? 'Cash Discount' : 'Standard Pricing'}
-                                    </p>
-                                </div>
-                                {pricingModel !== 'STANDARD' && (
-                                    <div className="bg-stone-800/60 border border-stone-700 rounded-xl p-4">
-                                        <p className="text-xs text-stone-500 uppercase tracking-wide mb-1">Card Surcharge</p>
-                                        <p className="text-lg font-bold text-stone-100">
-                                            {surchargeValue}{surchargeType === 'PERCENTAGE' ? '%' : ' flat'}
-                                        </p>
-                                    </div>
-                                )}
-                                <div className="bg-stone-800/60 border border-stone-700 rounded-xl p-4">
-                                    <p className="text-xs text-stone-500 uppercase tracking-wide mb-1">Sales Tax Rate</p>
-                                    <p className="text-lg font-bold text-stone-100">{taxRate}%</p>
-                                </div>
-                            </div>
-                            <p className="text-xs text-stone-500 flex items-center gap-1.5">
-                                <Lock className="h-3 w-3" />
-                                These values are configured by ORO Support. To request changes, contact your account manager.
-                            </p>
-                        </div>
                     )}
                 </div>
+                )}
 
                 {/* ── Tip Settings — FIX 5: OWNER editable ─────────────────── */}
                 <div className="glass-panel rounded-2xl p-6 mb-6">
