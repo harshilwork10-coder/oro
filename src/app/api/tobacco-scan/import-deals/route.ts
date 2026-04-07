@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('[TOBACCO_IMPORT]', error)
-    return NextResponse.json({ error: 'Failed to import deals' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }
 

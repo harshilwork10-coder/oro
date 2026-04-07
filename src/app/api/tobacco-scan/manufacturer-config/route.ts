@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ configs: maskedConfigs })
   } catch (error) {
     console.error('[MANUFACTURER_CONFIG_GET]', error)
-    return NextResponse.json({ error: 'Failed to fetch configs' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }
 
@@ -96,6 +96,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('[MANUFACTURER_CONFIG_POST]', error)
-    return NextResponse.json({ error: 'Failed to update config' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }

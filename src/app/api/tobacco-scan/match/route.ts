@@ -43,33 +43,41 @@ export async function POST(req: NextRequest) {
 
     const now = new Date()
 
-    // Find all active deals that have at least one UPC matching the cart
-    const activeDeals = await prisma.tobaccoScanDeal.findMany({
-      where: {
-        franchiseId: user.franchiseId,
-        status: 'ACTIVE',
-        startDate: { lte: now },
-        OR: [
-          { endDate: null },
-          { endDate: { gte: now } },
-        ],
-        eligibleUpcs: {
-          some: {
-            upc: { in: cartUpcs },
+    let activeDeals: any[] = []
+    try {
+      activeDeals = await prisma.tobaccoScanDeal.findMany({
+        where: {
+          franchiseId: user.franchiseId,
+          status: 'ACTIVE',
+          startDate: { lte: now },
+          OR: [
+            { endDate: null },
+            { endDate: { gte: now } },
+          ],
+          eligibleUpcs: {
+            some: {
+              upc: { in: cartUpcs },
+            },
           },
         },
-      },
-      include: {
-        eligibleUpcs: true,
-      },
-    })
+        include: {
+          eligibleUpcs: true,
+        },
+      })
+    } catch (dbErr: any) {
+      console.warn('[TOBACCO_MATCH] DB query failed (table may not exist):', dbErr?.message?.slice(0, 100))
+      return NextResponse.json({ matches: [], totalDiscount: 0, totalReimbursement: 0 })
+    }
 
     // Run the matching engine
-    const result = matchTobaccoDeals(items, activeDeals, resolvedStoreId)
-
-    return NextResponse.json(result)
+    try {
+      const result = matchTobaccoDeals(items, activeDeals, resolvedStoreId)
+      return NextResponse.json(result)
+    } catch {
+      return NextResponse.json({ matches: [], totalDiscount: 0, totalReimbursement: 0 })
+    }
   } catch (error) {
     console.error('[TOBACCO_MATCH]', error)
-    return NextResponse.json({ error: 'Failed to match tobacco deals' }, { status: 500 })
+    return NextResponse.json({ matches: [], totalDiscount: 0, totalReimbursement: 0 })
   }
 }

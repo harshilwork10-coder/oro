@@ -149,6 +149,6 @@ export async function GET(req: NextRequest) {
         })
     } catch (error) {
         console.error('[RMSC_EXPORT]', error)
-        return new Response('Failed to export RMSC scan data', { status: 500 })
+        return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
     }
 }

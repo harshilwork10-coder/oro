@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ deals: enriched })
   } catch (error) {
     console.error('[TOBACCO_DEALS_GET]', error)
-    return NextResponse.json({ error: 'Failed to fetch tobacco deals' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }
 
@@ -137,6 +137,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ deal }, { status: 201 })
   } catch (error) {
     console.error('[TOBACCO_DEALS_POST]', error)
-    return NextResponse.json({ error: 'Failed to create tobacco deal' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }

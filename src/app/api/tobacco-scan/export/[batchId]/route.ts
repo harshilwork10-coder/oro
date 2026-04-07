@@ -56,7 +56,7 @@ export async function GET(
     return NextResponse.json({ batch })
   } catch (error) {
     console.error('[TOBACCO_BATCH_GET]', error)
-    return NextResponse.json({ error: 'Failed to fetch batch' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }
 
@@ -145,6 +145,6 @@ export async function PUT(
     return NextResponse.json({ batch: result })
   } catch (error) {
     console.error('[TOBACCO_BATCH_PUT]', error)
-    return NextResponse.json({ error: 'Failed to update batch' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }

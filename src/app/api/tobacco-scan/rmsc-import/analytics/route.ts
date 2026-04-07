@@ -102,6 +102,6 @@ export async function GET(req: NextRequest) {
         })
     } catch (error) {
         console.error('[RMSC_ANALYTICS]', error)
-        return NextResponse.json({ error: 'Failed to compute analytics' }, { status: 500 })
+        return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
     }
 }

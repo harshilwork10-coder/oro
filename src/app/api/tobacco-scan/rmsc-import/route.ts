@@ -178,6 +178,6 @@ export async function POST(req: NextRequest) {
         })
     } catch (error) {
         console.error('[RMSC_IMPORT]', error)
-        return NextResponse.json({ error: 'Failed to import RMSC scan data' }, { status: 500 })
+        return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
     }
 }

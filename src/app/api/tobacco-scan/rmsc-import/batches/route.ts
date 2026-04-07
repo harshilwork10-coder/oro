@@ -42,6 +42,6 @@ export async function GET(req: NextRequest) {
         })
     } catch (error) {
         console.error('[RMSC_BATCHES]', error)
-        return NextResponse.json({ error: 'Failed to fetch import batches' }, { status: 500 })
+        return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
     }
 }

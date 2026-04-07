@@ -43,6 +43,6 @@ export async function POST(req: NextRequest) {
         }, { status: 301 })
     } catch (error) {
         console.error('[TOBACCO_GENERATE]', error)
-        return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 })
+        return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
     }
 }

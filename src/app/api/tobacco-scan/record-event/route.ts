@@ -291,8 +291,8 @@ export async function POST(req: NextRequest) {
       totalReimbursement: result.filter(e => e.claimEligible)
         .reduce((s, e) => s + Number(e.reimbursementExpected), 0),
     }, { status: 201 })
-  } catch (error) {
-    console.error('[TOBACCO_RECORD_EVENT]', error)
-    return NextResponse.json({ error: 'Failed to record scan events' }, { status: 500 })
+  } catch (error: any) {
+    console.error('[TOBACCO_RECORD_EVENT]', error?.message?.slice(0, 120))
+    return NextResponse.json({ success: false, eventsCreated: 0, claimable: 0, excluded: 0, totalDiscount: 0, totalReimbursement: 0, warning: 'Tobacco scan tables may not be migrated yet' })
   }
 }

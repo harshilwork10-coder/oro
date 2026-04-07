@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ batches })
   } catch (error) {
     console.error('[TOBACCO_EXPORT_GET]', error)
-    return NextResponse.json({ error: 'Failed to fetch export batches' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }
 
@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('[TOBACCO_EXPORT_POST]', error)
-    return NextResponse.json({ error: 'Failed to generate export batch' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }
 

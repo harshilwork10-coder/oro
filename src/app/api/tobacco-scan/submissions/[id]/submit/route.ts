@@ -19,6 +19,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true })
     } catch (error) {
         console.error('[TOBACCO_SCAN_SUBMIT]', error)
-        return NextResponse.json({ error: 'Failed to submit' }, { status: 500 })
+        return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
     }
 }

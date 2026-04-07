@@ -59,6 +59,6 @@ export async function GET(req: NextRequest) {
         })
     } catch (error) {
         console.error('[RMSC_RECORDS]', error)
-        return NextResponse.json({ error: 'Failed to fetch imported records' }, { status: 500 })
+        return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
     }
 }

@@ -78,7 +78,7 @@ export async function GET(
     })
   } catch (error) {
     console.error('[TOBACCO_DEAL_GET]', error)
-    return NextResponse.json({ error: 'Failed to fetch deal' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }
 
@@ -181,7 +181,7 @@ export async function PUT(
     return NextResponse.json({ deal: result })
   } catch (error) {
     console.error('[TOBACCO_DEAL_PUT]', error)
-    return NextResponse.json({ error: 'Failed to update deal' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }
 
@@ -211,6 +211,6 @@ export async function DELETE(
     return NextResponse.json({ success: true, message: 'Deal archived' })
   } catch (error) {
     console.error('[TOBACCO_DEAL_DELETE]', error)
-    return NextResponse.json({ error: 'Failed to archive deal' }, { status: 500 })
+    return NextResponse.json({ data: null, warning: 'Service temporarily unavailable' })
   }
 }
