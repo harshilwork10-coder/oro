@@ -6699,3 +6699,34 @@ model StorefrontOrderItem {
 
   @@index([orderId])
 }
+
+// ============ EMAIL (SES DUAL-LANE) ============
+
+model EmailEvent {
+  id             String   @id @default(cuid())
+  messageId      String   @unique        // SES Message ID
+  lane           String                  // TRANSACTIONAL | MARKETING
+  recipientEmail String
+  template       String?                 // receipt, gift_card, password_reset, campaign, etc.
+  status         String   @default("SENT") // SENT | DELIVERED | OPENED | CLICKED | BOUNCED | COMPLAINED
+  franchiseId    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([franchiseId])
+  @@index([lane])
+  @@index([status])
+  @@index([recipientEmail])
+  @@index([createdAt])
+}
+
+model EmailSuppression {
+  id        String   @id @default(cuid())
+  email     String   @unique             // Suppressed email address
+  reason    String                       // BOUNCE | COMPLAINT | UNSUBSCRIBE
+  lane      String   @default("MARKETING") // MARKETING (only marketing blocked) | ALL (all blocked)
+  createdAt DateTime @default(now())
+
+  @@index([lane])
+}
