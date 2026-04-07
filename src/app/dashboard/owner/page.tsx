@@ -156,7 +156,7 @@ export default function OwnerDashboard() {
                     { href: '/dashboard/owner', label: 'Overview', icon: Store },
                     { href: '/dashboard/owner/briefing', label: 'Briefing', icon: Newspaper },
                     { href: '/dashboard/owner/inventory', label: 'Inventory', icon: Package },
-                    { href: '/dashboard/owner/reports-hub', label: 'Reports', icon: BarChart3 },
+                    { href: '/dashboard/reports', label: 'Reports', icon: BarChart3 },
                     { href: '/dashboard/owner/approval-queue', label: 'Operations', icon: ShoppingBag },
                 ].map(({ href, label, icon: Icon }) => (
                     <Link

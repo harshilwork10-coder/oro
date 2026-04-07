@@ -128,8 +128,8 @@ const retailReportCategories: ReportCategory[] = [
         color: 'from-stone-500 to-zinc-600',
         accent: 'stone',
         reports: [
-            { name: 'Tobacco Scan', href: '/dashboard/reports/tobacco-scan' },
-            { name: 'Tobacco Deals', href: '/dashboard/reports/tobacco-scan/deals' },
+            { name: 'Tobacco Scan', href: '/dashboard/owner/tobacco-scan' },
+            { name: 'Tobacco Deals', href: '/dashboard/owner/tobacco-scan/deals' },
             { name: 'Age-Restricted Sales', href: '/dashboard/reports/age-restricted' },
         ]
     },
@@ -426,7 +426,7 @@ export default function ReportsPage() {
     // Quick access links differ by vertical
     const quickLinks = isRetail ? [
         { href: '/dashboard/reports/z-report', icon: FileText, color: 'text-emerald-400', bg: 'bg-emerald-500/10', borderColor: 'hover:border-emerald-500/50', label: 'Z-Report' },
-        { href: '/dashboard/reports/tobacco-scan', icon: Cigarette, color: 'text-stone-400', bg: 'bg-stone-500/10', borderColor: 'hover:border-stone-500/50', label: 'Tobacco Scan' },
+        { href: '/dashboard/owner/tobacco-scan', icon: Cigarette, color: 'text-stone-400', bg: 'bg-stone-500/10', borderColor: 'hover:border-stone-500/50', label: 'Tobacco Scan' },
         { href: '/dashboard/reports/daily', icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-500/10', borderColor: 'hover:border-purple-500/50', label: 'Daily Sales' },
         { href: '/dashboard/reports/loss-prevention', icon: ShieldCheck, color: 'text-red-400', bg: 'bg-red-500/10', borderColor: 'hover:border-red-500/50', label: 'Loss Prevention' },
         { href: '/dashboard/reports/pnl', icon: PieChart, color: 'text-teal-400', bg: 'bg-teal-500/10', borderColor: 'hover:border-teal-500/50', label: 'P&L' },
