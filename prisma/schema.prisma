@@ -3911,6 +3911,12 @@ model CheckIn {
   locationId  String
   location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   status      String   @default("WAITING") // WAITING, SERVED, CANCELLED
+
+  // QR Check-In tracking (Phase 1)
+  source        String  @default("KIOSK") // KIOSK, QR_SCAN, WALK_IN, PHONE
+  appointmentId String? // Links check-in to specific appointment (optional)
+  stationRef    String? // Which display/station was scanned (analytics)
+
   checkedInAt DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

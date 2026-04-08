@@ -17,6 +17,7 @@ function DisplayContent() {
     const displayKey = stationId || locationId // Use whichever is provided
 
     const [cart, setCart] = useState<any>(null)
+    const [checkinUrl, setCheckinUrl] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
@@ -93,6 +94,10 @@ function DisplayContent() {
                             setCart(data)
                         } else {
                             setCart(null)
+                            // Extract QR check-in URL from IDLE response (salon only)
+                            if (data.checkinUrl) {
+                                setCheckinUrl(data.checkinUrl)
+                            }
                         }
                     }
                     setNetworkErrorCount(0) // Reset on successful fetch
@@ -228,7 +233,7 @@ function DisplayContent() {
 
             {/* Keep CheckIn mounted but hidden when not active to preserve state */}
             <div style={{ display: status === 'IDLE' || !cart ? 'block' : 'none' }}>
-                <CheckIn />
+                <CheckIn checkinUrl={checkinUrl} />
             </div>
         </>
     )

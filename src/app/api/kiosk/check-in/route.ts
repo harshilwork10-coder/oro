@@ -14,6 +14,11 @@ export async function POST(request: Request) {
         const body = await request.json()
         const { name, email, phone, liabilitySigned, loyaltyJoined, locationId } = body
 
+        // QR Check-In extension (Phase 1) — all optional, existing callers unaffected
+        const source = body.source || 'KIOSK'
+        const appointmentId = body.appointmentId || null
+        const stationRef = body.stationRef || null
+
         if (!name || !phone) {
             return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 })
         }
@@ -89,9 +94,23 @@ export async function POST(request: Request) {
                 data: {
                     clientId: customer.id,
                     locationId: resolvedLocationId,
-                    status: 'WAITING'
+                    status: 'WAITING',
+                    source,
+                    appointmentId,
+                    stationRef
                 }
             })
+
+            // If checking in against an appointment, mark it as CHECKED_IN
+            if (appointmentId) {
+                await prisma.appointment.update({
+                    where: { id: appointmentId },
+                    data: { status: 'CHECKED_IN' }
+                }).catch(() => {
+                    // Silent fail — check-in record already created successfully
+                    // Appointment status update is non-critical enhancement
+                })
+            }
         }
 
         return NextResponse.json({

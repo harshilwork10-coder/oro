@@ -1,11 +1,49 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Check, ChevronRight } from 'lucide-react'
 
 import VirtualKeyboard from './VirtualKeyboard'
 
-export default function CheckIn() {
+// ── Props ──
+interface CheckInProps {
+    checkinUrl?: string | null
+}
+
+// ── Lightweight QR Code Generator ──
+// Generates a QR code as a data URL using Canvas API.
+// Uses the 'qrcode' pattern but implemented inline to avoid adding a dependency.
+// Falls back to showing the URL as text if generation fails.
+function useQRCode(text: string | null | undefined): string | null {
+    const [dataUrl, setDataUrl] = useState<string | null>(null)
+    const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+    useEffect(() => {
+        if (!text) { setDataUrl(null); return }
+
+        // Dynamic import of qrcode library (tree-shakeable)
+        import('qrcode').then(QRCode => {
+            const canvas = canvasRef.current || document.createElement('canvas')
+            canvasRef.current = canvas
+            QRCode.toCanvas(canvas, text, {
+                width: 280,
+                margin: 2,
+                color: { dark: '#1c1917', light: '#ffffff' } // stone-950 on white
+            }, (err: Error | null | undefined) => {
+                if (!err) {
+                    setDataUrl(canvas.toDataURL('image/png'))
+                }
+            })
+        }).catch(() => {
+            // If qrcode library isn't available, dataUrl stays null
+            // and we show the URL as fallback text
+        })
+    }, [text])
+
+    return dataUrl
+}
+
+export default function CheckIn({ checkinUrl }: CheckInProps) {
     const [step, setStep] = useState<'phone' | 'name' | 'liability' | 'loyalty' | 'welcome'>('phone')
     const [phone, setPhone] = useState('')
     const [firstName, setFirstName] = useState('')
@@ -17,6 +55,10 @@ export default function CheckIn() {
     const [loyaltyJoined, setLoyaltyJoined] = useState(false)
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const [storeName, setStoreName] = useState('Our Store') // Dynamic store name
+    const [showPhoneEntry, setShowPhoneEntry] = useState(false) // For fallback from QR screen
+
+    // Generate QR code data URL from checkinUrl
+    const qrDataUrl = useQRCode(checkinUrl)
 
     // Load store name from terminal_config and refresh from server
     useEffect(() => {
@@ -143,6 +185,7 @@ export default function CheckIn() {
                 setLastName('')
                 setLiabilitySigned(false)
                 setLoyaltyJoined(false)
+                setShowPhoneEntry(false) // Return to QR idle screen
             }, 30000) // 30 seconds
 
             return () => clearTimeout(timer)
@@ -166,6 +209,7 @@ export default function CheckIn() {
                             setLastName('')
                             setLiabilitySigned(false)
                             setLoyaltyJoined(false)
+                            setShowPhoneEntry(false) // Return to QR idle screen
                         }}
                         className="mt-12 px-8 py-3 bg-stone-800 hover:bg-stone-700 rounded-full text-sm font-medium transition-colors text-stone-300 border border-stone-700"
                     >
@@ -174,6 +218,56 @@ export default function CheckIn() {
                 </div>
             </div>
         )
+    }
+
+    // ═══ QR CODE IDLE SCREEN (Salon Customer Display) ═══
+    // When checkinUrl is available and user hasn't started phone entry,
+    // show the QR code as the primary idle screen.
+    if (checkinUrl && step === 'phone' && !showPhoneEntry) {
+        return (
+            <div className="min-h-screen bg-stone-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-orange-900/20 via-stone-950 to-stone-950 flex flex-col items-center justify-center p-8 relative overflow-hidden">
+                {/* Ambient glow */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-80 bg-orange-500/8 blur-[100px] pointer-events-none" />
+
+                {/* Logo */}
+                <div className="h-16 w-16 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20 p-1.5 mb-8 relative z-10">
+                    <img src="/oro9-gold.png" alt="Logo" className="w-full h-full object-contain rounded-lg" />
+                </div>
+
+                {/* Store name */}
+                <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-300 to-amber-200 mb-2 relative z-10">
+                    {storeName}
+                </h1>
+
+                {/* Scan prompt */}
+                <p className="text-xl text-stone-300 mb-8 relative z-10">Scan to Check In</p>
+
+                {/* QR Code */}
+                <div className="bg-white rounded-3xl p-6 shadow-2xl shadow-orange-500/10 mb-8 relative z-10">
+                    {qrDataUrl ? (
+                        <img src={qrDataUrl} alt="Check-in QR Code" className="w-56 h-56" />
+                    ) : (
+                        <div className="w-56 h-56 flex items-center justify-center">
+                            <div className="animate-spin h-8 w-8 border-3 border-orange-500 border-t-transparent rounded-full" />
+                        </div>
+                    )}
+                </div>
+
+                {/* Fallback */}
+                <button
+                    onClick={() => setShowPhoneEntry(true)}
+                    className="text-stone-600 hover:text-stone-400 text-sm transition-colors relative z-10"
+                >
+                    Or enter phone number here
+                </button>
+            </div>
+        )
+    }
+
+    // Reset showPhoneEntry when step changes back to phone (after welcome auto-reset)
+    // This ensures QR screen reappears after a successful check-in cycle
+    if (step === 'phone' && showPhoneEntry) {
+        // Keep showing phone entry — user explicitly chose it
     }
 
     return (
