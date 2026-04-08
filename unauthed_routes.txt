@@ -1,0 +1,95 @@
+﻿READ  | app\version-check | GET | 
+READ  | auth\magic-link\[token] | GET | magicLink
+WRITE | auth\mfa\verify | POST | user
+WRITE | auth\onboarding\complete | POST | franchise,franchisor,magicLink,user
+WRITE | auth\phone-pin-login | POST | user
+WRITE | auth\pin-login | POST | user
+WRITE | auth\pre-login | POST | user
+WRITE | auth\restore-device | POST | trustedDevice
+WRITE | auth\sms-verify | POST,PUT | user
+READ  | auth\[...nextauth] |  | 
+WRITE | cron\collect-signals | POST | cashDrawerSession,franchise,ownerSignal,product,transaction
+WRITE | cron\marketing-sms | POST | client,customerPromo,smsMarketingRule
+WRITE | cron\process-interventions | POST | 
+WRITE | cron\process-issues | POST | location,ownerIssue,ownerIssueEvent,ownerNotificationPreference,ownerSignal
+WRITE | cron\send-reminders | POST | franchise
+WRITE | email\unsubscribe | GET,POST | emailSuppression
+WRITE | franchisor\requests | GET,POST | onboardingRequest
+READ  | franchisor\requests\[id] | GET | onboardingRequest
+WRITE | franchisor\requests\[id]\comments | GET,POST | onboardingRequest,onboardingRequestEvent
+WRITE | franchisor\requests\[id]\documents | GET,POST | onboardingRequest,onboardingRequestDocument,onboardingRequestEvent
+WRITE | kiosk\check-in | POST | checkIn,client,location
+WRITE | license\validate | GET,POST | 
+READ  | location\[id] | GET | location
+WRITE | loyalty\members | GET,POST | loyaltyMasterAccount,loyaltyMember,loyaltyProgram
+WRITE | pax\cancel | POST | 
+READ  | pos\bootstrap |  | businessConfig,discount,location,product,service,serviceCategory,user
+READ  | pos\businesses | GET | 
+READ  | pos\client-photos |  | client,clientPhoto,user
+READ  | pos\consultation-forms |  | client,clientWaiver
+READ  | pos\employees-for-login |  | user
+WRITE | pos\exchange | POST | 
+READ  | pos\formulas |  | client,clientNote,user
+READ  | pos\marketing\campaigns |  | smsMarketingRule
+READ  | pos\memberships |  | client,clientMembership,membershipPlan,servicePackage
+READ  | pos\memberships\enroll |  | client,clientMembership,membershipPlan
+READ  | pos\menu |  | discount,product,service,serviceCategory
+READ  | pos\no-show\records |  | appointment,client,service
+READ  | pos\no-show\settings |  | 
+READ  | pos\online-booking\config |  | 
+WRITE | pos\pair-terminal | POST | station
+READ  | pos\payroll |  | timeEntry,transaction,user
+READ  | pos\price-check | GET | item
+READ  | pos\product-recommendations |  | product,productCategory
+READ  | pos\rebooking-suggestions\[clientId] |  | appointment
+READ  | pos\refresh-config | GET | station
+READ  | pos\refresh-status | GET | discount,product,service,serviceCategory,user
+WRITE | pos\refresh-token | POST | station
+WRITE | pos\review | GET,POST | location,review
+READ  | pos\staff |  | user
+READ  | pos\staff-rankings |  | transaction,user
+READ  | pos\station\config |  | location
+WRITE | pos\stations\pair | GET,POST | station
+WRITE | pos\sync | GET,POST | transaction
+WRITE | pos\tip | POST | activeCart
+WRITE | pos\validate-setup-code | POST | location,station,trustedDevice
+WRITE | print-proxy | GET,POST | 
+READ  | promotions\active | GET | promotion
+READ  | provider\onboarding\requests | GET | onboardingRequest
+WRITE | provider\onboarding\requests\[id] | GET,PATCH | onboardingRequest
+WRITE | provider\onboarding\requests\[id]\activate | POST | onboardingRequest,onboardingRequestEvent
+WRITE | provider\onboarding\requests\[id]\assignment | PATCH | onboardingRequest,onboardingRequestEvent
+WRITE | provider\onboarding\requests\[id]\create-franchise | POST | franchise,onboardingRequest,onboardingRequestEvent
+WRITE | provider\onboarding\requests\[id]\create-locations | POST | location,onboardingRequest,onboardingRequestEvent,onboardingRequestLocation
+WRITE | provider\onboarding\requests\[id]\devices\assign | GET,POST | onboardingRequest,onboardingRequestDevice,onboardingRequestEvent
+WRITE | provider\onboarding\requests\[id]\documents\request | POST | onboardingRequest,onboardingRequestDocument,onboardingRequestEvent
+WRITE | provider\onboarding\requests\[id]\documents\[docId] | PATCH | onboardingRequestDocument,onboardingRequestEvent
+WRITE | provider\onboarding\requests\[id]\events | GET,POST | onboardingRequestEvent
+WRITE | provider\onboarding\requests\[id]\modules | PUT | onboardingRequest,onboardingRequestEvent
+WRITE | provider\onboarding\requests\[id]\shipments | GET,POST | onboardingRequest,onboardingRequestEvent,shipment,shipmentItem
+WRITE | provider\onboarding\requests\[id]\status | PATCH | onboardingRequest,onboardingRequestEvent
+WRITE | provider\shipments\[id]\delivered | PATCH | shipment
+WRITE | provider\shipments\[id]\tracking | PATCH | shipment
+READ  | public\booking\availability | GET | appointment,location,service,timeBlock
+READ  | public\booking\cancel | GET | appointment
+WRITE | public\booking\create | POST | appointment,client,location,service,user
+READ  | public\booking\locations | GET | franchise,franchisor,location
+READ  | public\booking\services | GET | franchise,service,user
+READ  | public\booking\staff | GET | franchise,service,user
+READ  | public\deals | GET | promotion
+WRITE | public\order-ahead | GET,POST | franchise,product
+READ  | public\storefront\order\[orderNumber] | GET | storefrontOrder
+READ  | public\storefront\[slug] | GET | location
+WRITE | public\storefront\[slug]\order | POST | item,location,storefrontOrder
+READ  | public\storefront\[slug]\products | GET | item,location,unifiedCategory
+READ  | public\stores | GET | location
+WRITE | public\waiver | GET,POST | client,clientWaiver,franchise,franchiseWaiverSettings
+WRITE | pulse\quick-login | POST | location,pulseDeviceToken,user
+READ  | pwa\manifest | GET | franchise,user
+WRITE | support-chat | GET,POST,PUT | supportChat,supportMessage
+WRITE | support-chat\admin | GET,POST,PUT | supportChat,supportMessage,user
+WRITE | test\seed | GET,POST | 
+WRITE | webhooks\events | POST | 
+WRITE | webhooks\ses | POST | emailEvent,emailSuppression
+WRITE | webhooks\square | POST | auditLog,notification,paymentLog,transaction
+WRITE | webhooks\stripe | POST | auditLog,notification,paymentLog,transaction

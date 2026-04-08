@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireProvider, unauthorizedResponse } from '@/lib/requireProvider';
 
 // GET /api/provider/onboarding/requests/[id]/events - List timeline events
 export async function GET(
@@ -7,6 +8,9 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const user = await requireProvider(request)
+        if (!user) return unauthorizedResponse()
+
         const { id } = await params;
 
         const events = await prisma.onboardingRequestEvent.findMany({
@@ -46,6 +50,9 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const user = await requireProvider(request)
+        if (!user) return unauthorizedResponse()
+
         const { id } = await params;
         const body = await request.json();
         const { type = 'NOTE', message, actorUserId } = body;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import {
     Plus, Save, Trash2, ChevronLeft, ChevronRight, Settings2,
     DollarSign, Layers, ArrowRightLeft, CheckCircle2, AlertCircle,
@@ -36,8 +37,16 @@ interface CatMapping {
 // ============ MAIN COMPONENT ============
 
 export default function PricingRulesPage() {
-    const { data: session } = useSession()
+    const { data: session, status } = useSession()
     const user = session?.user as any
+    // SECURITY: Provider-only page — redirect unauthorized roles
+    const __router = useRouter()
+    useEffect(() => {
+        if (status === 'loading') return
+        if (!user || !['PROVIDER', 'ADMIN'].includes(user.role)) {
+            __router.replace('/dashboard/settings')
+        }
+    }, [status, user, __router])
 
     const [step, setStep] = useState(0)
     const [loading, setLoading] = useState(true)

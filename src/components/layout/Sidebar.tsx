@@ -543,10 +543,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 {session?.user?.name}
                             </p>
                             <p className="text-[10px] xl:text-xs text-stone-500">
-                                {role === 'PROVIDER' ? 'Platform Owner' :
-                                    role === 'FRANCHISOR' ? 'Owner' :
-                                        role === 'FRANCHISEE' ? 'Manager' :
-                                            role === 'MANAGER' ? 'Manager' : 'Employee'}
+                                {role === 'PROVIDER' ? 'Platform Admin' :
+                                    role === 'FRANCHISOR' ? 'Brand HQ' :
+                                        role === 'OWNER' ? 'Owner' :
+                                            role === 'FRANCHISEE' ? 'Owner' :
+                                                role === 'MANAGER' ? 'Manager' : 'Employee'}
                             </p>
                         </div>
                     </div>

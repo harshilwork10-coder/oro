@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 // Canned responses for quick replies
 const CANNED_RESPONSES = [
@@ -37,9 +39,10 @@ const CANNED_RESPONSES = [
 
 // GET - Fetch all support chats for admin dashboard
 export async function GET(req: Request) {
+    const session = await getServerSession(authOptions)
     const user = session?.user as any
 
-    if (!user?.id) {
+    if (!user?.id || !['PROVIDER','ADMIN','FRANCHISOR'].includes(user.role)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -149,9 +152,10 @@ export async function GET(req: Request) {
 
 // POST - Send a reply as support
 export async function POST(req: Request) {
+    const session = await getServerSession(authOptions)
     const user = session?.user as any
 
-    if (!user?.id) {
+    if (!user?.id || !['PROVIDER','ADMIN','FRANCHISOR'].includes(user.role)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -191,9 +195,10 @@ export async function POST(req: Request) {
 
 // PUT - Update chat status, priority, or assignee
 export async function PUT(req: Request) {
+    const session = await getServerSession(authOptions)
     const user = session?.user as any
 
-    if (!user?.id) {
+    if (!user?.id || !['PROVIDER','ADMIN','FRANCHISOR'].includes(user.role)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

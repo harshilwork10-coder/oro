@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import {
     ChevronLeft, ChevronRight, Plus, Trash2, Save,
     CheckCircle2, AlertCircle, Settings2, Layers, ArrowRightLeft, X,
@@ -52,8 +53,17 @@ interface DeptDefault {
 // ============ MAIN COMPONENT ============
 
 export default function TaxSetupPage() {
-    const { data: session } = useSession()
+    const { data: session, status } = useSession()
+    const router = useRouter()
     const user = session?.user as any
+
+    // SECURITY: Provider-only page — redirect unauthorized roles
+    useEffect(() => {
+        if (status === 'loading') return
+        if (!user || !['PROVIDER', 'ADMIN'].includes(user.role)) {
+            router.replace('/dashboard/settings')
+        }
+    }, [status, user, router])
 
     // Wizard step: 0=Components, 1=Groups, 2=Mapping
     const [step, setStep] = useState(0)

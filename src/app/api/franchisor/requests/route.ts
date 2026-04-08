@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
 
 // Status constants
 const REQUEST_STATUS = {
@@ -33,6 +34,11 @@ function generateRequestNumber(): string {
 
 // POST /api/franchisor/requests - Create onboarding request
 export async function POST(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user || !['FRANCHISOR','PROVIDER','ADMIN'].includes(user.role || '')) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     try {
         const body = await request.json();
         const {
@@ -122,6 +128,11 @@ export async function POST(request: NextRequest) {
 
 // GET /api/franchisor/requests - List requests
 export async function GET(request: NextRequest) {
+    const user = await getAuthUser(request)
+    if (!user || !['FRANCHISOR','PROVIDER','ADMIN'].includes(user.role || '')) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     try {
         const { searchParams } = new URL(request.url);
         const status = searchParams.get('status');

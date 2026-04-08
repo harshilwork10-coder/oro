@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireProvider, unauthorizedResponse } from '@/lib/requireProvider';
 
 // PATCH /api/provider/onboarding/requests/[requestId]/documents/[documentId] - Verify/reject doc
 export async function PATCH(
@@ -7,6 +8,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string; docId: string }> }
 ) {
     try {
+        const user = await requireProvider(request)
+        if (!user) return unauthorizedResponse()
+
         const { id, docId } = await params;
         const body = await request.json();
         const { status, reason, actorUserId } = body;

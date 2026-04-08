@@ -89,6 +89,11 @@ export async function getOwnerContext(): Promise<OwnerContext | null> {
     if (!session?.user) return null
 
     const user = session.user as any
+
+    // SECURITY: Only owner-level roles can access owner intelligence
+    const allowedRoles = ['OWNER', 'FRANCHISEE', 'FRANCHISOR', 'PROVIDER', 'ADMIN', 'MANAGER']
+    if (!user.role || !allowedRoles.includes(user.role)) return null
+
     const dbUser = await prisma.user.findUnique({
         where: { id: user.id },
         select: {

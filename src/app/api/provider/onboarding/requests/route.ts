@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireProvider, unauthorizedResponse } from '@/lib/requireProvider';
 
 // Status/Type maps
 const REQUEST_STATUS = {
@@ -13,6 +14,9 @@ const REQUEST_TYPE = {
 
 // GET /api/provider/onboarding/requests - Queue list
 export async function GET(request: NextRequest) {
+    const user = await requireProvider(request)
+    if (!user) return unauthorizedResponse()
+
     try {
         const { searchParams } = new URL(request.url);
         const status = searchParams.get('status');

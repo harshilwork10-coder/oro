@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireProvider, unauthorizedResponse } from '@/lib/requireProvider';
 
 const DOC_TYPE = {
     DL: 1,
@@ -15,6 +16,9 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const user = await requireProvider(request)
+        if (!user) return unauthorizedResponse()
+
         const { id } = await params;
         const body = await request.json();
         const { docTypes = [], delivery = ['email'], messageTemplateId, customMessage, actorUserId } = body;

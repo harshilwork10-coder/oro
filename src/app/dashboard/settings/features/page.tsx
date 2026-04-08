@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import {
     Package,
     Check,
@@ -147,7 +148,7 @@ const AVAILABLE_FEATURES = [
 ]
 
 export default function FeaturesPage() {
-    const { data: session } = useSession()
+    const { data: session, status } = useSession()
     const [config, setConfig] = useState<FeatureConfig | null>(null)
     const [requests, setRequests] = useState<FeatureRequest[]>([])
     const [loading, setLoading] = useState(true)

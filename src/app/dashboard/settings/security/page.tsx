@@ -1,12 +1,13 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft, Shield, Key, Clock, Smartphone } from 'lucide-react'
 import Link from 'next/link'
 import MFASettings from '@/components/security/MFASettings'
 
 export default function SecuritySettingsPage() {
-    const { data: session } = useSession()
+    const { data: session, status } = useSession()
 
     return (
         <div className="min-h-screen bg-gray-900 text-white p-8">

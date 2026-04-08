@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireProvider, unauthorizedResponse } from '@/lib/requireProvider';
 
 const REQUEST_STATUS = {
     SUBMITTED: 1, IN_REVIEW: 2, WAITING_DOCS: 3,
@@ -12,6 +13,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const user = await requireProvider(request)
+        if (!user) return unauthorizedResponse()
+
         const { id } = await params;
         const body = await request.json();
         const { status, reason, actorUserId } = body;

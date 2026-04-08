@@ -42,8 +42,16 @@ const DEFAULT_COLORS = [
 ]
 
 export default function PosLayoutPage() {
-    const { data: session } = useSession()
+    const { data: session, status } = useSession()
     const user = session?.user as any
+    // SECURITY: Provider-only page — redirect unauthorized roles
+    const __router = useRouter()
+    useEffect(() => {
+        if (status === 'loading') return
+        if (!user || !['PROVIDER', 'ADMIN'].includes(user.role)) {
+            __router.replace('/dashboard/settings')
+        }
+    }, [status, user, __router])
     const router = useRouter()
 
     const [categories, setCategories] = useState<Category[]>([])

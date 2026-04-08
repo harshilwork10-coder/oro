@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireProvider, unauthorizedResponse } from '@/lib/requireProvider';
 
 // PATCH /api/provider/shipments/[id]/delivered - Mark delivered
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const user = await requireProvider(request)
+    if (!user) return unauthorizedResponse()
+
     try {
         const { id } = await params;
         const body = await request.json();

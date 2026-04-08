@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth/mobileAuth';
 
 // GET /api/franchisor/requests/[id] - Get request detail
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const user = await getAuthUser(request)
+    if (!user || !['FRANCHISOR','PROVIDER','ADMIN'].includes(user.role || '')) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     try {
         const { id } = await params;
 

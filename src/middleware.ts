@@ -61,11 +61,11 @@ export async function middleware(req: NextRequest) {
             'ADMIN': [],                 // Provider-equivalent — full access
             'FRANCHISOR': ['/provider'],
             'OWNER': ['/provider', '/franchisor'],
-            'MANAGER': ['/provider', '/franchisor'],
+            'MANAGER': ['/provider', '/franchisor', '/dashboard/owner'],
             'FRANCHISEE': ['/provider', '/franchisor'],           // Same as OWNER
             'SUB_FRANCHISEE': ['/provider', '/franchisor'],       // Same as OWNER
-            'SHIFT_SUPERVISOR': ['/provider', '/franchisor', '/owner'], // Same as EMPLOYEE
-            'EMPLOYEE': ['/provider', '/franchisor', '/owner'],
+            'SHIFT_SUPERVISOR': ['/provider', '/franchisor', '/owner', '/dashboard/owner'],
+            'EMPLOYEE': ['/provider', '/franchisor', '/owner', '/dashboard/owner'],
         }
 
         const blocked = role ? (roleRestrictions[role] || []) : []
@@ -77,9 +77,9 @@ export async function middleware(req: NextRequest) {
                 'PROVIDER': '/provider/home',
                 'ADMIN': '/provider/home',
                 'FRANCHISOR': '/franchisor/home',
-                'OWNER': '/owner',
-                'MANAGER': '/owner',
-                'FRANCHISEE': '/owner',
+                'OWNER': '/dashboard',
+                'MANAGER': '/dashboard',
+                'FRANCHISEE': '/dashboard',
                 'SUB_FRANCHISEE': '/dashboard',
                 'SHIFT_SUPERVISOR': '/dashboard',
                 'EMPLOYEE': '/dashboard',
