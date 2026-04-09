@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+import { sumRevenue } from '@/lib/utils/resolveTransactionRevenue'
 
 /**
  * Stylist Performance API
@@ -95,6 +96,8 @@ export async function GET(req: NextRequest) {
                 id: true,
                 employeeId: true,
                 total: true,
+                totalCash: true,
+                chargedMode: true,
                 clientId: true,
             }
         })
@@ -114,7 +117,7 @@ export async function GET(req: NextRequest) {
             empTransactions.forEach(t => t.clientId && customerIds.add(t.clientId))
 
             // Revenue
-            const revenue = empTransactions.reduce((sum, t) => sum + Number(t.total || 0), 0)
+            const revenue = sumRevenue(empTransactions)
 
             // Booked minutes (default 60 min per appointment - duration not in schema)
             const bookedMinutes = empAppointments.length * 60

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+import { sumRevenue } from '@/lib/utils/resolveTransactionRevenue'
 
 /**
  * Location Leaderboard API
@@ -81,6 +82,8 @@ export async function GET(req: NextRequest) {
             select: {
                 id: true,
                 total: true,
+                totalCash: true,
+                chargedMode: true,
                 franchiseId: true,
                 clientId: true,
             }
@@ -110,7 +113,7 @@ export async function GET(req: NextRequest) {
             const locTransactions = transactions.filter(t => locFranchiseIds.includes(t.franchiseId!))
             const locAppointments = appointments.filter(a => a.locationId === loc.id)
 
-            const revenue = locTransactions.reduce((sum, t) => sum + Number(t.total || 0), 0)
+            const revenue = sumRevenue(locTransactions)
             const appointmentsCompleted = locAppointments.filter(a => a.status === 'COMPLETED' || a.status === 'CHECKED_OUT').length
             const walkIns = locTransactions.length  // treat all non-appointment txns as walk-ins (no appointmentId on Transaction)
             const totalVisits = appointmentsCompleted + walkIns

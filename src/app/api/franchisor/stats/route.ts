@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+import { sumRevenue } from '@/lib/utils/resolveTransactionRevenue'
 
 export async function GET(req: NextRequest) {
     try {
@@ -31,6 +32,11 @@ export async function GET(req: NextRequest) {
                                 createdAt: {
                                     gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
                                 }
+                            },
+                            select: {
+                                total: true,
+                                totalCash: true,
+                                chargedMode: true
                             }
                         }
                     }
@@ -50,7 +56,7 @@ export async function GET(req: NextRequest) {
 
         const totalTransactions = franchisor.franchises.reduce((sum, f) => sum + f.transactions.length, 0)
         const monthlyRevenue = franchisor.franchises.reduce((sum, f) => {
-            return sum + f.transactions.reduce((txSum, tx) => txSum + Number(tx.total), 0)
+            return sum + sumRevenue(f.transactions)
         }, 0)
 
         // Get recent activity (simplified for now)

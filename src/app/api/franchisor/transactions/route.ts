@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+import { resolveRevenue } from '@/lib/utils/resolveTransactionRevenue'
 
 // GET - Transaction Log for Franchisor
 export async function GET(req: NextRequest) {
@@ -79,7 +80,9 @@ export async function GET(req: NextRequest) {
             customerPhone: tx.client?.phone,
             subtotal: Number(tx.subtotal),
             tax: Number(tx.tax),
-            total: Number(tx.total),
+            total: resolveRevenue(tx),
+            chargedTotal: Number(tx.total),
+            chargedMode: tx.chargedMode || 'CASH',
             tip: Number(tx.tip || 0),
             paymentMethod: tx.paymentMethod,
             status: tx.status,

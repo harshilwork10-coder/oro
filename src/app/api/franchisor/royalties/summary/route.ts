@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/auth/mobileAuth';
 import { prisma } from '@/lib/prisma';
+import { sumRevenue } from '@/lib/utils/resolveTransactionRevenue';
 
 export async function GET(req: NextRequest) {
     try {
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
                                 createdAt: { gte: monthStart, lte: monthEnd },
                                 status: 'COMPLETED'
                             },
-                            select: { total: true }
+                            select: { total: true, totalCash: true, chargedMode: true }
                         },
                         _count: {
                             select: {
@@ -80,11 +81,11 @@ export async function GET(req: NextRequest) {
                     }
                 }
             }
-        });
+        }) as any[];
 
-        const royaltyRows = franchises.map(franchise => {
+        const royaltyRows = franchises.map((franchise: any) => {
             const grossSales = franchise.locations.reduce((sum, loc) => {
-                return sum + loc.transactions.reduce((s, t) => s + Number(t.total), 0);
+                return sum + sumRevenue(loc.transactions);
             }, 0);
 
             const royaltyDue = Math.max(grossSales * royaltyPct, minimumFee);

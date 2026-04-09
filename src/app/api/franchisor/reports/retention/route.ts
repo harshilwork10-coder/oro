@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+import { sumRevenue } from '@/lib/utils/resolveTransactionRevenue'
 
 /**
  * Customer Retention API
@@ -67,6 +68,8 @@ export async function GET(req: NextRequest) {
                 id: true,
                 clientId: true,
                 total: true,
+                totalCash: true,
+                chargedMode: true,
                 createdAt: true,
             },
             orderBy: { createdAt: 'asc' }
@@ -126,7 +129,7 @@ export async function GET(req: NextRequest) {
             : 0
 
         // Average spend per customer
-        const totalSpend = transactions.reduce((sum, t) => sum + Number(t.total || 0), 0)
+        const totalSpend = sumRevenue(transactions)
         const avgSpendPerCustomer = totalCustomers > 0
             ? Math.round(totalSpend / totalCustomers)
             : 0

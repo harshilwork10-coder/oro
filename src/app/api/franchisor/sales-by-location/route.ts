@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+import { resolveRevenue } from '@/lib/utils/resolveTransactionRevenue'
 
 // GET - Sales by Location Report for Franchisor
 export async function GET(req: NextRequest) {
@@ -92,7 +93,7 @@ export async function GET(req: NextRequest) {
             const loc = locationData[locId]
             if (!loc) continue
 
-            const total = Number(tx.total)
+            const total = resolveRevenue(tx)
             const tax = Number(tx.tax)
             const tip = Number(tx.tip || 0)
             const paymentMethod = tx.paymentMethod || 'CASH'

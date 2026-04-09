@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
+import { sumRevenue } from '@/lib/utils/resolveTransactionRevenue'
 
 /**
  * Brand Command Center API
@@ -95,11 +96,13 @@ export async function GET(req: NextRequest) {
             select: {
                 id: true,
                 total: true,
+                totalCash: true,
+                chargedMode: true,
                 clientId: true,
             }
         })
 
-        const totalRevenue = transactions.reduce((sum, t) => sum + Number(t.total || 0), 0)
+        const totalRevenue = sumRevenue(transactions)
         const walkIns = transactions.length // Simplified - would need appointmentId
 
         // Unique customers
