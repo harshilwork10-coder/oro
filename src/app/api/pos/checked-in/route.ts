@@ -1,19 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
-// Get today's checked-in customers
+// Get today's checked-in customers — reads from the CheckIn table
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
     if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     try {
         const franchiseId = user.franchiseId
-        const locationId = user.locationId
 
         // Get today's date range
         const today = new Date()
@@ -21,50 +16,50 @@ export async function GET(req: NextRequest) {
         const tomorrow = new Date(today)
         tomorrow.setDate(tomorrow.getDate() + 1)
 
-        // Build where clause - try franchiseId first, then locationId
-        let whereClause: any = {}
+        // Get location IDs for this franchise (tenant isolation)
+        const locations = await prisma.location.findMany({
+            where: { franchiseId },
+            select: { id: true }
+        })
+        const locationIds = locations.map(l => l.id)
 
-        if (franchiseId) {
-            whereClause.franchiseId = franchiseId
-        } else if (locationId) {
-            // Get franchiseId from location
-            const location = await prisma.location.findUnique({
-                where: { id: locationId },
-                select: { franchiseId: true }
-            })
-            if (location?.franchiseId) {
-                whereClause.franchiseId = location.franchiseId
-            }
+        if (locationIds.length === 0) {
+            return NextResponse.json([])
         }
 
-        // BUG-4 FIX: Never fall back to all customers — that's a cross-tenant data leak
-        if (!whereClause.franchiseId) {
-            return NextResponse.json({ error: 'No franchise context' }, { status: 400 })
-        }
-
-        // Find recent customers who checked in today (by createdAt for new, updatedAt for returning)
-        const customers = await prisma.client.findMany({
+        // Query the CheckIn table for today's check-ins
+        const checkIns = await prisma.checkIn.findMany({
             where: {
-                ...whereClause,
-                OR: [
-                    { createdAt: { gte: today, lt: tomorrow } },
-                    { updatedAt: { gte: today, lt: tomorrow } }
-                ]
+                locationId: { in: locationIds },
+                checkedInAt: { gte: today, lt: tomorrow },
+                status: 'WAITING'
             },
-            select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-                email: true,
-                createdAt: true,
-                updatedAt: true
+            include: {
+                client: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        phone: true,
+                        email: true
+                    }
+                }
             },
-            orderBy: {
-                updatedAt: 'desc'
-            },
+            orderBy: { checkedInAt: 'desc' },
             take: 20
         })
+
+        // Map to the same response shape consumers expect:
+        // array of { id, firstName, lastName, phone, email, createdAt, updatedAt }
+        const customers = checkIns.map(ci => ({
+            id: ci.client.id,
+            firstName: ci.client.firstName,
+            lastName: ci.client.lastName,
+            phone: ci.client.phone,
+            email: ci.client.email,
+            createdAt: ci.checkedInAt,
+            updatedAt: ci.updatedAt
+        }))
 
         return NextResponse.json(customers)
     } catch (error) {
@@ -72,4 +67,3 @@ export async function GET(req: NextRequest) {
         return NextResponse.json([])
     }
 }
-

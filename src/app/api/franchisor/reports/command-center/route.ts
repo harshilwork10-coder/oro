@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     try {
         // Get franchisor owned by this user (matching auth.ts pattern)
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             select: { id: true }
         })
 

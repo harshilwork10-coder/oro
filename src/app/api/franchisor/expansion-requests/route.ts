@@ -1,19 +1,19 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
     try {
-        const authUser = await getAuthUser(request)
+        const authUser = await getAuthUser(req)
         if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session || authUser.role !== 'FRANCHISOR') {
+        if (!authUser || authUser.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Get franchisor's ID
         const user = await prisma.user.findUnique({
-            where: { email: user.email! },
+            where: { email: authUser.email! },
             include: { franchisor: true }
         })
 
@@ -55,9 +55,10 @@ export async function GET(req: NextRequest) {
     }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
     try {
-        if (!session || authUser.role !== 'FRANCHISOR') {
+        const authUser = await getAuthUser(request)
+        if (!authUser || authUser.role !== 'FRANCHISOR') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 

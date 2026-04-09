@@ -38,10 +38,7 @@ export async function GET(req: NextRequest) {
         // Pull all locations under this franchisor brand via their franchises
         const franchises = await prisma.franchise.findMany({
             where: { franchisorId: franchisor.id },
-            select: {
-                id: true,
-                name: true,
-                region: true,
+            include: {
                 users: {
                     where: { role: { in: ['FRANCHISEE', 'OWNER'] } },
                     select: { name: true, email: true },
@@ -54,20 +51,9 @@ export async function GET(req: NextRequest) {
                         address: true,
                         provisioningStatus: true,
                         createdAt: true,
-                        settings: {
-                            select: {
-                                storeCity: true,
-                                storeState: true,
-                            }
-                        },
                         stations: {
                             where: { pairingStatus: 'PAIRED' },
                             select: { id: true },
-                        },
-                        transactions: {
-                            orderBy: { createdAt: 'desc' },
-                            take: 1,
-                            select: { createdAt: true },
                         },
                         appointments: {
                             where: { createdAt: { gte: monthStart } },
@@ -76,7 +62,22 @@ export async function GET(req: NextRequest) {
                     }
                 }
             }
+        }) as any[];
+
+        // Fetch last transaction per franchise for NO_ACTIVITY check
+        // (Transaction does not have a direct Location relation — it links via franchiseId)
+        const franchiseIds = franchises.map(f => f.id);
+        const lastTransactions = await prisma.transaction.findMany({
+            where: {
+                franchiseId: { in: franchiseIds },
+                status: { in: ['COMPLETED', 'PARTIAL_REFUND'] },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: franchiseIds.length, // one per franchise at most
+            select: { franchiseId: true, createdAt: true },
+            distinct: ['franchiseId'],
         });
+        const lastTxByFranchise = new Map(lastTransactions.map(t => [t.franchiseId, t.createdAt]));
 
         type ExceptionSeverity = 'CRITICAL' | 'WARNING';
         type ExceptionType = 'NO_DEVICES' | 'NO_ACTIVITY' | 'HIGH_NOSHOW' | 'STUCK_PROVISION';
@@ -107,8 +108,8 @@ export async function GET(req: NextRequest) {
                 const base = {
                     locationId: location.id,
                     locationName: location.name,
-                    locationCity: location.settings?.storeCity || '',
-                    locationState: location.settings?.storeState || '',
+                    locationCity: '',
+                    locationState: '',
                     franchiseName: franchise.name,
                     franchiseeContact: ownerName,
                     region: franchise.region,
@@ -129,7 +130,7 @@ export async function GET(req: NextRequest) {
 
                 // CATEGORY 2: No transactions in 48h (active, has devices)
                 if (isActive && location.stations.length > 0) {
-                    const lastTx = location.transactions[0]?.createdAt;
+                    const lastTx = lastTxByFranchise.get(franchise.id);
                     const daysInactive = lastTx
                         ? Math.floor((now.getTime() - new Date(lastTx).getTime()) / (1000 * 60 * 60 * 24))
                         : daysOld;

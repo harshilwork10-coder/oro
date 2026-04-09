@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
     try {
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             select: { id: true, franchiseId: true }
         }) as any
 
