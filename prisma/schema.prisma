@@ -3923,6 +3923,10 @@ model CheckIn {
   @@index([locationId])
   @@index([status])
   @@index([checkedInAt])
+  // Covering index for cashier queue polling: WHERE locationId + status + checkedInAt
+  @@index([locationId, status, checkedInAt])
+  // Index for duplicate prevention: findFirst(clientId + locationId + checkedInAt)
+  @@index([clientId, locationId, checkedInAt])
 }
 
 // ============ LOTTERY MANAGEMENT ============
