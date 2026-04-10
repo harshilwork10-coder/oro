@@ -210,21 +210,30 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
 
     // FRANCHISEE: Owner who views reports for their locations (no POS - they don't serve customers)
-    const franchiseeLinks = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'My Locations', href: '/dashboard/my-locations', icon: MapPin },
-        { name: 'Employees', href: '/dashboard/employees', icon: Users },
-        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar },  // Merged Schedule+Appointments
-        { name: 'Services', href: '/dashboard/services', icon: Briefcase },  // Merged Services+Packages
-        { name: 'Inventory', href: '/dashboard/inventory/purchase-orders', icon: ShoppingBag },
-        { name: 'Customers', href: '/dashboard/customers', icon: Users },  // Merged Customers+Loyalty+GiftCards
-        { name: 'Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy },
-        { name: 'Orders', href: '/dashboard/transactions', icon: Receipt },
-        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText },
-        { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones },
-        { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Sparkles },
-        { name: 'Security', href: '/dashboard/settings/security', icon: Shield },
+    // Industry-aware: SERVICE-only items hidden for RETAIL, RETAIL-only items hidden for SERVICE
+    const franchiseeLinksBase = [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, always: true },
+        { name: 'My Locations', href: '/dashboard/my-locations', icon: MapPin, always: true },
+        { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
+        // SERVICE only - calendar and services
+        { name: 'Calendar', href: '/dashboard/appointments', icon: Calendar, industry: ['SERVICE'] as const },
+        { name: 'Services', href: '/dashboard/services', icon: Briefcase, industry: ['SERVICE'] as const },
+        { name: 'Inventory', href: industryType === 'RETAIL' ? '/dashboard/inventory/retail' : '/dashboard/inventory/purchase-orders', icon: ShoppingBag, always: true },
+        // RETAIL only
+        { name: 'Deals', href: '/dashboard/deals', icon: Gift, industry: ['RETAIL'] as const },
+        { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
+        { name: 'Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy, always: true },
+        { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
+        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText, always: true },
+        { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones, always: true },
+        { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Sparkles, always: true },
+        { name: 'Security', href: '/dashboard/settings/security', icon: Shield, always: true },
     ]
+
+    const franchiseeLinks = franchiseeLinksBase.filter(link => {
+        if (link.industry && !(link.industry as readonly string[]).includes(industryType)) return false
+        return true
+    }).map(({ always, industry, ...link }) => link)
 
     // MANAGER: Operations manager
     const managerLinksBase = [
@@ -325,7 +334,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Customers', href: '/dashboard/customers', icon: UserCircle, always: true },
         { name: 'Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy, always: true },
         { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt, always: true },
-        { name: 'Operations', href: '/dashboard/operations', icon: Clipboard, always: true },
+        { name: 'Operations', href: '/dashboard/operations', icon: Clipboard, industry: ['RETAIL'] as const },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },
         { name: 'Settings', href: '/dashboard/settings', icon: Settings, always: true },
         { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones, always: true },
