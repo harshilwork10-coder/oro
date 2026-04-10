@@ -1,6 +1,6 @@
 import {NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
-import { prisma } from '@/lib/prisma'
+import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 // GET: Client Retention Report
 // Tracks returning clients and rebooking rates
 export async function GET(req: NextRequest) {

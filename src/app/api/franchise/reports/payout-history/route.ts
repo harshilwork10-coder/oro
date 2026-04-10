@@ -1,6 +1,6 @@
 import {NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
-import { prisma } from '@/lib/prisma'
+import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 // GET: Payout History Report
 // Shows all payouts made to barbers/stylists
 export async function GET(req: NextRequest) {

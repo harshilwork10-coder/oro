@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { applyRateLimit } from '@/lib/security'
+import { cacheDelete, CACHE_KEYS } from '@/lib/cache'
 
 export async function POST(request: Request) {
     try {
@@ -14,10 +15,15 @@ export async function POST(request: Request) {
         const body = await request.json()
         const { name, email, phone, liabilitySigned, loyaltyJoined, locationId } = body
 
-        // QR Check-In extension (Phase 1) — all optional, existing callers unaffected
+        // QR Check-In extension — all optional, existing callers unaffected
         const source = body.source || 'KIOSK'
         const appointmentId = body.appointmentId || null
         const stationRef = body.stationRef || null
+
+        // Multi-tenant QR enrichment (Phase 1)
+        const brandId = body.brandId || null
+        const deviceId = body.deviceId || null
+        const qrTokenId = body.qrTokenId || null
 
         if (!name || !phone) {
             return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 })
@@ -122,9 +128,15 @@ export async function POST(request: Request) {
                 status: 'WAITING',
                 source,
                 appointmentId,
-                stationRef
+                stationRef,
+                brandId,
+                deviceId,
+                qrTokenId,
             }
         })
+
+        // Invalidate queue cache so cashier devices see new check-in immediately
+        cacheDelete(CACHE_KEYS.QUEUE(locationId)).catch(() => {})
 
         // If checking in against an appointment, mark it as CHECKED_IN
         if (appointmentId) {

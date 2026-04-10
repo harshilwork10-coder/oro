@@ -1,6 +1,6 @@
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 
 /** Cross-Location Price Compare — HQ report */
 export async function GET(req: NextRequest) {

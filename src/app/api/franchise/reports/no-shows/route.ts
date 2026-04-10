@@ -1,6 +1,6 @@
 import {NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
-import { prisma } from '@/lib/prisma'
+import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 // GET: No-Show & Cancellation Report
 export async function GET(req: NextRequest) {
     try {

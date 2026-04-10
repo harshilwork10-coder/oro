@@ -24,6 +24,7 @@ export async function middleware(req: NextRequest) {
         pathname.startsWith('/register') ||
         pathname.startsWith('/auth/magic-link') ||
         pathname.startsWith('/checkin') ||          // Customer QR check-in (public, no auth)
+        pathname.startsWith('/qr') ||               // Brand-aware QR check-in (public, no auth)
         pathname.startsWith('/book') ||             // Online booking (public)
         pathname.startsWith('/kiosk') ||            // Kiosk displays (public)
         pathname.startsWith('/customer-display') || // Customer-facing display (public)

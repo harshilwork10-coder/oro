@@ -1,6 +1,6 @@
 import {NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
-import { prisma } from '@/lib/prisma'
+import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 // GET: Barber/Stylist Earnings Statement
 // Shows detailed breakdown of earnings per barber for a date range
 export async function GET(req: NextRequest) {

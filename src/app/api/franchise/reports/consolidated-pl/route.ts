@@ -1,6 +1,6 @@
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 
 /** Consolidated P&L — Multi-location profit/loss report (Owner+ only) */
 export async function GET(req: NextRequest) {

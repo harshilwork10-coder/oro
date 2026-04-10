@@ -1,14 +1,3 @@
-/**
- * @deprecated — LEGACY CHECK-IN PAGE
- * 
- * This page is preserved for backward compatibility with existing QR codes
- * that point to oronext.app/checkin/[slug].
- * 
- * NEW QR codes should use the brand-aware route: /qr/[slug]
- * Generated via POST /api/qr/generate (station-authenticated).
- * 
- * See: src/app/qr/[slug]/page.tsx
- */
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -36,6 +25,15 @@ interface LookupResult {
     appointments?: AppointmentMatch[]
 }
 
+interface BrandTheme {
+    brandName: string
+    logoUrl: string | null
+    primaryColor: string
+    secondaryColor: string
+    welcomeText: string | null
+    bgGradient: string
+}
+
 type Step = 'phone' | 'confirm' | 'walkin' | 'newclient' | 'success' | 'error'
 
 // ─── Phone Format Helper ───
@@ -46,12 +44,23 @@ function formatPhone(raw: string): string {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
 }
 
+// ─── Default theme ───
+const DEFAULT_THEME: BrandTheme = {
+    brandName: '',
+    logoUrl: null,
+    primaryColor: '#f59e0b',
+    secondaryColor: '#d97706',
+    welcomeText: null,
+    bgGradient: 'from-orange-900/20 via-stone-950 to-stone-950',
+}
+
 // ─── Main Component ───
-export default function QRCheckinPage() {
+export default function BrandQrCheckinPage() {
     const params = useParams()
     const searchParams = useSearchParams()
     const slug = params.slug as string
-    const token = searchParams.get('t')
+    const tokenParam = searchParams.get('t')
+    const deviceParam = searchParams.get('d')
 
     // State
     const [step, setStep] = useState<Step>('phone')
@@ -69,37 +78,38 @@ export default function QRCheckinPage() {
     const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false)
     const [errorMsg, setErrorMsg] = useState('')
     const [checkedInName, setCheckedInName] = useState('')
-    const [tokenValid, setTokenValid] = useState<boolean | null>(null)
+    const [theme, setTheme] = useState<BrandTheme>(DEFAULT_THEME)
+    const [brandId, setBrandId] = useState('')
 
-    // ─── Token Verification (on mount) ───
-    // If token is present, verify it server-side via the lookup endpoint.
-    // If invalid/expired, silently degrade to phone entry (no error shown).
+    // ─── Resolve brand from API (server-side resolution via token or slug context) ───
     useEffect(() => {
-        if (token) {
-            // Token is verified server-side when lookup is called.
-            // For now, mark as "has token" — actual validation happens in lookup.
-            setTokenValid(true)
-        } else {
-            setTokenValid(false) // No token — public fallback mode
-        }
-    }, [token])
-
-    // ─── Fetch location name from slug ───
-    useEffect(() => {
-        const fetchLocation = async () => {
+        const fetchBrand = async () => {
             try {
+                // Use the public storefront endpoint to get location + brand info
                 const res = await fetch(`/api/public/storefront/${slug}`)
                 if (res.ok) {
                     const data = await res.json()
-                    if (data.location?.name) {
-                        setLocationName(data.location.name)
+                    if (data.location?.name) setLocationName(data.location.name)
+                    if (data.location?.id) setLocationId(data.location.id)
+
+                    // Try to extract brand theming from franchise/franchisor
+                    if (data.brand) {
+                        setBrandId(data.brand.id || '')
+                        setTheme({
+                            brandName: data.brand.name || '',
+                            logoUrl: data.brand.logoUrl || null,
+                            primaryColor: data.brand.primaryColor || '#f59e0b',
+                            secondaryColor: data.brand.secondaryColor || '#d97706',
+                            welcomeText: data.brand.welcomeText || null,
+                            bgGradient: data.brand.bgGradient || DEFAULT_THEME.bgGradient,
+                        })
                     }
                 }
             } catch {
-                // Silent — locationName stays empty, page still functional
+                // Silent — page still functional without brand theme
             }
         }
-        if (slug) fetchLocation()
+        if (slug) fetchBrand()
     }, [slug])
 
     // ─── Phone Lookup ───
@@ -133,12 +143,10 @@ export default function QRCheckinPage() {
             if (data.locationName) setLocationName(data.locationName)
 
             if (!data.found) {
-                // New customer — show name entry
                 setStep('newclient')
                 return
             }
 
-            // Existing customer
             if (data.clientId) setClientId(data.clientId)
             if (data.clientFirstName) setMaskedName(data.clientFirstName)
             setLiabilitySigned(data.liabilitySigned ?? false)
@@ -166,7 +174,7 @@ export default function QRCheckinPage() {
         }
     }, [phone, slug])
 
-    // ─── Check-In (calls existing /api/kiosk/check-in) ───
+    // ─── Check-In (calls /api/kiosk/check-in with multi-tenant context) ───
     const performCheckIn = useCallback(async (opts: {
         appointmentId?: string
         source: string
@@ -186,7 +194,11 @@ export default function QRCheckinPage() {
                     locationId,
                     source: opts.source,
                     appointmentId: opts.appointmentId || null,
-                    stationRef: null
+                    stationRef: deviceParam || null,
+                    // Multi-tenant QR enrichment
+                    brandId: brandId || null,
+                    deviceId: deviceParam || null,
+                    qrTokenId: null, // Token audit is server-side
                 })
             })
 
@@ -204,13 +216,12 @@ export default function QRCheckinPage() {
         } finally {
             setLoading(false)
         }
-    }, [phone, firstName, lastName, maskedName, locationId])
+    }, [phone, firstName, lastName, maskedName, locationId, brandId, deviceParam])
 
     // ─── Auto-reset after success ───
     useEffect(() => {
         if (step === 'success') {
             const timer = setTimeout(() => {
-                // Reset everything
                 setStep('phone')
                 setPhone('')
                 setFirstName('')
@@ -224,7 +235,7 @@ export default function QRCheckinPage() {
         }
     }, [step])
 
-    // ─── Numpad for phone entry ───
+    // ─── Numpad ───
     const handleNumpadPress = (digit: string) => {
         if (digit === 'DEL') {
             setPhone(prev => prev.slice(0, -1))
@@ -238,6 +249,12 @@ export default function QRCheckinPage() {
 
     const phoneDigits = phone.replace(/\D/g, '')
 
+    // ─── Dynamic CSS vars from brand theme ───
+    const brandStyle = {
+        '--brand-primary': theme.primaryColor,
+        '--brand-secondary': theme.secondaryColor,
+    } as React.CSSProperties
+
     // ═══════════════════════════════════════════════════════════
     // RENDER
     // ═══════════════════════════════════════════════════════════
@@ -245,7 +262,7 @@ export default function QRCheckinPage() {
     // ─── SUCCESS STATE ───
     if (step === 'success') {
         return (
-            <div className="min-h-screen bg-stone-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-900/30 via-stone-950 to-stone-950 flex items-center justify-center p-6">
+            <div className="min-h-screen bg-stone-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-900/30 via-stone-950 to-stone-950 flex items-center justify-center p-6" style={brandStyle}>
                 <div className="max-w-sm w-full text-center space-y-6">
                     <div className="mx-auto w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center border border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.2)]">
                         <Check className="h-10 w-10 text-emerald-400" />
@@ -270,7 +287,7 @@ export default function QRCheckinPage() {
     // ─── ERROR STATE ───
     if (step === 'error') {
         return (
-            <div className="min-h-screen bg-stone-950 flex items-center justify-center p-6">
+            <div className="min-h-screen bg-stone-950 flex items-center justify-center p-6" style={brandStyle}>
                 <div className="max-w-sm w-full text-center space-y-6">
                     <div className="mx-auto w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center border border-red-500/30">
                         <AlertCircle className="h-8 w-8 text-red-400" />
@@ -292,16 +309,28 @@ export default function QRCheckinPage() {
     }
 
     return (
-        <div className="min-h-screen bg-stone-950 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-900/20 via-stone-950 to-stone-950 flex flex-col">
-            {/* Header */}
+        <div className={`min-h-screen bg-stone-950 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] ${theme.bgGradient} flex flex-col`} style={brandStyle}>
+            {/* Brand Header — shows brand logo + location name, NO platform branding */}
             <div className="p-4 flex items-center justify-center">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-gradient-to-br from-orange-500 to-amber-600 rounded-lg flex items-center justify-center shadow-lg shadow-orange-500/20">
-                        <img src="/oro9-gold.png" alt="ORO 9" className="w-full h-full object-contain rounded-lg p-1" />
-                    </div>
-                    {locationName && (
-                        <span className="text-stone-400 text-sm font-medium">{locationName}</span>
+                    {theme.logoUrl ? (
+                        <img src={theme.logoUrl} alt={theme.brandName} className="h-10 w-10 rounded-lg object-contain" />
+                    ) : (
+                        <div
+                            className="h-10 w-10 rounded-lg flex items-center justify-center shadow-lg text-white font-bold text-lg"
+                            style={{ background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})` }}
+                        >
+                            {theme.brandName?.charAt(0)?.toUpperCase() || '●'}
+                        </div>
                     )}
+                    <div className="text-left">
+                        {theme.brandName && (
+                            <span className="block text-stone-200 text-sm font-semibold">{theme.brandName}</span>
+                        )}
+                        {locationName && (
+                            <span className="block text-stone-500 text-xs">{locationName}</span>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -313,7 +342,9 @@ export default function QRCheckinPage() {
                     {step === 'phone' && (
                         <div className="space-y-6">
                             <div className="text-center">
-                                <h1 className="text-2xl font-bold text-stone-100 mb-1">Welcome! 👋</h1>
+                                <h1 className="text-2xl font-bold text-stone-100 mb-1">
+                                    {theme.welcomeText || 'Welcome! 👋'}
+                                </h1>
                                 <p className="text-stone-400">Enter your phone number to check in</p>
                             </div>
 
@@ -340,12 +371,17 @@ export default function QRCheckinPage() {
                                         className={`h-14 rounded-xl font-bold text-lg transition-all active:scale-95 ${
                                             key === '→'
                                                 ? phoneDigits.length >= 10
-                                                    ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-lg shadow-orange-500/20'
+                                                    ? 'text-white shadow-lg'
                                                     : 'bg-stone-800/50 text-stone-600 cursor-not-allowed'
                                                 : key === 'DEL'
                                                     ? 'bg-stone-800/50 text-stone-400 hover:bg-stone-700/50'
                                                     : 'bg-stone-800/80 text-stone-200 hover:bg-stone-700/80'
                                         }`}
+                                        style={
+                                            key === '→' && phoneDigits.length >= 10
+                                                ? { background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})` }
+                                                : undefined
+                                        }
                                     >
                                         {key === '→' ? (loading ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : '→') : key === 'DEL' ? '⌫' : key}
                                     </button>
@@ -373,15 +409,15 @@ export default function QRCheckinPage() {
                                         key={appt.id}
                                         onClick={() => performCheckIn({
                                             appointmentId: appt.id,
-                                            source: 'QR_SCAN'
+                                            source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED'
                                         })}
                                         disabled={loading}
-                                        className="w-full bg-stone-900/60 border border-stone-800 hover:border-orange-500/40 rounded-2xl p-5 text-left transition-all hover:bg-stone-800/40 group"
+                                        className="w-full bg-stone-900/60 border border-stone-800 hover:border-stone-600 rounded-2xl p-5 text-left transition-all hover:bg-stone-800/40 group"
                                     >
                                         <div className="flex items-center justify-between">
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2 text-stone-100 font-semibold">
-                                                    <Scissors className="h-4 w-4 text-orange-400" />
+                                                    <Scissors className="h-4 w-4" style={{ color: theme.primaryColor }} />
                                                     {appt.service}
                                                 </div>
                                                 <div className="flex items-center gap-4 text-sm text-stone-400">
@@ -395,7 +431,7 @@ export default function QRCheckinPage() {
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-2 text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: theme.primaryColor }}>
                                                 <span className="text-sm font-medium">Check In</span>
                                                 <ChevronRight className="h-4 w-4" />
                                             </div>
@@ -427,9 +463,10 @@ export default function QRCheckinPage() {
                             </div>
 
                             <button
-                                onClick={() => performCheckIn({ source: 'QR_SCAN' })}
+                                onClick={() => performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })}
                                 disabled={loading}
-                                className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
+                                className="w-full py-4 text-white rounded-2xl font-bold text-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
+                                style={{ background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})` }}
                             >
                                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
                                     <>
@@ -459,7 +496,8 @@ export default function QRCheckinPage() {
                                         type="text"
                                         value={firstName}
                                         onChange={e => setFirstName(e.target.value)}
-                                        className="w-full text-lg p-4 bg-stone-900/60 border-2 border-stone-800 rounded-xl focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 text-stone-100 placeholder-stone-700 transition-all outline-none"
+                                        className="w-full text-lg p-4 bg-stone-900/60 border-2 border-stone-800 rounded-xl focus:ring-2 focus:border-stone-600 text-stone-100 placeholder-stone-700 transition-all outline-none"
+                                        style={{ '--tw-ring-color': theme.primaryColor } as React.CSSProperties}
                                         placeholder="Jane"
                                         autoFocus
                                     />
@@ -470,16 +508,17 @@ export default function QRCheckinPage() {
                                         type="text"
                                         value={lastName}
                                         onChange={e => setLastName(e.target.value)}
-                                        className="w-full text-lg p-4 bg-stone-900/60 border-2 border-stone-800 rounded-xl focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 text-stone-100 placeholder-stone-700 transition-all outline-none"
+                                        className="w-full text-lg p-4 bg-stone-900/60 border-2 border-stone-800 rounded-xl focus:ring-2 focus:border-stone-600 text-stone-100 placeholder-stone-700 transition-all outline-none"
                                         placeholder="Doe"
                                     />
                                 </div>
                             </div>
 
                             <button
-                                onClick={() => performCheckIn({ source: 'QR_SCAN' })}
+                                onClick={() => performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })}
                                 disabled={loading || !firstName.trim() || !lastName.trim()}
-                                className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+                                className="w-full py-4 text-white rounded-2xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+                                style={{ background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})` }}
                             >
                                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
                                     <>
@@ -494,9 +533,11 @@ export default function QRCheckinPage() {
                 </div>
             </div>
 
-            {/* Footer */}
+            {/* Footer — NO platform domain exposed, brand-only */}
             <div className="p-4 text-center">
-                <p className="text-stone-700 text-xs">Powered by ORO 9</p>
+                <p className="text-stone-800 text-xs">
+                    {theme.brandName || locationName || ''}
+                </p>
             </div>
         </div>
     )
