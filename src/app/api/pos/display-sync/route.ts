@@ -102,6 +102,7 @@ export async function GET(request: Request) {
                             slug: loc.slug,
                             token: result.token,
                             deviceId: stationId || 'display',
+                            platformDomain: new URL(request.url).origin,
                         })
                     } else {
                         // V1 Fallback: Legacy platform URL for brands without brandCode

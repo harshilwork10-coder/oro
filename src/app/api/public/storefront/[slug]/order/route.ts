@@ -4,11 +4,12 @@ import { prisma } from '@/lib/prisma'
 // POST /api/public/storefront/[slug]/order — Place pickup/reserve order
 export async function POST(
     req: NextRequest,
-    { params }: { params: { slug: string } }
+    { params }: { params: Promise<{ slug: string }> }
 ) {
     try {
+        const resolvedParams = await params
         const location = await prisma.location.findFirst({
-            where: { slug: params.slug },
+            where: { slug: resolvedParams.slug },
             include: {
                 storefrontProfile: true,
                 franchise: {

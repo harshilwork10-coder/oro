@@ -4,9 +4,10 @@ import { prisma } from '@/lib/prisma'
 // GET /api/public/storefront/[slug]/products — Filtered product catalog
 export async function GET(
     req: NextRequest,
-    { params }: { params: { slug: string } }
+    { params }: { params: Promise<{ slug: string }> }
 ) {
     try {
+        const resolvedParams = await params
         const { searchParams } = new URL(req.url)
         const category = searchParams.get('category')
         const search = searchParams.get('search')
@@ -14,7 +15,7 @@ export async function GET(
         const limit = Math.min(parseInt(searchParams.get('limit') || '40'), 100)
 
         const location = await prisma.location.findFirst({
-            where: { slug: params.slug },
+            where: { slug: resolvedParams.slug },
             include: {
                 storefrontProfile: true,
                 franchise: {

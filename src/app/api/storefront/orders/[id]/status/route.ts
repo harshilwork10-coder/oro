@@ -5,9 +5,10 @@ import { prisma } from '@/lib/prisma'
 // PUT /api/storefront/orders/[id]/status — Update order status
 export async function PUT(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const resolvedParams = await params
         const user = await getAuthUser(req)
         if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -21,7 +22,7 @@ export async function PUT(
         }
 
         const order = await prisma.storefrontOrder.findUnique({
-            where: { id: params.id },
+            where: { id: resolvedParams.id },
             select: { id: true, status: true, locationId: true }
         })
 
@@ -49,7 +50,7 @@ export async function PUT(
         if (status === 'PICKED_UP') updateData.pickedUpAt = new Date()
 
         const updated = await prisma.storefrontOrder.update({
-            where: { id: params.id },
+            where: { id: resolvedParams.id },
             data: updateData,
         })
 

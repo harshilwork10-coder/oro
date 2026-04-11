@@ -4,11 +4,12 @@ import { prisma } from '@/lib/prisma'
 // GET /api/public/storefront/order/[orderNumber] — Check order status (public)
 export async function GET(
     req: NextRequest,
-    { params }: { params: { orderNumber: string } }
+    { params }: { params: Promise<{ orderNumber: string }> }
 ) {
     try {
+        const resolvedParams = await params
         const order = await prisma.storefrontOrder.findUnique({
-            where: { orderNumber: params.orderNumber },
+            where: { orderNumber: resolvedParams.orderNumber },
             include: {
                 items: true,
                 location: {

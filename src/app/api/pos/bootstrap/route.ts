@@ -188,10 +188,20 @@ async function buildBootstrapResponse(
     console.error('  Computed dualPricingEnabled:', settings?.pricingModel === 'DUAL_PRICING')
     console.error('='.repeat(50))
 
+    // ═══ Pre-build QR check-in URL for Android customer display ═══
+    // Android app was constructing this URL incorrectly (producing /checkin with no slug).
+    // Server builds the complete URL so Android can use it directly.
+    let checkinUrl: string | null = null
+    if (location.businessType === 'SALON' && location.slug) {
+        const { buildCheckinUrl } = await import('@/lib/checkinToken')
+        checkinUrl = buildCheckinUrl(location.slug, process.env.NEXTAUTH_URL || 'http://localhost:3001')
+    }
+
     const stationConfig = {
         locationId: location.id,
         locationName: location.name,
         locationSlug: location.slug,  // For QR check-in URL generation
+        checkinUrl,                   // Pre-built QR URL — Android uses this directly
         stationName: stationName,
         businessType: location.businessType || 'RETAIL',
 

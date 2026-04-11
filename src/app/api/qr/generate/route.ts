@@ -127,6 +127,7 @@ export async function POST(request: Request) {
       slug: location.slug,
       token: result.token,
       deviceId: station.stationId,
+      platformDomain: new URL(request.url).origin,
     })
 
     // ─── Audit Trail (fire-and-forget) ───

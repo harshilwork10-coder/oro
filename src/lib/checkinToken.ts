@@ -213,7 +213,10 @@ export function buildBrandQrUrl(opts: {
   platformDomain?: string
 }): string {
   // Use main domain with /qr/ path — subdomain DNS is not configured yet
-  const domain = opts.platformDomain || process.env.QR_PLATFORM_DOMAIN || 'www.oronext.app'
-  const baseUrl = `https://${domain}`
+  // Priority: explicit opt → env override → NEXTAUTH_URL (actual deployment) → production domain
+  const domain = opts.platformDomain || process.env.QR_PLATFORM_DOMAIN || ''
+  const baseUrl = domain
+    ? (domain.startsWith('http') ? domain : `https://${domain}`)
+    : (process.env.NEXTAUTH_URL || 'https://www.oronext.app')
   return `${baseUrl}/qr/${encodeURIComponent(opts.slug)}?t=${encodeURIComponent(opts.token)}&d=${encodeURIComponent(opts.deviceId)}`
 }
