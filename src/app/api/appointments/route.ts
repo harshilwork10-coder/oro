@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
         // Audit log
         await logActivity({
             userId: user.id,
-            userEmail: user.email,
+            useremail: authUser.email,
             userRole: user.role || 'USER',
             action: 'APPOINTMENT_CREATED',
             entityType: 'Appointment',

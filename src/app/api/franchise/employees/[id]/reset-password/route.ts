@@ -79,7 +79,7 @@ export async function POST(
         // Audit log
         await logActivity({
             userId: user.id,
-            userEmail: user.email,
+            useremail: authUser.email,
             userRole: userRole,
             action: 'EMPLOYEE_PASSWORD_RESET',
             entityType: 'User',
