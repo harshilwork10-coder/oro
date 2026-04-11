@@ -1,20 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// GET /api/public/storefront/[slug] — Store info for storefront landing page
+/**
+ * Public Storefront API — /api/public/storefront/[slug]
+ * 
+ * Returns public-facing location + brand info for a given location slug.
+ * NO authentication required — used by QR check-in pages.
+ */
 export async function GET(
     req: NextRequest,
     { params }: { params: { slug: string } }
 ) {
     try {
+        const { slug } = params
+
+        if (!slug) {
+            return NextResponse.json({ error: 'Slug is required' }, { status: 400 })
+        }
+
         const location = await prisma.location.findFirst({
-            where: { slug: params.slug },
-            include: {
-                storefrontProfile: true,
+            where: { slug },
+            select: {
+                id: true,
+                name: true,
+                address: true,
+                businessType: true,
+                slug: true,
                 franchise: {
-                    include: {
+                    select: {
+                        id: true,
+                        name: true,
                         franchisor: {
-                            include: { config: { select: { usesStorefront: true } } }
+                            select: {
+                                id: true,
+                                name: true,
+                                brandColorPrimary: true,
+                                brandCode: true,
+                            }
                         }
                     }
                 }
@@ -22,45 +44,35 @@ export async function GET(
         })
 
         if (!location) {
-            return NextResponse.json({ error: 'Store not found' }, { status: 404 })
+            return NextResponse.json({ error: 'Location not found' }, { status: 404 })
         }
 
-        // Check storefront is enabled
-        const featureEnabled = location.franchise?.franchisor?.config?.usesStorefront
-        if (!featureEnabled || !location.storefrontProfile?.isEnabled) {
-            return NextResponse.json({ error: 'Store not available' }, { status: 404 })
-        }
-
-        const profile = location.storefrontProfile
+        const franchisor = location.franchise?.franchisor
 
         return NextResponse.json({
-            store: {
-                name: location.publicName || location.name,
-                slug: location.slug,
-                headline: profile.headline,
+            location: {
+                id: location.id,
+                name: location.name,
                 address: location.address,
-                phone: location.publicPhone,
-                bannerImageUrl: profile.bannerImageUrl || location.publicBannerUrl,
-                logoUrl: location.publicLogoUrl,
-                latitude: location.latitude,
-                longitude: location.longitude,
-                operatingHours: location.operatingHours ? JSON.parse(location.operatingHours) : null,
-                timezone: location.timezone,
                 businessType: location.businessType,
+                slug: location.slug,
             },
-            pickup: {
-                enabled: profile.pickupEnabled,
-                leadMinutes: profile.pickupLeadMinutes,
-                maxOrdersPerSlot: profile.maxOrdersPerSlot,
-            },
-            order: {
-                minAmount: profile.minOrderAmount,
-                maxItems: profile.maxItemsPerOrder,
-                notesEnabled: profile.orderNotesEnabled,
-            }
+            brand: franchisor ? {
+                id: franchisor.id,
+                name: franchisor.name,
+                primaryColor: franchisor.brandColorPrimary || '#f59e0b',
+                secondaryColor: franchisor.brandColorPrimary || '#d97706',
+                logoUrl: null, // Add when logo storage is implemented
+                welcomeText: null,
+                bgGradient: 'from-orange-900/20 via-stone-950 to-stone-950',
+            } : null,
+            franchise: location.franchise ? {
+                id: location.franchise.id,
+                name: location.franchise.name,
+            } : null,
         })
     } catch (error) {
-        console.error('[STOREFRONT_GET]', error)
-        return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+        console.error('[Public Storefront] Error:', error)
+        return NextResponse.json({ error: 'Failed to load storefront' }, { status: 500 })
     }
 }
