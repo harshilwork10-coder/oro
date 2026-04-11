@@ -10,7 +10,7 @@ import { logActivity } from '@/lib/auditLog'
  */
 export async function POST(req: NextRequest) {
     const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)) {
         return NextResponse.json({ error: 'Manager+ only' }, { status: 403 })
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
     const stationId = searchParams.get('stationId')

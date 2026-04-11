@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 // GET /api/loyalty/rules - List rules for a program
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     try {
         const { searchParams } = new URL(req.url)
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 // POST /api/loyalty/rules - Create a new rule
 export async function POST(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR'].includes(user.role)) {
         return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 // PATCH /api/loyalty/rules - Toggle rule active/inactive
 export async function PATCH(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     try {
         const { id, isActive } = await req.json()
@@ -113,7 +113,7 @@ export async function PATCH(req: NextRequest) {
 // DELETE /api/loyalty/rules - Delete a rule
 export async function DELETE(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR'].includes(user.role)) {
         return NextResponse.json({ error: 'Permission denied' }, { status: 403 })

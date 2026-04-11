@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 // GET /api/pos/clients - Fetch all clients for the franchise with real loyalty data
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const franchiseId = user.franchiseId
 

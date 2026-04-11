@@ -7,7 +7,7 @@ import { checkBrandLock } from '@/lib/brandLock'
 export async function GET(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // PricingRule is per-location. Get all rules for locations in this franchise.
         const locations = await prisma.location.findMany({
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // ── BRAND LOCK: lockPricing ───────────────────────────────
         const lockError = await checkBrandLock(authUser.franchiseId, 'lockPricing')
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // ── BRAND LOCK: lockPricing ───────────────────────────────
         const lockError = await checkBrandLock(authUser.franchiseId, 'lockPricing')
@@ -77,7 +77,7 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // ── BRAND LOCK: lockPricing ───────────────────────────────
         const lockError = await checkBrandLock(authUser.franchiseId, 'lockPricing')

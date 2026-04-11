@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 /** Customer Segmentation — VIP / Regular / Occasional / Inactive */
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { searchParams } = new URL(req.url)
     const days = parseInt(searchParams.get('days') || '90')
     const since = new Date(Date.now() - days * 86400000)

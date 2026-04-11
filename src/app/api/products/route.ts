@@ -20,7 +20,7 @@ const productCreateSchema = z.object({
 // GET — reads are never locked
 export async function GET(request: NextRequest) {
     const authUser = await getAuthUser(request)
-    if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     try {
         let franchiseId = authUser.franchiseId
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 // POST — blocked by lockProducts and also lockPricing (setting price on a new product)
 export async function POST(request: NextRequest) {
     const authUser = await getAuthUser(request)
-    if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // ── BRAND LOCK: lockProducts + lockPricing ────────────────────
     const lockError = await checkBrandLocks(authUser.franchiseId, ['lockProducts', 'lockPricing'])

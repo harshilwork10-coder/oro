@@ -21,7 +21,7 @@ import { logActivity } from '@/lib/auditLog'
  */
 export async function POST(request: NextRequest) {
     const user = await getAuthUser(request)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     try {
         const body = await request.json()
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
     const user = await getAuthUser(request)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(request.url)
     const code = searchParams.get('code')

@@ -26,7 +26,7 @@ export async function POST(
     { params }: { params: Promise<{ stationId: string }> }
 ) {
     const user = await getAuthUser(request)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Only Provider can manage stations
     if (!user || user.role !== 'PROVIDER') {

@@ -21,7 +21,7 @@ import crypto from 'crypto'
  */
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     try {
         // ═══ LOCATION ISOLATION: Filter by user's assigned location ═══

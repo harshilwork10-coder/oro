@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 /** Customer Groups — Wholesale, VIP, Employee pricing tiers */
 export async function POST(req: NextRequest) {
     const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
     try {
         const { name, discountPercent, description, pricingType } = await req.json()
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     try {
         const groups = await prisma.promotion.findMany({ where: { franchiseId: user.franchiseId, type: 'CUSTOMER_GROUP', isActive: true }, orderBy: { name: 'asc' } })
         return NextResponse.json({ groups })

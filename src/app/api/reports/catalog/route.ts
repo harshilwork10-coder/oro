@@ -13,7 +13,7 @@ import { getAvailableReports, REPORT_CATALOG } from '@/lib/reporting/pdfGenerato
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         // Get HQ payroll permission flag (if franchisor)
         let hqCanViewPayrollReports = false;
         if (user.role === 'FRANCHISOR') {

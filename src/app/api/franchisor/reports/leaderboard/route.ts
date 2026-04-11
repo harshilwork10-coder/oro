@@ -9,7 +9,7 @@ import { sumRevenue } from '@/lib/utils/resolveTransactionRevenue'
  */
 export async function GET(req: NextRequest) {
     const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
     const period = searchParams.get('period') || 'mtd' // mtd, week, today

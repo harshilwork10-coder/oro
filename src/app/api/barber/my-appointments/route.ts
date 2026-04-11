@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 // GET /api/barber/my-appointments - Get today's appointments for the logged-in barber
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

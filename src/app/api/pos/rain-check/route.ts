@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     try {
         const rainChecks = await prisma.promotion.findMany({ where: { franchiseId: user.franchiseId, type: 'RAIN_CHECK', isActive: true, endDate: { gte: new Date() } }, orderBy: { createdAt: 'desc' } })
         return NextResponse.json({ rainChecks })

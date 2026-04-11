@@ -6,7 +6,7 @@ import { logActivity } from '@/lib/auditLog'
 
 export async function POST(request: Request) {
     const user = await getAuthUser(request)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!user?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

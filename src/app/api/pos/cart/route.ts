@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET(request: Request) {
     try {
         const authUser = await getAuthUser(request)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // For kiosk (no auth), get the most recent active cart
         if (!authUser?.email) {

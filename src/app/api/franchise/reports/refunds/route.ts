@@ -4,7 +4,7 @@ import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 
 export async function GET(request: Request) {
     const authUser = await getAuthUser(request)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!authUser?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

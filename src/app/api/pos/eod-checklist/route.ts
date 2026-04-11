@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma'
  */
 export async function POST(request: NextRequest) {
     const user = await getAuthUser(request)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
     const locationId = dbUser?.locationId
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
     const user = await getAuthUser(request)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { locationId: true } })
     const locationId = dbUser?.locationId

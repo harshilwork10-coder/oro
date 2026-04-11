@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: Request) {
     try {
         const user = await getAuthUser(request)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const body = await request.json()
         const { productId, barcode, quantity, notes, supplierId } = body
