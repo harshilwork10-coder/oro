@@ -1,11 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
     const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
     if (!authUser?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

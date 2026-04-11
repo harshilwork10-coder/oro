@@ -3,7 +3,7 @@
  * GDPR Article 20 - Right to Data Portability
  */
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { exportUserData } from '@/lib/security/gdpr'
 import { logActivity } from '@/lib/auditLog'
 

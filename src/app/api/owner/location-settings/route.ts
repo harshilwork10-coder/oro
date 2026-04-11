@@ -7,7 +7,7 @@
  * Protected by session auth - requires OWNER role
  */
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import { logActivity } from '@/lib/auditLog'

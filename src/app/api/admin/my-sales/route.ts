@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 // STUB: Sales agent tracking feature not yet implemented in current schema
 // The salesAgentId and deletedAt fields don't exist on Franchisor
 

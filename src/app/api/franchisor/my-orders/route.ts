@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 // STUB: My orders feature not yet implemented in current schema
 // The licenseRequest model doesn't exist in the Prisma schema
 
