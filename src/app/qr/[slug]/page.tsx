@@ -34,7 +34,7 @@ interface BrandTheme {
     bgGradient: string
 }
 
-type Step = 'phone' | 'confirm' | 'walkin' | 'newclient' | 'success' | 'error'
+type Step = 'phone' | 'confirm' | 'walkin' | 'newclient' | 'waiver' | 'loyalty' | 'success' | 'error'
 
 // ─── Phone Format Helper ───
 function formatPhone(raw: string): string {
@@ -163,7 +163,14 @@ export default function BrandQrCheckinPage() {
                 setAppointments(data.appointments)
                 setStep('confirm')
             } else {
-                setStep('walkin')
+                // Go to waiver if not signed, otherwise loyalty, otherwise walkin
+                if (!data.liabilitySigned) {
+                    setStep('waiver')
+                } else if (!data.loyaltyJoined) {
+                    setStep('loyalty')
+                } else {
+                    setStep('walkin')
+                }
             }
 
         } catch {
@@ -463,7 +470,11 @@ export default function BrandQrCheckinPage() {
                             </div>
 
                             <button
-                                onClick={() => performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })}
+                                onClick={() => {
+                                    if (!liabilitySigned) { setStep('waiver'); return }
+                                    if (!loyaltyJoined) { setStep('loyalty'); return }
+                                    performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })
+                                }}
                                 disabled={loading}
                                 className="w-full py-4 text-white rounded-2xl font-bold text-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                                 style={{ background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})` }}
@@ -515,17 +526,87 @@ export default function BrandQrCheckinPage() {
                             </div>
 
                             <button
-                                onClick={() => performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })}
-                                disabled={loading || !firstName.trim() || !lastName.trim()}
+                                onClick={() => setStep('waiver')}
+                                disabled={!firstName.trim() || !lastName.trim()}
                                 className="w-full py-4 text-white rounded-2xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+                                style={{ background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})` }}
+                            >
+                                Continue
+                                <ChevronRight className="h-5 w-5" />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ─── LIABILITY WAIVER ─── */}
+                    {step === 'waiver' && (
+                        <div className="space-y-6">
+                            <button onClick={() => setStep('phone')} className="flex items-center gap-1 text-stone-500 hover:text-stone-300 transition-colors text-sm">
+                                <ArrowLeft className="h-4 w-4" /> Back
+                            </button>
+                            <div className="text-center">
+                                <h2 className="text-2xl font-bold text-stone-100 mb-1">One last thing...</h2>
+                                <p className="text-stone-400">Please review and accept our liability waiver</p>
+                            </div>
+
+                            <div className="bg-stone-900/60 border border-stone-800 rounded-2xl p-5 max-h-[240px] overflow-y-auto text-sm text-stone-400 leading-relaxed space-y-3">
+                                <p className="text-stone-200 font-bold text-xs uppercase tracking-wider">Liability Waiver and Release Form</p>
+                                <p>I hereby acknowledge that I am voluntarily participating in services provided. I understand that these services may involve risks, including but not limited to allergic reactions to products, minor cuts, or other injuries.</p>
+                                <p>I agree to release and hold harmless this establishment, its employees, and agents from any and all liability, claims, or causes of action arising out of my participation in these services.</p>
+                                <p>By tapping &quot;I Accept&quot;, I acknowledge that I have read and understood this waiver and agree to its terms.</p>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    setLiabilitySigned(true)
+                                    if (!loyaltyJoined) {
+                                        setStep('loyalty')
+                                    } else {
+                                        performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })
+                                    }
+                                }}
+                                className="w-full py-4 text-white rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                                style={{ background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})` }}
+                            >
+                                <Check className="h-5 w-5" /> I Accept
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ─── LOYALTY ENROLLMENT ─── */}
+                    {step === 'loyalty' && (
+                        <div className="space-y-6">
+                            <div className="text-center">
+                                <div className="mx-auto w-20 h-20 rounded-2xl flex items-center justify-center text-4xl mb-4"
+                                    style={{ background: `linear-gradient(135deg, ${theme.primaryColor}33, ${theme.secondaryColor}33)` }}
+                                >
+                                    🎁
+                                </div>
+                                <h2 className="text-2xl font-bold text-stone-100 mb-1">Join Our Rewards?</h2>
+                                <p className="text-stone-400">Earn points on every visit and get exclusive offers!</p>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    setLoyaltyJoined(true)
+                                    performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })
+                                }}
+                                disabled={loading}
+                                className="w-full py-4 text-white rounded-2xl font-bold text-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                                 style={{ background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})` }}
                             >
                                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
                                     <>
-                                        Check In
-                                        <Check className="h-5 w-5" />
+                                        Yes, sign me up! ✨
                                     </>
                                 )}
+                            </button>
+
+                            <button
+                                onClick={() => performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })}
+                                disabled={loading}
+                                className="w-full text-stone-500 text-sm hover:text-stone-300 transition-colors py-2"
+                            >
+                                No thanks, maybe later
                             </button>
                         </div>
                     )}
