@@ -191,6 +191,7 @@ async function buildBootstrapResponse(
     const stationConfig = {
         locationId: location.id,
         locationName: location.name,
+        locationSlug: location.slug,  // For QR check-in URL generation
         stationName: stationName,
         businessType: location.businessType || 'RETAIL',
 

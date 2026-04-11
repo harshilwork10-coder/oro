@@ -91,13 +91,13 @@ export default function ReportsPage() {
             } else if (activeTab === 'leaderboard') {
                 const res = await fetch(`/api/franchisor/portfolio/leaderboard?range=${period === 'mtd' ? 'MTD' : period === 'wtd' ? 'WTD' : 'TODAY'}&sortBy=netSales`);
                 const data = await res.json();
-                setLeaderboard(data.leaderboard?.map((l: { rank: number; id: string; name: string; netSales: number; transactionCount: number; avgTicket: number; noShowRate: number }) => ({
+                setLeaderboard(data.leaderboard?.map((l: { rank: number; id: string; name: string; netSales: number; transactionCount: number; uniqueCustomers?: number; avgTicket: number; noShowRate: number }) => ({
                     rank: l.rank,
                     id: l.id,
                     name: l.name,
                     revenue: l.netSales,
                     totalVisits: l.transactionCount,
-                    uniqueCustomers: 0,
+                    uniqueCustomers: l.uniqueCustomers ?? 0,
                     avgTicket: l.avgTicket,
                     noShowRate: l.noShowRate
                 })) || []);
@@ -160,7 +160,7 @@ export default function ReportsPage() {
                                     printWindow.document.write(`
                                         <html>
                                         <head>
-                                            <title>ORO 9 - HQ Reports - ${new Date().toLocaleDateString()}</title>
+                                            <title>ORO GURUS - HQ Reports - ${new Date().toLocaleDateString()}</title>
                                             <style>
                                                 body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
                                                 h1 { color: #f97316; }
@@ -176,7 +176,7 @@ export default function ReportsPage() {
                                         </head>
                                         <body>
                                             <div class="header">
-                                                <h1>ORO 9 - Brand HQ Reports</h1>
+                                                <h1>ORO GURUS - Brand HQ Reports</h1>
                                                 <p>Generated: ${new Date().toLocaleString()}</p>
                                                 <p>Report Period: ${period === 'mtd' ? 'Month to Date' : period === 'wtd' ? 'Week to Date' : 'Today'}</p>
                                             </div>
@@ -202,7 +202,7 @@ export default function ReportsPage() {
                                                 <div class="metric-value">${commandCenter?.locations?.active || 0}</div>
                                             </div>
                                             <div class="footer">
-                                                ORO 9 POS System | Report Version 1.0 | Confidential
+                                                ORO GURUS POS System | Report Version 1.0 | Confidential
                                             </div>
                                         </body>
                                         </html>

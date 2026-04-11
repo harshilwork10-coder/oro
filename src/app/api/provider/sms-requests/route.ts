@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: user.email }
+            where: { email: authUser.email }
         })
 
         if (user?.role !== 'PROVIDER') {
@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: user.email }
+            where: { email: authUser.email }
         })
 
         if (user?.role !== 'PROVIDER') {

@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             include: { location: true }
         })
 
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             include: {
                 location: {
                     include: { franchise: true }
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
         // Audit log
         await logActivity({
             userId: user.id,
-            userEmail: user.email,
+            useremail: authUser.email,
             userRole: (user as any).role || 'USER',
             action: 'WAITLIST_ENTRY_CREATED',
             entityType: 'WaitlistEntry',

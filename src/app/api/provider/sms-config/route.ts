@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
         // Check if user is provider
         const user = await prisma.user.findUnique({
-            where: { email: user.email }
+            where: { email: authUser.email }
         })
 
         if (user?.role !== 'PROVIDER') {
@@ -45,7 +45,7 @@ export async function PUT(req: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: user.email }
+            where: { email: authUser.email }
         })
 
         if (user?.role !== 'PROVIDER') {

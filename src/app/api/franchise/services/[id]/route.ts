@@ -14,7 +14,7 @@ export async function PUT(
     }
 
     const user = await prisma.user.findUnique({
-        where: { email: user.email },
+        where: { email: authUser.email },
         include: { franchise: true }
     })
 
@@ -63,7 +63,7 @@ export async function DELETE(
     }
 
     const user = await prisma.user.findUnique({
-        where: { email: user.email },
+        where: { email: authUser.email },
         include: { franchise: true }
     })
 

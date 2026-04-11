@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             include: {
                 paymentConfig: true
             }

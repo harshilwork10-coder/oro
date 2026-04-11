@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
         // Get user with franchise info
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             include: { franchise: true }
         })
 

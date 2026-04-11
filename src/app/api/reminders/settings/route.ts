@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             select: { franchiseId: true }
         })
 
@@ -53,7 +53,7 @@ export async function PUT(req: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             select: { franchiseId: true, role: true }
         })
 

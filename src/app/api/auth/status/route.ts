@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
     try {
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             include: {
                 // Legacy 1:1 relation (for backward compatibility)
                 franchisor: {

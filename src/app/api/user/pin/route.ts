@@ -26,14 +26,14 @@ export async function POST(request: Request) {
 
         // Update user's PIN
         await prisma.user.update({
-            where: { email: user.email },
+            where: { email: authUser.email },
             data: { pin: hashedPin }
         })
 
         // Audit log
         await logActivity({
             userId: user.id,
-            userEmail: user.email!,
+            useremail: authUser.email!,
             userRole: user.role || 'USER',
             action: 'PIN_SET',
             entityType: 'User',
