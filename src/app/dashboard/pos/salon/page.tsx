@@ -560,7 +560,7 @@ function POSContent() {
                                 : total + pricingSettings.cardSurcharge)
                             : total,
                         showDualPricing: pricingSettings.showDualPricing,
-                        customerName: selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : null
+                        customerName: selectedCustomer?.firstName || null
                     }
 
                 await fetch('/api/pos/display-sync', {

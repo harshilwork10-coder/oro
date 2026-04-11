@@ -30,7 +30,7 @@ export default function CommissionsPage() {
         productCommission: ''
     })
 
-    const franchiseId = 'your-franchise-id' // Replace with session.user.franchiseId
+    const franchiseId = (session?.user as any)?.franchiseId || ''
 
     useEffect(() => {
         if (status === 'authenticated') {
