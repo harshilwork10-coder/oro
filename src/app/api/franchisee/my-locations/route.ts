@@ -6,16 +6,22 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!user || user.role !== 'FRANCHISEE') {
+        if (user.role !== 'FRANCHISEE') {
             return NextResponse.json({ error: 'Unauthorized - Franchisee only' }, { status: 401 })
         }
 
-        // Get locations where this user is the owner
+        // Resolve the real franchiseId (skip sentinel values)
+        const franchiseId = user.franchiseId && !user.franchiseId.startsWith('__') ? user.franchiseId : null
+        if (!franchiseId) {
+            return NextResponse.json({ error: 'No franchise linked to account' }, { status: 404 })
+        }
+
+        // Get locations for this franchisee's franchise
         const locations = await prisma.location.findMany({
             where: {
-                ownerId: user.id
+                franchiseId: franchiseId
             },
             include: {
                 franchise: {
@@ -42,4 +48,3 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
 }
-
