@@ -54,9 +54,11 @@ import TransactionDiscountModal from '@/components/modals/TransactionDiscountMod
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
 import EndOfDayWizard from '@/components/pos/EndOfDayWizard'
 import PaidInOutModal from '@/components/pos/PaidInOutModal'
+import NoSaleModal from '@/components/pos/NoSaleModal'
 import LotteryModal from '@/components/pos/LotteryModal'
 import LotteryPayoutModal from '@/components/pos/LotteryPayoutModal'
 import ReceiptModal from '@/components/pos/ReceiptModal'
+import TimeClockButton from '@/components/pos/TimeClockButton'
 import UniversalSearch from '@/components/pos/UniversalSearch'
 import NumpadModal from '@/components/modals/NumpadModal'
 import {
@@ -151,6 +153,34 @@ export default function RetailPOSPage() {
     const user = session?.user as any
     const { data: config } = useBusinessConfig()
 
+    const [shiftRequirement, setShiftRequirement] = useState<'NONE' | 'CLOCK_IN_ONLY' | 'CASH_COUNT_ONLY' | 'BOTH'>('BOTH')
+    const [isClockedIn, setIsClockedIn] = useState<boolean>(false)
+    const [shift, setShift] = useState<any>(null)
+    const [activeTimeEntryId, setActiveTimeEntryId] = useState<string | null>(null)
+
+    // Derive canProcessTransactions based on strict rule matrix
+    const canProcessTransactions = useMemo(() => {
+        const currentUser = session?.user as any
+        const isOwnerBypass = ['FRANCHISOR', 'OWNER'].includes(currentUser?.role)
+        if (isOwnerBypass) return true
+
+        if (shiftRequirement === 'NONE') return true
+        if (shiftRequirement === 'CLOCK_IN_ONLY') return isClockedIn
+        if (shiftRequirement === 'CASH_COUNT_ONLY') return !!shift
+        if (shiftRequirement === 'BOTH') return isClockedIn && !!shift
+        return false
+    }, [shiftRequirement, isClockedIn, shift, session])
+    
+    const needsClockIn = !['FRANCHISOR', 'OWNER'].includes((session?.user as any)?.role) && (shiftRequirement === 'CLOCK_IN_ONLY' || shiftRequirement === 'BOTH') && !isClockedIn
+    const needsShift = !['FRANCHISOR', 'OWNER'].includes((session?.user as any)?.role) && (shiftRequirement === 'CASH_COUNT_ONLY' || shiftRequirement === 'BOTH') && !shift
+
+
+    // Drawer Managers can process No Sale and Paid In/Out
+    const isDrawerManager = useMemo(() => {
+        const currentUser = session?.user as any
+        return ['OWNER', 'FRANCHISOR', 'PROVIDER', 'MANAGER', 'SHIFT_SUPERVISOR'].includes(currentUser?.role || '')
+    }, [session])
+
     // Multi-Tax Profile
     const [taxProfile, setTaxProfile] = useState<TaxProfile | null>(null)
 
@@ -226,9 +256,9 @@ export default function RetailPOSPage() {
     const [favorites, setFavorites] = useState<{ id: string; name: string; price: number; barcode?: string }[]>([])
 
     // Quick Life Features
-    const [showCustomerLookup, setShowCustomerLookup] = useState(false)
     const [showCashDropModal, setShowCashDropModal] = useState(false)
     const [showPaidInOutModal, setShowPaidInOutModal] = useState(false)
+    const [showNoSaleModal, setShowNoSaleModal] = useState(false)
     const [showReceiveStockModal, setShowReceiveStockModal] = useState(false)
     const [showRecentTransactions, setShowRecentTransactions] = useState(false)
     const [recentTransactions, setRecentTransactions] = useState<any[]>([])
@@ -413,6 +443,39 @@ export default function RetailPOSPage() {
         document.addEventListener('keydown', handleKeyDown)
         return () => document.removeEventListener('keydown', handleKeyDown)
     }, [])
+
+    // ========== TIME & LABOR TRUTH ==========
+    const checkShift = async () => {
+        const user = session?.user as any
+        if (user?.role === 'FRANCHISOR' || user?.role === 'OWNER') {
+            try {
+                const res = await fetch('/api/pos/shift')
+                const data = await res.json()
+                if (data.shiftRequirement) setShiftRequirement(data.shiftRequirement)
+                if (data.shift) setShift(data.shift)
+                setIsClockedIn(!!data.isClockedIn)
+                setActiveTimeEntryId(data.activeTimeEntryId || null)
+            } catch (error) {
+                console.error('Failed to check shift:', error)
+            }
+            return
+        }
+
+        try {
+            const res = await fetch('/api/pos/shift')
+            const data = await res.json()
+            if (data.shiftRequirement) setShiftRequirement(data.shiftRequirement)
+            setIsClockedIn(!!data.isClockedIn)
+            setActiveTimeEntryId(data.activeTimeEntryId || null)
+            if (data.shift) setShift(data.shift)
+        } catch (error) {
+            console.error('Failed to check shift:', error)
+        }
+    }
+
+    useEffect(() => {
+        checkShift()
+    }, [session])
 
     // ========== CRE DATA FETCHING ==========
 
@@ -2132,6 +2195,19 @@ export default function RetailPOSPage() {
                     <span className="hidden xl:inline">Search</span>
                 </button>
 
+                {/* 1.5 Time Clock */}
+                <div className="flex-shrink-0">
+                    <TimeClockButton
+                        isClockedIn={isClockedIn}
+                        shiftRequirement={shiftRequirement}
+                        locationId={user?.locationId as string}
+                        onStatusChange={(newStatus, entryId) => {
+                            setIsClockedIn(newStatus)
+                            setActiveTimeEntryId(entryId || null)
+                        }}
+                    />
+                </div>
+
                 {/* 2. Dashboard Button - Using plain anchor for reliable navigation */}
                 <a
                     href="/dashboard"
@@ -2588,15 +2664,34 @@ export default function RetailPOSPage() {
                             </button>
                         </div>
 
-                        {/* Row 3: Paid In/Out + End of Day */}
+                        {/* Row 3: Paid In/Out + End of Day + No Sale */}
                         <div className="grid grid-cols-2 gap-1">
-                            <button
-                                onClick={() => setShowPaidInOutModal(true)}
-                                className="flex items-center justify-center gap-2 py-2 bg-teal-500/30 hover:bg-teal-500/50 rounded text-white transition-colors"
-                            >
-                                <Banknote className="h-4 w-4" />
-                                <span className="text-xs font-medium">Paid In / Out</span>
-                            </button>
+                            {isDrawerManager ? (
+                                <div className="grid grid-cols-2 gap-1">
+                                    <button
+                                        onClick={() => setShowNoSaleModal(true)}
+                                        className="flex flex-col items-center justify-center gap-0.5 py-2 bg-amber-500/30 hover:bg-amber-500/50 rounded text-amber-200 transition-colors"
+                                    >
+                                        <Unlock className="h-4 w-4" />
+                                        <span className="text-[10px]">NO SALE</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setShowPaidInOutModal(true)}
+                                        className="flex flex-col items-center justify-center gap-0.5 py-2 bg-teal-500/30 hover:bg-teal-500/50 rounded text-teal-200 transition-colors"
+                                    >
+                                        <Banknote className="h-4 w-4" />
+                                        <span className="text-[10px]">PAID I/O</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setToast({ message: 'Manager access required for drawer actions', type: 'error' })}
+                                    className="flex items-center justify-center gap-2 py-2 bg-stone-800/50 rounded text-stone-500 cursor-not-allowed transition-colors"
+                                >
+                                    <Unlock className="h-4 w-4 opacity-50" />
+                                    <span className="text-xs font-medium">No Drawer Access</span>
+                                </button>
+                            )}
                             <button
                                 onClick={() => setShowEndOfDayWizard(true)}
                                 className="flex items-center justify-center gap-2 py-2 bg-indigo-500/30 hover:bg-indigo-500/50 rounded text-white transition-colors"
@@ -2839,10 +2934,21 @@ export default function RetailPOSPage() {
                         )}
                     </div>
 
+                    {/* Checkout Blockers (Time & Labor Truth) */}
+                    {(needsClockIn || needsShift) && (
+                        <div className="bg-red-500/10 border-y border-red-500/30 p-3 text-center">
+                            <p className="text-red-400 font-medium text-sm">
+                                {needsClockIn && needsShift && '⚠️ Clock In and Open Shift Required to process transactions.'}
+                                {needsClockIn && !needsShift && '⚠️ Clock In Required to process transactions.'}
+                                {!needsClockIn && needsShift && '⚠️ Open Shift Required to process transactions.'}
+                            </p>
+                        </div>
+                    )}
+
                     {/* PAY Button - Smaller on compact screens */}
                     <button
                         onClick={() => setShowPaymentModal(true)}
-                        disabled={cart.length === 0 || isLoading}
+                        disabled={cart.length === 0 || isLoading || needsClockIn || needsShift}
                         className={`bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20 ${compactMode ? 'm-2 py-5 text-2xl' : 'm-4 py-8 text-4xl'}`}
                     >
                         PAY {formatCurrency(total)}
@@ -3368,7 +3474,17 @@ export default function RetailPOSPage() {
                     setShowPaidInOutModal(false)
                     fetchShiftSummary()
                 }}
-                cashDrawerSessionId={currentShiftId || ''}
+                cashDrawerSessionId={shift?.id || ''}
+                storeName={(session?.user as any)?.franchiseName || 'Store'}
+                cashierName={session?.user?.name || 'Cashier'}
+            />
+
+            {/* No Sale Modal */}
+            <NoSaleModal
+                isOpen={showNoSaleModal}
+                onClose={() => setShowNoSaleModal(false)}
+                onSuccess={() => setShowNoSaleModal(false)}
+                cashDrawerSessionId={shift?.id || ''}
                 storeName={(session?.user as any)?.franchiseName || 'Store'}
                 cashierName={session?.user?.name || 'Cashier'}
             />

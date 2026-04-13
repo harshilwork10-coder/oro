@@ -17,6 +17,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const ALLOWED_ROLES = ['OWNER', 'FRANCHISOR', 'PROVIDER', 'MANAGER', 'SHIFT_SUPERVISOR']
+    if (!ALLOWED_ROLES.includes(user.role)) {
+        return NextResponse.json({ error: 'Manager access required for drawer actions.' }, { status: 403 })
+    }
+
     try {
         const body = await req.json()
         const { type, amount, reason, reasonCode, reasonNote, note, cashDrawerSessionId } = body
@@ -38,7 +43,7 @@ export async function POST(req: NextRequest) {
 
         // Validate shift is open
         if (!cashDrawerSessionId) {
-            return NextResponse.json({ error: 'No active shift. Open a shift first.' }, { status: 400 })
+            return NextResponse.json({ error: 'No active shift found for this drawer action.' }, { status: 400 })
         }
 
         const session = await prisma.cashDrawerSession.findUnique({
@@ -47,7 +52,11 @@ export async function POST(req: NextRequest) {
         })
 
         if (!session || session.endTime) {
-            return NextResponse.json({ error: 'Shift is closed. Cannot record paid in/out.' }, { status: 400 })
+            return NextResponse.json({ error: 'No active shift found for this drawer action.' }, { status: 400 })
+        }
+
+        if (user.locationId && session.locationId !== user.locationId) {
+            return NextResponse.json({ error: 'Shift session not found for this location.' }, { status: 403 })
         }
 
         // Create DrawerActivity record

@@ -333,5 +333,20 @@ export async function GET(req: NextRequest) {
         delete (shiftData as any).transactions
     }
 
-    return NextResponse.json({ shift: shiftData, shiftRequirement })
+    // Fetch active TimeEntry for Clock-In UI state optimization
+    const activeTimeEntry = await prisma.timeEntry.findFirst({
+        where: {
+            userId: dbUser.id,
+            status: 'OPEN',
+            clockOut: null
+        },
+        orderBy: { clockIn: 'desc' }
+    })
+
+    return NextResponse.json({ 
+        shift: shiftData, 
+        shiftRequirement,
+        isClockedIn: !!activeTimeEntry,
+        activeTimeEntryId: activeTimeEntry?.id || null 
+    })
 }

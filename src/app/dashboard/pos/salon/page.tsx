@@ -25,6 +25,7 @@ import {
     DollarSign,
     Gift,
     X,
+    Unlock,
     Menu,
     Maximize2,
     Minimize2,
@@ -40,10 +41,19 @@ import { QRCodeSVG } from 'qrcode.react'
 import Toast from '@/components/ui/Toast'
 import { Printer } from 'lucide-react'
 import ReceiptModal from '@/components/pos/ReceiptModal'
-import { printReceipt as printThermalReceipt, isPrintAgentAvailable, ReceiptData } from '@/lib/print-agent'
+import {
+    printReceipt as printThermalReceipt,
+    isPrintAgentAvailable,
+    ReceiptData
+} from '@/lib/print-agent'
 import { normalizeTransactionForPrint } from '@/lib/print-utils'
+import PaidInOutModal from '@/components/pos/PaidInOutModal'
+import NoSaleModal from '@/components/pos/NoSaleModal'
 
 // Removed hardcoded maps
+import TimeClockButton from '@/components/pos/TimeClockButton'
+import QueuePanel from '@/components/pos/salon/QueuePanel'
+import ReceptionistCheckInModal from '@/components/pos/salon/ReceptionistCheckInModal'
 
 // Types
 interface PaymentDetails {
@@ -183,6 +193,11 @@ function POSContent() {
     const [showOpenItemModal, setShowOpenItemModal] = useState(false)
     const [openItemPrice, setOpenItemPrice] = useState('15')
     const [showCustomerModal, setShowCustomerModal] = useState(false)
+    const [showPaidInOutModal, setShowPaidInOutModal] = useState(false)
+    const [showNoSaleModal, setShowNoSaleModal] = useState(false)
+    const [showCheckInModal, setShowCheckInModal] = useState(false)
+    const [activeCheckInId, setActiveCheckInId] = useState<string | null>(null) // Tracks which check-in is being served
+    const [queueRefreshKey, setQueueRefreshKey] = useState(0) // Bump to force queue refresh
 
     // Tip prompt state
     const [showTipWaiting, setShowTipWaiting] = useState(false)
@@ -209,6 +224,19 @@ function POSContent() {
     // Shift requirement mode (from BusinessConfig)
     // NONE = no shift required, CLOCK_IN_ONLY = simple clock in, CASH_COUNT_ONLY = drawer only, BOTH = full
     const [shiftRequirement, setShiftRequirement] = useState<'NONE' | 'CLOCK_IN_ONLY' | 'CASH_COUNT_ONLY' | 'BOTH'>('BOTH')
+    const [isClockedIn, setIsClockedIn] = useState<boolean>(false)
+    const [activeTimeEntryId, setActiveTimeEntryId] = useState<string | null>(null)
+
+    // Drawer Managers can process No Sale and Paid In/Out
+    const isDrawerManager = useMemo(() => {
+        const currentUser = session?.user as any
+        return ['OWNER', 'FRANCHISOR', 'PROVIDER', 'MANAGER', 'SHIFT_SUPERVISOR'].includes(currentUser?.role || '')
+    }, [session])
+
+    const isOwnerBypass = ['FRANCHISOR', 'OWNER'].includes((session?.user as any)?.role)
+    const needsClockIn = !isOwnerBypass && (shiftRequirement === 'CLOCK_IN_ONLY' || shiftRequirement === 'BOTH') && !isClockedIn
+    const needsShift = !isOwnerBypass && (shiftRequirement === 'CASH_COUNT_ONLY' || shiftRequirement === 'BOTH') && !shift
+
 
     // Cash tendering state
     const [showCashTendering, setShowCashTendering] = useState(false)
@@ -958,7 +986,7 @@ function POSContent() {
     const checkShift = async () => {
         // FRANCHISOR/Owner doesn't require a shift to use POS
         const user = session?.user as any
-        if (user?.role === 'FRANCHISOR') {
+        if (user?.role === 'FRANCHISOR' || user?.role === 'OWNER') {
             // Owner mode - no shift required, but still fetch if one exists
             try {
                 const res = await fetch('/api/pos/shift')
@@ -969,6 +997,8 @@ function POSContent() {
                 if (data.shift) {
                     setShift(data.shift)
                 }
+                setIsClockedIn(!!data.isClockedIn)
+                setActiveTimeEntryId(data.activeTimeEntryId || null)
             } catch (error) {
                 console.error('Failed to check shift:', error)
             }
@@ -980,14 +1010,16 @@ function POSContent() {
             const res = await fetch('/api/pos/shift')
             const data = await res.json()
 
-            // Save shift requirement setting
+            // Save shift requirement setting & timeclock states
             if (data.shiftRequirement) {
                 setShiftRequirement(data.shiftRequirement)
             }
+            setIsClockedIn(!!data.isClockedIn)
+            setActiveTimeEntryId(data.activeTimeEntryId || null)
 
             // Check if shift is required
-            if (data.shiftRequirement === 'NONE') {
-                // No shift required - skip modal
+            if (data.shiftRequirement === 'NONE' || data.shiftRequirement === 'CLOCK_IN_ONLY') {
+                // No drawer shift required - skip modal
                 return
             }
 
@@ -1220,6 +1252,86 @@ function POSContent() {
             receiptWindow.document.close()
         }
     }
+    // ═══ QUEUE LIFECYCLE HANDLERS (Wave B) ═══
+
+    const handleQueueStartService = async (customer: any, barberId: string | null) => {
+        // 1. Transition check-in to IN_SERVICE
+        try {
+            await fetch('/api/pos/checked-in', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ checkInId: customer.id, status: 'IN_SERVICE' })
+            })
+        } catch (err) {
+            console.error('[Queue] Failed to transition to IN_SERVICE:', err)
+        }
+
+        // 2. Set selectedCustomer from the check-in client
+        setSelectedCustomer({
+            id: customer.clientId,
+            firstName: customer.firstName,
+            lastName: customer.lastName,
+            phone: customer.phone,
+            email: customer.email,
+            loyaltyPoints: 0
+        })
+
+        // 3. Set selectedBarber if one was assigned
+        if (barberId) {
+            const barber = barberList.find(b => b.id === barberId)
+            if (barber) {
+                setSelectedBarber(barber)
+                setSelectedCategory('BARBER_SERVICE')
+            }
+        }
+
+        // 4. Track active check-in for SERVED linkage at checkout
+        setActiveCheckInId(customer.id)
+
+        setToast({ message: `${customer.firstName} ${customer.lastName} — service started`, type: 'success' })
+    }
+
+    const handleQueueCancel = async (checkInId: string) => {
+        try {
+            await fetch('/api/pos/checked-in', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ checkInId, status: 'CANCELLED' })
+            })
+            setToast({ message: 'Check-in cancelled', type: 'info' })
+        } catch (err) {
+            console.error('[Queue] Failed to cancel:', err)
+            setToast({ message: 'Failed to cancel check-in', type: 'error' })
+        }
+    }
+
+    const handleQueueNoShow = async (checkInId: string) => {
+        try {
+            await fetch('/api/pos/checked-in', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ checkInId, status: 'NO_SHOW' })
+            })
+            setToast({ message: 'Marked as no-show', type: 'info' })
+        } catch (err) {
+            console.error('[Queue] Failed to mark no-show:', err)
+            setToast({ message: 'Failed to update status', type: 'error' })
+        }
+    }
+
+    const markCheckInServed = async () => {
+        if (!activeCheckInId) return
+        try {
+            await fetch('/api/pos/checked-in', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ checkInId: activeCheckInId, status: 'SERVED' })
+            })
+        } catch (err) {
+            console.error('[Queue] Failed to mark SERVED:', err)
+        }
+        setActiveCheckInId(null)
+    }
 
     const handleCheckout = async (paymentMethod: 'CASH' | 'CREDIT_CARD' | 'SPLIT', cashAmount?: number, cardAmount?: number, paymentDetails?: PaymentDetails) => {
         if (cart.length === 0) return
@@ -1296,6 +1408,9 @@ function POSContent() {
                 setAppliedDiscountSource(null)
                 setShowCheckoutModal(false)
                 fetchTransactions()
+
+                // Mark check-in as SERVED if this was a queue customer (Wave B)
+                markCheckInServed()
 
                 // Clear cart from customer display
                 await fetch('/api/pos/cart', {
@@ -1915,6 +2030,37 @@ function POSContent() {
                                 </div>
                             )}
 
+                            {/* Drawer Action Buttons for Managers */}
+                            {isDrawerManager && (
+                                <>
+                                    <button
+                                        onClick={() => setShowNoSaleModal(true)}
+                                        className="p-3 bg-stone-800 hover:bg-amber-600/30 rounded-xl text-amber-500 transition-all border border-stone-700 hover:border-amber-500/50"
+                                        title="No Sale"
+                                    >
+                                        <Unlock className="h-5 w-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => setShowPaidInOutModal(true)}
+                                        className="p-3 bg-stone-800 hover:bg-teal-600/30 rounded-xl text-teal-400 transition-all border border-stone-700 hover:border-teal-500/50"
+                                        title="Paid In / Out"
+                                    >
+                                        <Banknote className="h-5 w-5" />
+                                    </button>
+                                </>
+                            )}
+
+                            {/* Time Clock */}
+                            <TimeClockButton
+                                isClockedIn={isClockedIn}
+                                shiftRequirement={shiftRequirement}
+                                locationId={user?.locationId}
+                                onStatusChange={(newStatus, entryId) => {
+                                    setIsClockedIn(newStatus)
+                                    setActiveTimeEntryId(entryId || null)
+                                }}
+                            />
+
                             {/* Fullscreen */}
                             <button
                                 onClick={() => {
@@ -1930,18 +2076,28 @@ function POSContent() {
                                 {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
                             </button>
 
-                            {/* New Customer / Shift Button */}
+                            {/* New Customer / Check-In / Shift Button */}
                             {view === 'POS' ? (
-                                <button
-                                    onClick={() => {
-                                        if (!shift) setShowShiftModal(true)
-                                    }}
-                                    className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white rounded-xl font-bold transition-all shadow-lg flex items-center gap-2"
-                                    title="New Customer"
-                                >
-                                    <UserPlus className="h-5 w-5" />
-                                    <span className="hidden sm:inline">New</span>
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setShowCheckInModal(true)}
+                                        className="px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white rounded-xl font-bold transition-all shadow-lg flex items-center gap-2"
+                                        title="Check In Customer"
+                                    >
+                                        <UserPlus className="h-5 w-5" />
+                                        <span className="hidden sm:inline">Check In</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (!shift) setShowShiftModal(true)
+                                        }}
+                                        className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white rounded-xl font-bold transition-all shadow-lg flex items-center gap-2"
+                                        title="New Customer"
+                                    >
+                                        <UserPlus className="h-5 w-5" />
+                                        <span className="hidden sm:inline">New</span>
+                                    </button>
+                                </div>
                             ) : (
                                 <button
                                     onClick={() => setShowShiftModal(true)}
@@ -2006,10 +2162,7 @@ function POSContent() {
                                                 <div
                                                     key={item.id}
                                                     onClick={() => {
-                                                        const isOwnerClick = (session?.user as any)?.role === 'FRANCHISOR'
-                                                        if (!shift && !isOwnerClick) {
-                                                            setShowShiftModal(true)
-                                                        } else if (item.name === 'Open Item') {
+                                                        if (item.name === 'Open Item') {
                                                             setShowOpenItemModal(true)
                                                             setOpenItemPrice('')
                                                         } else {
@@ -2230,7 +2383,16 @@ function POSContent() {
                 <div className="w-[340px] xl:w-[400px] 2xl:w-[440px] shrink-0 flex flex-col bg-gradient-to-b from-stone-900/95 to-stone-950/95 backdrop-blur-xl border-l border-white/5 shadow-2xl shadow-black/50">
                     {view === 'POS' ? (
                         <>
-
+                            {/* Queue Panel (Wave B) */}
+                            <div className="max-h-[280px] border-b border-white/10 overflow-hidden">
+                                <QueuePanel
+                                    key={queueRefreshKey}
+                                    barberList={barberList}
+                                    onStartService={handleQueueStartService}
+                                    onCancel={handleQueueCancel}
+                                    onNoShow={handleQueueNoShow}
+                                />
+                            </div>
                             <div className="h-[72px] border-b border-white/5 flex items-center justify-between px-4 xl:px-5 bg-black/20">
                                 <h2 className="text-lg xl:text-xl font-bold text-white">Order</h2>
                                 <div className="flex items-center gap-2">
@@ -2414,6 +2576,17 @@ function POSContent() {
                                     )}
                                 </div>
 
+                                {/* Checkout Blockers (Time & Labor Truth) */}
+                                {(needsClockIn || needsShift) && (
+                                    <div className="bg-red-500/10 border-y border-red-500/30 p-3 mb-4 rounded-xl text-center">
+                                        <p className="text-red-400 font-medium text-sm">
+                                            {needsClockIn && needsShift && '⚠️ Clock In and Open Shift Required to process transactions.'}
+                                            {needsClockIn && !needsShift && '⚠️ Clock In Required to process transactions.'}
+                                            {!needsClockIn && needsShift && '⚠️ Open Shift Required to process transactions.'}
+                                        </p>
+                                    </div>
+                                )}
+
                                 <button
                                     onClick={async () => {
                                         // Require staff selection before checkout
@@ -2454,8 +2627,8 @@ function POSContent() {
                                             setShowCheckoutModal(true)
                                         }
                                     }}
-                                    disabled={cart.length === 0}
-                                    className={`w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-xl flex items-center justify-center gap-2 ${cart.length > 0 ? 'bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 hover:from-orange-400 hover:via-amber-400 hover:to-orange-400 text-white shadow-orange-500/30 hover:shadow-orange-500/40 hover:scale-[1.02] active:scale-[0.98]' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}
+                                    disabled={cart.length === 0 || needsClockIn || needsShift}
+                                    className={`w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-xl flex items-center justify-center gap-2 ${cart.length > 0 && !needsClockIn && !needsShift ? 'bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 hover:from-orange-400 hover:via-amber-400 hover:to-orange-400 text-white shadow-orange-500/30 hover:shadow-orange-500/40 hover:scale-[1.02] active:scale-[0.98]' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}
                                 >
                                     <ShoppingBag className="h-5 w-5" />
                                     Checkout
@@ -3563,6 +3736,40 @@ function POSContent() {
                 </div>
             )}
 
+            {/* Paid In/Out Modal */}
+            <PaidInOutModal
+                isOpen={showPaidInOutModal}
+                onClose={() => setShowPaidInOutModal(false)}
+                onSuccess={() => {
+                    setShowPaidInOutModal(false)
+                    // Could fetch shift summary if salon needs it
+                }}
+                cashDrawerSessionId={shift?.id || ''}
+                storeName={(session?.user as any)?.franchiseName || 'Store'}
+                cashierName={session?.user?.name || 'Cashier'}
+            />
+
+            {/* No Sale Modal */}
+            <NoSaleModal
+                isOpen={showNoSaleModal}
+                onClose={() => setShowNoSaleModal(false)}
+                onSuccess={() => setShowNoSaleModal(false)}
+                cashDrawerSessionId={shift?.id || ''}
+                storeName={(session?.user as any)?.franchiseName || 'Store'}
+                cashierName={session?.user?.name || 'Cashier'}
+            />
+
+            {/* Receptionist Check-In Modal (Wave B) */}
+            <ReceptionistCheckInModal
+                isOpen={showCheckInModal}
+                onClose={() => setShowCheckInModal(false)}
+                onSuccess={() => {
+                    setShowCheckInModal(false)
+                    setQueueRefreshKey(prev => prev + 1) // Force queue panel to re-fetch
+                }}
+                locationId={(session?.user as any)?.locationId || ''}
+                franchiseId={(session?.user as any)?.franchiseId || ''}
+            />
             {/* Toast Notification */}
             {
                 toast && (

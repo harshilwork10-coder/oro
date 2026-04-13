@@ -164,7 +164,7 @@ async function buildBootstrapResponse(
     // Get business config for per-item-type tax flags
     const businessConfig = await prisma.businessConfig.findFirst({
         where: { franchisorId: franchise.franchisorId },
-        select: { taxServices: true, taxProducts: true }
+        select: { taxServices: true, taxProducts: true, usesTipping: true }
     })
 
     const taxConfig = {
@@ -217,8 +217,8 @@ async function buildBootstrapResponse(
         receiptHeader: settings?.storeDisplayName || franchise.name || '',
         receiptFooter: settings?.receiptFooter || 'Thank you!',
 
-        // Tips - read from account settings (owner can enable/disable)
-        tipEnabled: (settings as any)?.tipPromptEnabled ?? true,
+        // Tips - Provider capability gate AND Franchise operational preference
+        tipEnabled: (businessConfig?.usesTipping !== false) && ((settings as any)?.tipPromptEnabled ?? true),
         tipPresets: [15, 18, 20, 25],
 
         // Permissions

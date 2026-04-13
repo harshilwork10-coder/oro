@@ -106,7 +106,7 @@ export async function POST(request: Request) {
                 clientId: customer.id,
                 locationId: locationId,
                 checkedInAt: { gte: today, lt: tomorrow },
-                status: { in: ['WAITING', 'SERVED'] }
+                status: { in: ['WAITING', 'IN_SERVICE', 'SERVED'] }
             }
         })
 

@@ -92,8 +92,36 @@ export async function POST(req: NextRequest) {
         select: { franchisorId: true }
     })
 
-    // NOTE: Shift requirement check disabled — BusinessConfig.shiftRequirement not in schema yet.
-    // When ready, add the field and re-enable shift validation here.
+    const businessConfig = await prisma.businessConfig.findFirst({
+        where: { franchisorId: franchiseRecord?.franchisorId },
+        select: { shiftRequirement: true }
+    })
+    const shiftRequirement = businessConfig?.shiftRequirement || 'NONE'
+
+    if (!isOwnerOrAbove && !userBypassesShift && shiftRequirement !== 'NONE') {
+        const needsClockIn = shiftRequirement === 'CLOCK_IN_ONLY' || shiftRequirement === 'BOTH'
+        const needsShift = shiftRequirement === 'CASH_COUNT_ONLY' || shiftRequirement === 'BOTH'
+
+        if (needsClockIn) {
+            const activePunch = await prisma.timeEntry.findFirst({
+                where: { employeeId: user.id, clockOut: null },
+                orderBy: { clockIn: 'desc' }
+            })
+            if (!activePunch) {
+                return unauthorizedResponse('Clock-in required to process transactions based on system policy.')
+            }
+        }
+
+        if (needsShift) {
+            const activeShift = await prisma.cashDrawerSession.findFirst({
+                where: { franchiseId: user.franchiseId, status: 'OPEN' },
+                orderBy: { openedAt: 'desc' }
+            })
+            if (!activeShift) {
+                return unauthorizedResponse('Open cash drawer required to process transactions based on system policy.')
+            }
+        }
+    }
 
     // Determine chargedMode based on payment method
     // CASH payment = use cash prices, CARD payment = use card prices

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
-import { cacheGet, cacheSet, CACHE_KEYS } from '@/lib/cache'
+import { cacheGet, cacheSet, cacheDelete, CACHE_KEYS } from '@/lib/cache'
 import crypto from 'crypto'
 
 /**
@@ -72,12 +72,13 @@ export async function GET(req: NextRequest) {
         const tomorrow = new Date(today)
         tomorrow.setDate(tomorrow.getDate() + 1)
 
-        // Query the CheckIn table for today's WAITING check-ins at THIS location
+        // Query the CheckIn table for today's active check-ins at THIS location
+        // WAITING = in queue, IN_SERVICE = stylist has taken customer
         const checkIns = await prisma.checkIn.findMany({
             where: {
                 locationId: locationId,
                 checkedInAt: { gte: today, lt: tomorrow },
-                status: 'WAITING'
+                status: { in: ['WAITING', 'IN_SERVICE'] }
             },
             include: {
                 client: {
@@ -94,7 +95,7 @@ export async function GET(req: NextRequest) {
             take: 50
         })
 
-        // Map to response shape expected by Android POS POSService
+        // Map to response shape expected by POS queue
         const customers: QueueCustomer[] = checkIns.map(ci => ({
             id: ci.id,  // CheckIn record ID (for status updates)
             clientId: ci.client.id,
@@ -102,7 +103,9 @@ export async function GET(req: NextRequest) {
             lastName: ci.client.lastName,
             phone: ci.client.phone,
             email: ci.client.email,
+            status: ci.status,
             source: ci.source,
+            appointmentId: ci.appointmentId,
             checkedInAt: ci.checkedInAt,
             updatedAt: ci.updatedAt
         }))
@@ -132,6 +135,103 @@ export async function GET(req: NextRequest) {
     }
 }
 
+/**
+ * PATCH /api/pos/checked-in
+ *
+ * Transitions a CheckIn record to a new status.
+ * Used by the Salon POS queue panel to manage customer lifecycle.
+ *
+ * Allowed transitions:
+ *   WAITING    → IN_SERVICE | CANCELLED | NO_SHOW
+ *   IN_SERVICE → SERVED | CANCELLED
+ *
+ * Disallowed (terminal states): SERVED, CANCELLED, NO_SHOW cannot transition.
+ */
+export async function PATCH(req: NextRequest) {
+    const user = await getAuthUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    try {
+        const body = await req.json()
+        const { checkInId, status } = body
+
+        if (!checkInId || !status) {
+            return NextResponse.json({ error: 'checkInId and status are required' }, { status: 400 })
+        }
+
+        // Validate target status is one of our known states
+        const VALID_STATUSES = ['WAITING', 'IN_SERVICE', 'SERVED', 'CANCELLED', 'NO_SHOW']
+        if (!VALID_STATUSES.includes(status)) {
+            return NextResponse.json({ error: `Invalid status: ${status}` }, { status: 400 })
+        }
+
+        // Fetch existing check-in — must exist at user's location
+        const checkIn = await prisma.checkIn.findFirst({
+            where: {
+                id: checkInId,
+                locationId: user.locationId || undefined
+            }
+        })
+
+        if (!checkIn) {
+            return NextResponse.json({ error: 'Check-in not found at this location' }, { status: 404 })
+        }
+
+        // Validate transition is legal
+        const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+            'WAITING': ['IN_SERVICE', 'CANCELLED', 'NO_SHOW'],
+            'IN_SERVICE': ['SERVED', 'CANCELLED'],
+        }
+
+        const allowed = ALLOWED_TRANSITIONS[checkIn.status]
+        if (!allowed || !allowed.includes(status)) {
+            return NextResponse.json(
+                { error: `Cannot transition from ${checkIn.status} to ${status}` },
+                { status: 400 }
+            )
+        }
+
+        // Perform update
+        const updated = await prisma.checkIn.update({
+            where: { id: checkInId },
+            data: { status },
+            include: {
+                client: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        phone: true,
+                        email: true
+                    }
+                }
+            }
+        })
+
+        // Invalidate queue cache so all devices see the change immediately
+        if (user.locationId) {
+            cacheDelete(CACHE_KEYS.QUEUE(user.locationId)).catch(() => {})
+        }
+
+        return NextResponse.json({
+            id: updated.id,
+            clientId: updated.client.id,
+            firstName: updated.client.firstName,
+            lastName: updated.client.lastName,
+            phone: updated.client.phone,
+            email: updated.client.email,
+            status: updated.status,
+            source: updated.source,
+            appointmentId: updated.appointmentId,
+            checkedInAt: updated.checkedInAt,
+            updatedAt: updated.updatedAt
+        })
+    } catch (error) {
+        console.error('Failed to update check-in status:', error)
+        return NextResponse.json({ error: 'Failed to update status' }, { status: 500 })
+    }
+}
+
 // Response type for queue entries
 interface QueueCustomer {
     id: string
@@ -140,7 +240,9 @@ interface QueueCustomer {
     lastName: string | null
     phone: string | null
     email: string | null
+    status: string
     source: string
+    appointmentId: string | null
     checkedInAt: Date
     updatedAt: Date
 }
