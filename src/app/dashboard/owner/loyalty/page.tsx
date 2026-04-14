@@ -212,11 +212,7 @@ export default function LoyaltyPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white p-4 md:p-6">
-            {/* Vertical Scope */}
-            <div className="mb-4 bg-stone-800/60 border border-stone-700/50 rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm">
-                <Store className="h-4 w-4 text-amber-400 flex-shrink-0" />
-                <span className="text-stone-400">Loyalty is <strong className="text-amber-400">Retail-only</strong> for now. Salon loyalty is not active.</span>
-            </div>
+
 
             {/* Header */}
             <div className="flex items-center justify-between mb-5">
