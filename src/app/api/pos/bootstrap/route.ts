@@ -23,6 +23,7 @@ import { withPOSAuth, POSContext } from '@/lib/posAuth'
 import { computeFeatureFlags } from '@/lib/feature-flags'
 import { CACHE_KEYS, CACHE_TTL, withStampedeProtection } from '@/lib/cache'
 import crypto from 'crypto'
+import { buildPOSMenu } from '@/lib/pos/menuBuilder'
 
 // ═══════════════════════════════════════════════════════════════════
 // CACHE DATA SHAPE — unchanged from previous implementation
@@ -132,26 +133,10 @@ async function buildBootstrapResponse(
     // ═══════════════════════════════════════════════════════════════════
     // 2. MENU
     // ═══════════════════════════════════════════════════════════════════
-    const [services, products, discounts, categories] = await Promise.all([
-        prisma.service.findMany({
-            where: { franchiseId },
-            include: { serviceCategory: true },
-            orderBy: { name: 'asc' }
-        }),
-        prisma.product.findMany({
-            where: { franchiseId, isActive: true },
-            orderBy: { name: 'asc' }
-        }),
-        prisma.discount.findMany({
-            where: { franchiseId, isActive: true }
-        }),
-        prisma.serviceCategory.findMany({
-            where: { franchiseId },
-            select: { id: true, name: true }
-        })
-    ])
+    const franchisorId = franchisor?.id
 
-    const menuVersion = generateMenuVersion(services, products, discounts)
+    const posMenu = await buildPOSMenu(franchiseId, location.id, franchisorId)
+    const menuVersion = generateMenuVersion(posMenu.services, posMenu.products, posMenu.discounts)
 
     // ═══════════════════════════════════════════════════════════════════
     // 3. SETTINGS & TAX CONFIG
@@ -188,11 +173,16 @@ async function buildBootstrapResponse(
     console.error('  Computed dualPricingEnabled:', settings?.pricingModel === 'DUAL_PRICING')
     console.error('='.repeat(50))
 
+    // Resolve business type safely falling back to franchisor then retail
+    const rawIndustry = location.businessType || franchisor?.industryType || 'RETAIL'
+    // Coerce SERVICE to SALON for POS functionality
+    const resolvedBusinessType = rawIndustry === 'SERVICE' ? 'SALON' : rawIndustry
+
     // ═══ Pre-build QR check-in URL for Android customer display ═══
     // Android app was constructing this URL incorrectly (producing /checkin with no slug).
     // Server builds the complete URL so Android can use it directly.
     let checkinUrl: string | null = null
-    if (location.businessType === 'SALON' && location.slug) {
+    if (resolvedBusinessType === 'SALON' && location.slug) {
         const { buildCheckinUrl } = await import('@/lib/checkinToken')
         checkinUrl = buildCheckinUrl(location.slug, process.env.NEXTAUTH_URL || 'http://localhost:3001')
     }
@@ -203,7 +193,7 @@ async function buildBootstrapResponse(
         locationSlug: location.slug,  // For QR check-in URL generation
         checkinUrl,                   // Pre-built QR URL — Android uses this directly
         stationName: stationName,
-        businessType: location.businessType || 'RETAIL',
+        businessType: resolvedBusinessType,
 
         // Dual pricing - requires BOTH pricingModel AND showDualPricing flag (matches web POS logic)
         dualPricingEnabled: settings?.pricingModel === 'DUAL_PRICING' && settings?.showDualPricing === true,
@@ -293,30 +283,9 @@ async function buildBootstrapResponse(
         },
 
         // Core data - always include for cache
-        vertical: location.businessType || 'RETAIL',
+        vertical: resolvedBusinessType,
         staff: staffFormatted,  // Always include in cached version
-        menu: {
-            services: services.map(s => ({
-                id: s.id,
-                name: s.name,
-                description: s.description,
-                price: parseFloat(s.price.toString()),
-                duration: s.duration,
-                category: s.serviceCategory?.name || 'SERVICES',
-                franchiseId: s.franchiseId
-            })),
-            products: products.map(p => ({
-                id: p.id,
-                name: p.name,
-                description: p.description,
-                price: parseFloat(p.price.toString()),
-                stock: p.stock,
-                category: p.category || 'PRODUCTS',
-                franchiseId: p.franchiseId
-            })),
-            discounts,
-            categories
-        },
+        menu: posMenu,
 
         // Config & settings
         settings: stationConfig,

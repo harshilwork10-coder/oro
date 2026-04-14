@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withPOSAuth, POSContext } from '@/lib/posAuth'
 import crypto from 'crypto'
+import { buildPOSMenu } from '@/lib/pos/menuBuilder'
 
 // Generate ETag from menu data for efficient Android refresh
 function generateETag(services: unknown[], products: unknown[], discounts: unknown[]): string {
@@ -34,30 +35,20 @@ function generateETag(services: unknown[], products: unknown[], discounts: unkno
  * franchiseId comes from validated token, NEVER from client
  */
 export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
-    // SECURITY: franchiseId from validated token only
-    const { franchiseId } = ctx
+    // SECURITY: franchiseId and locationId from validated token only
+    const { franchiseId, locationId } = ctx
 
     try {
-        // Fetch real services from database
-        const services = await prisma.service.findMany({
-            where: { franchiseId },
-            include: { serviceCategory: true },
-            orderBy: { name: 'asc' }
+        // Fetch location to get franchisorId
+        const location = await prisma.location.findUnique({
+            where: { id: locationId },
+            select: { franchisorId: true }
         })
 
-        // Fetch real products from database
-        const products = await prisma.product.findMany({
-            where: { franchiseId, isActive: true },
-            orderBy: { name: 'asc' }
-        })
-
-        // Fetch discounts from database
-        const discounts = await prisma.discount.findMany({
-            where: { franchiseId, isActive: true }
-        })
+        const posMenu = await buildPOSMenu(franchiseId, locationId, location?.franchisorId)
 
         // Generate ETag for efficient Android refresh
-        const etag = `"${generateETag(services, products, discounts)}"`
+        const etag = `"${generateETag(posMenu.services, posMenu.products, posMenu.discounts)}"`
         const clientETag = req.headers.get('If-None-Match')
 
         // If ETag matches, return 304 Not Modified (Android can skip download)
@@ -71,45 +62,14 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
             })
         }
 
-        // Transform services to include category string for POS compatibility
-        const servicesFormatted = services.map(service => ({
-            id: service.id,
-            name: service.name,
-            description: service.description,
-            price: parseFloat(service.price.toString()),
-            duration: service.duration,
-            category: service.serviceCategory?.name || 'SERVICES',  // Default to avoid null
-            franchiseId: service.franchiseId
-        }))
-
-        // Transform products for POS
-        const productsFormatted = products.map(product => ({
-            id: product.id,
-            name: product.name,
-            description: product.description,
-            price: parseFloat(product.price.toString()),
-            stock: product.stock,
-            category: product.category || 'PRODUCTS',
-            franchiseId: product.franchiseId
-        }))
-
-        // Fetch categories for Android
-        const categories = await prisma.serviceCategory.findMany({
-            where: { franchiseId },
-            select: { id: true, name: true }
-        })
-
         return NextResponse.json({
-            services: servicesFormatted,
-            products: productsFormatted,
-            discounts,
-            categories,
+            ...posMenu,
             // Metadata for Android
             meta: {
-                serviceCount: servicesFormatted.length,
-                productCount: productsFormatted.length,
-                discountCount: discounts.length,
-                categoryCount: categories.length,
+                serviceCount: posMenu.services.length,
+                productCount: posMenu.products.length,
+                discountCount: posMenu.discounts.length,
+                categoryCount: posMenu.categories.length,
                 lastUpdated: new Date().toISOString()
             }
         }, {
