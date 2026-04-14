@@ -76,7 +76,12 @@ export async function POST(request: NextRequest) {
                             select: {
                                 id: true,
                                 name: true,
-                                franchisorId: true
+                                franchisorId: true,
+                                franchisor: {
+                                    select: {
+                                        industryType: true
+                                    }
+                                }
                             }
                         }
                     }
@@ -134,6 +139,8 @@ export async function POST(request: NextRequest) {
         const location = station.location
         const franchise = location.franchise
 
+        const rawIndustry = location.businessType || franchise.franchisor?.industryType || 'RETAIL'
+
         const stationConfig = {
             // Terminal settings
             paxTerminalIP: location.paxTerminalIP || null,
@@ -165,7 +172,7 @@ export async function POST(request: NextRequest) {
                 stationName: updatedStation.name,
                 locationId: location.id,
                 locationName: location.name,
-                businessType: location.businessType || 'RETAIL',
+                businessType: rawIndustry === 'SERVICE' ? 'SALON' : rawIndustry,
                 franchiseId: franchise.id,
                 franchiseName: franchise.name,
                 franchisorId: franchise.franchisorId,

@@ -1444,8 +1444,9 @@ function POSContent() {
                 const transaction = await res.json()
 
                 // LOY-6: Post-transaction finalize hook
+                let loyaltySummary = null
                 try {
-                    await fetch('/api/salon/loyalty/finalize', {
+                    const finalizeRes = await fetch('/api/salon/loyalty/finalize', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1454,6 +1455,10 @@ function POSContent() {
                             appliedRewards: appliedRewards
                         })
                     })
+                    const finalizeData = await finalizeRes.json()
+                    if (finalizeData.success && finalizeData.result?.earningSummaries) {
+                        loyaltySummary = finalizeData.result.earningSummaries
+                    }
                 } catch (e) {
                     console.error('[Loyalty Finalize Failed]', e)
                 }
@@ -1491,8 +1496,15 @@ function POSContent() {
                 })
 
                 // Print receipt using DB data only (no cart snapshot workaround)
+                setLastTransactionData({
+                    ...transaction,
+                    loyaltySummary,
+                    locationName: locationName,
+                    franchiseName: franchiseName
+                })
                 setToast({ message: '✓ Transaction Successful!', type: 'success' })
                 printReceipt(transaction)
+                setShowReceiptModal(true)
 
                 // Fetch rebooking suggestions if a customer was attached to this transaction
                 if (checkoutCustomerId) {
@@ -3033,9 +3045,10 @@ function POSContent() {
                                                     const txData = await res.json()
                                                     
                                                     // LOY-6: Post-transaction finalize hook
+                                                    let loyaltySummary = null
                                                     try {
                                                         const txPayload = txData.transaction || txData
-                                                        await fetch('/api/salon/loyalty/finalize', {
+                                                        const finalizeRes = await fetch('/api/salon/loyalty/finalize', {
                                                             method: 'POST',
                                                             headers: { 'Content-Type': 'application/json' },
                                                             body: JSON.stringify({
@@ -3044,6 +3057,10 @@ function POSContent() {
                                                                 appliedRewards: appliedRewards
                                                             })
                                                         })
+                                                        const finalizeData = await finalizeRes.json()
+                                                        if (finalizeData.success && finalizeData.result?.earningSummaries) {
+                                                            loyaltySummary = finalizeData.result.earningSummaries
+                                                        }
                                                     } catch (e) {
                                                         console.error('[Loyalty Finalize Failed]', e)
                                                     }
@@ -3074,6 +3091,7 @@ function POSContent() {
                                                     const transaction = txData.transaction || txData
                                                     setLastTransactionData({
                                                         ...transaction,
+                                                        loyaltySummary,
                                                         change: changeDue,
                                                         locationName: locationName,
                                                         franchiseName: franchiseName

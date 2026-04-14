@@ -81,7 +81,8 @@ export async function processTransactionRedeem(
                     transactionId,
                     loyaltyProgramId: program.id,
                     membershipId: membership.id,
-                    appliedValue: targetItem.price,
+                    rewardType: 'FULL_DISCOUNT',
+                    rewardValue: targetItem.price,
                     transactionLineItemId: targetItem.id
                 }
             })

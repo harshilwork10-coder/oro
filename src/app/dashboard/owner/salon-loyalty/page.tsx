@@ -12,10 +12,33 @@ export default function SalonLoyaltyOwnerPage() {
     const [activeProgram, setActiveProgram] = useState<any>(null)
     const [showWizard, setShowWizard] = useState(false)
     const [message, setMessage] = useState('')
+    const [analytics, setAnalytics] = useState<any>(null)
+    const [analyticsLoading, setAnalyticsLoading] = useState(false)
 
     useEffect(() => {
         fetchProgram()
     }, [])
+
+    useEffect(() => {
+        if (activeProgram) {
+            fetchAnalytics(activeProgram.id)
+        }
+    }, [activeProgram])
+
+    const fetchAnalytics = async (programId: string) => {
+        setAnalyticsLoading(true)
+        try {
+            const res = await fetch(`/api/salon/loyalty/analytics?programId=${programId}`)
+            if (res.ok) {
+                const data = await res.json()
+                setAnalytics(data.data)
+            }
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setAnalyticsLoading(false)
+        }
+    }
 
     const fetchProgram = async () => {
         setLoading(true)
@@ -140,30 +163,47 @@ export default function SalonLoyaltyOwnerPage() {
                             </div>
                         )}
 
-                        {/* LOY-12 Analytics Component Placeholder */}
+                        {/* LOY-12 Analytics Component */}
                         <div className="border-t border-stone-800 pt-8 mt-8">
                             <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                                 <BarChart3 className="w-5 h-5 text-stone-400" />
-                                Retention Impact
+                                Loyalty Performance
                             </h3>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
-                                    <p className="text-xs text-stone-500 font-bold uppercase mb-1">Active Loops</p>
-                                    <p className="text-2xl font-bold text-white">0</p>
+                            {analyticsLoading ? (
+                                <div className="h-32 flex items-center justify-center">
+                                    <RefreshCw className="w-6 h-6 text-violet-500 animate-spin" />
                                 </div>
-                                <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
-                                    <p className="text-xs text-stone-500 font-bold uppercase mb-1">Loop Revenue</p>
-                                    <p className="text-2xl font-bold text-emerald-400">$0.00</p>
+                            ) : analytics ? (
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                    <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
+                                        <p className="text-xs text-stone-500 font-bold uppercase mb-1">Active Loops</p>
+                                        <p className="text-2xl font-bold text-white">{analytics.activeLoops}</p>
+                                    </div>
+                                    <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
+                                        <p className="text-xs text-emerald-500/70 font-bold uppercase mb-1">Redemption Rev</p>
+                                        <p className="text-2xl font-bold text-emerald-400">${(analytics.redemptionRevenue || 0).toFixed(2)}</p>
+                                    </div>
+                                    <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
+                                        <p className="text-xs text-emerald-500/70 font-bold uppercase mb-1">Member Rev</p>
+                                        <p className="text-2xl font-bold text-emerald-400">${(analytics.memberRevenue || 0).toFixed(2)}</p>
+                                    </div>
+                                    <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
+                                        <p className="text-xs text-stone-500 font-bold uppercase mb-1">Rewards Claimed</p>
+                                        <p className="text-2xl font-bold text-white">{analytics.rewardsClaimed}</p>
+                                    </div>
+                                    <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
+                                        <p className="text-xs text-amber-500 font-bold uppercase mb-1">Overrides</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <p className="text-2xl font-bold text-amber-400">{analytics.manualAdjustCount}</p>
+                                            {(analytics.manualPositiveAdjustCount > 0 || analytics.manualNegativeAdjustCount > 0) ? (
+                                                <span className="text-xs text-amber-500/70 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                                                    +{analytics.manualPositiveAdjustCount} / {analytics.manualNegativeAdjustCount}
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
-                                    <p className="text-xs text-stone-500 font-bold uppercase mb-1">Rewards Claimed</p>
-                                    <p className="text-2xl font-bold text-white">0</p>
-                                </div>
-                                <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
-                                    <p className="text-xs text-amber-500 font-bold uppercase mb-1">Overrides</p>
-                                    <p className="text-2xl font-bold text-amber-400">0</p>
-                                </div>
-                            </div>
+                            ) : null}
                         </div>
 
                     </div>

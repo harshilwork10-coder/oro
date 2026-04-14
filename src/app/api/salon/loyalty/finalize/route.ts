@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
 
             // EARN PHASE: Iterate all active programs and compute EARN accumulation
             let totalEarnProcessed = 0
+            const earningSummaries = []
             const activePrograms = await tx.salonLoyaltyProgram.findMany({
                 where: {
                     status: 'ACTIVE',
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
                 const earnedPunches = calculatePotentialPunches(qualifyingItems, program)
 
                 if (earnedPunches > 0) {
-                    await processTransactionEarn(
+                    const earnResult = await processTransactionEarn(
                         tx,
                         program,
                         clientId,
@@ -104,11 +105,17 @@ export async function POST(req: NextRequest) {
                         earnedPunches,
                         stylistId || null
                     )
+                    if (earnResult.success) {
+                        earningSummaries.push({
+                            programName: program.name,
+                            ...earnResult
+                        })
+                    }
                     totalEarnProcessed++
                 }
             }
 
-            return { totalEarnProcessed, redemptionsProcessed }
+            return { totalEarnProcessed, redemptionsProcessed, earningSummaries }
         })
 
         return NextResponse.json({ success: true, result })

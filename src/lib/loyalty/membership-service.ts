@@ -41,14 +41,25 @@ export async function ensureMembership(
     })
 
     if (!membership && autoEnrollAllowed) {
-        membership = await prisma.salonCustomerLoyaltyMembership.create({
-            data: {
-                clientId,
-                loyaltyProgramId: programId,
-                homeLocationId: locationId,
-                status: 'ACTIVE'
+        try {
+            membership = await prisma.salonCustomerLoyaltyMembership.create({
+                data: {
+                    clientId,
+                    loyaltyProgramId: programId,
+                    homeLocationId: locationId,
+                    status: 'ACTIVE'
+                }
+            })
+        } catch (e: any) {
+            // Concurrency race: Another request auto-enrolled them exactly now.
+            if (e.code === 'P2002') {
+                membership = await prisma.salonCustomerLoyaltyMembership.findUnique({
+                    where: { clientId_loyaltyProgramId: { clientId, loyaltyProgramId: programId } }
+                })
+            } else {
+                throw e
             }
-        })
+        }
     }
 
     return membership

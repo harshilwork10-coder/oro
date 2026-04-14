@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Printer, MessageSquare, Mail, Check, RefreshCw } from 'lucide-react'
+import { X, Printer, MessageSquare, Mail, Check, RefreshCw, Gift, Star } from 'lucide-react'
 import { printReceipt, isPrintAgentAvailable, ReceiptData } from '@/lib/print-agent'
 import { normalizeTransactionForPrint } from '@/lib/print-utils'
 
@@ -235,6 +235,33 @@ export default function ReceiptModal({ isOpen, onClose, transactionData, onCompl
                         </div>
                     )}
                 </div>
+
+                {/* LOY-8: Dynamic Loyalty Summary */}
+                {transactionData?.loyaltySummary && transactionData.loyaltySummary.length > 0 && (
+                    <div className="bg-emerald-900/30 border-b border-emerald-900 px-6 py-4">
+                        {transactionData.loyaltySummary.map((summary: any, idx: number) => (
+                            <div key={idx} className="flex items-start gap-4">
+                                <div className="mt-1 w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
+                                    <Star className="h-5 w-5 text-emerald-400 fill-emerald-400" />
+                                </div>
+                                <div>
+                                    <h4 className="text-emerald-400 font-bold">{summary.programName}</h4>
+                                    <p className="text-emerald-300/80 text-sm">
+                                        +{summary.punchesEarned} Punch{summary.punchesEarned !== 1 ? 'es' : ''} Earned!
+                                    </p>
+                                    {summary.newlyUnlockedRewards > 0 && (
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <Gift className="h-4 w-4 text-amber-400" />
+                                            <p className="text-amber-400 text-sm font-bold tracking-wide">
+                                                REWARD UNLOCKED!
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 {/* Content */}
                 <div className="p-6">
