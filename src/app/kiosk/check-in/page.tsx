@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { User, Check, ChevronRight, Delete } from 'lucide-react'
 import OroLogo from '@/components/ui/OroLogo'
 
@@ -130,14 +130,17 @@ function OnScreenKeyboard({
     )
 }
 
-export default function KioskCheckInPage() {
+function KioskCheckInContent() {
     const router = useRouter()
-    const [step, setStep] = useState<'phone' | 'name' | 'waiver' | 'loyalty' | 'welcome'>('phone')
+    const searchParams = useSearchParams()
+    const locationId = searchParams.get('locationId') || ''
+    
+    // Stripped Loyalty completely. Flow is: Phone -> Name (if new) -> Waiver (triggers API sync) -> Welcome.
+    const [step, setStep] = useState<'phone' | 'name' | 'waiver' | 'welcome'>('phone')
     const [phone, setPhone] = useState('')
     const [firstName, setFirstName] = useState('')
     const [lastName, setLastName] = useState('')
     const [loading, setLoading] = useState(false)
-    const [isExistingCustomer, setIsExistingCustomer] = useState(false)
     const [waiverAccepted, setWaiverAccepted] = useState(false)
     const [activeInput, setActiveInput] = useState<'first' | 'last'>('first')
 
@@ -151,13 +154,12 @@ export default function KioskCheckInPage() {
             if (res.ok) {
                 const data = await res.json()
                 if (data.length > 0) {
-                    // Existing customer - go to waiver
+                    // Existing customer - extract name, skip Name step, go straight to Waiver
                     setFirstName(data[0].name.split(' ')[0])
-                    setIsExistingCustomer(true)
+                    setLastName(data[0].name.split(' ').slice(1).join(' '))
                     setStep('waiver')
                 } else {
                     // New customer - collect name first
-                    setIsExistingCustomer(false)
                     setStep('name')
                 }
             }
@@ -168,39 +170,32 @@ export default function KioskCheckInPage() {
         }
     }
 
-    const handleNameSubmit = async (e?: React.FormEvent) => {
-        e?.preventDefault()
-        if (!firstName || !lastName) return
-
+    const handleWaiverSubmit = async () => {
         setLoading(true)
-
         try {
-            // Create new customer
-            const res = await fetch('/api/franchise/customers', {
+            // Execute the master Kiosk Check-In Route, passing liabilitySigned.
+            // This natively creates the customer if new, updates existing, handles idempotency,
+            // and actually drops them into the `CheckIn` queue model for the location!
+            const res = await fetch('/api/kiosk/check-in', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    name: `${firstName} ${lastName}`,
-                    phone: phone
+                    name: `${firstName} ${lastName}`.trim(),
+                    phone: phone,
+                    locationId: locationId,
+                    liabilitySigned: true, // They confirmed the checkbox UI
+                    loyaltyJoined: false, // Stripped locally, explicitly defaulted to backend
+                    source: 'KIOSK' // Tags this checkin trace correctly
                 })
             })
 
             if (res.ok) {
-                setStep('waiver')
+                setStep('welcome')
+            } else {
+                console.error("Failed to sync check-in")
             }
-        } catch (error) {
-            console.error('Error creating customer:', error)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    const handleLoyaltyChoice = async (enrollInLoyalty: boolean) => {
-        setLoading(true)
-        try {
-            // TODO: Update customer with loyalty preference
-            // For now, just proceed to welcome
-            setStep('welcome')
+        } catch (err) {
+            console.error('Error syncing waiver and check-in:', err)
         } finally {
             setLoading(false)
         }
@@ -254,79 +249,13 @@ export default function KioskCheckInPage() {
                         </label>
 
                         <button
-                            onClick={() => setStep('loyalty')}
-                            disabled={!waiverAccepted}
+                            onClick={handleWaiverSubmit}
+                            disabled={!waiverAccepted || loading}
                             className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
                         >
-                            Continue
-                            <ChevronRight className="h-5 w-5" />
+                            {loading ? "Syncing..." : "Accept & Check In"}
+                            {!loading && <ChevronRight className="h-5 w-5" />}
                         </button>
-                    </div>
-                </div>
-            </div>
-        )
-    }
-
-    // Loyalty program step
-    if (step === 'loyalty') {
-        return (
-            <div className="h-screen bg-stone-950 flex flex-col relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-stone-900 to-stone-950 z-0" />
-                <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-orange-600/10 blur-[120px] rounded-full z-0" />
-
-                <div className="relative z-10 bg-stone-900/50 backdrop-blur-md border-b border-stone-800 p-6 shadow-lg flex items-center justify-center">
-                    <div className="flex items-center gap-3">
-                        <OroLogo size={32} />
-                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">ORO 9</span>
-                    </div>
-                </div>
-
-                <div className="flex-1 flex items-center justify-center p-6 relative z-10">
-                    <div className="max-w-lg w-full glass-panel rounded-3xl shadow-2xl p-8 border border-stone-800">
-                        <div className="text-center mb-8">
-                            <h2 className="text-3xl font-bold text-stone-100 mb-2">Join Our Loyalty Program?</h2>
-                            <p className="text-stone-400">Earn points with every visit and get exclusive rewards!</p>
-                        </div>
-
-                        <div className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 rounded-2xl p-6 mb-8 border border-orange-500/20">
-                            <h3 className="text-lg font-semibold text-orange-400 mb-3">Benefits:</h3>
-                            <ul className="text-sm text-stone-300 space-y-2">
-                                <li className="flex items-center gap-2">
-                                    <Check className="h-4 w-4 text-orange-400" />
-                                    Earn 1 point for every dollar spent
-                                </li>
-                                <li className="flex items-center gap-2">
-                                    <Check className="h-4 w-4 text-orange-400" />
-                                    Get $10 off for every 100 points
-                                </li>
-                                <li className="flex items-center gap-2">
-                                    <Check className="h-4 w-4 text-orange-400" />
-                                    Exclusive member-only discounts
-                                </li>
-                                <li className="flex items-center gap-2">
-                                    <Check className="h-4 w-4 text-orange-400" />
-                                    Birthday rewards and special offers
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div className="space-y-3">
-                            <button
-                                onClick={() => handleLoyaltyChoice(true)}
-                                disabled={loading}
-                                className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
-                            >
-                                {loading ? 'Enrolling...' : 'Of course! Sign me up'}
-                                <Check className="h-5 w-5" />
-                            </button>
-                            <button
-                                onClick={() => handleLoyaltyChoice(false)}
-                                disabled={loading}
-                                className="w-full py-4 bg-stone-800/50 hover:bg-stone-800 text-stone-200 rounded-2xl font-medium text-lg border border-stone-700 hover:border-orange-500/50 transition-all disabled:opacity-50 active:scale-[0.98]"
-                            >
-                                Not today
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -352,6 +281,7 @@ export default function KioskCheckInPage() {
                             setPhone('')
                             setFirstName('')
                             setLastName('')
+                            setWaiverAccepted(false)
                         }}
                         className="mt-12 px-8 py-3 bg-stone-800/50 hover:bg-stone-800 border border-stone-700 hover:border-orange-500/50 rounded-full text-sm font-medium transition-all text-stone-300 hover:text-white"
                     >
@@ -437,6 +367,7 @@ export default function KioskCheckInPage() {
                                 </button>
                             </div>
 
+                            {/* Only enabled if they manually hit enter via physical keyboard */}
                             <button
                                 type="submit"
                                 disabled={loading || phone.length < 10}
@@ -491,7 +422,7 @@ export default function KioskCheckInPage() {
                                 if (activeInput === 'first') {
                                     setActiveInput('last')
                                 } else if (firstName && lastName) {
-                                    handleNameSubmit()
+                                    setStep('waiver') // Advance to waiver instead of submitting
                                 }
                             }}
                             label={activeInput === 'first' ? 'First Name' : 'Last Name'}
@@ -500,22 +431,30 @@ export default function KioskCheckInPage() {
                         {/* Submit Button */}
                         <button
                             type="button"
-                            onClick={() => handleNameSubmit()}
+                            onClick={() => setStep('waiver')}
                             disabled={loading || !firstName || !lastName}
                             className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
                         >
-                            {loading ? (
-                                'Saving...'
-                            ) : (
-                                <>
-                                    Continue
-                                    <ChevronRight className="h-5 w-5" />
-                                </>
-                            )}
+                            <>
+                                Continue
+                                <ChevronRight className="h-5 w-5" />
+                            </>
                         </button>
                     </div>
                 )}
             </div>
         </div>
+    )
+}
+
+export default function KioskCheckInPage() {
+    return (
+        <Suspense fallback={
+            <div className="h-screen bg-stone-950 flex items-center justify-center font-bold text-white">
+                Preparing Kiosk...
+            </div>
+        }>
+            <KioskCheckInContent />
+        </Suspense>
     )
 }

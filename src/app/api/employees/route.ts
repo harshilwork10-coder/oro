@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        let whereClause: any = {
+        const whereClause: any = {
             role: 'EMPLOYEE'
         }
 

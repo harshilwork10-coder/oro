@@ -59,11 +59,11 @@ export async function POST(req: NextRequest) {
         }
 
         // Find user by email
-        let user = await prisma.user.findUnique({ where: { email } })
+        let dbUser = await prisma.user.findUnique({ where: { email } })
 
         // If user doesn't exist, create them
-        if (!user) {
-            user = await prisma.user.create({
+        if (!dbUser) {
+            dbUser = await prisma.user.create({
                 data: {
                     email,
                     role: 'FRANCHISOR',
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
         const existingMembership = await prisma.franchisorMembership.findUnique({
             where: {
                 userId_franchisorId: {
-                    userId: user.id,
+                    userId: dbUser.id,
                     franchisorId
                 }
             }
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
         // Create membership
         const membership = await prisma.franchisorMembership.create({
             data: {
-                userId: user.id,
+                userId: dbUser.id,
                 franchisorId,
                 role,
                 isPrimary

@@ -181,7 +181,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Lottery', href: '/dashboard/lottery', icon: Ticket, feature: 'lotteryEnabled' as const, industry: ['RETAIL'] as const },
         { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
         { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
-        { name: 'Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy, always: true },
+        { name: 'Retail Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy, industry: ['RETAIL'] as const },
+        { name: 'Beauty Loop', href: '/dashboard/owner/salon-loyalty', icon: Trophy, industry: ['SERVICE'] as const },
         { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt, always: true },
         { name: 'Reports', href: '/dashboard/reports', icon: BarChart3, always: true },
         // RETAIL only - Pricing Intelligence
@@ -222,7 +223,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         // RETAIL only
         { name: 'Deals', href: '/dashboard/deals', icon: Gift, industry: ['RETAIL'] as const },
         { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
-        { name: 'Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy, always: true },
+        { name: 'Retail Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy, industry: ['RETAIL'] as const },
+        { name: 'Beauty Loop', href: '/dashboard/owner/salon-loyalty', icon: Trophy, industry: ['SERVICE'] as const },
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },
         { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones, always: true },
@@ -332,7 +334,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         // Universal
         { name: 'Employees', href: '/dashboard/employees', icon: Users, always: true },
         { name: 'Customers', href: '/dashboard/customers', icon: UserCircle, always: true },
-        { name: 'Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy, always: true },
+        { name: 'Retail Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy, industry: ['RETAIL'] as const },
+        { name: 'Beauty Loop', href: '/dashboard/owner/salon-loyalty', icon: Trophy, industry: ['SERVICE'] as const },
         { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt, always: true },
         { name: 'Operations', href: '/dashboard/operations', icon: Clipboard, industry: ['RETAIL'] as const },
         { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },

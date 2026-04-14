@@ -25,8 +25,8 @@ export default function TransactionFilters({ filters, onFiltersChange, onApply }
 
     const handleQuickFilter = (quick: FilterValues['quickFilter']) => {
         const today = new Date()
-        let from = new Date()
-        let to = new Date()
+        const from = new Date()
+        const to = new Date()
 
         switch (quick) {
             case 'TODAY':

@@ -429,7 +429,7 @@ export function parseRmscFile(content: string): ParseResult {
     }
   } else {
     // CSV: handle multiline quoted fields
-    let fullContent = content
+    const fullContent = content
     // Rejoin lines that are inside quotes
     const csvLines: string[] = []
     let accumulated = ''

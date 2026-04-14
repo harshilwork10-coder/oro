@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     const period = searchParams.get('period') || 'week'
 
     const now = new Date()
-    let since = new Date()
+    const since = new Date()
     if (period === 'today') since.setHours(0, 0, 0, 0)
     else if (period === 'week') since.setDate(now.getDate() - 7)
     else if (period === 'month') since.setDate(now.getDate() - 30)

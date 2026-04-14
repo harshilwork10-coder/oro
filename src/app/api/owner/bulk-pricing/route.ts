@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
         const limit = parseInt(searchParams.get('limit') || '50')
 
         // Build filter
-        let where: any = { isActive: true }
+        const where: any = { isActive: true }
 
         if (user.role !== 'PROVIDER' && user.franchiseId) {
             where.franchiseId = user.franchiseId
@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
             }
         } else if (mode === 'percentage' && value !== undefined) {
             // Bulk percentage adjustment
-            let where: any = { isActive: true }
+            const where: any = { isActive: true }
 
             if (user.role !== 'PROVIDER' && user.franchiseId) {
                 where.franchiseId = user.franchiseId
@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
             }
         } else if (mode === 'margin' && value !== undefined) {
             // Set prices based on cost + margin
-            let where: any = { isActive: true, cost: { not: null } }
+            const where: any = { isActive: true, cost: { not: null } }
 
             if (user.role !== 'PROVIDER' && user.franchiseId) {
                 where.franchiseId = user.franchiseId

@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
             franchiseId = user.franchiseId
         }
 
-        let response: any = {}
+        const response: any = {}
 
         // Get suppliers
         if (type === 'suppliers' || type === 'all') {
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 
         // Get purchase orders
         if (type === 'orders' || type === 'all') {
-            let orderWhere: any = {}
+            const orderWhere: any = {}
 
             if (franchiseId) orderWhere.franchiseId = franchiseId
             if (status && status !== 'all') orderWhere.status = status

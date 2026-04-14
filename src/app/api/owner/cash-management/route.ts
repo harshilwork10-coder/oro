@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
         const type = searchParams.get('type') // 'counts', 'drops', 'deposits', or null for all
 
         // Build location filter
-        let locationFilter: any = {}
+        const locationFilter: any = {}
 
         if (user.role === 'PROVIDER') {
             if (locationId && locationId !== 'all') {

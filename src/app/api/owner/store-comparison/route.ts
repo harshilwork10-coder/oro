@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         const metric = searchParams.get('metric') || 'sales' // sales, transactions, avgTicket
 
         // Get locations
-        let locationFilter: any = {}
+        const locationFilter: any = {}
         if (user.role !== 'PROVIDER' && user.franchiseId) {
             locationFilter.franchiseId = user.franchiseId
         }

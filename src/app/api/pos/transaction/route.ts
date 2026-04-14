@@ -505,6 +505,12 @@ export async function GET(req: NextRequest) {
                             service: true,
                             product: true
                         }
+                    },
+                    salonLoyaltyLedgerEntries: {
+                        include: { loyaltyProgram: true }
+                    },
+                    salonLoyaltyRedemptions: {
+                        include: { loyaltyProgram: true }
                     }
                 }
             })
@@ -627,6 +633,12 @@ export async function GET(req: NextRequest) {
                         name: true,
                         email: true
                     }
+                },
+                salonLoyaltyLedgerEntries: {
+                    include: { loyaltyProgram: true }
+                },
+                salonLoyaltyRedemptions: {
+                    include: { loyaltyProgram: true }
                 }
             },
             orderBy: {

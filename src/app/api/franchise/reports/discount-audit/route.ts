@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
 
         // Calculate statistics
         let totalDiscountAmount = 0
-        let totalTransactionsWithDiscount = transactions.length
+        const totalTransactionsWithDiscount = transactions.length
 
         // By barber breakdown
         const byBarber: Record<string, {

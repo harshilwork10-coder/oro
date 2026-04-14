@@ -7,6 +7,7 @@ import {
     Clock, CheckCircle, AlertCircle, Play, Plus, X, Copy, Check, RefreshCw
 } from 'lucide-react';
 import Toast from '@/components/ui/Toast';
+import PreOnboardingConfig from '@/components/provider/PreOnboardingConfig';
 
 interface Station {
     id: string;
@@ -269,6 +270,12 @@ export default function ProvisioningDetailPage({ params }: { params: Promise<{ i
                     </div>
                 )}
             </div>
+
+            {/* Pre-Onboarding Config */ }
+            <PreOnboardingConfig 
+                franchiseId={task.franchiseeBusinessId} 
+                franchisorId={task.franchisorId} 
+            />
 
             {/* Stations Section */}
             <div className="bg-stone-900/50 border border-stone-800 rounded-2xl p-6 mb-6">

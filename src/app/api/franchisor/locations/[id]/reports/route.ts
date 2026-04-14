@@ -31,7 +31,7 @@ export async function GET(
         // Get date range based on period
         const now = new Date();
         let from: Date;
-        let to: Date = now;
+        const to: Date = now;
         let label: string;
 
         switch (periodParam) {

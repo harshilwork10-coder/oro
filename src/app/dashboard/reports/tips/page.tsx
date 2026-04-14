@@ -45,7 +45,7 @@ export default function TipsReportPage() {
     const getDateParams = () => {
         const now = new Date()
         let start: Date
-        let end = new Date()
+        const end = new Date()
 
         switch (dateRange) {
             case 'today':

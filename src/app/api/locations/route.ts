@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Generate slug
-        let slug = name.toLowerCase()
+        const slug = name.toLowerCase()
             .replace(/\s+/g, '-')
             .replace(/[^\w\-]+/g, '')
             .replace(/\-\-+/g, '-')

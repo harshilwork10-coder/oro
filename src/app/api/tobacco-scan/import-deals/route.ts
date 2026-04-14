@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer())
 
     // Use pdf-parse to extract text (CJS module)
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfParseFn = (require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>)
     const pdfData = await pdfParseFn(buffer)
     const text = pdfData.text

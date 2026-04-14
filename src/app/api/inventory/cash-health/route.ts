@@ -43,8 +43,8 @@ export async function GET(request: Request) {
 
         // Batch: get last sale date and 30d units for ALL products at once
         // We'll use raw queries for efficiency on large catalogs
-        let productSales30d: Record<string, number> = {}
-        let productLastSale: Record<string, Date | null> = {}
+        const productSales30d: Record<string, number> = {}
+        const productLastSale: Record<string, Date | null> = {}
 
         try {
             // Get 30-day sales grouped by product

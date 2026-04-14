@@ -709,6 +709,81 @@ export default function ProviderClientConfigPage() {
                                 </div>
                             )}
 
+                            {categoryView === 'tax' && (
+                                <div className="space-y-4">
+                                    <p className="text-stone-400">Configure global tax defaults</p>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm text-stone-300 mb-2">Default Base Tax Rate %</label>
+                                            <div className="relative">
+                                                <input 
+                                                    id="tax-rate-input"
+                                                    type="number" 
+                                                    step="0.01"
+                                                    defaultValue={client.defaultTaxRate || 0}
+                                                    className="w-full bg-stone-700 border border-stone-600 rounded-lg px-3 py-2 text-stone-200"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {[
+                                                { id: 'servicesTaxableDefault', label: 'Services Taxable by Default', enabled: client.servicesTaxableDefault },
+                                                { id: 'productsTaxableDefault', label: 'Products Taxable by Default', enabled: client.productsTaxableDefault },
+                                                { id: 'taxInclusive', label: 'Tax Inclusive Pricing', enabled: client.taxInclusive },
+                                            ].map((method) => (
+                                                <button
+                                                    key={method.id}
+                                                    id={`tax-toggle-${method.id}`}
+                                                    onClick={(e) => {
+                                                        const btn = e.currentTarget;
+                                                        const isOn = btn.getAttribute('data-on') === 'true';
+                                                        btn.setAttribute('data-on', (!isOn).toString());
+                                                        btn.className = !isOn 
+                                                            ? 'w-full p-3 rounded-lg border flex items-center justify-between border-emerald-500/50 bg-emerald-500/10' 
+                                                            : 'w-full p-3 rounded-lg border flex items-center justify-between border-stone-700';
+                                                        const span = btn.querySelector('span:last-child');
+                                                        if (span) span.innerHTML = !isOn ? '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>' : '○';
+                                                    }}
+                                                    data-on={method.enabled.toString()}
+                                                    className={`w-full p-3 rounded-lg border flex items-center justify-between ${method.enabled
+                                                        ? 'border-emerald-500/50 bg-emerald-500/10'
+                                                        : 'border-stone-700'
+                                                        }`}
+                                                >
+                                                    <span className="text-stone-200">{method.label}</span>
+                                                    <span className={method.enabled ? 'text-emerald-400' : 'text-stone-500'}>
+                                                        {method.enabled ? <CheckCircle size={18} /> : '○'}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                const rateInput = document.getElementById('tax-rate-input') as HTMLInputElement;
+                                                const rate = parseFloat(rateInput?.value) || 0;
+                                                
+                                                const stBtn = document.getElementById('tax-toggle-servicesTaxableDefault');
+                                                const ptBtn = document.getElementById('tax-toggle-productsTaxableDefault');
+                                                const tiBtn = document.getElementById('tax-toggle-taxInclusive');
+
+                                                updateConfig({
+                                                    defaultTaxRate: rate,
+                                                    taxRate: rate, // Update legacy field as well
+                                                    servicesTaxableDefault: stBtn?.getAttribute('data-on') === 'true',
+                                                    productsTaxableDefault: ptBtn?.getAttribute('data-on') === 'true',
+                                                    taxInclusive: tiBtn?.getAttribute('data-on') === 'true'
+                                                });
+                                                setCategoryView(null);
+                                            }}
+                                            disabled={saving}
+                                            className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                                        >
+                                            {saving ? 'Saving...' : 'Save Tax Settings'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {categoryView === 'shift' && (
                                 <div className="space-y-4">
                                     <p className="text-stone-400">Configure shift opening requirements for employees</p>

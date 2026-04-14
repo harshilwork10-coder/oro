@@ -102,7 +102,7 @@ export async function calculateCommission(
     let serviceCommission = 0
     let productCommission = 0
     let servicesPerformed = 0
-    let newClientBonus = 0
+    const newClientBonus = 0
 
     // Calculate service & product commissions
     for (const txn of transactions) {
@@ -147,7 +147,7 @@ export async function calculateCommission(
                 productRevenue += revenue
 
                 // TODO: Implement product cost deduction when GlobalProduct has COGS
-                let commissionBase = revenue
+                const commissionBase = revenue
                 if (paymentConfig.useProductCostDeduction) {
                     // commissionBase = revenue - productCost
                 }

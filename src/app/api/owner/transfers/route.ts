@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         const locationId = searchParams.get('locationId')
 
         // Build location filter
-        let locationFilter: any = {}
+        const locationFilter: any = {}
 
         if (user.role === 'PROVIDER') {
             // Provider sees all

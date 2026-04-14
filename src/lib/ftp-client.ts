@@ -54,8 +54,8 @@ export async function fetchInvoiceFiles(
 ): Promise<FetchResult> {
   const errors: string[] = []
   const fetchedFiles: FetchedFile[] = []
-  let filesFound = 0
-  let filesSkipped = 0
+  const filesFound = 0
+  const filesSkipped = 0
 
   try {
     if (config.protocol === 'SFTP') {

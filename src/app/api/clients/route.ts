@@ -141,7 +141,7 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 })
         }
 
-        let franchiseId = user.franchiseId
+        const franchiseId = user.franchiseId
 
         // Handle FRANCHISOR users
         if (user.role === 'FRANCHISOR' && !franchiseId) {

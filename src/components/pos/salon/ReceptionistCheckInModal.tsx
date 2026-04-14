@@ -35,6 +35,7 @@ export default function ReceptionistCheckInModal({
     // Walk-in state
     const [name, setName] = useState('')
     const [phone, setPhone] = useState('')
+    const [waiverSigned, setWaiverSigned] = useState(false)
     const [loading, setLoading] = useState(false)
     const [result, setResult] = useState<{ success: boolean; message: string; alreadyCheckedIn?: boolean } | null>(null)
 
@@ -43,15 +44,18 @@ export default function ReceptionistCheckInModal({
     const [appointmentSearch, setAppointmentSearch] = useState('')
     const [loadingAppointments, setLoadingAppointments] = useState(false)
     const [checkingInAppointment, setCheckingInAppointment] = useState<string | null>(null)
+    const [globalAptWaiverSigned, setGlobalAptWaiverSigned] = useState(false)
 
     // Reset state when modal opens
     useEffect(() => {
         if (isOpen) {
             setName('')
             setPhone('')
+            setWaiverSigned(false)
             setResult(null)
             setTab('walkin')
             setAppointmentSearch('')
+            setGlobalAptWaiverSigned(false)
             fetchTodayAppointments()
         }
     }, [isOpen])
@@ -83,7 +87,7 @@ export default function ReceptionistCheckInModal({
     }
 
     const handleWalkInCheckIn = async () => {
-        if (!name.trim() || !phone.trim()) return
+        if (!name.trim() || !phone.trim() || !waiverSigned) return
         setLoading(true)
         setResult(null)
 
@@ -95,6 +99,7 @@ export default function ReceptionistCheckInModal({
                     name: name.trim(),
                     phone: phone.trim(),
                     locationId,
+                    liabilitySigned: true, // Persist waiver state checked by receptionist
                     source: 'RECEPTIONIST'
                 })
             })
@@ -135,6 +140,7 @@ export default function ReceptionistCheckInModal({
                     name: appointment.clientName,
                     phone: appointment.clientPhone,
                     locationId,
+                    liabilitySigned: true, // Assuming receptionist validated it via globalAptWaiverSigned
                     source: 'RECEPTIONIST',
                     appointmentId: appointment.id
                 })
@@ -265,13 +271,26 @@ export default function ReceptionistCheckInModal({
                                         onChange={(e) => setPhone(e.target.value)}
                                         placeholder="(555) 123-4567"
                                         className="w-full pl-10 pr-4 py-3 bg-stone-800 border border-stone-700 rounded-xl text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                        onKeyDown={(e) => e.key === 'Enter' && handleWalkInCheckIn()}
                                     />
                                 </div>
                             </div>
+
+                            {/* Required Liability Waiver UI */}
+                            <label className="flex items-start gap-3 p-3 bg-stone-800/50 rounded-xl border border-stone-700 cursor-pointer hover:border-orange-500/50 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    checked={waiverSigned}
+                                    onChange={(e) => setWaiverSigned(e.target.checked)}
+                                    className="mt-0.5 w-4 h-4 rounded border-stone-600 text-orange-500 focus:ring-orange-500 bg-stone-900 cursor-pointer"
+                                />
+                                <span className="text-sm text-stone-300 font-medium tracking-wide">
+                                    Customer has signed Liability Waiver (Required)
+                                </span>
+                            </label>
+
                             <button
                                 onClick={handleWalkInCheckIn}
-                                disabled={!name.trim() || !phone.trim() || loading}
+                                disabled={!name.trim() || !phone.trim() || !waiverSigned || loading}
                                 className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                             >
                                 {loading ? (
@@ -299,7 +318,20 @@ export default function ReceptionistCheckInModal({
                                 />
                             </div>
 
-                            <div className="max-h-[320px] overflow-y-auto space-y-2">
+                            {/* Required Liability Waiver UI for Appointments */}
+                            <label className="flex items-start gap-3 p-3 mb-2 bg-stone-800/50 rounded-xl border border-stone-700 cursor-pointer hover:border-violet-500/50 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    checked={globalAptWaiverSigned}
+                                    onChange={(e) => setGlobalAptWaiverSigned(e.target.checked)}
+                                    className="mt-0.5 w-4 h-4 rounded border-stone-600 text-violet-500 focus:ring-violet-500 bg-stone-900 cursor-pointer"
+                                />
+                                <span className="text-sm text-stone-300 font-medium tracking-wide">
+                                    Customer has signed Liability Waiver (Required)
+                                </span>
+                            </label>
+
+                            <div className="max-h-[280px] overflow-y-auto space-y-2">
                                 {loadingAppointments ? (
                                     <div className="text-center py-8 text-stone-500">
                                         <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
@@ -318,7 +350,7 @@ export default function ReceptionistCheckInModal({
                                         <button
                                             key={apt.id}
                                             onClick={() => handleAppointmentCheckIn(apt)}
-                                            disabled={checkingInAppointment === apt.id}
+                                            disabled={checkingInAppointment === apt.id || !globalAptWaiverSigned}
                                             className="w-full p-3 bg-stone-800/60 hover:bg-stone-800 border border-stone-700 hover:border-violet-500/50 rounded-xl text-left transition-all flex items-center justify-between disabled:opacity-50"
                                         >
                                             <div className="min-w-0">
@@ -337,7 +369,9 @@ export default function ReceptionistCheckInModal({
                                                 {checkingInAppointment === apt.id ? (
                                                     <Loader2 className="h-4 w-4 animate-spin text-violet-400 ml-auto mt-1" />
                                                 ) : (
-                                                    <span className="text-[10px] text-stone-600">Tap to check in</span>
+                                                    <span className="text-[10px] text-stone-400">
+                                                        {!globalAptWaiverSigned ? "Wait for waiver" : "Tap to check in"}
+                                                    </span>
                                                 )}
                                             </div>
                                         </button>

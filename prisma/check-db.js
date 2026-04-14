@@ -1,20 +1,17 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { PrismaClient } = require('@prisma/client')
+const p = new PrismaClient()
 
 async function main() {
-    // Get all users
-    const users = await prisma.user.findMany({
-        select: { id: true, email: true, name: true, role: true, franchiseId: true }
-    });
-    console.log('=== USERS ===');
-    console.log(JSON.stringify(users, null, 2));
-
-    // Get all franchises
-    const franchises = await prisma.franchise.findMany({
-        select: { id: true, name: true }
-    });
-    console.log('\n=== FRANCHISES ===');
-    console.log(JSON.stringify(franchises, null, 2));
+    const admin = await p.user.findFirst({ where: { email: 'admin@oro9.com' } });
+    console.log('Admin:', admin);
+    
+    // Check if provider entity exists
+    const provider = await p.provider.findFirst();
+    console.log('Provider:', provider);
+    
+    // Test if admin has the right role
+    if (admin) {
+        console.log('Admin role is:', admin.role);
+    }
 }
-
-main().finally(() => prisma.$disconnect());
+main().finally(() => p['$disconnect']());

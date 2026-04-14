@@ -1129,7 +1129,7 @@ export default function RetailPOSPage() {
 
     // Add product to cart (with weighted item support)
     const addToCart = (product: any) => {
-        let qty = parseInt(quantityInput) || 1
+        const qty = parseInt(quantityInput) || 1
 
         // Weighted item: auto-apply scale reading instead of integer quantity
         if (product.isWeighted && lastScaleReading && scaleConnected) {
@@ -1345,7 +1345,7 @@ export default function RetailPOSPage() {
         taxCard = round2(taxCard * (1 - discountRatio))
 
         // Totals
-        let cashTotal = round2(discountedSubtotalCash + taxCash)
+        const cashTotal = round2(discountedSubtotalCash + taxCash)
         let cardTotal = round2(discountedSubtotalCard + taxCard)
 
         // For FLAT_AMOUNT surcharge, add once at total level

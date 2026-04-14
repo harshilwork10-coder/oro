@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
         const accountId = offboardingCase.franchisorId || offboardingCase.franchiseId;
         const isFranchise = !!offboardingCase.franchiseId;
 
-        let exportData: any = {
+        const exportData: any = {
             exportedAt: new Date().toISOString(),
             accountType: offboardingCase.accountType,
             accountId

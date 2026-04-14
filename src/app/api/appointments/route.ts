@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         })
 
         const { searchParams } = new URL(req.url)
-        let locationId = searchParams.get('locationId')
+        const locationId = searchParams.get('locationId')
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
         const employeeId = searchParams.get('employeeId')

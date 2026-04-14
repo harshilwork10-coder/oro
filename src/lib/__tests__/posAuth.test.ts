@@ -154,7 +154,7 @@ describe('POS Authentication', () => {
         })
 
         it('returns 403 for missing token without calling handler', async () => {
-            let handlerCalled = false // eslint-disable-line prefer-const
+            let handlerCalled = false  
             const handler = withPOSAuth(async () => {
                 handlerCalled = true
                 return NextResponse.json({ success: true })

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     }
 
     try {
-        let whereClause: any = {}
+        const whereClause: any = {}
 
         if (user.role === 'FRANCHISOR') {
             const franchisor = await prisma.franchisor.findUnique({

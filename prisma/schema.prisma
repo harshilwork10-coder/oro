@@ -30,7 +30,7 @@ enum TransactionStatus {
   REFUNDED
   VOIDED
   PARTIALLY_REFUNDED
-  CORRECTED            // Has a correction child entry (late fix)
+  CORRECTED // Has a correction child entry (late fix)
 }
 
 enum PaymentMethod {
@@ -43,13 +43,13 @@ enum PaymentMethod {
 
 // Ledger-based Transaction Types (immutable accounting)
 enum TransactionType {
-  SALE        // Regular sale (positive amount)
-  REFUND      // Refund (negative, linked to original)
-  VOID        // Void (cancels before settlement, creates child row)
-  CORRECTION  // Late reversal (post-settlement, post-day, creates child row)
-  TIP_ADJUST  // Tip adjustment after sale
-  PAYIN       // Cash added to drawer
-  PAYOUT      // Cash removed from drawer
+  SALE // Regular sale (positive amount)
+  REFUND // Refund (negative, linked to original)
+  VOID // Void (cancels before settlement, creates child row)
+  CORRECTION // Late reversal (post-settlement, post-day, creates child row)
+  TIP_ADJUST // Tip adjustment after sale
+  PAYIN // Cash added to drawer
+  PAYOUT // Cash removed from drawer
 }
 
 enum AppointmentStatus {
@@ -118,14 +118,13 @@ enum TrustedDeviceStatus {
 }
 
 enum DisplayMode {
-  SECOND_SCREEN      // HDMI/secondary browser window
-  POLE_DISPLAY       // Serial/USB 2x20 VFD
-  REMOTE_BROWSER     // Separate device polling via HTTP
-  ANDROID_DISPLAY    // Android WebView on PAX/integrated
-  VENDOR_INTEGRATED  // Vendor SDK (PAX S-series, etc.)
-  NONE               // No display configured
+  SECOND_SCREEN // HDMI/secondary browser window
+  POLE_DISPLAY // Serial/USB 2x20 VFD
+  REMOTE_BROWSER // Separate device polling via HTTP
+  ANDROID_DISPLAY // Android WebView on PAX/integrated
+  VENDOR_INTEGRATED // Vendor SDK (PAX S-series, etc.)
+  NONE // No display configured
 }
-
 
 enum TerminalType {
   PAX
@@ -162,47 +161,47 @@ enum InvoiceStatus {
 // Kept for schema compatibility — do NOT add new code that reads these tables.
 // Scheduled for removal after confirming no production data exists.
 model FeatureFlag {
-  id           String   @id @default(cuid())
-  key          String   @unique // e.g., "appointments_v2", "inventory_advanced"
+  id           String  @id @default(cuid())
+  key          String  @unique // e.g., "appointments_v2", "inventory_advanced"
   description  String?
-  defaultValue Boolean  @default(false)
-  
+  defaultValue Boolean @default(false)
+
   // Targeting - JSON array of verticals or null for all
   // Example: ["SALON", "RETAIL"] or null = all verticals
   targetVerticals Json?
-  
+
   // Rollout controls
-  status       String   @default("ACTIVE") // ACTIVE, DEPRECATED
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  overrides    FeatureFlagOverride[]
-  
+  status String @default("ACTIVE") // ACTIVE, DEPRECATED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  overrides FeatureFlagOverride[]
+
   @@index([key])
   @@index([status])
 }
 
 // @deprecated — see FeatureFlag above
 model FeatureFlagOverride {
-  id          String   @id @default(cuid())
-  flagId      String
-  flag        FeatureFlag @relation(fields: [flagId], references: [id], onDelete: Cascade)
-  
+  id     String      @id @default(cuid())
+  flagId String
+  flag   FeatureFlag @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
   // Scope targeting - most specific wins
-  scopeType   String   // FRANCHISOR | FRANCHISEE_BUSINESS | LOCATION | STATION
-  scopeId     String   // ID of the targeted entity
-  
-  value       Boolean  // Override value (true = enabled, false = disabled)
-  reason      String?  // Required for audit: "Pilot testing", "Bug workaround", etc.
-  
-  updatedById String?  // Who made this change
+  scopeType String // FRANCHISOR | FRANCHISEE_BUSINESS | LOCATION | STATION
+  scopeId   String // ID of the targeted entity
+
+  value  Boolean // Override value (true = enabled, false = disabled)
+  reason String? // Required for audit: "Pilot testing", "Bug workaround", etc.
+
+  updatedById String? // Who made this change
   updatedAt   DateTime @updatedAt
   createdAt   DateTime @default(now())
-  
+
+  @@unique([flagId, scopeType, scopeId]) // One override per scope per flag
   @@index([flagId])
   @@index([scopeType, scopeId])
-  @@unique([flagId, scopeType, scopeId]) // One override per scope per flag
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -316,19 +315,19 @@ model RoleDefaultPermission {
 // For cases like "Manager has access to 2 of 3 stores"
 // Used in addition to role-based access (scope enforcement)
 model UserLocationAccess {
-  id         String   @id @default(cuid())
+  id         String @id @default(cuid())
   userId     String
-  user       User     @relation("UserLocationAccess", fields: [userId], references: [id], onDelete: Cascade)
+  user       User   @relation("UserLocationAccess", fields: [userId], references: [id], onDelete: Cascade)
   locationId String
-  
+
   // Access level at this specific location
-  accessRole String   @default("VIEW") // VIEW, OPERATE, MANAGE, FULL
-  
+  accessRole String @default("VIEW") // VIEW, OPERATE, MANAGE, FULL
+
   // Reporting access
-  canViewReports     Boolean @default(false)
-  canExportReports   Boolean @default(false)
-  canViewFinancials  Boolean @default(false)
-  
+  canViewReports    Boolean @default(false)
+  canExportReports  Boolean @default(false)
+  canViewFinancials Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -390,8 +389,8 @@ model User {
   // Employee Discount (auto-applied when employee is the customer)
   employeeDiscountEnabled Boolean  @default(false)
   employeeDiscountPct     Decimal? @db.Decimal(5, 2) // e.g., 15.00 = 15% off
-  maxDiscountPercent Int     @default(0) // Max discount percentage allowed (e.g., 20)
-  maxDiscountAmount  Decimal @default(0) @db.Decimal(12, 2) // Max discount flat amount allowed (e.g., 10.00)
+  maxDiscountPercent      Int      @default(0) // Max discount percentage allowed (e.g., 20)
+  maxDiscountAmount       Decimal  @default(0) @db.Decimal(12, 2) // Max discount flat amount allowed (e.g., 10.00)
 
   // Shift Management Permissions
   requiresTimeClock Boolean @default(false) // Employee must clock in/out
@@ -437,13 +436,13 @@ model User {
   activeCart            ActiveCart?
 
   // New Relations
-  timeEntries        TimeEntry[]
-  commissionRuleId   String?
-  commissionRule     CommissionRule?     @relation(fields: [commissionRuleId], references: [id])
-  cashDrawerSessions CashDrawerSession[]
-  drawerActivities   DrawerActivity[] // Fraud prevention - all drawer opens logged
+  timeEntries           TimeEntry[]
+  commissionRuleId      String?
+  commissionRule        CommissionRule?        @relation(fields: [commissionRuleId], references: [id])
+  cashDrawerSessions    CashDrawerSession[]
+  drawerActivities      DrawerActivity[] // Fraud prevention - all drawer opens logged
   suspendedTransactions SuspendedTransaction[] @relation("SuspendedTransactions")
-  paymentLogs        PaymentLog[] @relation("PaymentLogs") // Payment attempt logs
+  paymentLogs           PaymentLog[]           @relation("PaymentLogs") // Payment attempt logs
 
   // Sub-Franchisee Link (Phase 2)
   subFranchisee SubFranchisee?
@@ -528,7 +527,7 @@ model Franchise {
   // Region / Territory grouping for enterprise HQ reporting and Regional Manager scoping
   // Examples: "Southeast", "Pacific Northwest", "TX-DFW", "Chicago Metro"
   region String? // Optional — set by HQ when adding franchisee or editing location
-  
+
   // Customer ID: Format ZIPCODE-0001 (e.g., 75001-0001)
   // Generated based on storeZip from FranchiseSettings + sequential number
   customerId String? @unique // Auto-generated on first save with zip
@@ -586,13 +585,13 @@ model Franchise {
   manufacturerConfigs ManufacturerConfig[]
 
   // Tobacco Scan Deal Engine
-  tobaccoScanDeals    TobaccoScanDeal[]
+  tobaccoScanDeals     TobaccoScanDeal[]
   tobaccoExportBatches TobaccoScanExportBatch[]
 
   // Vendor Invoice Import
-  inboundFiles     InboundFile[]
-  vendorInvoices   VendorInvoice[]
-  ftpConfig        FtpConfig?
+  inboundFiles   InboundFile[]
+  vendorInvoices VendorInvoice[]
+  ftpConfig      FtpConfig?
 
   // Tax Configuration
   taxJurisdictions TaxJurisdiction[]
@@ -637,7 +636,7 @@ model Franchise {
   printers PrinterConfig[]
 
   // === Account Offboarding (GDPR/CCPA Compliant) ===
-  accountStatus       AccountStatus @default(ACTIVE)
+  accountStatus       AccountStatus     @default(ACTIVE)
   suspendedAt         DateTime?
   suspendedReason     String?
   suspendedBy         String? // User ID who suspended
@@ -746,8 +745,8 @@ model FranchiseSettings {
   retentionConfig String? @db.Text // Full retention suite settings as JSON
 
   // ========== VOID / REFUND LIMITS ==========
-  voidLimitPerDay       Decimal? @db.Decimal(12, 2) // Max $ void per cashier per day (null = unlimited)
-  refundLimitPerDay     Decimal? @db.Decimal(12, 2) // Max $ refund per cashier per day (null = unlimited)
+  voidLimitPerDay        Decimal? @db.Decimal(12, 2) // Max $ void per cashier per day (null = unlimited)
+  refundLimitPerDay      Decimal? @db.Decimal(12, 2) // Max $ refund per cashier per day (null = unlimited)
   requireManagerPinAbove Decimal? @db.Decimal(12, 2) // Require manager PIN for void/refund above this $
 
   // ========== TAX RECEIPT DISPLAY ==========
@@ -944,16 +943,16 @@ model Location {
   // Brand HQ (franchisor) that owns this location chain
   franchisorId String?
   franchisor   Franchisor? @relation("FranchisorLocations", fields: [franchisorId], references: [id])
-  
+
   // The franchisee LLC/business that operates this specific location
   franchiseeBusinessId String?
-  
+
   // Provisioning status for new locations
   provisioningStatus String @default("PROVISIONING_PENDING") // PROVISIONING_PENDING, READY_FOR_INSTALL, ACTIVE, SUSPENDED
-  
+
   // Brand Catalog Permissions (franchisor grants per-location)
   canCustomizePricing Boolean @default(false) // If true, location can override brand prices
-  
+
   // Provisioning tasks for this location
   provisioningTasks LocationProvisioningTask[]
 
@@ -977,9 +976,9 @@ model Location {
   schedules          Schedule[]
   drawerActivities   DrawerActivity[] // Fraud prevention audit trail
   stations           Station[] // POS stations/registers
-  paymentLogs        PaymentLog[] @relation("PaymentLogs") // Payment attempt logs
+  paymentLogs        PaymentLog[]        @relation("PaymentLogs") // Payment attempt logs
   paymentTerminals   PaymentTerminal[] // Card terminals at this location
-  vendorInvoices     VendorInvoice[]   // Vendor invoices for this location
+  vendorInvoices     VendorInvoice[] // Vendor invoices for this location
 
   // Payment Processor Configuration
   processorName   String? // e.g., "DATAWIRE", "TSYS", "VANTIV", "WORLDPAY", "FIRST_DATA"
@@ -1030,7 +1029,7 @@ model Location {
   rmscScanRecords     RmscScanRecord[]
 
   // Tobacco Scan Events (ledger rows for this location)
-  tobaccoScanEvents   TobaccoScanEvent[]
+  tobaccoScanEvents TobaccoScanEvent[]
 
   // Tax Jurisdictions (sales tax + excise taxes applicable to this location)
   taxJurisdictions LocationTaxJurisdiction[]
@@ -1039,12 +1038,12 @@ model Location {
   taxCategoryRules LocationTaxCategoryRule[]
 
   // Tax Groups (bundles of tax components per location)
-  taxGroups            TaxGroup[]             @relation("LocationTaxGroups")
+  taxGroups             TaxGroup[]             @relation("LocationTaxGroups")
   departmentTaxDefaults DepartmentTaxDefault[] @relation("LocationDeptTaxDefaults")
 
   // Pricing Rules (auto-pricing per department)
-  pricingRules          PricingRule[]
-  categoryPricingRules  CategoryPricingRule[]  @relation("LocationCatPricingRules")
+  pricingRules         PricingRule[]
+  categoryPricingRules CategoryPricingRule[] @relation("LocationCatPricingRules")
 
   // Suspended Transactions
   suspendedTransactions SuspendedTransaction[]
@@ -1103,10 +1102,10 @@ model Location {
   compensationPlans CompensationPlan[] @relation("CompensationPlans")
 
   // SMS Marketing + Quota System
-  smsUsageLogs     SmsUsageLedger[]   @relation("SmsUsageLogs")
-  smsMonthlyUsage  SmsMonthlyUsage[]  @relation("SmsMonthlyUsage")
-  dealSuggestions  DealSuggestion[]   @relation("DealSuggestions")
-  dealCampaigns    DealCampaign[]     @relation("DealCampaigns")
+  smsUsageLogs    SmsUsageLedger[]  @relation("SmsUsageLogs")
+  smsMonthlyUsage SmsMonthlyUsage[] @relation("SmsMonthlyUsage")
+  dealSuggestions DealSuggestion[]  @relation("DealSuggestions")
+  dealCampaigns   DealCampaign[]    @relation("DealCampaigns")
 
   // ============ BRAND THEME CUSTOMIZATION ============
   themeId      String  @default("classic_oro") // Preset theme: classic_oro, rose_gold, blush_pink, lavender_night, mint_clean, ocean_blue
@@ -1123,9 +1122,9 @@ model Location {
   storefrontOrders  StorefrontOrder[]
 
   // ============ QR CHECK-IN SYSTEM ============
-  qrEnabled    Boolean @default(true)   // Location-level kill switch
-  qrTokenSalt  String?                  // Per-location HMAC salt (rotatable)
-  qrTokens     QrToken[]                // Audit trail for generated tokens
+  qrEnabled   Boolean   @default(true) // Location-level kill switch
+  qrTokenSalt String? // Per-location HMAC salt (rotatable)
+  qrTokens    QrToken[] // Audit trail for generated tokens
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1137,7 +1136,7 @@ model PosRegisterLayout {
   id         String   @id @default(cuid())
   locationId String   @unique
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  config     Json     // { pinnedCategoryIds, categoryOverrides, quickFilters }
+  config     Json // { pinnedCategoryIds, categoryOverrides, quickFilters }
   updatedAt  DateTime @updatedAt
 }
 
@@ -1181,8 +1180,8 @@ model Station {
   locationId String
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
-  name     String // "Register 1", "Register 2", etc.
-  isActive Boolean @default(true)
+  name         String // "Register 1", "Register 2", etc.
+  isActive     Boolean @default(true)
   trainingMode Boolean @default(false) // When true, transactions don't affect real data
 
   // Payment capability: DEDICATED (has terminal) or CASH_ONLY
@@ -1199,10 +1198,10 @@ model Station {
 
   // Device binding - once paired, only this device can use station
   pairingStatus   PairingStatus @default(UNPAIRED)
-  pairedDeviceId  String?   // UUID from device (fingerprint)
+  pairedDeviceId  String? // UUID from device (fingerprint)
   pairedAt        DateTime? // When pairing was completed
   lastHeartbeatAt DateTime? // Last API call from paired device
-  isTrusted       Boolean   @default(false) // Set true after successful pairing
+  isTrusted       Boolean       @default(false) // Set true after successful pairing
 
   // Currently logged-in employee (for shift tracking)
   currentUserId String?
@@ -1226,14 +1225,14 @@ model Station {
 
 // Customer Display Profile — saved per station for auto-reconnect
 model StationDisplayProfile {
-  id        String   @id @default(cuid())
-  stationId String   @unique
-  station   Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  stationId String  @unique
+  station   Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
 
   displayMode         DisplayMode @default(NONE)
-  hardwareIdentifier  String?     // e.g. "screen-2", "COM3", "192.168.1.50"
-  driver              String?     // e.g. "second-screen", "pole-epson-vfd"
-  protocolSettings    Json?       // { baudRate, dataBits, parity, ... }
+  hardwareIdentifier  String? // e.g. "screen-2", "COM3", "192.168.1.50"
+  driver              String? // e.g. "second-screen", "pole-epson-vfd"
+  protocolSettings    Json? // { baudRate, dataBits, parity, ... }
   fallbackMode        DisplayMode @default(REMOTE_BROWSER)
   lastConnectedAt     DateTime?
   lastConnectionError String?
@@ -1276,8 +1275,8 @@ model PaymentTerminal {
   name         String // "Terminal 1", "Counter Left"
   terminalType TerminalType @default(PAX)
   terminalIP   String // "192.168.1.101"
-  terminalPort String  @default("10009")
-  isActive     Boolean @default(true)
+  terminalPort String       @default("10009")
+  isActive     Boolean      @default(true)
 
   // Which station owns this terminal
   assignedStation Station?
@@ -1342,7 +1341,7 @@ model GlobalService {
 
   name        String
   description String?
-  duration    Int     // in minutes
+  duration    Int // in minutes
   basePrice   Decimal @db.Decimal(12, 2) // Default price
 
   // Salon pricing modes
@@ -1375,11 +1374,11 @@ model GlobalService {
 }
 
 model LocationServiceOverride {
-  id               String        @id @default(cuid())
-  globalServiceId  String
-  globalService    GlobalService @relation(fields: [globalServiceId], references: [id], onDelete: Cascade)
-  locationId       String
-  location         Location      @relation("LocationServiceOverrides", fields: [locationId], references: [id], onDelete: Cascade)
+  id              String        @id @default(cuid())
+  globalServiceId String
+  globalService   GlobalService @relation(fields: [globalServiceId], references: [id], onDelete: Cascade)
+  locationId      String
+  location        Location      @relation("LocationServiceOverrides", fields: [locationId], references: [id], onDelete: Cascade)
 
   // Override fields (null = use brand value)
   name        String?
@@ -1395,7 +1394,7 @@ model LocationServiceOverride {
   tierLongPrice   Decimal? @db.Decimal(12, 2)
 
   // Local controls
-  isEnabled Boolean @default(true)  // Disable service at this location
+  isEnabled Boolean @default(true) // Disable service at this location
   isLocked  Boolean @default(false) // Prevent brand sync updates
 
   createdAt DateTime @default(now())
@@ -1412,7 +1411,7 @@ model GlobalProduct {
 
   name         String
   description  String?
-  defaultPrice Decimal @db.Decimal(12, 2)
+  defaultPrice Decimal  @db.Decimal(12, 2)
   defaultCost  Decimal? @db.Decimal(12, 2)
   sku          String?
   category     String?
@@ -1564,22 +1563,22 @@ model Item {
   // === TAX CONFIGURATION ===
   taxExempt          Boolean  @default(false)
   taxRate            Decimal? @db.Decimal(7, 4) // Override tax rate (null = use default)
-  taxGroupOverrideId String?  // Override tax group (null = use department default)
+  taxGroupOverrideId String? // Override tax group (null = use department default)
 
   // === PRICING CONFIGURATION ===
-  priceLocked     Boolean  @default(false) // If true, auto-pricing won't update this item
-  msrp            Decimal? @db.Decimal(12, 2) // Manufacturer suggested retail price
-  overrideMarkup  Decimal? @db.Decimal(7, 4) // Per-item markup override (null = use dept rule)
-  minSellPrice    Decimal? @db.Decimal(12, 2) // HQ-enforced minimum sell price (null = no floor)
+  priceLocked    Boolean  @default(false) // If true, auto-pricing won't update this item
+  msrp           Decimal? @db.Decimal(12, 2) // Manufacturer suggested retail price
+  overrideMarkup Decimal? @db.Decimal(7, 4) // Per-item markup override (null = use dept rule)
+  minSellPrice   Decimal? @db.Decimal(12, 2) // HQ-enforced minimum sell price (null = no floor)
 
   // === WEIGHTED / SCALE ITEMS ===
   isWeighted    Boolean  @default(false) // Sold by weight (deli, produce)
   pricePerUnit  Decimal? @db.Decimal(12, 4) // Price per unit of measure
-  unitOfMeasure String?  // "lb", "oz", "kg", "g"
+  unitOfMeasure String? // "lb", "oz", "kg", "g"
 
   // === AUTO-REORDER (PAR LEVELS) ===
-  parLevel          Int?     // Target stock level
-  autoReorderQty    Int?     // Quantity to order when below par
+  parLevel            Int? // Target stock level
+  autoReorderQty      Int? // Quantity to order when below par
   preferredSupplierId String? // Default supplier for auto-reorder
 
   // === AUDIT ===
@@ -1755,13 +1754,14 @@ model Client {
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
-  appointments      Appointment[]
-  memberships       ClientMembership[]
-  loyalty           ClientLoyalty?
-  transactions      Transaction[]
-  reviews           Review[]
-  chatConversations ChatConversation[] // Support chat conversations
-  customerPromos    CustomerPromo[] // Auto-applied promotions
+  appointments            Appointment[]
+  memberships             ClientMembership[]
+  salonLoyaltyMemberships SalonCustomerLoyaltyMembership[]
+  loyalty                 ClientLoyalty?
+  transactions            Transaction[]
+  reviews                 Review[]
+  chatConversations       ChatConversation[] // Support chat conversations
+  customerPromos          CustomerPromo[] // Auto-applied promotions
 
   // New Relations
   photos                   ClientPhoto[]
@@ -1952,8 +1952,8 @@ model Product {
   isTobacco     Boolean @default(false) // Tobacco product (for scan data reporting)
 
   // PLU & Weight (for deli/produce scanner-scale combos)
-  plu          String?  // PLU number (4-5 digit produce code, e.g. 4011 = Banana)
-  soldByWeight Boolean  @default(false) // If true, trigger scale at POS checkout
+  plu          String? // PLU number (4-5 digit produce code, e.g. 4011 = Banana)
+  soldByWeight Boolean @default(false) // If true, trigger scale at POS checkout
 
   // Alcohol Attributes (for excise tax calculation)
   alcoholType String? // NONE, BEER, WINE_LIGHT, WINE_HEAVY, SPIRITS
@@ -2081,12 +2081,12 @@ model Transaction {
   cardType    String? // Visa, MasterCard, etc.
 
   // Settlement Awareness (ledger-safe correction model)
-  captureStatus    String?   // AUTHORIZED | CAPTURED | SETTLED | UNKNOWN
-  settledAt        DateTime? // When batch was settled (from PAX/processor)
-  settlementBatch  String?   // Batch ID from processor
+  captureStatus   String? // AUTHORIZED | CAPTURED | SETTLED | UNKNOWN
+  settledAt       DateTime? // When batch was settled (from PAX/processor)
+  settlementBatch String? // Batch ID from processor
 
   status String @default("COMPLETED") // COMPLETED, REFUNDED, VOIDED, CORRECTED, PARTIALLY_REFUNDED
-  source String @default("WEB_POS")    // ANDROID_POS, WEB_POS, API (POS compliance)
+  source String @default("WEB_POS") // ANDROID_POS, WEB_POS, API (POS compliance)
 
   // Void Tracking (Audit Trail) — legacy fields for backward compat
   voidedById String? // User who voided this transaction
@@ -2094,9 +2094,9 @@ model Transaction {
   voidReason String? // Optional reason for voiding
 
   // Correction Tracking (new ledger-safe model)
-  correctionType       String?   // VOID | REFUND | CORRECTION — what kind of reversal
-  correctionReasonCode String?   // From CORRECTION_REASON_CODES
-  correctionApprovedBy String?   // Manager userId who approved
+  correctionType       String? // VOID | REFUND | CORRECTION — what kind of reversal
+  correctionReasonCode String? // From CORRECTION_REASON_CODES
+  correctionApprovedBy String? // Manager userId who approved
   correctionApprovedAt DateTime? // When approval happened
 
   cashDrawerSessionId String?
@@ -2107,11 +2107,15 @@ model Transaction {
   originalTransaction   Transaction?  @relation("RefundRelation", fields: [originalTransactionId], references: [id])
   refunds               Transaction[] @relation("RefundRelation")
 
-  lineItems        TransactionLineItem[]
-  taxLines         TransactionTaxLine[] // Detailed tax breakdown per jurisdiction
-  itemLineItems    ItemLineItem[] // Unified Item line items (new system)
-  drawerActivities DrawerActivity[] // Drawer opens related to this transaction
+  lineItems         TransactionLineItem[]
+  taxLines          TransactionTaxLine[] // Detailed tax breakdown per jurisdiction
+  itemLineItems     ItemLineItem[] // Unified Item line items (new system)
+  drawerActivities  DrawerActivity[] // Drawer opens related to this transaction
   tobaccoScanEvents TobaccoScanEvent[] // Tobacco scan deal events (reimbursement ledger)
+
+  salonLoyaltyRedemptions     SalonTransactionLoyaltyRedemption[]
+  salonLoyaltyLedgerEntries   SalonLoyaltyLedgerEntry[]           @relation("LoyaltyEntries")
+  salonLoyaltyLedgerReversals SalonLoyaltyLedgerEntry[]           @relation("LoyaltyReversals")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2159,13 +2163,13 @@ model TransactionLineItem {
   // These fields are set at checkout and NEVER change
   serviceNameSnapshot String? // Service/product name frozen at checkout
   productNameSnapshot String? // Product name frozen at checkout
-  priceCharged        Decimal? @db.Decimal(12, 2) // Actual price charged per unit
-  discountAllocated   Decimal? @db.Decimal(12, 2) // Discount amount on this line item
-  taxAllocated        Decimal? @db.Decimal(12, 2) // Tax amount on this line item
-  tipAllocated        Decimal? @db.Decimal(12, 2) // Tip allocated to this line (for services)
-  commissionSplitUsed Decimal? @db.Decimal(5, 2) // Commission % used (e.g., 50 for 50%)
-  commissionAmount    Decimal? @db.Decimal(12, 2) // Amount barber/staff earns
-  ownerAmount         Decimal? @db.Decimal(12, 2) // Amount owner keeps
+  priceCharged        Decimal?  @db.Decimal(12, 2) // Actual price charged per unit
+  discountAllocated   Decimal?  @db.Decimal(12, 2) // Discount amount on this line item
+  taxAllocated        Decimal?  @db.Decimal(12, 2) // Tax amount on this line item
+  tipAllocated        Decimal?  @db.Decimal(12, 2) // Tip allocated to this line (for services)
+  commissionSplitUsed Decimal?  @db.Decimal(5, 2) // Commission % used (e.g., 50 for 50%)
+  commissionAmount    Decimal?  @db.Decimal(12, 2) // Amount barber/staff earns
+  ownerAmount         Decimal?  @db.Decimal(12, 2) // Amount owner keeps
   businessDate        DateTime? // Business date (location timezone)
   lineItemStatus      String?   @default("PAID") // PAID, REFUNDED, VOIDED
 
@@ -2179,7 +2183,7 @@ model TransactionTaxLine {
   transactionId String
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
-  taxName       String  // "State Sales Tax", "City Tax", "Special District"
+  taxName       String // "State Sales Tax", "City Tax", "Special District"
   taxRate       Decimal @db.Decimal(7, 4) // 0.0625 for 6.25%
   taxableAmount Decimal @db.Decimal(12, 2) // Pre-tax amount this rate applies to
   taxAmount     Decimal @db.Decimal(12, 2) // Computed tax amount
@@ -2197,7 +2201,7 @@ model RoyaltyConfig {
   franchisorId String     @unique
   franchisor   Franchisor @relation(fields: [franchisorId], references: [id], onDelete: Cascade)
 
-  percentage        Decimal @db.Decimal(5, 2) // e.g., 6.0 for 6%
+  percentage        Decimal  @db.Decimal(5, 2) // e.g., 6.0 for 6%
   minimumMonthlyFee Decimal? @db.Decimal(12, 2) // Optional minimum fee
   calculationPeriod String   @default("MONTHLY") // MONTHLY, WEEKLY, DAILY
 
@@ -2214,8 +2218,8 @@ model RoyaltyRecord {
   periodStart DateTime
   periodEnd   DateTime
 
-  grossRevenue  Decimal @db.Decimal(12, 2) // Total revenue for period
-  royaltyAmount Decimal @db.Decimal(12, 2) // Calculated royalty
+  grossRevenue  Decimal             @db.Decimal(12, 2) // Total revenue for period
+  royaltyAmount Decimal             @db.Decimal(12, 2) // Calculated royalty
   status        RoyaltyRecordStatus @default(PENDING)
 
   paidAt DateTime?
@@ -2326,11 +2330,11 @@ model Supplier {
   franchiseId String
   franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
-  name              String
-  contactName       String?
-  email             String?
-  phone             String?
-  address           String?
+  name               String
+  contactName        String?
+  email              String?
+  phone              String?
+  address            String?
   externalVendorCode String? // Fintech Retailer VendorID
 
   products       ProductSupplier[]
@@ -2401,14 +2405,14 @@ model StockAdjustment {
   locationId String
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
-  quantity      Int      // Positive (add) or Negative (remove)
-  reason        String   // "SALE", "RESTOCK", "DAMAGE", "THEFT", "TRANSFER", "VENDOR_INVOICE", "VOID_REVERSAL"
-  notes         String?
-  sourceId      String?  // invoiceId or transactionId
-  uom           String?  // Original unit of measure from invoice
-  baseUnitsDelta Int?    // Converted to sellable units
-  previousStock Int?     // Stock before this adjustment
-  newStock      Int?     // Stock after this adjustment
+  quantity       Int // Positive (add) or Negative (remove)
+  reason         String // "SALE", "RESTOCK", "DAMAGE", "THEFT", "TRANSFER", "VENDOR_INVOICE", "VOID_REVERSAL"
+  notes          String?
+  sourceId       String? // invoiceId or transactionId
+  uom            String? // Original unit of measure from invoice
+  baseUnitsDelta Int? // Converted to sellable units
+  previousStock  Int? // Stock before this adjustment
+  newStock       Int? // Stock after this adjustment
 
   performedBy String
   createdAt   DateTime @default(now())
@@ -2499,7 +2503,7 @@ model CashDrawerSession {
   startTime DateTime  @default(now())
   endTime   DateTime?
 
-  startingCash Decimal @db.Decimal(12, 2)
+  startingCash Decimal  @db.Decimal(12, 2)
   endingCash   Decimal? @db.Decimal(12, 2) // Actual cash counted
   expectedCash Decimal? @db.Decimal(12, 2) // Calculated cash (Start + Cash Sales - Drops)
   variance     Decimal? @db.Decimal(12, 2) // Ending - Expected
@@ -2546,8 +2550,8 @@ model SuspendedTransaction {
   cartData Json
 
   // Optional label for quick identification
-  label    String?  // "John - forgot wallet", "Table 5"
-  
+  label String? // "John - forgot wallet", "Table 5"
+
   // Auto-expire after 24h
   expiresAt DateTime
   status    String   @default("ACTIVE") // ACTIVE, RECALLED, EXPIRED, VOIDED
@@ -2778,9 +2782,9 @@ model Franchisor {
   approvalStatus String @default("PENDING") // PENDING, APPROVED, REJECTED
 
   // Account Status (for suspension/termination) - uses ENUM for type safety
-  accountStatus    AccountStatus @default(ACTIVE)
-  suspendedAt      DateTime?
-  suspendedReason  String?
+  accountStatus   AccountStatus @default(ACTIVE)
+  suspendedAt     DateTime?
+  suspendedReason String?
 
   // Business Type (Owner Type)
   businessType String @default("MULTI_LOCATION_OWNER") // "BRAND_FRANCHISOR" | "MULTI_LOCATION_OWNER"
@@ -2851,10 +2855,10 @@ model Franchisor {
   domain              String? // Custom domain e.g. "app.mysalon.com"
 
   // ============ QR CHECK-IN SYSTEM ============
-  qrEnabled       Boolean @default(true)   // Kill switch per brand
-  qrSubdomain     String? @unique          // Explicit subdomain override (default: auto from brandCode)
-  qrWelcomeText   String?                  // Custom welcome message
-  qrThemeJson     String?                  // JSON: { primaryColor, bgGradient, fontFamily }
+  qrEnabled     Boolean @default(true) // Kill switch per brand
+  qrSubdomain   String? @unique // Explicit subdomain override (default: auto from brandCode)
+  qrWelcomeText String? // Custom welcome message
+  qrThemeJson   String? // JSON: { primaryColor, bgGradient, fontFamily }
 
   // Offboarding relation
   offboardingCases OffboardingCase[] @relation("FranchisorOffboarding")
@@ -2870,11 +2874,11 @@ model Franchisor {
 
   // Feature Requests
   featureRequests FeatureRequest[]
-  
+
   // Locations owned by this franchisor (for BRAND_FRANCHISOR model)
-  locations LocationProvisioningTask[] @relation("FranchisorProvisioningTasks")
-  ownedLocations Location[] @relation("FranchisorLocations")
-  
+  locations      LocationProvisioningTask[] @relation("FranchisorProvisioningTasks")
+  ownedLocations Location[]                 @relation("FranchisorLocations")
+
   // ============ DEALER CO-BRANDING ============
   // Links this franchisor to a dealer/reseller for co-branded experience
   dealerBrandingId String?
@@ -2885,55 +2889,55 @@ model Franchisor {
 // Allows dealers/resellers to have their branding + support info displayed
 // Mode: ORO_ONLY = no dealer shown, CO_BRANDED = dealer shown with "Powered by ORO 9"
 model DealerBranding {
-  id           String @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Dealer Identity
-  dealerName   String    // "ABC Payments"
-  logoUrl      String?   // Small dealer logo URL
-  
+  dealerName String // "ABC Payments"
+  logoUrl    String? // Small dealer logo URL
+
   // Dealer Support Contact (shown in POS + receipts)
-  supportPhone String?   // "630-xxx-xxxx"
-  supportEmail String?   // "support@abcpayments.com"
-  supportUrl   String?   // Optional support website
-  
+  supportPhone String? // "630-xxx-xxxx"
+  supportEmail String? // "support@abcpayments.com"
+  supportUrl   String? // Optional support website
+
   // Clients using this dealer branding
-  franchisors         Franchisor[]
-  onboardingRequests  OnboardingRequest[]
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  franchisors        Franchisor[]
+  onboardingRequests OnboardingRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============ LOCATION PROVISIONING WORKFLOW ============
 // When HQ creates a location, Provider must provision it before go-live
 model LocationProvisioningTask {
-  id                    String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // The location being provisioned
-  locationId            String
-  location              Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
   // Brand HQ that requested this
-  franchisorId          String
-  franchisor            Franchisor @relation("FranchisorProvisioningTasks", fields: [franchisorId], references: [id])
-  
+  franchisorId String
+  franchisor   Franchisor @relation("FranchisorProvisioningTasks", fields: [franchisorId], references: [id])
+
   // The franchisee LLC operating this location
-  franchiseeBusinessId  String
-  
+  franchiseeBusinessId String
+
   // Request details
-  requestedByUserId     String?  // HQ admin who created the location
-  requestedDevicesCount Int?     // How many POS terminals needed
-  notes                 String?  // Special instructions from HQ
-  
+  requestedByUserId     String? // HQ admin who created the location
+  requestedDevicesCount Int? // How many POS terminals needed
+  notes                 String? // Special instructions from HQ
+
   // Assignment
-  assignedToUserId      String?  // Provider staff assigned to this
-  
+  assignedToUserId String? // Provider staff assigned to this
+
   // Status: OPEN -> IN_PROGRESS -> DONE
-  status                String   @default("OPEN") // OPEN, IN_PROGRESS, DONE
-  
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
+  status String @default("OPEN") // OPEN, IN_PROGRESS, DONE
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([status])
   @@index([franchisorId, status])
   @@index([locationId])
@@ -2943,47 +2947,47 @@ model LocationProvisioningTask {
 // One case per offboarding attempt - tracks the full workflow for legal compliance
 // Provider-only control: customers can request, only Provider can execute
 model OffboardingCase {
-  id                       String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Account being offboarded (exactly ONE must be set)
-  accountType              OffboardingAccountType
-  franchisorId             String?
-  franchisor               Franchisor? @relation("FranchisorOffboarding", fields: [franchisorId], references: [id])
-  franchiseId              String?
-  franchise                Franchise? @relation("FranchiseOffboarding", fields: [franchiseId], references: [id])
-  
+  accountType  OffboardingAccountType
+  franchisorId String?
+  franchisor   Franchisor?            @relation("FranchisorOffboarding", fields: [franchisorId], references: [id])
+  franchiseId  String?
+  franchise    Franchise?             @relation("FranchiseOffboarding", fields: [franchiseId], references: [id])
+
   // Status tracking (enum for type safety)
-  status                   OffboardingStatus @default(SUSPENDED)
-  
+  status OffboardingStatus @default(SUSPENDED)
+
   // Request details
   reason                   String?
-  requestedByUserId        String?  // Customer who requested
-  approvedByProviderUserId String?  // Provider staff who approved
-  
+  requestedByUserId        String? // Customer who requested
+  approvedByProviderUserId String? // Provider staff who approved
+
   // Stage timestamps (audit trail)
-  startedAt                DateTime @default(now())
-  suspendedAt              DateTime?
-  exportGeneratedAt        DateTime?
-  anonymizedAt             DateTime?
-  archivedAt               DateTime?
-  
+  startedAt         DateTime  @default(now())
+  suspendedAt       DateTime?
+  exportGeneratedAt DateTime?
+  anonymizedAt      DateTime?
+  archivedAt        DateTime?
+
   // Configuration (Provider-settable per case)
-  retentionYears           Int      @default(7)  // 3, 5, 7, 10
-  graceDays                Int      @default(30) // 7, 14, 30, 60
-  
+  retentionYears Int @default(7) // 3, 5, 7, 10
+  graceDays      Int @default(30) // 7, 14, 30, 60
+
   // Export tracking
-  exportFileUrl            String?
-  exportFileExpiresAt      DateTime?
-  
+  exportFileUrl       String?
+  exportFileExpiresAt DateTime?
+
   // Financial obligations check
-  hasOpenChargebacks       Boolean  @default(false)
-  hasPendingSettlements    Boolean  @default(false)
-  financialClearanceAt     DateTime?
-  financialClearedBy       String?
-  
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-  
+  hasOpenChargebacks    Boolean   @default(false)
+  hasPendingSettlements Boolean   @default(false)
+  financialClearanceAt  DateTime?
+  financialClearedBy    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([franchisorId])
   @@index([franchiseId])
   @@index([status])
@@ -3017,10 +3021,11 @@ model BusinessConfig {
   usesVirtualKeypad Boolean @default(true)
 
   // Customer Features
-  usesLoyalty     Boolean @default(true)
-  usesGiftCards   Boolean @default(true)
-  usesMemberships Boolean @default(true)
-  usesReferrals   Boolean @default(true)
+  usesLoyalty      Boolean @default(true)
+  usesSalonLoyalty Boolean @default(false)
+  usesGiftCards    Boolean @default(true)
+  usesMemberships  Boolean @default(true)
+  usesReferrals    Boolean @default(true)
 
   // Financial Features
   usesRoyalties Boolean @default(false) // Only for franchisors
@@ -3204,12 +3209,12 @@ model AuditLog {
   userRole   String?
 
   // POS Compliance Fields (added for transaction standards)
-  franchiseId String?  // Which franchise
-  locationId  String?  // Which location
-  stationId   String?  // Which terminal
-  source      String   @default("WEB_POS") // ANDROID_POS, WEB_POS, API, SYSTEM
-  reason      String?  // User-provided reason (required for voids/refunds)
-  approvedBy  String?  // Manager who approved action
+  franchiseId String? // Which franchise
+  locationId  String? // Which location
+  stationId   String? // Which terminal
+  source      String  @default("WEB_POS") // ANDROID_POS, WEB_POS, API, SYSTEM
+  reason      String? // User-provided reason (required for voids/refunds)
+  approvedBy  String? // Manager who approved action
 
   // Context
   changes   String? // JSON before/after
@@ -3639,19 +3644,19 @@ model LoyaltyRule {
   programId String
   program   LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
 
-  name     String   // "Tobacco Exclusion", "Beer Bonus"
-  type     String   // EXCLUSION, CATEGORY, PRODUCT, GLOBAL
-  isActive Boolean  @default(true)
+  name     String // "Tobacco Exclusion", "Beer Bonus"
+  type     String // EXCLUSION, CATEGORY, PRODUCT, GLOBAL
+  isActive Boolean @default(true)
 
   // Scope: what does this rule apply to?
-  category String?  // For CATEGORY rules: match against item category
-  upc      String?  // For PRODUCT rules: match against specific UPC
+  category String? // For CATEGORY rules: match against item category
+  upc      String? // For PRODUCT rules: match against specific UPC
 
   // Earn mode
-  earnMode        String  @default("PER_DOLLAR") // PER_DOLLAR, PER_UNIT, MULTIPLIER
-  pointsPerDollar Decimal? @db.Decimal(10, 2)    // 2.0 = 2 pts per $1
-  fixedPointsPerUnit Int?                         // 15 = 15 pts per item
-  multiplier      Decimal? @db.Decimal(5, 2)      // 2.0 = 2x base rate
+  earnMode           String   @default("PER_DOLLAR") // PER_DOLLAR, PER_UNIT, MULTIPLIER
+  pointsPerDollar    Decimal? @db.Decimal(10, 2) // 2.0 = 2 pts per $1
+  fixedPointsPerUnit Int? // 15 = 15 pts per item
+  multiplier         Decimal? @db.Decimal(5, 2) // 2.0 = 2x base rate
 
   // Priority (lower = higher priority)
   priority Int @default(500)
@@ -3673,14 +3678,14 @@ model LoyaltyRedeemTier {
   programId String
   program   LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
 
-  name            String                          // "Bronze Reward", "Gold Reward"
-  pointsRequired  Int                             // 100, 500
-  rewardType      String  @default("AMOUNT_OFF")  // AMOUNT_OFF | PERCENT_OFF | FREE_ITEM
-  rewardValue     Decimal @db.Decimal(10, 2)      // 10.00, 50.00
-  minBasketAmount Decimal? @db.Decimal(10, 2)     // Optional: min cart total to redeem
-  maxPerDay       Int?                            // Optional: daily cap per member
-  isActive        Boolean @default(true)
-  sortOrder       Int     @default(0)
+  name            String // "Bronze Reward", "Gold Reward"
+  pointsRequired  Int // 100, 500
+  rewardType      String   @default("AMOUNT_OFF") // AMOUNT_OFF | PERCENT_OFF | FREE_ITEM
+  rewardValue     Decimal  @db.Decimal(10, 2) // 10.00, 50.00
+  minBasketAmount Decimal? @db.Decimal(10, 2) // Optional: min cart total to redeem
+  maxPerDay       Int? // Optional: daily cap per member
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3917,12 +3922,12 @@ model RecurringAppointment {
 }
 
 model CheckIn {
-  id          String   @id @default(cuid())
-  clientId    String
-  client      Client   @relation(fields: [clientId], references: [id])
-  locationId  String
-  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  status      String   @default("WAITING") // WAITING, SERVED, CANCELLED
+  id         String   @id @default(cuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id])
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  status     String   @default("WAITING") // WAITING, SERVED, CANCELLED
 
   // QR Check-In tracking
   source        String  @default("KIOSK") // KIOSK, QR_SCAN, QR_SCAN_UNVERIFIED, WALK_IN, PHONE
@@ -3930,9 +3935,9 @@ model CheckIn {
   stationRef    String? // Which display/station was scanned (analytics)
 
   // Multi-tenant QR enrichment
-  brandId       String? // Franchisor ID (denormalized for fast queries)
-  deviceId      String? // Station ID that generated the QR code
-  qrTokenId     String? // Which QrToken was used (audit trail)
+  brandId   String? // Franchisor ID (denormalized for fast queries)
+  deviceId  String? // Station ID that generated the QR code
+  qrTokenId String? // Which QrToken was used (audit trail)
 
   checkedInAt DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -3951,17 +3956,17 @@ model CheckIn {
 // Tracks QR tokens generated by POS stations for analytics and fraud prevention.
 // Tokens are stateless HMAC — this is an optional audit trail, not required for validation.
 model QrToken {
-  id          String   @id @default(cuid())
-  locationId  String
-  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  deviceId    String?  // Station that requested this QR
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  deviceId   String? // Station that requested this QR
 
-  tokenHash   String   @unique  // SHA-256 of the full token (never store raw)
-  expiresAt   DateTime           // Token TTL (configurable, default 24h)
-  usedAt      DateTime?          // When first scanned
-  usedCount   Int      @default(0) // Scan count (for analytics)
+  tokenHash String    @unique // SHA-256 of the full token (never store raw)
+  expiresAt DateTime // Token TTL (configurable, default 24h)
+  usedAt    DateTime? // When first scanned
+  usedCount Int       @default(0) // Scan count (for analytics)
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([locationId])
   @@index([expiresAt])
@@ -4054,49 +4059,49 @@ model LotteryTransaction {
 
 // ─── Deal Definition ──────────────────────────────────────────────
 model TobaccoScanDeal {
-  id            String   @id @default(cuid())
-  franchiseId   String
-  franchise     Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
   // Manufacturer / Program
-  manufacturer    String    // ALTRIA, RJR, ITG, LIGGETT, SWEDISH_MATCH, etc.
-  programCode     String?   // Manufacturer's program code (e.g., "ALTR-2026-Q1")
-  dealName        String    // Human-readable: "Marlboro Gold KS $1.00 Off"
+  manufacturer String // ALTRIA, RJR, ITG, LIGGETT, SWEDISH_MATCH, etc.
+  programCode  String? // Manufacturer's program code (e.g., "ALTR-2026-Q1")
+  dealName     String // Human-readable: "Marlboro Gold KS $1.00 Off"
 
   // Deal Type
   //   BUYDOWN    = per-unit price reduction ("$1 off per pack")
   //   MULTIBUY   = qty-triggered ("Buy 2 packs, get $2 off")
   //   THRESHOLD  = volume rebate ("Buy 5+ packs/week, get $X back")
   //   MIX_MATCH  = cross-brand bundle ("1 Marlboro + 1 Copenhagen = $1 off")
-  type   String  @default("BUYDOWN")
+  type String @default("BUYDOWN")
 
   // What it applies to
-  appliesToLevel  String   @default("PACK") // PACK | CARTON | BOTH
+  appliesToLevel String @default("PACK") // PACK | CARTON | BOTH
 
   // Quantity Rules
-  minQty              Int     @default(1)  // Min units to trigger deal
-  maxQty              Int?                 // Max units deal applies to (null = unlimited)
-  customerLimitPerTxn Int?                 // Max times deal fires per transaction
+  minQty              Int  @default(1) // Min units to trigger deal
+  maxQty              Int? // Max units deal applies to (null = unlimited)
+  customerLimitPerTxn Int? // Max times deal fires per transaction
 
   // Reward (customer-facing discount)
   //   FIXED_AMOUNT = $1.00 off per qualifying unit
   //   PERCENTAGE   = 10% off each qualifying unit
   //   PENNY_DEAL   = price drops to $0.01
   //   FREE_UNIT    = buy X get 1 free
-  rewardType  String   @default("FIXED_AMOUNT")
-  rewardValue Decimal  @db.Decimal(12, 2)
+  rewardType  String  @default("FIXED_AMOUNT")
+  rewardValue Decimal @db.Decimal(12, 2)
 
   // ─── Two-Layer Discount Model ──────────────────────────────────
   // Layer 1: Base manufacturer allowance (always applied)
-  baseAllowance    Decimal  @default(0) @db.Decimal(8, 2)
+  baseAllowance Decimal @default(0) @db.Decimal(8, 2)
   // Layer 2: Manufacturer loyalty bonus (only when customer ID present)
-  loyaltyBonus     Decimal  @default(0) @db.Decimal(8, 2)
+  loyaltyBonus  Decimal @default(0) @db.Decimal(8, 2)
 
   // How layers combine when both apply:
   //   STACK     = baseAllowance + loyaltyBonus (e.g., 0.50 + 1.00 = 1.50)
   //   REPLACE   = loyaltyBonus replaces baseAllowance (e.g., 1.00)
   //   MAX_ONLY  = max(baseAllowance, loyaltyBonus) (e.g., 1.00)
-  stackPolicy      String   @default("STACK") // STACK | REPLACE | MAX_ONLY
+  stackPolicy String @default("STACK") // STACK | REPLACE | MAX_ONLY
 
   // Whether normal store loyalty points/rewards can stack on top of this tobacco deal
   allowStoreLoyaltyStack Boolean @default(false)
@@ -4106,12 +4111,12 @@ model TobaccoScanDeal {
   reimbursementPerUnit Decimal @default(0) @db.Decimal(12, 2)
 
   // Store Scope (empty = all stores)
-  storeIds    String[] // Location IDs. Empty = all franchise locations.
+  storeIds String[] // Location IDs. Empty = all franchise locations.
 
   // Schedule
-  startDate   DateTime
-  endDate     DateTime?
-  status      String   @default("ACTIVE") // DRAFT | ACTIVE | PAUSED | EXPIRED | ARCHIVED
+  startDate DateTime
+  endDate   DateTime?
+  status    String    @default("ACTIVE") // DRAFT | ACTIVE | PAUSED | EXPIRED | ARCHIVED
 
   // Rules
   requiresScanReporting Boolean @default(true)
@@ -4119,11 +4124,11 @@ model TobaccoScanDeal {
   requiresLoyalty       Boolean @default(false) // If true, POS prompts for loyalty ID
 
   // Import metadata
-  sourceFile      String?  // PDF filename this was imported from
-  manufacturerPLU String?  // Manufacturer's deal PLU/code
+  sourceFile      String? // PDF filename this was imported from
+  manufacturerPLU String? // Manufacturer's deal PLU/code
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   eligibleUpcs TobaccoScanDealUPC[]
@@ -4138,17 +4143,17 @@ model TobaccoScanDeal {
 // ─── Eligible UPC Mapping ─────────────────────────────────────────
 // Separate table for UPC list so we can query/index/join efficiently.
 model TobaccoScanDealUPC {
-  id          String          @id @default(cuid())
-  dealId      String
-  deal        TobaccoScanDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  id     String          @id @default(cuid())
+  dealId String
+  deal   TobaccoScanDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
-  upc         String    // Barcode (UPC-A, EAN-13, etc.)
-  productName String?   // Human label for reference: "Marlboro Gold KS Box"
-  packOrCarton String   @default("PACK") // PACK | CARTON
+  upc          String // Barcode (UPC-A, EAN-13, etc.)
+  productName  String? // Human label for reference: "Marlboro Gold KS Box"
+  packOrCarton String  @default("PACK") // PACK | CARTON
 
   // Optional link to inventory product (for POS display)
-  itemId      String?
-  item        Item?    @relation(fields: [itemId], references: [id])
+  itemId String?
+  item   Item?   @relation(fields: [itemId], references: [id])
 
   @@unique([dealId, upc])
   @@index([upc]) // Fast lookup when POS scans a barcode
@@ -4160,92 +4165,92 @@ model TobaccoScanDealUPC {
 // channels to generate industry-standard pipe-delimited export files.
 // Immutable ledger row — created only after COMPLETED sale.
 model TobaccoScanEvent {
-  id              String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Link to deal (nullable — normal sales w/o match still create events)
-  tobaccoDealId   String?
-  tobaccoDeal     TobaccoScanDeal? @relation(fields: [tobaccoDealId], references: [id], onDelete: Restrict)
+  tobaccoDealId String?
+  tobaccoDeal   TobaccoScanDeal? @relation(fields: [tobaccoDealId], references: [id], onDelete: Restrict)
 
   // Link to transaction
-  transactionId   String
-  transaction     Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
-  lineItemId      String?  // TransactionLineItem ID
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  lineItemId    String? // TransactionLineItem ID
 
   // ─── Line Classification ───────────────────────────────────────
   // NORMAL_SALE | MFG_MULTIPACK | OUTLET_MULTIPACK | CO_FUNDED_MULTIPACK
   // | PROMO_UPC | VAP_SALE | JBF_SALE | COUPON_SALE | LOYALTY_OFFER
   // | RETURN | EXCHANGE
-  lineType        String   @default("NORMAL_SALE")
-  lineNumber      Int      @default(1) // RMSC field 10: Scan ID / position in txn
+  lineType   String @default("NORMAL_SALE")
+  lineNumber Int    @default(1) // RMSC field 10: Scan ID / position in txn
 
   // ─── Claim Eligibility ─────────────────────────────────────────
-  claimEligible       Boolean @default(true)
-  exclusionReason     String?  // PROMO_UPC_PREPRICED | RETURN_VOID | EXCHANGE_RETURN
+  claimEligible   Boolean @default(true)
+  exclusionReason String? // PROMO_UPC_PREPRICED | RETURN_VOID | EXCHANGE_RETURN
 
   // ─── Location / Device / User ──────────────────────────────────
-  storeId         String
-  location        Location @relation(fields: [storeId], references: [id])
-  stationId       String?
-  cashierId       String?
+  storeId   String
+  location  Location @relation(fields: [storeId], references: [id])
+  stationId String?
+  cashierId String?
 
   // ─── Sale Data ─────────────────────────────────────────────────
-  soldAt          DateTime @default(now())
-  upc             String   // 14-digit UPC (zero-padded)
-  upcDescription  String?  // Product description for export
-  qty             Int      @default(1) // SIGNED — negative for returns
-  unitOfMeasure   String   @default("PACK") // PACK|CARTON|CAN|ROLL|TIN|SLEEVE
+  soldAt         DateTime @default(now())
+  upc            String // 14-digit UPC (zero-padded)
+  upcDescription String? // Product description for export
+  qty            Int      @default(1) // SIGNED — negative for returns
+  unitOfMeasure  String   @default("PACK") // PACK|CARTON|CAN|ROLL|TIN|SLEEVE
 
   // ─── Flags ─────────────────────────────────────────────────────
-  promoFlag       Boolean  @default(false) // RMSC field 17: any promo applied
-  isPromoUpc      Boolean  @default(false) // Discount baked into UPC ("$0.50 OFF")
+  promoFlag  Boolean @default(false) // RMSC field 17: any promo applied
+  isPromoUpc Boolean @default(false) // Discount baked into UPC ("$0.50 OFF")
 
   // ─── Pricing ───────────────────────────────────────────────────
-  regularPrice    Decimal  @db.Decimal(12, 2) // Shelf price (pre-discount)
-  sellingPrice    Decimal  @db.Decimal(12, 2) // Per-unit post-all-discounts (RMSC field 13)
+  regularPrice Decimal @db.Decimal(12, 2) // Shelf price (pre-discount)
+  sellingPrice Decimal @db.Decimal(12, 2) // Per-unit post-all-discounts (RMSC field 13)
 
   // ─── Channel 1: Outlet-Funded Multipack (store pays) ───────────
-  outletMultipackFlag  Boolean  @default(false) // RMSC field 18
-  outletMultipackQty   Int?                     // RMSC field 19
-  outletMultipackDisc  Decimal  @default(0) @db.Decimal(8, 2) // RMSC field 20
+  outletMultipackFlag Boolean @default(false) // RMSC field 18
+  outletMultipackQty  Int? // RMSC field 19
+  outletMultipackDisc Decimal @default(0) @db.Decimal(8, 2) // RMSC field 20
 
   // ─── Channel 2: Account Promo ──────────────────────────────────
-  acctPromoName   String?                        // RMSC field 21
-  acctDiscAmt     Decimal  @default(0) @db.Decimal(8, 2) // RMSC field 22
+  acctPromoName String? // RMSC field 21
+  acctDiscAmt   Decimal @default(0) @db.Decimal(8, 2) // RMSC field 22
 
   // ─── Channel 3: Manufacturer Discount (JBF / VAP) ──────────────
-  mfgDiscAmt      Decimal  @default(0) @db.Decimal(8, 2) // RMSC field 23
+  mfgDiscAmt Decimal @default(0) @db.Decimal(8, 2) // RMSC field 23
 
   // ─── Channel 4: PID Coupon ─────────────────────────────────────
-  pidCoupon       String?                        // RMSC field 24: coupon UPC barcode
-  pidCouponDisc   Decimal  @default(0) @db.Decimal(8, 2) // RMSC field 25
+  pidCoupon     String? // RMSC field 24: coupon UPC barcode
+  pidCouponDisc Decimal @default(0) @db.Decimal(8, 2) // RMSC field 25
 
   // ─── Channel 5: Manufacturer Multipack Allowance ───────────────
-  mfgMultipackFlag Boolean @default(false)       // RMSC field 26
-  mfgMultipackQty  Int?                          // RMSC field 27
+  mfgMultipackFlag Boolean @default(false) // RMSC field 26
+  mfgMultipackQty  Int? // RMSC field 27
   mfgMultipackDisc Decimal @default(0) @db.Decimal(8, 2) // RMSC field 28
-  mfgPromoDesc     String?                       // RMSC field 29: "RJR VAP $0.75", "JBF"
+  mfgPromoDesc     String? // RMSC field 29: "RJR VAP $0.75", "JBF"
 
   // ─── Channel 6: Manufacturer Buydown ───────────────────────────
-  mfgBuydownDesc  String?                        // RMSC field 30: "RJR Buydown"
-  mfgBuydownAmt   Decimal  @default(0) @db.Decimal(8, 2) // RMSC field 31
+  mfgBuydownDesc String? // RMSC field 30: "RJR Buydown"
+  mfgBuydownAmt  Decimal @default(0) @db.Decimal(8, 2) // RMSC field 31
 
   // ─── Channel 7: Multipack Desc + Loyalty ───────────────────────
-  mfgMultipackDesc String?                       // RMSC field 32: "RJR MP"
-  loyaltyId        String?                       // RMSC field 33 (HASHED before storage)
-  loyaltyStatus    String   @default("NONE")     // NONE | PRESENT | REQUIRED_MISSING
-  offerCode        String?                       // RMSC field 34: offer code "10201"
+  mfgMultipackDesc String? // RMSC field 32: "RJR MP"
+  loyaltyId        String? // RMSC field 33 (HASHED before storage)
+  loyaltyStatus    String  @default("NONE") // NONE | PRESENT | REQUIRED_MISSING
+  offerCode        String? // RMSC field 34: offer code "10201"
 
   // ─── Derived Totals (for fast queries) ─────────────────────────
-  baseAllowanceApplied  Decimal  @default(0) @db.Decimal(8, 2) // Layer 1 amount actually applied
-  loyaltyBonusApplied   Decimal  @default(0) @db.Decimal(8, 2) // Layer 2 amount actually applied
-  storeLoyaltyBlocked   Boolean  @default(false) // True if store loyalty was suppressed
-  discountApplied       Decimal  @db.Decimal(12, 2) // Sum of all customer-facing discounts
-  reimbursementExpected Decimal  @db.Decimal(12, 2) // buydown + mfg multipack + mfg disc
+  baseAllowanceApplied  Decimal @default(0) @db.Decimal(8, 2) // Layer 1 amount actually applied
+  loyaltyBonusApplied   Decimal @default(0) @db.Decimal(8, 2) // Layer 2 amount actually applied
+  storeLoyaltyBlocked   Boolean @default(false) // True if store loyalty was suppressed
+  discountApplied       Decimal @db.Decimal(12, 2) // Sum of all customer-facing discounts
+  reimbursementExpected Decimal @db.Decimal(12, 2) // buydown + mfg multipack + mfg disc
 
   // ─── Claim Tracking ────────────────────────────────────────────
-  exportBatchId   String?
-  exportBatch     TobaccoScanExportBatch? @relation(fields: [exportBatchId], references: [id])
-  claimStatus     String  @default("UNCLAIMED") // UNCLAIMED|EXPORTED|SUBMITTED|PAID|DENIED
+  exportBatchId String?
+  exportBatch   TobaccoScanExportBatch? @relation(fields: [exportBatchId], references: [id])
+  claimStatus   String                  @default("UNCLAIMED") // UNCLAIMED|EXPORTED|SUBMITTED|PAID|DENIED
 
   createdAt DateTime @default(now())
 
@@ -4261,14 +4266,14 @@ model TobaccoScanEvent {
 
 // ─── Export Batch (Claim Tracking) ────────────────────────────────
 model TobaccoScanExportBatch {
-  id            String   @id @default(cuid())
-  franchiseId   String
-  franchise     Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
 
-  manufacturer  String   // ALTRIA | RJR | ITG
-  programCode   String?
-  weekStart     DateTime
-  weekEnd       DateTime
+  manufacturer String // ALTRIA | RJR | ITG
+  programCode  String?
+  weekStart    DateTime
+  weekEnd      DateTime
 
   // Counts
   eventCount         Int     @default(0)
@@ -4276,7 +4281,7 @@ model TobaccoScanExportBatch {
   totalReimbursement Decimal @default(0) @db.Decimal(12, 2)
 
   // Status
-  status          String @default("GENERATED") // GENERATED | SUBMITTED | ACKNOWLEDGED | PAID | REJECTED
+  status          String    @default("GENERATED") // GENERATED | SUBMITTED | ACKNOWLEDGED | PAID | REJECTED
   submittedAt     DateTime?
   paidAt          DateTime?
   paidAmount      Decimal?  @db.Decimal(12, 2)
@@ -4284,7 +4289,7 @@ model TobaccoScanExportBatch {
 
   // File
   exportFileName String?
-  exportFormat   String?  // ALTRIA_C3M | RJR_CIRCANA | ITG_PIPE
+  exportFormat   String? // ALTRIA_C3M | RJR_CIRCANA | ITG_PIPE
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4464,8 +4469,8 @@ model TaxGroup {
   locationId String
   location   Location @relation("LocationTaxGroups", fields: [locationId], references: [id], onDelete: Cascade)
 
-  name      String   // "GENERAL", "ALCOHOL", "TOBACCO", "GROCERY", "PREPARED_FOOD"
-  isDefault Boolean  @default(false) // One default per location (fallback)
+  name      String // "GENERAL", "ALCOHOL", "TOBACCO", "GROCERY", "PREPARED_FOOD"
+  isDefault Boolean @default(false) // One default per location (fallback)
 
   // Components in this group
   components TaxGroupComponent[]
@@ -4519,7 +4524,7 @@ model DepartmentTaxDefault {
 // ============ PRICE CHANGE AUDIT LOG ============
 
 model PriceChangeLog {
-  id     String @id @default(cuid())
+  id String @id @default(cuid())
 
   // Supports both Item and Product (one or the other)
   itemId    String?
@@ -4527,14 +4532,14 @@ model PriceChangeLog {
   productId String?
   product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  oldPrice  Decimal @db.Decimal(12, 2)
-  newPrice  Decimal @db.Decimal(12, 2)
-  oldCost   Decimal? @db.Decimal(12, 2)
-  newCost   Decimal? @db.Decimal(12, 2)
+  oldPrice Decimal  @db.Decimal(12, 2)
+  newPrice Decimal  @db.Decimal(12, 2)
+  oldCost  Decimal? @db.Decimal(12, 2)
+  newCost  Decimal? @db.Decimal(12, 2)
 
-  reason    String? // "Cost update", "Manual override", "Import", "Auto-reprice"
-  source    String  @default("MANUAL") // MANUAL, AUTO_REPRICE, IMPORT, PROMO, VENDOR_UPDATE
-  changedBy String  // User ID
+  reason        String? // "Cost update", "Manual override", "Import", "Auto-reprice"
+  source        String  @default("MANUAL") // MANUAL, AUTO_REPRICE, IMPORT, PROMO, VENDOR_UPDATE
+  changedBy     String // User ID
   changedByName String? // User name for display
 
   createdAt DateTime @default(now())
@@ -4553,8 +4558,8 @@ model PricingRule {
   locationId String
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
-  name   String // "BEER_PACKS", "SPIRITS", "TOBACCO_CIG", etc.
-  label  String // "Beer Packs (6/12/24)", human-friendly
+  name  String // "BEER_PACKS", "SPIRITS", "TOBACCO_CIG", etc.
+  label String // "Beer Packs (6/12/24)", human-friendly
 
   // Method: MARKUP or TARGET_MARGIN
   method String @default("MARKUP")
@@ -4576,13 +4581,13 @@ model PricingRule {
 
 // Category → Pricing Rule mapping per location
 model CategoryPricingRule {
-  id            String         @id @default(cuid())
+  id            String          @id @default(cuid())
   locationId    String
-  location      Location       @relation("LocationCatPricingRules", fields: [locationId], references: [id], onDelete: Cascade)
+  location      Location        @relation("LocationCatPricingRules", fields: [locationId], references: [id], onDelete: Cascade)
   categoryId    String
   category      UnifiedCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   pricingRuleId String
-  pricingRule   PricingRule    @relation(fields: [pricingRuleId], references: [id], onDelete: Cascade)
+  pricingRule   PricingRule     @relation(fields: [pricingRuleId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5818,15 +5823,15 @@ model SubFranchisee {
 
 // Payment Log - Track payment attempts for dispute resolution
 model PaymentLog {
-  id            String   @id @default(cuid())
-  transactionId String   @unique // Idempotency key from Android app
-  status        String   // SENT, APPROVED, DECLINED, UNKNOWN, ERROR, VOIDED, REFUNDED
-  amount        Int?     // Amount in cents
-  authCode      String?  // Authorization code from processor
-  cardLast4     String?  // Last 4 digits (masked)
-  cardBrand     String?  // VISA, MASTERCARD, AMEX, DISCOVER
-  terminalId    String?  // PAX terminal identifier
-  reason        String?  // Decline reason or error message
+  id            String  @id @default(cuid())
+  transactionId String  @unique // Idempotency key from Android app
+  status        String // SENT, APPROVED, DECLINED, UNKNOWN, ERROR, VOIDED, REFUNDED
+  amount        Int? // Amount in cents
+  authCode      String? // Authorization code from processor
+  cardLast4     String? // Last 4 digits (masked)
+  cardBrand     String? // VISA, MASTERCARD, AMEX, DISCOVER
+  terminalId    String? // PAX terminal identifier
+  reason        String? // Decline reason or error message
 
   // Relations
   stationId  String?
@@ -5876,22 +5881,22 @@ model SystemAlert {
 
 // SMS Usage Ledger - Append-only truth for billing proof
 model SmsUsageLedger {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   locationId        String
-  campaignId        String?  // Reference to DealCampaign
-  customerId        String?  // Reference to Client
+  campaignId        String? // Reference to DealCampaign
+  customerId        String? // Reference to Client
   phone             String
-  messageType       String   // PROMO | TRANSACTIONAL
-  messageContent    String?  // Template snapshot for audit
-  units             Int      @default(1) // SMS segments
-  monthKey          String   // "2026-01" in location timezone
-  billCategory      String   // FREE | OVERAGE
-  providerMessageId String?  // Provider's message ID
-  status            String   // QUEUED | SENT | DELIVERED | FAILED | OPTED_OUT | SUPPRESSED_*
-  carrierCode       String?  // Carrier response code
-  suppressedReason  String?  // NO_CONSENT | OPTED_OUT | FREQUENCY_CAP | DELIVERY_FAILURE | REDEEMED | RECENT_VISIT
+  messageType       String // PROMO | TRANSACTIONAL
+  messageContent    String? // Template snapshot for audit
+  units             Int       @default(1) // SMS segments
+  monthKey          String // "2026-01" in location timezone
+  billCategory      String // FREE | OVERAGE
+  providerMessageId String? // Provider's message ID
+  status            String // QUEUED | SENT | DELIVERED | FAILED | OPTED_OUT | SUPPRESSED_*
+  carrierCode       String? // Carrier response code
+  suppressedReason  String? // NO_CONSENT | OPTED_OUT | FREQUENCY_CAP | DELIVERY_FAILURE | REDEEMED | RECENT_VISIT
   sentAt            DateTime?
-  createdAt         DateTime @default(now())
+  createdAt         DateTime  @default(now())
 
   location Location @relation("SmsUsageLogs", fields: [locationId], references: [id], onDelete: Cascade)
 
@@ -5906,7 +5911,7 @@ model SmsUsageLedger {
 model SmsMonthlyUsage {
   id               String   @id @default(cuid())
   locationId       String
-  monthKey         String   // "2026-01"
+  monthKey         String // "2026-01"
   freeUnitsUsed    Int      @default(0)
   overageUnitsUsed Int      @default(0)
   updatedAt        DateTime @updatedAt
@@ -5920,7 +5925,7 @@ model SmsMonthlyUsage {
 model SmsOptOut {
   id        String   @id @default(cuid())
   phone     String   @unique
-  reason    String   // STOP | DELIVERY_FAILURE | SPAM_REPORT
+  reason    String // STOP | DELIVERY_FAILURE | SPAM_REPORT
   createdAt DateTime @default(now())
 
   @@index([phone])
@@ -5930,25 +5935,25 @@ model SmsOptOut {
 
 // Deal Suggestion - Weekly generated suggestions
 model DealSuggestion {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   locationId      String
   weekOf          DateTime // Start of the week this suggestion is for
-  dealType        String   // SLOW_DAY | WIN_BACK | REBOOK
+  dealType        String // SLOW_DAY | WIN_BACK | REBOOK
   title           String
   description     String
-  discountType    String   // FIXED_AMOUNT | PERCENTAGE | FREE_ADDON
+  discountType    String // FIXED_AMOUNT | PERCENTAGE | FREE_ADDON
   discountValue   Decimal
   priceFloor      Decimal? // Min final price (profit lock)
   minSpend        Decimal? // Min spend to qualify
   targetDays      String[] // ["MONDAY", "TUESDAY"]
-  targetTimeStart String?  // "10:00"
-  targetTimeEnd   String?  // "14:00"
-  audienceCount   Int      @default(0) // Eligible customers
-  status          String   @default("PENDING") // PENDING | SCHEDULED | SENT | EXPIRED
+  targetTimeStart String? // "10:00"
+  targetTimeEnd   String? // "14:00"
+  audienceCount   Int       @default(0) // Eligible customers
+  status          String    @default("PENDING") // PENDING | SCHEDULED | SENT | EXPIRED
   scheduledFor    DateTime?
   sentAt          DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   location  Location       @relation("DealSuggestions", fields: [locationId], references: [id], onDelete: Cascade)
   campaigns DealCampaign[]
@@ -5959,25 +5964,25 @@ model DealSuggestion {
 
 // Deal Campaign - Scheduled SMS campaign (linked to suggestion or standalone)
 model DealCampaign {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   locationId       String
-  dealSuggestionId String?  // Optional - may be custom campaign
-  templateHash     String   // Hash of content for duplicate detection
-  audienceType     String   // INACTIVE_35 | NEW_14 | VIP | ALL | CUSTOM
-  audienceCount    Int      @default(0)
-  estimatedUnits   Int      @default(0)
-  estimatedFree    Int      @default(0)
-  estimatedOverage Int      @default(0)
+  dealSuggestionId String? // Optional - may be custom campaign
+  templateHash     String // Hash of content for duplicate detection
+  audienceType     String // INACTIVE_35 | NEW_14 | VIP | ALL | CUSTOM
+  audienceCount    Int       @default(0)
+  estimatedUnits   Int       @default(0)
+  estimatedFree    Int       @default(0)
+  estimatedOverage Int       @default(0)
   actualUnits      Int?
-  status           String   @default("DRAFT") // DRAFT | SCHEDULED | SENDING | SENT | BLOCKED
-  blockedReason    String?  // DUPLICATE_WITHIN_7_DAYS | FOOTER_MISSING | etc.
+  status           String    @default("DRAFT") // DRAFT | SCHEDULED | SENDING | SENT | BLOCKED
+  blockedReason    String? // DUPLICATE_WITHIN_7_DAYS | FOOTER_MISSING | etc.
   scheduledFor     DateTime
   sentAt           DateTime?
   createdById      String
-  
+
   // Message content
-  messageTemplate  String   // SMS template with placeholders
-  
+  messageTemplate String // SMS template with placeholders
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -5999,12 +6004,12 @@ model ApiLog {
   locationId    String?
   stationId     String?
   userId        String?
-  route         String   // API endpoint path
-  method        String   // GET, POST, PUT, DELETE
-  status        Int      // HTTP status code
-  statusClass   String   // "2xx", "4xx", "5xx"
-  latencyMs     Int      // Response time in milliseconds
-  responseBytes Int?     // Response body size in bytes
+  route         String // API endpoint path
+  method        String // GET, POST, PUT, DELETE
+  status        Int // HTTP status code
+  statusClass   String // "2xx", "4xx", "5xx"
+  latencyMs     Int // Response time in milliseconds
+  responseBytes Int? // Response body size in bytes
   userAgent     String?
   sampled       Boolean  @default(true) // false = skipped due to sampling
   createdAt     DateTime @default(now())
@@ -6017,22 +6022,22 @@ model ApiLog {
 // Daily aggregated API usage (rollup from ApiLog)
 // Use this for dashboards, not raw ApiLog
 model ApiUsageDaily {
-  id           String   @id @default(cuid())
-  date         DateTime @db.Date
-  locationId   String?
-  route        String
-  
+  id         String   @id @default(cuid())
+  date       DateTime @db.Date
+  locationId String?
+  route      String
+
   // Metrics
-  totalCalls   Int      @default(0)
-  successCalls Int      @default(0) // 2xx
-  clientErrors Int      @default(0) // 4xx
-  serverErrors Int      @default(0) // 5xx
-  avgLatencyMs Int      @default(0)
-  p95LatencyMs Int      @default(0)
-  totalBytes   BigInt   @default(0)
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  totalCalls   Int    @default(0)
+  successCalls Int    @default(0) // 2xx
+  clientErrors Int    @default(0) // 4xx
+  serverErrors Int    @default(0) // 5xx
+  avgLatencyMs Int    @default(0)
+  p95LatencyMs Int    @default(0)
+  totalBytes   BigInt @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([date, locationId, route])
   @@index([locationId, date])
@@ -6046,7 +6051,7 @@ model RmscImportBatch {
   locationId    String
   location      Location         @relation(fields: [locationId], references: [id])
   fileName      String
-  fileType      String           // csv, xlsx
+  fileType      String // csv, xlsx
   fileHash      String
   importedById  String?
   importedAt    DateTime         @default(now())
@@ -6058,20 +6063,20 @@ model RmscImportBatch {
   errorSummary  Json?
   records       RmscScanRecord[]
 
-  @@index([locationId, importedAt])
   @@unique([locationId, fileHash])
+  @@index([locationId, importedAt])
 }
 
 model RmscScanRecord {
-  id                 String           @id @default(cuid())
-  importBatchId      String
-  importBatch        RmscImportBatch  @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  id            String          @id @default(cuid())
+  importBatchId String
+  importBatch   RmscImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
 
-  locationId         String
-  location           Location         @relation(fields: [locationId], references: [id])
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
 
-  sourceRowNumber    Int
-  rowHash            String
+  sourceRowNumber Int
+  rowHash         String
 
   // Normalized analytics fields
   outletNumber       String?
@@ -6081,53 +6086,53 @@ model RmscScanRecord {
   registerNo         String?
   upc                String?
   productDescription String?
-  quantity           Decimal?         @db.Decimal(10, 3)
-  unitPrice          Decimal?         @db.Decimal(10, 2)
-  extendedPrice      Decimal?         @db.Decimal(12, 2)
+  quantity           Decimal?  @db.Decimal(10, 3)
+  unitPrice          Decimal?  @db.Decimal(10, 2)
+  extendedPrice      Decimal?  @db.Decimal(12, 2)
   manufacturerCode   String?
   manufacturerName   String?
-  promoFlag          Boolean          @default(false)
+  promoFlag          Boolean   @default(false)
   promoType          String?
-  multipackFlag      Boolean          @default(false)
-  buydownAmount      Decimal?         @db.Decimal(10, 2)
-  loyaltyFlag        Boolean          @default(false)
+  multipackFlag      Boolean   @default(false)
+  buydownAmount      Decimal?  @db.Decimal(10, 2)
+  loyaltyFlag        Boolean   @default(false)
 
   // Exact source preservation
-  rawFields          Json
+  rawFields Json
 
-  createdAt          DateTime         @default(now())
+  createdAt DateTime @default(now())
 
+  @@unique([locationId, rowHash])
   @@index([locationId, transactionDate])
   @@index([locationId, manufacturerName])
   @@index([locationId, promoType])
   @@index([locationId, loyaltyFlag])
-  @@unique([locationId, rowHash])
 }
 
 // ============ VENDOR INVOICE AUTO-IMPORT ============
 
 model InboundFile {
-  id            String    @id @default(cuid())
-  franchiseId   String
-  franchise     Franchise @relation(fields: [franchiseId], references: [id])
-  sourceType    String    // "FTP" or "UPLOAD"
-  filename      String
-  remotePath    String?
-  fileHash      String    @unique // SHA256 — prevents reprocessing
-  fileSize      Int?
-  parseStatus   String    @default("PENDING") // PENDING, PARSED, FAILED
-  parseError    String?
-  totalRows     Int       @default(0)
-  parsedRows    Int       @default(0)
-  matchedRows   Int       @default(0)
-  newProductRows Int      @default(0)
-  errorRows     Int       @default(0)
-  errors        Json?     // [{row, field, message}]
-  invoices      VendorInvoice[]
-  uploadedBy    String?
-  startedAt     DateTime  @default(now())
-  completedAt   DateTime?
-  createdAt     DateTime  @default(now())
+  id             String          @id @default(cuid())
+  franchiseId    String
+  franchise      Franchise       @relation(fields: [franchiseId], references: [id])
+  sourceType     String // "FTP" or "UPLOAD"
+  filename       String
+  remotePath     String?
+  fileHash       String          @unique // SHA256 — prevents reprocessing
+  fileSize       Int?
+  parseStatus    String          @default("PENDING") // PENDING, PARSED, FAILED
+  parseError     String?
+  totalRows      Int             @default(0)
+  parsedRows     Int             @default(0)
+  matchedRows    Int             @default(0)
+  newProductRows Int             @default(0)
+  errorRows      Int             @default(0)
+  errors         Json? // [{row, field, message}]
+  invoices       VendorInvoice[]
+  uploadedBy     String?
+  startedAt      DateTime        @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime        @default(now())
 
   @@index([franchiseId])
   @@index([fileHash])
@@ -6135,15 +6140,15 @@ model InboundFile {
 }
 
 model VendorInvoice {
-  id               String      @id @default(cuid())
-  franchiseId      String
-  franchise        Franchise   @relation(fields: [franchiseId], references: [id])
-  locationId       String?
-  location         Location?   @relation(fields: [locationId], references: [id])
-  supplierId       String?
-  supplier         Supplier?   @relation(fields: [supplierId], references: [id])
-  inboundFileId    String?
-  inboundFile      InboundFile? @relation(fields: [inboundFileId], references: [id])
+  id            String       @id @default(cuid())
+  franchiseId   String
+  franchise     Franchise    @relation(fields: [franchiseId], references: [id])
+  locationId    String?
+  location      Location?    @relation(fields: [locationId], references: [id])
+  supplierId    String?
+  supplier      Supplier?    @relation(fields: [supplierId], references: [id])
+  inboundFileId String?
+  inboundFile   InboundFile? @relation(fields: [inboundFileId], references: [id])
 
   // Header (all from CSV)
   invoiceNumber    String
@@ -6162,31 +6167,31 @@ model VendorInvoice {
   refInvoiceNumber String?
 
   // Lifecycle — never delete, only transition
-  status           String    @default("IMPORTED")
+  status         String   @default("IMPORTED")
   // IMPORTED → REVIEW_REQUIRED → READY_TO_POST → POSTED → VOIDED
-  matchRate        Decimal?  @db.Decimal(5, 2)
-  totalItems       Int       @default(0)
-  matchedItems     Int       @default(0)
-  newItems         Int       @default(0)
-  errorItems       Int       @default(0)
-  costAlertItems   Int       @default(0)
+  matchRate      Decimal? @db.Decimal(5, 2)
+  totalItems     Int      @default(0)
+  matchedItems   Int      @default(0)
+  newItems       Int      @default(0)
+  errorItems     Int      @default(0)
+  costAlertItems Int      @default(0)
 
   // Reconciliation
-  parsedTotal      Decimal?  @db.Decimal(12, 2) // Sum of line extendedPrice
-  discrepancy      Decimal?  @db.Decimal(12, 2) // parsedTotal − totalAmount
-  discrepancyOk    Boolean   @default(false)
+  parsedTotal   Decimal? @db.Decimal(12, 2) // Sum of line extendedPrice
+  discrepancy   Decimal? @db.Decimal(12, 2) // parsedTotal − totalAmount
+  discrepancyOk Boolean  @default(false)
 
   // Posting
-  postedAt         DateTime?
-  postedBy         String?
-  voidedAt         DateTime?
-  voidedBy         String?
-  voidReason       String?
+  postedAt   DateTime?
+  postedBy   String?
+  voidedAt   DateTime?
+  voidedBy   String?
+  voidReason String?
 
-  items            VendorInvoiceItem[]
-  uploadedBy       String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  items      VendorInvoiceItem[]
+  uploadedBy String?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
 
   @@unique([supplierId, locationId, invoiceNumber, invoiceDate])
   @@index([franchiseId])
@@ -6196,52 +6201,52 @@ model VendorInvoice {
 }
 
 model VendorInvoiceItem {
-  id               String        @id @default(cuid())
-  invoiceId        String
-  invoice          VendorInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id        String        @id @default(cuid())
+  invoiceId String
+  invoice   VendorInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   // Raw CSV data (all 33 fields preserved)
   lineNumber       Int
   vendorProductNum String?
   quantity         Int
-  unitCost         Decimal       @db.Decimal(12, 4)
-  unitOfMeasure    String?       // CA, BO, EA, CS
+  unitCost         Decimal @db.Decimal(12, 4)
+  unitOfMeasure    String? // CA, BO, EA, CS
   productVolume    String?
   caseUpc          String?
   cleanUpc         String?
   packUpc          String?
   productDesc      String
-  productClass     String?       // Wine, Spirits, Beer
+  productClass     String? // Wine, Spirits, Beer
   glCode           String?
   packsPerCase     Int?
   unitsPerPack     Int?
 
   // Adjustments
-  discountAdj      Decimal   @default(0) @db.Decimal(12, 2)
-  depositAdj       Decimal   @default(0) @db.Decimal(12, 2)
-  miscAdj          Decimal   @default(0) @db.Decimal(12, 2)
-  taxAdj           Decimal   @default(0) @db.Decimal(12, 2)
-  deliveryAdj      Decimal   @default(0) @db.Decimal(12, 2)
-  extendedPrice    Decimal   @db.Decimal(12, 2)
+  discountAdj   Decimal @default(0) @db.Decimal(12, 2)
+  depositAdj    Decimal @default(0) @db.Decimal(12, 2)
+  miscAdj       Decimal @default(0) @db.Decimal(12, 2)
+  taxAdj        Decimal @default(0) @db.Decimal(12, 2)
+  deliveryAdj   Decimal @default(0) @db.Decimal(12, 2)
+  extendedPrice Decimal @db.Decimal(12, 2)
 
   // Computed
-  baseUnitsReceived Int?     // Converted to sellable units
+  baseUnitsReceived Int? // Converted to sellable units
   perUnitCost       Decimal? @db.Decimal(12, 4) // Cost per single sellable unit
 
   // Match result
-  matchStatus      String    @default("PENDING")
+  matchStatus          String  @default("PENDING")
   // PENDING, MATCHED, NEW_PRODUCT, SUGGESTED, MANUAL, ERROR
-  matchMethod      String?   // SUPPLIER_SKU, CLEAN_UPC, CASE_UPC, PACK_UPC, LEGACY_BARCODE, MANUAL
-  matchedProductId String?
+  matchMethod          String? // SUPPLIER_SKU, CLEAN_UPC, CASE_UPC, PACK_UPC, LEGACY_BARCODE, MANUAL
+  matchedProductId     String?
   autoCreatedProductId String?
-  suggestedProductIds  Json?  // Top 3 candidates for review
+  suggestedProductIds  Json? // Top 3 candidates for review
 
   // Cost tracking
-  costChanged      Boolean   @default(false)
-  previousCost     Decimal?  @db.Decimal(12, 4)
-  costChangePct    Decimal?  @db.Decimal(8, 2)
+  costChanged   Boolean  @default(false)
+  previousCost  Decimal? @db.Decimal(12, 4)
+  costChangePct Decimal? @db.Decimal(8, 2)
 
-  createdAt        DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([invoiceId])
   @@index([cleanUpc])
@@ -6253,9 +6258,9 @@ model ProductBarcodeAlias {
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   barcode   String   @unique
-  type      String   // CLEAN, CASE, PACK, ALT, MANUAL
+  type      String // CLEAN, CASE, PACK, ALT, MANUAL
   isPrimary Boolean  @default(false)
-  source    String?  // INVOICE_IMPORT, MANUAL, SCAN
+  source    String? // INVOICE_IMPORT, MANUAL, SCAN
   createdAt DateTime @default(now())
 
   @@index([productId])
@@ -6271,8 +6276,8 @@ model ProductCostHistory {
   oldCost    Decimal   @db.Decimal(12, 4)
   newCost    Decimal   @db.Decimal(12, 4)
   changePct  Decimal   @db.Decimal(8, 2)
-  sourceType String    // VENDOR_INVOICE, MANUAL
-  sourceId   String?   // invoiceItemId
+  sourceType String // VENDOR_INVOICE, MANUAL
+  sourceId   String? // invoiceItemId
   changedBy  String?
   changedAt  DateTime  @default(now())
 
@@ -6288,7 +6293,7 @@ model FtpConfig {
   port          Int       @default(21)
   protocol      String    @default("SFTP") // FTP, FTPS, SFTP
   username      String
-  password      String    // Should be encrypted at app layer
+  password      String // Should be encrypted at app layer
   remotePath    String    @default("/")
   filePattern   String    @default("*.csv")
   autoFetch     Boolean   @default(false)
@@ -6411,20 +6416,20 @@ enum OwnerRecommendationScope {
 // ──── Stage 1: Raw Signals ────
 
 model OwnerSignal {
-  id          String               @id @default(cuid())
+  id          String                 @id @default(cuid())
   franchiseId String
   locationId  String
   signalType  OwnerSignalType
   entityType  OwnerSignalEntityType?
   entityId    String?
-  signalDate  DateTime             // Business date (not wall-clock)
-  payload     Json?                // Full context from source module
-  scoreInputs Json?                // Pre-computed: {financialImpact, urgency, ...}
-  dedupKey    String?              // Formula output per signal type
-  processed   Boolean              @default(false)
+  signalDate  DateTime // Business date (not wall-clock)
+  payload     Json? // Full context from source module
+  scoreInputs Json? // Pre-computed: {financialImpact, urgency, ...}
+  dedupKey    String? // Formula output per signal type
+  processed   Boolean                @default(false)
   processedAt DateTime?
-  jobRunId    String?              // Idempotency: which cron run created this
-  createdAt   DateTime             @default(now())
+  jobRunId    String? // Idempotency: which cron run created this
+  createdAt   DateTime               @default(now())
 
   @@index([franchiseId, signalType, signalDate])
   @@index([franchiseId, processed, createdAt])
@@ -6435,38 +6440,38 @@ model OwnerSignal {
 // ──── Stage 2: Issues (Central queue) ────
 
 model OwnerIssue {
-  id          String             @id @default(cuid())
+  id          String   @id @default(cuid())
   franchiseId String
   locationId  String
-  location    Location           @relation(fields: [locationId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id])
 
   // Classification
-  category    OwnerIssueCategory
-  issueType   OwnerSignalType
-  severity    OwnerIssueSeverity @default(MEDIUM)
+  category  OwnerIssueCategory
+  issueType OwnerSignalType
+  severity  OwnerIssueSeverity @default(MEDIUM)
 
   // Dedup
   dedupKey       String?
-  isActiveSignal Boolean          @default(true)
-  repeatCount    Int              @default(1)
-  reopenedCount  Int              @default(0)
+  isActiveSignal Boolean @default(true)
+  repeatCount    Int     @default(1)
+  reopenedCount  Int     @default(0)
 
   // Scoring
-  priorityScore   Float           @default(0)
-  financialImpact Float           @default(0)
-  urgencyScore    Float           @default(0)
-  complianceRisk  Float           @default(0)
+  priorityScore   Float @default(0)
+  financialImpact Float @default(0)
+  urgencyScore    Float @default(0)
+  complianceRisk  Float @default(0)
 
   // Content
   title       String
-  summary     String             // Human-readable: "Store 3 cash drawer short $47.50"
+  summary     String // Human-readable: "Store 3 cash drawer short $47.50"
   details     Json?
-  reasoning   String?            // "High because deposit 2 days overdue + open cash variance"
-  recommended String?            // "Verify deposit slip"
+  reasoning   String? // "High because deposit 2 days overdue + open cash variance"
+  recommended String? // "Verify deposit slip"
 
   // Status + concurrency
-  status  OwnerIssueStatus       @default(OPEN)
-  version Int                    @default(1)
+  status  OwnerIssueStatus @default(OPEN)
+  version Int              @default(1)
 
   // Action tracking
   assignedToId     String?
@@ -6482,15 +6487,15 @@ model OwnerIssue {
   resolvedReason   OwnerIssueResolvedReason?
 
   // Dual resolution
-  workflowResolvedAt DateTime?   // User clicked resolve
-  sourceResolvedAt   DateTime?   // Engine confirmed signal gone
+  workflowResolvedAt DateTime? // User clicked resolve
+  sourceResolvedAt   DateTime? // Engine confirmed signal gone
 
   escalatedAt   DateTime?
   escalatedToId String?
 
   // Timestamps
-  firstSeenAt DateTime            @default(now())
-  lastSeenAt  DateTime            @default(now())
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
 
   // Source
   sourceType OwnerIssueSourceType?
@@ -6498,8 +6503,8 @@ model OwnerIssue {
 
   events OwnerIssueEvent[]
 
-  createdAt DateTime              @default(now())
-  updatedAt DateTime              @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([franchiseId, status])
   @@index([franchiseId, status, severity])
@@ -6515,17 +6520,17 @@ model OwnerIssue {
 // ──── Audit Trail ────
 
 model OwnerIssueEvent {
-  id           String               @id @default(cuid())
+  id           String              @id @default(cuid())
   ownerIssueId String
-  issue        OwnerIssue           @relation(fields: [ownerIssueId], references: [id], onDelete: Cascade)
+  issue        OwnerIssue          @relation(fields: [ownerIssueId], references: [id], onDelete: Cascade)
   eventType    OwnerIssueEventType
   fromStatus   OwnerIssueStatus?
   toStatus     OwnerIssueStatus?
   actorUserId  String?
   actorName    String?
   note         String?
-  meta         Json?                // {oldDueAt, newDueAt, oldAssignee, newAssignee, ...}
-  createdAt    DateTime             @default(now())
+  meta         Json? // {oldDueAt, newDueAt, oldAssignee, newAssignee, ...}
+  createdAt    DateTime            @default(now())
 
   @@index([ownerIssueId, createdAt])
 }
@@ -6563,7 +6568,7 @@ model ManagerScorecard {
   userId           String
   locationId       String
   franchiseId      String
-  period           String   // "2026-03" or "2026-W11"
+  period           String // "2026-03" or "2026-W11"
   avgCloseTime     Float?
   alertResponseMin Float?
   issuesIgnored    Int      @default(0)
@@ -6608,21 +6613,21 @@ model OwnerDigest {
 // ──── Notification Preferences ────
 
 model OwnerNotificationPreference {
-  id                     String  @id @default(cuid())
+  id                     String   @id @default(cuid())
   userId                 String
   franchiseId            String
-  morningEmailEnabled    Boolean @default(true)
+  morningEmailEnabled    Boolean  @default(true)
   morningEmailTime       String? // "06:30" in owner timezone
-  dailyRecapEnabled      Boolean @default(true)
-  weeklyDigestEnabled    Boolean @default(true)
-  criticalSmsEnabled     Boolean @default(true)
-  depositSmsEnabled      Boolean @default(true)
-  complianceSmsEnabled   Boolean @default(true)
-  cashVarianceSmsEnabled Boolean @default(false)
+  dailyRecapEnabled      Boolean  @default(true)
+  weeklyDigestEnabled    Boolean  @default(true)
+  criticalSmsEnabled     Boolean  @default(true)
+  depositSmsEnabled      Boolean  @default(true)
+  complianceSmsEnabled   Boolean  @default(true)
+  cashVarianceSmsEnabled Boolean  @default(false)
   quietHoursStart        String? // "22:00"
   quietHoursEnd          String? // "06:00"
-  weekendEnabled         Boolean @default(true)
-  weightOverrides        Json?   // {DEPOSIT_OVERDUE: 95, SALES_DROP: 40}
+  weekendEnabled         Boolean  @default(true)
+  weightOverrides        Json? // {DEPOSIT_OVERDUE: 95, SALES_DROP: 40}
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
@@ -6677,14 +6682,14 @@ model StorefrontProfile {
   bannerImageUrl String? // Hero banner
 
   // Product Visibility
-  showAllCategories  Boolean @default(true)  // false = use visibleCategoryIds
+  showAllCategories  Boolean @default(true) // false = use visibleCategoryIds
   visibleCategoryIds String? // JSON: ["catId1","catId2"]
   hiddenItemIds      String? // JSON: ["itemId1","itemId2"]
   hideOutOfStock     Boolean @default(true)
 
   // Pickup Rules
   pickupEnabled     Boolean @default(true)
-  pickupLeadMinutes Int     @default(30)  // "Ready in ~30 min"
+  pickupLeadMinutes Int     @default(30) // "Ready in ~30 min"
   maxOrdersPerSlot  Int     @default(10)
 
   // Order Rules
@@ -6740,8 +6745,8 @@ model StorefrontOrderItem {
   orderId String
   order   StorefrontOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  itemId   String  // Reference to Item (snapshot, not FK)
-  itemName String  // Snapshot at order time
+  itemId   String // Reference to Item (snapshot, not FK)
+  itemName String // Snapshot at order time
   quantity Int
   price    Decimal @db.Decimal(12, 2) // Snapshot at order time
   total    Decimal @db.Decimal(12, 2)
@@ -6753,10 +6758,10 @@ model StorefrontOrderItem {
 
 model EmailEvent {
   id             String   @id @default(cuid())
-  messageId      String   @unique        // SES Message ID
-  lane           String                  // TRANSACTIONAL | MARKETING
+  messageId      String   @unique // SES Message ID
+  lane           String // TRANSACTIONAL | MARKETING
   recipientEmail String
-  template       String?                 // receipt, gift_card, password_reset, campaign, etc.
+  template       String? // receipt, gift_card, password_reset, campaign, etc.
   status         String   @default("SENT") // SENT | DELIVERED | OPENED | CLICKED | BOUNCED | COMPLAINED
   franchiseId    String?
   metadata       Json?
@@ -6772,10 +6777,154 @@ model EmailEvent {
 
 model EmailSuppression {
   id        String   @id @default(cuid())
-  email     String   @unique             // Suppressed email address
-  reason    String                       // BOUNCE | COMPLAINT | UNSUBSCRIBE
+  email     String   @unique // Suppressed email address
+  reason    String // BOUNCE | COMPLAINT | UNSUBSCRIBE
   lane      String   @default("MARKETING") // MARKETING (only marketing blocked) | ALL (all blocked)
   createdAt DateTime @default(now())
 
   @@index([lane])
+}
+
+// ==========================================
+// SALON LOYALTY V1 (BEAUTY LOOP ENGINE)
+// ==========================================
+
+model SalonLoyaltyProgram {
+  id            String  @id @default(cuid())
+  franchisorId  String?
+  franchiseId   String?
+  locationId    String?
+  name          String
+  code          String  @unique
+  customerLabel String?
+  description   String?
+
+  status      String  @default("DRAFT") // DRAFT, ACTIVE, PAUSED, ARCHIVED
+  programType String  @default("SERVICE_PUNCH") // SERVICE_PUNCH, BEAUTY_LOOP
+  goal        String? // REPEAT_VISITS, REBOOKING, SIGNATURE_SERVICE, etc.
+
+  punchesRequired Int?
+  earnMode        String   @default("ONE_PER_QUALIFYING_VISIT")
+  rewardType      String // FREE_SERVICE, PERCENT_OFF, FIXED_OFF, FREE_ADDON
+  rewardValue     Decimal? @db.Decimal(10, 2)
+  rewardPercent   Decimal? @db.Decimal(5, 2)
+
+  appliesToSameLocationOnly Boolean @default(true)
+  allowMultiLocationEarn    Boolean @default(false)
+  allowMultiLocationRedeem  Boolean @default(false)
+
+  autoEnroll                Boolean @default(true)
+  requireIdentifiedCustomer Boolean @default(true)
+
+  timingWindowDays Int? // Beauty Loop behavior
+  rewardExpiryDays Int?
+
+  stackWithDiscounts         Boolean @default(false)
+  reverseOnRefund            Boolean @default(true)
+  reverseOnVoid              Boolean @default(true)
+  managerApprovalForOverride Boolean @default(false)
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  rules        SalonLoyaltyProgramRule[]
+  memberships  SalonCustomerLoyaltyMembership[]
+  transactions SalonLoyaltyLedgerEntry[]
+
+  @@index([franchisorId])
+  @@index([franchiseId])
+  @@index([locationId])
+  @@index([status])
+  @@index([programType])
+}
+
+model SalonLoyaltyProgramRule {
+  id               String   @id @default(cuid())
+  loyaltyProgramId String
+  serviceId        String?
+  categoryId       String?
+  excluded         Boolean  @default(false)
+  minSubtotal      Decimal? @db.Decimal(10, 2)
+  locationId       String?
+  stylistId        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  loyaltyProgram SalonLoyaltyProgram @relation(fields: [loyaltyProgramId], references: [id], onDelete: Cascade)
+}
+
+model SalonCustomerLoyaltyMembership {
+  id               String  @id @default(cuid())
+  loyaltyProgramId String
+  clientId         String
+  homeLocationId   String?
+  status           String  @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, EXPIRED
+
+  punchesEarned        Int       @default(0)
+  rewardsUnlocked      Int       @default(0)
+  rewardsRedeemed      Int       @default(0)
+  streakPreservedUntil DateTime?
+  rewardExpiresAt      DateTime?
+  lastQualifiedVisitAt DateTime?
+  lastRewardRedeemedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  loyaltyProgram SalonLoyaltyProgram @relation(fields: [loyaltyProgramId], references: [id], onDelete: Cascade)
+  client         Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, loyaltyProgramId])
+  @@index([clientId, loyaltyProgramId])
+  @@index([status, rewardExpiresAt])
+  @@index([homeLocationId, status])
+}
+
+model SalonLoyaltyLedgerEntry {
+  id                        String   @id @default(cuid())
+  loyaltyProgramId          String
+  membershipId              String
+  clientId                  String
+  transactionId             String?
+  locationId                String?
+  stylistId                 String?
+  entryType                 String // EARN, REVERSE_REFUND, REVERSE_VOID, REWARD_UNLOCK, REDEEM, EXPIRE, MANUAL_ADJUST
+  idempotencyKey            String   @unique // Rigid anchor: '{programId}_{membershipId}_{entryType}_{transactionId}_{sourceRefundId|base}'
+  punchesDelta              Int      @default(0)
+  rewardDelta               Int      @default(0)
+  notes                     String?
+  sourceRefundTransactionId String? // Tie reversal uniquely to the refund event 
+  transactionLineItemId     String? // Track EXACTLY which line was credited
+  createdByUserId           String?
+  createdAt                 DateTime @default(now())
+
+  loyaltyProgram          SalonLoyaltyProgram @relation(fields: [loyaltyProgramId], references: [id], onDelete: Cascade)
+  transaction             Transaction?        @relation("LoyaltyEntries", fields: [transactionId], references: [id])
+  sourceRefundTransaction Transaction?        @relation("LoyaltyReversals", fields: [sourceRefundTransactionId], references: [id])
+
+  @@index([membershipId])
+  @@index([transactionId])
+  @@index([sourceRefundTransactionId])
+  @@index([entryType])
+  @@index([createdAt])
+  @@index([clientId, loyaltyProgramId, createdAt])
+}
+
+model SalonTransactionLoyaltyRedemption {
+  id                    String   @id @default(cuid())
+  transactionId         String
+  transactionLineItemId String? // Precise link to what line was comped
+  loyaltyProgramId      String
+  membershipId          String
+  rewardType            String
+  rewardValue           Decimal? @db.Decimal(10, 2)
+  createdAt             DateTime @default(now())
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@index([membershipId])
+  @@index([loyaltyProgramId])
 }

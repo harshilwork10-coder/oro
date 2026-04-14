@@ -9,7 +9,7 @@
  * Safe number conversion — handles Prisma Decimal, null, undefined, NaN
  * Always returns a finite number (0 as fallback)
  */
-export function safeNumber(value: any, fallback = 0): number {
+export function safeNumber(value: unknown, fallback = 0): number {
     if (value === null || value === undefined) return fallback
     const n = typeof value === 'string' ? parseFloat(value) : Number(value)
     return isFinite(n) ? n : fallback
@@ -28,7 +28,7 @@ export function safeDivide(numerator: number, denominator: number, fallback = 0)
  * Safe money rounding — always 2 decimal places, prevents floating point artifacts
  * e.g., 0.1 + 0.2 = 0.30000000000000004 → safeMoney gives 0.30
  */
-export function safeMoney(value: any): number {
+export function safeMoney(value: unknown): number {
     const n = safeNumber(value)
     return Math.round(n * 100) / 100
 }
@@ -52,13 +52,15 @@ export function safeArray<T>(value: T[] | null | undefined): T[] {
 /**
  * Safe sum — sums a numeric field from an array with type coercion
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function safeSum(items: any[], field: string): number {
-    return safeArray(items).reduce((sum, item) => sum + safeNumber(item[field]), 0)
+    return safeArray(items).reduce((sum, item) => sum + safeNumber(item?.[field]), 0)
 }
 
 /**
  * Safe average — average of a numeric field, guarded against empty arrays
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function safeAverage(items: any[], field: string): number {
     const arr = safeArray(items)
     if (arr.length === 0) return 0
@@ -68,7 +70,7 @@ export function safeAverage(items: any[], field: string): number {
 /**
  * Safe format — toFixed() that never returns "NaN" or "Infinity"
  */
-export function safeFixed(value: any, decimals = 2): string {
+export function safeFixed(value: unknown, decimals = 2): string {
     const n = safeNumber(value)
     return n.toFixed(decimals)
 }
@@ -80,7 +82,8 @@ export function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(safeNumber(value), min), max)
 }
 
-export default {
+const safeMath = {
     safeNumber, safeDivide, safeMoney, safePercent,
     safeArray, safeSum, safeAverage, safeFixed, clamp,
 }
+export default safeMath

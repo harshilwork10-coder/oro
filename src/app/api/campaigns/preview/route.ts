@@ -94,7 +94,7 @@ async function buildAudience(locationId: string, audienceType: string): Promise<
 
     if (!location) return []
 
-    let whereClause: any = {
+    const whereClause: any = {
         franchiseId: location.franchiseId,
         phone: { not: null }
     }

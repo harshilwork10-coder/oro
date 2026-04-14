@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
         const locationId = searchParams.get('locationId')
 
         // Build location filter based on role
-        let locationFilter: any = {}
+        const locationFilter: any = {}
 
         if (user.role === 'PROVIDER') {
             // Provider sees all
@@ -165,7 +165,7 @@ async function generateRealTimeExceptions(franchiseId: string | null, locationId
     today.setHours(0, 0, 0, 0)
 
     // Get locations to check
-    let locationFilter: any = {}
+    const locationFilter: any = {}
     if (locationId) {
         locationFilter.id = locationId
     } else if (franchiseId) {

@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
         // For now, we'll use Transaction data to infer ID checks
         // In production, this would be a separate IDScanLog model
-        let transactionWhere: any = {
+        const transactionWhere: any = {
             createdAt: { gte: startDate },
             status: 'COMPLETED'
         }

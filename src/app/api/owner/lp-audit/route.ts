@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
         const days = parseInt(searchParams.get('days') || '7')
 
         // Build location filter
-        let locationFilter: any = {}
+        const locationFilter: any = {}
         let franchiseId: string | null = null
 
         if (user.role === 'PROVIDER') {

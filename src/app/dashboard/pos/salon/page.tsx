@@ -49,6 +49,8 @@ import {
 import { normalizeTransactionForPrint } from '@/lib/print-utils'
 import PaidInOutModal from '@/components/pos/PaidInOutModal'
 import NoSaleModal from '@/components/pos/NoSaleModal'
+import SalonLoyaltyCartTracker, { AppliedReward } from '@/components/pos/salon/SalonLoyaltyCartTracker'
+import CustomerProfileLoyaltyCard from '@/components/pos/salon/CustomerProfileLoyaltyCard'
 
 // Removed hardcoded maps
 import TimeClockButton from '@/components/pos/TimeClockButton'
@@ -76,6 +78,7 @@ interface CartItem {
     barberId?: string // ID of barber who will perform this service
     cashPrice?: number // Dual pricing
     cardPrice?: number // Dual pricing
+    loyaltyProgramId?: string // LOY-6 Track reward application natively
 }
 
 interface MenuData {
@@ -180,6 +183,9 @@ function POSContent() {
     const [locationAddress, setLocationAddress] = useState<string>('')
     const [locationPhone, setLocationPhone] = useState<string>('')
     const [franchiseName, setFranchiseName] = useState<string>('')
+    
+    // LOY-6 State Tracking
+    const [appliedRewards, setAppliedRewards] = useState<AppliedReward[]>([])
     const [showPaxModal, setShowPaxModal] = useState(false)
     const [showTransactionModal, setShowTransactionModal] = useState(false)
     const [selectedTxForActions, setSelectedTxForActions] = useState<Transaction | null>(null)
@@ -1095,6 +1101,47 @@ function POSContent() {
         }
     }
 
+    const handleApplyReward = (programId: string) => {
+        setCart(prev => {
+            const newCart = [...prev]
+            // We comp the most expensive service that isn't already comped
+            const qualifyingServices = newCart.map((item, index) => ({ item, index }))
+                .filter(x => x.item.type === 'SERVICE' && !x.item.loyaltyProgramId)
+                .sort((a, b) => b.item.price - a.item.price)
+                
+            if (qualifyingServices.length === 0) {
+                setToast({ message: 'No qualifying service in cart', type: 'error' })
+                return prev
+            }
+            
+            const targetIdx = qualifyingServices[0].index
+            const target = newCart[targetIdx]
+            
+            // EXACT Option A 100% Line item splitting
+            if (target.quantity > 1) {
+                target.quantity -= 1
+                newCart.push({
+                    ...target,
+                    quantity: 1,
+                    discount: 100,
+                    loyaltyProgramId: programId,
+                    name: `${target.name} (Reward)`
+                })
+            } else {
+                target.discount = 100
+                target.loyaltyProgramId = programId
+                target.name = `${target.name} (Reward)`
+            }
+            
+            setAppliedRewards(curr => {
+                // Only add if not already there, safely
+                if (curr.some(r => r.programId === programId && r.serviceId === target.id)) return curr
+                return [...curr, { programId, serviceId: target.id }]
+            })
+            return newCart
+        })
+    }
+
     const addToCart = (item: any, type: 'SERVICE' | 'PRODUCT') => {
         // FRANCHISOR can add to cart without a shift
         const user = session?.user as any
@@ -1396,12 +1443,28 @@ function POSContent() {
             if (res.ok) {
                 const transaction = await res.json()
 
+                // LOY-6: Post-transaction finalize hook
+                try {
+                    await fetch('/api/salon/loyalty/finalize', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            transactionId: transaction.id || transaction,
+                            locationId: shift?.locationId || (session?.user as any)?.locationId,
+                            appliedRewards: appliedRewards
+                        })
+                    })
+                } catch (e) {
+                    console.error('[Loyalty Finalize Failed]', e)
+                }
+
                 // Capture customer data before clearing state (for rebooking widget)
                 const checkoutCustomerId = selectedCustomer?.id
                 const checkoutCustomerName = selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : ''
 
                 // Clear state — reset ALL transaction-scoped state to prevent leaks
                 setCart([])
+                setAppliedRewards([])
                 setPendingTipAmount(0)
                 setSelectedCustomer(null)
                 setAppliedDiscount(0)
@@ -2512,6 +2575,15 @@ function POSContent() {
                                         </div>
                                     ))
                                 )}
+                                {cart.length > 0 && typeof window !== 'undefined' && (
+                                    <SalonLoyaltyCartTracker
+                                        cart={cart}
+                                        clientId={selectedCustomer?.id}
+                                        locationId={shift?.locationId || (session?.user as any)?.locationId}
+                                        appliedRewards={appliedRewards}
+                                        onApplyReward={handleApplyReward}
+                                    />
+                                )}
                             </div>
 
                             {/* Totals & Actions - Premium Glass Design */}
@@ -2661,6 +2733,43 @@ function POSContent() {
                                             </div>
                                         ))}
                                     </div>
+
+                                    {/* Loyalty History Block */}
+                                    {(selectedTx.salonLoyaltyLedgerEntries?.length > 0 || selectedTx.salonLoyaltyRedemptions?.length > 0) && (
+                                        <div className="mt-6 pt-6 border-t border-stone-800 space-y-3">
+                                            <h4 className="text-sm font-bold text-stone-400 uppercase tracking-wider flex items-center gap-2">
+                                                <Sparkles className="w-4 h-4 text-violet-400" />
+                                                Loyalty Impact
+                                            </h4>
+                                            
+                                            {/* Earned Points */}
+                                            {selectedTx.salonLoyaltyLedgerEntries?.map((entry: any) => (
+                                                <div key={entry.id} className="bg-violet-900/10 border border-violet-500/20 rounded-lg p-3 flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-sm font-medium text-violet-200">{entry.loyaltyProgram?.name}</p>
+                                                        <p className="text-xs text-stone-500">Points Earned</p>
+                                                    </div>
+                                                    <div className="text-violet-400 font-bold text-lg">
+                                                        +{entry.pointsAmount}
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {/* Rewards Used */}
+                                            {selectedTx.salonLoyaltyRedemptions?.map((redemption: any) => (
+                                                <div key={redemption.id} className="bg-emerald-900/10 border border-emerald-500/20 rounded-lg p-3 flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-sm font-medium text-emerald-200">{redemption.loyaltyProgram?.name}</p>
+                                                        <p className="text-xs text-stone-500">Reward Redeemed</p>
+                                                    </div>
+                                                    <div className="text-emerald-400 font-bold text-sm bg-emerald-900/30 px-2 py-1 rounded border border-emerald-500/20">
+                                                        Applied
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
                                 </div>
                                 <div className="p-6 border-t border-stone-800">
                                     {selectedTx.status === 'COMPLETED' && (
@@ -2922,9 +3031,27 @@ function POSContent() {
                                                 })
                                                 if (res.ok) {
                                                     const txData = await res.json()
+                                                    
+                                                    // LOY-6: Post-transaction finalize hook
+                                                    try {
+                                                        const txPayload = txData.transaction || txData
+                                                        await fetch('/api/salon/loyalty/finalize', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({
+                                                                transactionId: txPayload.id,
+                                                                locationId: shift?.locationId || user?.locationId,
+                                                                appliedRewards: appliedRewards
+                                                            })
+                                                        })
+                                                    } catch (e) {
+                                                        console.error('[Loyalty Finalize Failed]', e)
+                                                    }
+
                                                     const changeDue = received - cashTenderingTotal
                                                     // Clear ALL transaction-scoped state to prevent leaks
                                                     setCart([])
+                                                    setAppliedRewards([])
                                                     setPendingTipAmount(0)
                                                     setSelectedCustomer(null)
                                                     setAppliedDiscount(0)
@@ -3604,12 +3731,17 @@ function POSContent() {
                                                 </button>
                                                 <button
                                                     onClick={() => setSelectedCustomer(null)}
-                                                    className="text-emerald-400 hover:text-red-400 transition-colors"
+                                                    className="text-emerald-500 hover:text-emerald-400 p-1 rounded-lg hover:bg-emerald-900/50 transition-colors"
                                                 >
-                                                    <Trash2 className="h-4 w-4" />
+                                                    <X className="h-4 w-4" />
                                                 </button>
                                             </div>
                                         </div>
+                                        {/* LOY-6 Client Profile Progress */}
+                                        <CustomerProfileLoyaltyCard 
+                                            clientId={selectedCustomer.id}
+                                            locationId={shift?.locationId || (session?.user as any)?.locationId}
+                                        />
                                     </div>
                                 )}
 
@@ -3645,6 +3777,15 @@ function POSContent() {
                                                 )}
                                             </button>
                                         ))
+                                    )}
+                                    {cart.length > 0 && typeof window !== 'undefined' && (
+                                        <SalonLoyaltyCartTracker
+                                            cart={cart}
+                                            clientId={selectedCustomer?.id}
+                                            locationId={shift?.locationId || (session?.user as any)?.locationId}
+                                            appliedRewards={appliedRewards}
+                                            onApplyReward={handleApplyReward}
+                                        />
                                     )}
                                 </div>
 

@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Get all locations for this user
-        let locationFilter: any = {}
+        const locationFilter: any = {}
         if (user.role !== 'PROVIDER' && user.franchiseId) {
             locationFilter.franchiseId = user.franchiseId
         }
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
         })
 
         // Build product search filter
-        let productWhere: any = { isActive: true }
+        const productWhere: any = { isActive: true }
 
         if (user.role !== 'PROVIDER' && user.franchiseId) {
             productWhere.franchiseId = user.franchiseId

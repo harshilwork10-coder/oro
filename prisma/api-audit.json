@@ -1,0 +1,786 @@
+{
+  "src\\app\\api\\provider\\accounts\\[id]\\dealer\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\audit-logs\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\consultations\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\dashboard\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\data-import\\clients\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\data-import\\customers\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\data-import\\departments\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\dealers\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\dealers\\[id]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\locations\\[id]\\stations\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\merchant-applications\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\request-docs\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\activate\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\assignment\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\create-franchise\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\create-locations\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\devices\\assign\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\documents\\request\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\documents\\[docId]\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\events\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\modules\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\shipments\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\requests\\[id]\\status\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\shipment\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\onboarding\\shipments\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\owners\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\owners\\[ownerId]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\owners\\[ownerId]\\[llcId]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\owners\\[ownerId]\\[llcId]\\[storeId]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\provisioning-tasks\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\provisioning-tasks\\[id]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\shipments\\[id]\\delivered\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\shipments\\[id]\\tracking\\route.ts": {
+    "hasGetAuthUser": false,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\sms-config\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\sms-credits\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\sms-packages\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\sms-requests\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\stations\\[stationId]\\admin\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\terminals\\discover\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\terminals\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\tickets\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\tickets\\[id]\\messages\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\provider\\tickets\\[id]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\activity\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\agents\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\analytics\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\analytics-chart\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\api-usage\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\audit-logs\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\backfill-codes\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\clients\\export\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\clients\\[id]\\magic-link\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\clients\\[id]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\dashboard\\stats\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\documents\\upload\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\feature-requests\\action\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\feature-requests\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisees\\create\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\approve\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\create\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\send-reminder\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\suspend\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": true
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\cash-discount\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\config\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\delete\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\export-data\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\franchisees\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\integrations\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\location-link\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\magic-link\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\status\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\upgrade\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\franchisors\\[id]\\users\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\interventions\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\interventions\\[id]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\licenses\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\locations\\create\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\locations\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\locations\\[id]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\locations\\[id]\\settings\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\locations\\[id]\\store-code\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\locations\\[id]\\taxes\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\memberships\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": true
+  },
+  "src\\app\\api\\admin\\metrics\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\my-sales\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\notifications\\clear\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\notifications\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\notifications\\[id]\\read\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\offboarding\\anonymize\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\offboarding\\archive\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\offboarding\\export\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\offboarding\\start\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\owners\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\owners\\[ownerId]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\owners\\[ownerId]\\[llcId]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\owners\\[ownerId]\\[llcId]\\[storeId]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\pulse-seats\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": false,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\requests\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\requests\\[id]\\approve\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\requests\\[id]\\ship\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\reset-owner-password\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\shipping\\pending\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\subscription\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\team\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\team\\[id]\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\terminals\\discover\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\terminals\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  },
+  "src\\app\\api\\admin\\user-activity\\route.ts": {
+    "hasGetAuthUser": true,
+    "hasGetServerSession": false,
+    "hasSessionCheck": false,
+    "hasRoleCheck": true,
+    "hasUndefinedUser": false
+  }
+}

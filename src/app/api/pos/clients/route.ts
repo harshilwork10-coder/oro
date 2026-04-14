@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
             .filter(c => c.phone)
             .map(c => ({ id: c.id, phone: c.phone! }))
 
-        let loyaltyMap = new Map<string, number>()
+        const loyaltyMap = new Map<string, number>()
         if (program && phonesWithClients.length > 0) {
             const members = await prisma.loyaltyMember.findMany({
                 where: {

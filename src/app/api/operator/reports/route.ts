@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
         // Get date range
         const now = new Date();
         let from: Date;
-        let to: Date = now;
+        const to: Date = now;
         let label: string;
 
         switch (periodParam) {
