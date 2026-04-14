@@ -1394,8 +1394,9 @@ model LocationServiceOverride {
   tierLongPrice   Decimal? @db.Decimal(12, 2)
 
   // Local controls
-  isEnabled Boolean @default(true) // Disable service at this location
-  isLocked  Boolean @default(false) // Prevent brand sync updates
+  isEnabled            Boolean @default(true) // Disable service at this location
+  useBrandDefaultPrice Boolean @default(false) // When true, use globalService.basePrice as-is (explicit opt-in)
+  isLocked             Boolean @default(false) // Prevent brand sync updates
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

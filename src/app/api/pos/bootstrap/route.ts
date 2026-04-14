@@ -135,7 +135,8 @@ async function buildBootstrapResponse(
     // ═══════════════════════════════════════════════════════════════════
     const franchisorId = franchisor?.id
 
-    const posMenu = await buildPOSMenu(franchiseId, location.id, franchisorId)
+    const posMenuFull = await buildPOSMenu(franchiseId, location.id, franchisorId)
+    const { pendingPricingCount, ...posMenu } = posMenuFull
     const menuVersion = generateMenuVersion(posMenu.services, posMenu.products, posMenu.discounts)
 
     // ═══════════════════════════════════════════════════════════════════
@@ -286,6 +287,7 @@ async function buildBootstrapResponse(
         vertical: resolvedBusinessType,
         staff: staffFormatted,  // Always include in cached version
         menu: posMenu,
+        pendingPricingCount,
 
         // Config & settings
         settings: stationConfig,

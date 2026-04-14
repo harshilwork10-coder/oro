@@ -63,13 +63,17 @@ export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
         }
 
         return NextResponse.json({
-            ...posMenu,
+            services: posMenu.services,
+            products: posMenu.products,
+            discounts: posMenu.discounts,
+            categories: posMenu.categories,
             // Metadata for Android
             meta: {
                 serviceCount: posMenu.services.length,
                 productCount: posMenu.products.length,
                 discountCount: posMenu.discounts.length,
                 categoryCount: posMenu.categories.length,
+                pendingPricingCount: posMenu.pendingPricingCount,
                 lastUpdated: new Date().toISOString()
             }
         }, {
