@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
                 name: legalName,
                 slug,
                 franchisorId: franchisor.id,
-                approvalStatus: 'APPROVED', // Auto-approve when HQ creates
+                approvalStatus: 'PENDING', // Requires Provider provisioning
                 accountStatus: 'ACTIVE',
                 region: region || null, // Region/territory set at creation
             }
