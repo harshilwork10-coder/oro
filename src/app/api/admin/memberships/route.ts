@@ -6,10 +6,8 @@ import { logActivity } from '@/lib/auditLog'
 // GET: List all memberships for a franchisor (admin only)
 export async function GET(req: NextRequest) {
     try {
-        const authUser = await getAuthUser(req)
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        if (!authUser || authUser.role !== 'PROVIDER') {
+        const user = await getAuthUser(req)
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -48,7 +46,8 @@ export async function GET(req: NextRequest) {
 // POST: Add a user to a franchisor (admin only)
 export async function POST(req: NextRequest) {
     try {
-        if (!authUser || authUser.role !== 'PROVIDER') {
+        const user = await getAuthUser(req)
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
@@ -135,7 +134,8 @@ export async function POST(req: NextRequest) {
 // DELETE: Remove a membership (admin only)
 export async function DELETE(req: NextRequest) {
     try {
-        if (!authUser || authUser.role !== 'PROVIDER') {
+        const user = await getAuthUser(req)
+        if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 

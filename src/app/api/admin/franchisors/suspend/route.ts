@@ -6,6 +6,7 @@ import { logActivity } from '@/lib/auditLog'
 // POST - Suspend, Activate, or Terminate a franchisor account
 export async function POST(req: NextRequest) {
     try {
+        const user = await getAuthUser(req);
         // Only PROVIDER can manage account status
         if (user?.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Only providers can manage account status' }, { status: 403 })
@@ -76,8 +77,8 @@ export async function POST(req: NextRequest) {
 
         // Audit log
         await logActivity({
-            userId: authUser?.id || 'unknown',
-            userEmail: (authUser as any)?.email,
+            userId: user?.id || 'unknown',
+            userEmail: (user as any)?.email,
             userRole: 'PROVIDER',
             action: `ACCOUNT_${action}`,
             entityType: 'Franchisor',
@@ -103,16 +104,8 @@ export async function POST(req: NextRequest) {
 // GET - Get all suspended/terminated accounts
 export async function GET(req: NextRequest) {
     try {
-        const authUser = await getAuthUser(req)
+        const user = await getAuthUser(req)
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        if (user?.role !== 'PROVIDER') {
-            return NextResponse.json({ error: 'Only providers can view this' }, { status: 403 })
-        }
-
-        const { searchParams } = new URL(req.url)
-        const status = searchParams.get('status') // SUSPENDED, TERMINATED, or null for all
-
-        // Build where clause — use status param if provided, otherwise show all non-active
         const whereClause: any = {}
         if (status && ['SUSPENDED', 'TERMINATED'].includes(status)) {
             whereClause.accountStatus = status
