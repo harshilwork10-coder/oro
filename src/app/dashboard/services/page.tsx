@@ -32,9 +32,9 @@ export default function ServicesPage() {
             const res = await fetch('/api/auth/me')
             if (res.ok) {
                 const user = await res.json()
-                // If user has franchiseeId, they're a franchise location (read-only)
-                setIsFranchise(!!user.franchiseeId)
-                setFranchiseName(user.franchise?.name || user.franchisee?.franchise?.name || '')
+                // If user has franchiseId, they're a franchise location (read-only)
+                setIsFranchise(!!user.franchiseId)
+                setFranchiseName(user.franchise?.name || '')
             }
         } catch (error) {
             console.error('Failed to check user type:', error)
