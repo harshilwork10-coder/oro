@@ -224,7 +224,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Customers', href: '/dashboard/customers', icon: Users, always: true },
         { name: 'Loyalty', href: '/dashboard/owner/loyalty', icon: Trophy, always: true },
         { name: 'Orders', href: '/dashboard/transactions', icon: Receipt, always: true },
-        { name: 'Reports', href: '/dashboard/reports/daily', icon: FileText, always: true },
+        { name: 'Reports', href: '/dashboard/reports', icon: FileText, always: true },
         { name: 'Help & Support', href: '/dashboard/help-desk', icon: Headphones, always: true },
         { name: 'Appearance', href: '/dashboard/settings/appearance', icon: Sparkles, always: true },
         { name: 'Security', href: '/dashboard/settings/security', icon: Shield, always: true },
