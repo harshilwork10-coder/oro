@@ -6,7 +6,7 @@ import { logActivity } from '@/lib/auditLog';
 // POST /api/admin/offboarding/start - Start offboarding (suspend account + create case)
 export async function POST(req: NextRequest) {
     try {
-        ;
+        const user = await getAuthUser(req);
         if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -110,10 +110,7 @@ export async function POST(req: NextRequest) {
 // GET /api/admin/offboarding/start?accountType=X&accountId=Y - Get offboarding status
 export async function GET(req: NextRequest) {
     try {
-        const user = await getAuthUser(req)
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        ;
+        const user = await getAuthUser(req);
         if (!user || user.role !== 'PROVIDER') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
