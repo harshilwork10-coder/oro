@@ -11,8 +11,8 @@ export async function PUT(
         const user = await getAuthUser(request)
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!session || user.role !== 'PROVIDER') {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
         const { id } = await params
@@ -69,8 +69,11 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        if (!session || user.role !== 'PROVIDER') {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = await getAuthUser(request)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        if (user.role !== 'PROVIDER') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
         const { id } = await params

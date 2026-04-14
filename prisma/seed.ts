@@ -21,23 +21,33 @@ async function main() {
     await prisma.station.deleteMany()
     await prisma.paymentTerminal.deleteMany()
     await prisma.client.deleteMany()
+    await prisma.franchisorMembership.deleteMany()
     await prisma.user.deleteMany()
     await prisma.location.deleteMany()
     await prisma.franchise.deleteMany()
     await prisma.businessConfig.deleteMany()
     await prisma.franchisor.deleteMany()
+    await prisma.provider.deleteMany()
 
     const hashedPassword = await hash('password', 10)
     const hashedPin = await hash('1234', 10)
 
     console.log('👤 Creating Provider...')
     // ===== 1. PROVIDER (Platform Owner) =====
+    const providerEntity = await prisma.provider.create({
+        data: {
+            name: 'ORO9 Platform',
+            isActive: true
+        }
+    })
+
     const provider = await prisma.user.create({
         data: {
             name: 'OroNext Admin',
             email: 'admin@oro9.com',
             password: hashedPassword,
-            role: 'PROVIDER'
+            role: 'PROVIDER',
+            providerId: providerEntity.id
         }
     })
 
@@ -97,6 +107,16 @@ async function main() {
             franchiseId: salonFranchise.id,
             locationId: salonLocation.id,
             dailyGoal: 3000
+        }
+    })
+
+    // Link salon owner to franchisor via FranchisorMembership (RBAC)
+    await prisma.franchisorMembership.create({
+        data: {
+            userId: salonOwner.id,
+            franchisorId: salonFranchisor.id,
+            role: 'OWNER',
+            isPrimary: true
         }
     })
 
@@ -210,6 +230,16 @@ async function main() {
             franchiseId: retailFranchise.id,
             locationId: retailLocation.id,
             dailyGoal: 5000
+        }
+    })
+
+    // Link retail owner to franchisor via FranchisorMembership (RBAC)
+    await prisma.franchisorMembership.create({
+        data: {
+            userId: retailOwner.id,
+            franchisorId: retailFranchisor.id,
+            role: 'OWNER',
+            isPrimary: true
         }
     })
 
