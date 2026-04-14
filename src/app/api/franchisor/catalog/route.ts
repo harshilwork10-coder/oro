@@ -33,9 +33,6 @@ export async function GET(req: NextRequest) {
         }
 
         const franchiseIds = franchisor.franchises.map(f => f.id)
-        if (franchiseIds.length === 0) {
-            return NextResponse.json({ success: true, data: { categories: [], uncategorizedServices: [], totalServices: 0 } })
-        }
 
         // Brand owner path — read from GlobalServiceCategory (matches POST write table)
         return await fetchBrandCatalog(franchisor.id, franchiseIds)
