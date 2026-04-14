@@ -43,8 +43,30 @@ export async function GET(request: Request) {
             include: { serviceCategory: true },
             orderBy: { name: 'asc' }
         })
+        
+        let globalServices = []
+        if (user.role !== 'FRANCHISOR' && user.franchise && user.franchise.franchisorId) {
+            // Get brand catalog overlay
+            const rawGlobal = await prisma.globalService.findMany({
+                where: { 
+                    franchisorId: user.franchise.franchisorId,
+                    isActive: true,
+                    isArchived: false
+                },
+                include: { category: true }
+            })
+            globalServices = rawGlobal.map(gs => ({
+                id: gs.id,
+                name: gs.name,
+                description: gs.description,
+                price: gs.basePrice,
+                duration: gs.duration,
+                category: gs.category?.name || "Brand Catalog",
+                isGlobal: true
+            }))
+        }
 
-        return NextResponse.json(services)
+        return NextResponse.json([...globalServices, ...services])
     } catch (error) {
         console.error('Error fetching services:', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
