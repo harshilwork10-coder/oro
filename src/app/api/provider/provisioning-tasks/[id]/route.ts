@@ -106,12 +106,18 @@ export async function PATCH(
         data: updateData
     });
 
-    // If marked DONE, update location status to READY_FOR_INSTALL
+    // If marked DONE, update location status to READY_FOR_INSTALL and approve franchise
     if (status === 'DONE') {
-        await prisma.location.update({
-            where: { id: task.locationId },
-            data: { provisioningStatus: 'READY_FOR_INSTALL' }
-        });
+        await prisma.$transaction([
+            prisma.location.update({
+                where: { id: task.locationId },
+                data: { provisioningStatus: 'READY_FOR_INSTALL' }
+            }),
+            prisma.franchise.update({
+                where: { id: task.franchiseeBusinessId },
+                data: { approvalStatus: 'APPROVED' }
+            })
+        ]);
     }
 
     // If marked IN_PROGRESS, assign to current user if not assigned
