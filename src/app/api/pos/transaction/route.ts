@@ -188,6 +188,30 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // ===== FETCH CANONICAL INVENTORY MAPS AHEAD OF TIME =====
+        const productIds = items
+            .filter((i: any) => i.type === 'PRODUCT' && i.id && !i.id.startsWith('custom') && !i.id.startsWith('open'))
+            .map((i: any) => i.id)
+
+        const serviceIds = items
+            .filter((i: any) => i.type === 'SERVICE' && i.id && !i.id.startsWith('custom') && !i.id.startsWith('open'))
+            .map((i: any) => i.id)
+
+        const [dbProducts, dbServices] = await Promise.all([
+            productIds.length > 0 ? prisma.product.findMany({
+                where: { id: { in: productIds } },
+                include: {
+                    productCategory: {
+                        select: { id: true, ageRestricted: true, minimumAge: true }
+                    }
+                }
+            }) : [],
+            serviceIds.length > 0 ? prisma.service.findMany({ where: { id: { in: serviceIds } } }) : []
+        ])
+
+        const productMap = new Map(dbProducts.map(p => [p.id, p]))
+        const serviceMap = new Map(dbServices.map(s => [s.id, s]))
+
         // Generate sequential invoice number
         const invoiceNumber = await generateInvoiceNumber(user.franchiseId)
 
@@ -331,30 +355,6 @@ export async function POST(req: NextRequest) {
 
         // ===== SECURITY: VALIDATE PRICES & STOCK =====
         // Fetch authoritative data to prevent client-side price manipulation
-        // Sprint 1: Product is the CANONICAL retail inventory model
-        const productIds = items
-            .filter((i: any) => i.type === 'PRODUCT' && i.id && !i.id.startsWith('custom') && !i.id.startsWith('open'))
-            .map((i: any) => i.id)
-
-        const serviceIds = items
-            .filter((i: any) => i.type === 'SERVICE' && i.id && !i.id.startsWith('custom') && !i.id.startsWith('open'))
-            .map((i: any) => i.id)
-
-        // Sprint 1: Fetch products WITH category age restriction data
-        const [dbProducts, dbServices] = await Promise.all([
-            productIds.length > 0 ? prisma.product.findMany({
-                where: { id: { in: productIds } },
-                include: {
-                    productCategory: {
-                        select: { id: true, ageRestricted: true, minimumAge: true }
-                    }
-                }
-            }) : [],
-            serviceIds.length > 0 ? prisma.service.findMany({ where: { id: { in: serviceIds } } }) : []
-        ])
-
-        const productMap = new Map(dbProducts.map(p => [p.id, p]))
-        const serviceMap = new Map(dbServices.map(s => [s.id, s]))
 
         // ===== SPRINT 1: AGE VERIFICATION ENFORCEMENT =====
         // Server-side check — NEVER trusts client booleans. Queries AgeVerificationSession table.
