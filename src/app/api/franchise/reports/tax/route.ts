@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
-import { prisma } from '@/lib/prisma'
+import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 
 export async function GET(request: Request) {
     const authUser = await getAuthUser(request)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!authUser?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const user = await prisma.user.findUnique({
-        where: { email: user.email },
+        where: { email: authUser.email },
         include: { franchise: true }
     })
 

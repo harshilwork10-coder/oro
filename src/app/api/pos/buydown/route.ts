@@ -12,7 +12,7 @@ import { logActivity } from '@/lib/auditLog'
  */
 export async function POST(req: NextRequest) {
     const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     try {
         const body = await req.json()
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     try {
         const promos = await prisma.promotion.findMany({

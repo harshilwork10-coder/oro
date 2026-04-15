@@ -12,7 +12,7 @@ const s3Client = new S3Client({
 export async function GET(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // Security: Require authentication
         if (!user?.id) {

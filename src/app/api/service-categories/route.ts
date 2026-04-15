@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const categories = await prisma.serviceCategory.findMany({
             where: { franchiseId: user.franchiseId },
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { name } = await req.json()
         if (!name) return NextResponse.json({ error: 'Category name is required' }, { status: 400 })
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { id, name, sortOrder } = await req.json()
         if (!id || !name) return NextResponse.json({ error: 'Category ID and name are required' }, { status: 400 })
@@ -59,7 +59,7 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { id } = await req.json()
         if (!id) return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })

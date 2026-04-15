@@ -21,7 +21,7 @@ const THRESHOLDS = {
 
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!['OWNER', 'ADMIN', 'PROVIDER', 'FRANCHISOR', 'MANAGER'].includes(user.role || '')) {
         return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }

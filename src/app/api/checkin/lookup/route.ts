@@ -79,7 +79,8 @@ export async function POST(request: Request) {
             // Customer not found — caller should show name-entry form
             return NextResponse.json({
                 found: false,
-                locationName: location.name
+                locationName: location.name,
+                locationId: location.id
             })
         }
 

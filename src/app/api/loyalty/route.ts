@@ -6,7 +6,7 @@ import { logActivity } from '@/lib/auditLog'
 export async function GET(req: Request) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { searchParams } = new URL(req.url)
         const franchiseId = searchParams.get('franchiseId') || user.franchiseId
@@ -29,7 +29,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // Use session franchiseId — NEVER trust client-provided franchiseId for writes
         const franchiseId = user.franchiseId

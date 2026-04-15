@@ -3,14 +3,14 @@
  * GDPR Article 20 - Right to Data Portability
  */
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { exportUserData } from '@/lib/security/gdpr'
 import { logActivity } from '@/lib/auditLog'
 
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         if (!user?.id) {
             return NextResponse.json(

@@ -17,7 +17,7 @@ import { matchInvoiceItem } from '@/lib/invoice-matcher'
 export async function POST(request: Request) {
   try {
         const user = await getAuthUser(request)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

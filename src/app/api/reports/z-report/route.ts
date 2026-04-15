@@ -14,7 +14,7 @@ const REFUNDED_STATUSES = ['REFUNDED', 'VOIDED', 'CANCELLED'] as const
 export async function GET(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const searchParams = req.nextUrl.searchParams
         const dateParam = searchParams.get('date')

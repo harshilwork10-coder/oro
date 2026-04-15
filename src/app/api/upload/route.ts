@@ -21,7 +21,7 @@ const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'
 export async function POST(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // Security: Require authentication
         if (!user?.id) {

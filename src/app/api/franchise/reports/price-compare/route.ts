@@ -1,11 +1,11 @@
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 
 /** Cross-Location Price Compare — HQ report */
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { searchParams } = new URL(req.url)
     const categoryId = searchParams.get('categoryId'), search = searchParams.get('search')
     try {

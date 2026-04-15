@@ -12,7 +12,7 @@ import { logActivity, ActionTypes } from '@/lib/auditLog'
  */
 export async function POST(request: NextRequest) {
     const user = await getAuthUser(request)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     try {
         const body = await request.json()
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
     const user = await getAuthUser(request)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const isManager = ['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)
     if (!isManager) return NextResponse.json({ error: 'Manager+ only' }, { status: 403 })
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
     const user = await getAuthUser(request)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const isManager = ['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)
     if (!isManager) return NextResponse.json({ error: 'Manager+ only' }, { status: 403 })

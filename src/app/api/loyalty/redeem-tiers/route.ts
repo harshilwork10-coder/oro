@@ -11,7 +11,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
-  if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
     const program = await prisma.loyaltyProgram.findUnique({
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
-  if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   if (!['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR'].includes(user.role)) {
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const user = await getAuthUser(req)
-  if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   if (!['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR'].includes(user.role)) {
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
@@ -120,7 +120,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const user = await getAuthUser(req)
-  if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   if (!['OWNER', 'MANAGER', 'PROVIDER', 'FRANCHISOR'].includes(user.role)) {
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })

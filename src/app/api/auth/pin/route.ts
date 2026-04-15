@@ -5,7 +5,7 @@ import { compare } from 'bcryptjs'
 
 export async function POST(request: Request) {
     const authUser = await getAuthUser(request)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!authUser?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: user.email }
+            where: { email: authUser.email }
         })
 
         if (!user || !user.pin) {

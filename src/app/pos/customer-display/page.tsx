@@ -11,10 +11,12 @@
  *   - Any tablet or kiosk display
  *
  * Shows:
+ * - Personalized greeting when customer is selected
  * - Items as cashier scans them (real-time)
  * - Running total
  * - Business logo + branding
  * - Idle state with promotional messages
+ * - "Powered by ORO GURUS" footer
  */
 
 'use client'
@@ -34,7 +36,7 @@ interface DisplayState {
     subtotal: number
     tax: number
     total: number
-    customerName?: string
+    customerName?: string | null
     lastAction?: string
     status: 'IDLE' | 'ACTIVE' | 'PAYMENT' | 'COMPLETE'
 }
@@ -52,6 +54,22 @@ export default function CustomerDisplayPage() {
     })
     const [promoIndex, setPromoIndex] = useState(0)
     const [time, setTime] = useState(new Date())
+    const [storeName, setStoreName] = useState('')
+
+    // Load store name from terminal_config (same pattern as CheckIn.tsx)
+    useEffect(() => {
+        try {
+            const savedConfig = localStorage.getItem('terminal_config')
+            if (savedConfig) {
+                const config = JSON.parse(savedConfig)
+                if (config.business?.name) {
+                    setStoreName(config.business.name)
+                }
+            }
+        } catch {
+            // Fallback — storeName stays empty, greeting still works
+        }
+    }, [])
 
     useEffect(() => {
         // Listen for cart updates via BroadcastChannel (zero API calls)
@@ -75,13 +93,25 @@ export default function CustomerDisplayPage() {
         }
     }, [])
 
+    // Extract first name only for safety — never display full name or phone
+    const customerFirstName = state.customerName || null
+
+    // Build the welcome greeting
+    const greeting = storeName && customerFirstName
+        ? `Welcome to ${storeName}, ${customerFirstName}`
+        : storeName
+            ? `Welcome to ${storeName}`
+            : customerFirstName
+                ? `Welcome, ${customerFirstName}`
+                : 'Welcome!'
+
     // IDLE STATE — Show branding + promo
     if (state.status === 'IDLE' || state.items.length === 0) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 flex flex-col items-center justify-center text-white p-[clamp(1rem,4vw,2rem)]">
                 <div className="text-center">
                     <h1 className="text-[clamp(2rem,8vw,4rem)] font-bold mb-[clamp(0.25rem,1vw,0.5rem)] bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
-                        ORO 9
+                        {storeName || 'ORO GURUS'}
                     </h1>
                     <p className="text-stone-400 text-[clamp(1rem,3.5vw,1.5rem)] mb-[clamp(2rem,6vw,3rem)]">Welcome!</p>
 
@@ -95,6 +125,11 @@ export default function CustomerDisplayPage() {
                         {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                 </div>
+
+                {/* Footer */}
+                <div className="absolute bottom-[clamp(1rem,3vw,2rem)] text-stone-600 text-[clamp(0.625rem,1.5vw,0.875rem)]">
+                    Powered by ORO GURUS
+                </div>
             </div>
         )
     }
@@ -102,16 +137,21 @@ export default function CustomerDisplayPage() {
     // COMPLETE STATE — Thank you
     if (state.status === 'COMPLETE') {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-stone-900 to-stone-950 flex flex-col items-center justify-center text-white p-[clamp(1rem,4vw,2rem)]">
+            <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-stone-900 to-stone-950 flex flex-col items-center justify-center text-white p-[clamp(1rem,4vw,2rem)] relative">
                 <div className="text-center">
                     <div className="text-[clamp(3rem,10vw,5rem)] mb-[clamp(1rem,3vw,1.5rem)]">✓</div>
                     <h1 className="text-[clamp(1.75rem,7vw,3.5rem)] font-bold text-emerald-400 mb-[clamp(0.5rem,2vw,1rem)]">Thank You!</h1>
                     <p className="text-[clamp(1rem,3.5vw,1.75rem)] text-stone-300">Your total was {formatCurrency(state.total)}</p>
-                    {state.customerName && (
+                    {customerFirstName && (
                         <p className="text-[clamp(0.875rem,2.5vw,1.25rem)] text-stone-400 mt-[clamp(0.25rem,1vw,0.5rem)]">
-                            See you next time, {state.customerName}!
+                            See you next time, {customerFirstName}!
                         </p>
                     )}
+                </div>
+
+                {/* Footer */}
+                <div className="absolute bottom-[clamp(1rem,3vw,2rem)] text-stone-600 text-[clamp(0.625rem,1.5vw,0.875rem)]">
+                    Powered by ORO GURUS
                 </div>
             </div>
         )
@@ -119,12 +159,20 @@ export default function CustomerDisplayPage() {
 
     // ACTIVE / PAYMENT — Show cart
     return (
-        <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white flex flex-col">
-            {/* Header */}
-            <div className="flex justify-between items-center px-[clamp(1rem,4vw,2rem)] py-[clamp(0.5rem,2vw,1rem)] border-b border-stone-800 flex-shrink-0">
-                <h1 className="text-[clamp(1rem,3.5vw,1.75rem)] font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">ORO 9</h1>
-                <p className="text-stone-400 text-[clamp(0.75rem,2vw,1rem)]">
-                    {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white flex flex-col relative">
+            {/* Header with personalized greeting */}
+            <div className="px-[clamp(1rem,4vw,2rem)] py-[clamp(0.5rem,2vw,1rem)] border-b border-stone-800 flex-shrink-0">
+                <div className="flex justify-between items-center">
+                    <h1 className="text-[clamp(1rem,3.5vw,1.75rem)] font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
+                        {storeName || 'ORO GURUS'}
+                    </h1>
+                    <p className="text-stone-400 text-[clamp(0.75rem,2vw,1rem)]">
+                        {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                </div>
+                {/* Personalized greeting bar */}
+                <p className="text-[clamp(0.75rem,2vw,1rem)] text-stone-400 mt-[clamp(0.125rem,0.5vw,0.25rem)]">
+                    {greeting}
                 </p>
             </div>
 
@@ -177,6 +225,11 @@ export default function CustomerDisplayPage() {
                         Processing payment...
                     </div>
                 )}
+            </div>
+
+            {/* Footer */}
+            <div className="text-center py-[clamp(0.25rem,1vw,0.5rem)] text-stone-600 text-[clamp(0.5rem,1.25vw,0.75rem)] border-t border-stone-900 flex-shrink-0">
+                Powered by ORO GURUS
             </div>
         </div>
     )

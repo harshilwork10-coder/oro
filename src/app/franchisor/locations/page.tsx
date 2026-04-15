@@ -132,7 +132,7 @@ export default function LocationsPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+                <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
             </div>
         );
     }
@@ -140,10 +140,10 @@ export default function LocationsPage() {
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl font-bold text-stone-100">Locations</h1>
+                <h1 className="text-2xl font-bold text-[var(--text-primary)]">Locations</h1>
                 <button
                     onClick={() => setShowAddModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-stone-900 rounded-lg text-sm font-medium transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white rounded-lg text-sm font-medium transition-colors"
                 >
                     <Plus size={16} />
                     Add Location
@@ -154,11 +154,11 @@ export default function LocationsPage() {
             <div className="flex items-center gap-6 mb-6 text-xs">
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-amber-400"></div>
-                    <span className="text-stone-400">Pending → </span>
+                    <span className="text-[var(--text-muted)]">Pending → </span>
                     <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                    <span className="text-stone-400">Ready → </span>
+                    <span className="text-[var(--text-muted)]">Ready → </span>
                     <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-                    <span className="text-stone-400">Active</span>
+                    <span className="text-[var(--text-muted)]">Active</span>
                 </div>
             </div>
 
@@ -166,13 +166,13 @@ export default function LocationsPage() {
             <div className="flex items-center gap-4 mb-6">
                 <div className="flex-1 max-w-sm">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" size={16} />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={16} />
                         <input
                             type="text"
                             placeholder="Search locations..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-stone-800 border border-stone-700 rounded-lg py-2 pl-9 pr-4 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 pl-9 pr-4 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                         />
                     </div>
                 </div>
@@ -180,10 +180,10 @@ export default function LocationsPage() {
 
             {/* Empty State */}
             {filteredLocations.length === 0 && (
-                <div className="text-center py-12 bg-stone-900/50 border border-stone-800 rounded-xl">
-                    <MapPin className="h-12 w-12 text-stone-600 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-stone-300 mb-2">No Locations Yet</h3>
-                    <p className="text-stone-500 mb-4">
+                <div className="text-center py-12 glass-panel border border-[var(--border)] rounded-xl">
+                    <MapPin className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-[var(--text-secondary)] mb-2">No Locations Yet</h3>
+                    <p className="text-[var(--text-muted)] mb-4">
                         {franchisees.length === 0
                             ? 'Add a franchisee first, then add locations.'
                             : 'Add your first location to get started.'
@@ -192,7 +192,7 @@ export default function LocationsPage() {
                     {franchisees.length > 0 && (
                         <button
                             onClick={() => setShowAddModal(true)}
-                            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-stone-900 rounded-lg text-sm font-medium"
+                            className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white rounded-lg text-sm font-medium"
                         >
                             Add Location
                         </button>
@@ -202,33 +202,33 @@ export default function LocationsPage() {
 
             {/* Table */}
             {filteredLocations.length > 0 && (
-                <div className="bg-stone-900/50 rounded-xl border border-stone-800 overflow-hidden">
+                <div className="glass-panel rounded-xl border border-[var(--border)] overflow-hidden">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b border-stone-800 bg-stone-800/50">
-                                <th className="px-4 py-3 text-left text-stone-500 font-medium">Location Name</th>
-                                <th className="px-4 py-3 text-left text-stone-500 font-medium">Franchisee</th>
-                                <th className="px-4 py-3 text-left text-stone-500 font-medium">Address</th>
-                                <th className="px-4 py-3 text-left text-stone-500 font-medium">Status</th>
-                                <th className="px-4 py-3 text-center text-stone-500 font-medium">Stations</th>
-                                <th className="px-4 py-3 text-center text-stone-500 font-medium">Reports</th>
+                            <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Location Name</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Franchisee</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Address</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Status</th>
+                                <th className="px-4 py-3 text-center text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Stations</th>
+                                <th className="px-4 py-3 text-center text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Reports</th>
                                 <th className="px-4 py-3"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredLocations.map((location) => (
-                                <tr key={location.id} className="border-b border-stone-800 hover:bg-stone-800/30 cursor-pointer">
+                                <tr key={location.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)] cursor-pointer">
                                     <td className="px-4 py-3">
-                                        <Link href={`/franchisor/locations/${location.id}`} className="flex items-center gap-2 hover:text-amber-400">
-                                            <Store size={16} className="text-stone-500" />
-                                            <span className="font-medium text-stone-100">{location.name}</span>
+                                        <Link href={`/franchisor/locations/${location.id}`} className="flex items-center gap-2 hover:text-[var(--primary)]">
+                                            <Store size={16} className="text-[var(--text-muted)]" />
+                                            <span className="font-medium text-[var(--text-primary)]">{location.name}</span>
                                         </Link>
                                     </td>
-                                    <td className="px-4 py-3 text-stone-400">{location.franchiseeName}</td>
-                                    <td className="px-4 py-3 text-stone-500 text-xs">{location.address || '—'}</td>
+                                    <td className="px-4 py-3 text-[var(--text-secondary)]">{location.franchiseeName}</td>
+                                    <td className="px-4 py-3 text-[var(--text-muted)] text-xs">{location.address || '—'}</td>
                                     <td className="px-4 py-3"><StatusBadge status={location.provisioningStatus} /></td>
                                     <td className="px-4 py-3 text-center">
-                                        <span className="inline-flex items-center gap-1 text-stone-400">
+                                        <span className="inline-flex items-center gap-1 text-[var(--text-secondary)]">
                                             <Monitor size={12} />
                                             {location.stationCount}
                                         </span>
@@ -236,13 +236,13 @@ export default function LocationsPage() {
                                     <td className="px-4 py-3 text-center">
                                         <Link
                                             href={`/franchisor/locations/${location.id}/reports`}
-                                            className="inline-flex items-center gap-1 px-2 py-1 bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 rounded text-xs font-medium transition-colors"
+                                            className="inline-flex items-center gap-1 px-2 py-1 bg-[var(--primary)]/20 text-[var(--primary)] hover:bg-[var(--primary)]/30 rounded text-xs font-medium transition-colors"
                                         >
                                             <BarChart3 size={12} />
                                             View
                                         </Link>
                                     </td>
-                                    <td className="px-4 py-3"><ChevronRight size={16} className="text-stone-600" /></td>
+                                    <td className="px-4 py-3"><ChevronRight size={16} className="text-[var(--text-muted)]" /></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -252,11 +252,11 @@ export default function LocationsPage() {
 
             {/* Add Location Modal */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-                    <div className="bg-stone-900 border border-stone-700 rounded-2xl p-6 w-full max-w-lg">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 w-full max-w-lg shadow-2xl">
                         <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-stone-100">Add Location</h2>
-                            <button onClick={() => setShowAddModal(false)} className="text-stone-500 hover:text-stone-300">
+                            <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Location</h2>
+                            <button onClick={() => setShowAddModal(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                                 <X size={20} />
                             </button>
                         </div>
@@ -264,15 +264,15 @@ export default function LocationsPage() {
                         <div className="space-y-4">
                             {/* Franchisee Selection - REQUIRED */}
                             <div>
-                                <label className="block text-xs font-medium text-stone-500 mb-1.5 uppercase">
+                                <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase">
                                     Franchisee LLC <span className="text-red-400">*</span>
                                 </label>
                                 <div className="relative">
-                                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
+                                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                                     <select
                                         value={newLocation.franchiseeId}
                                         onChange={e => setNewLocation({ ...newLocation, franchiseeId: e.target.value })}
-                                        className="w-full pl-9 pr-3 py-2.5 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-amber-500 appearance-none"
+                                        className="w-full pl-9 pr-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] appearance-none"
                                     >
                                         <option value="">Select franchisee...</option>
                                         {franchisees.map(f => (
@@ -289,59 +289,59 @@ export default function LocationsPage() {
 
                             {/* Location Name */}
                             <div>
-                                <label className="block text-xs font-medium text-stone-500 mb-1.5 uppercase">
+                                <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase">
                                     Location Name <span className="text-red-400">*</span>
                                 </label>
                                 <div className="relative">
-                                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
+                                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                                     <input
                                         type="text"
                                         value={newLocation.name}
                                         onChange={e => setNewLocation({ ...newLocation, name: e.target.value })}
                                         placeholder="e.g., Downtown Austin"
-                                        className="w-full pl-9 pr-3 py-2.5 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500"
+                                        className="w-full pl-9 pr-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                                     />
                                 </div>
                             </div>
 
                             {/* Address */}
                             <div>
-                                <label className="block text-xs font-medium text-stone-500 mb-1.5 uppercase">
+                                <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase">
                                     Address
                                 </label>
                                 <div className="relative">
-                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
+                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                                     <input
                                         type="text"
                                         value={newLocation.address}
                                         onChange={e => setNewLocation({ ...newLocation, address: e.target.value })}
                                         placeholder="e.g., 123 Main St, Austin, TX"
-                                        className="w-full pl-9 pr-3 py-2.5 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500"
+                                        className="w-full pl-9 pr-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                                     />
                                 </div>
                             </div>
 
                             {/* Requested Devices */}
                             <div>
-                                <label className="block text-xs font-medium text-stone-500 mb-1.5 uppercase">
+                                <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase">
                                     Requested POS Terminals
                                 </label>
                                 <div className="relative">
-                                    <Monitor className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
+                                    <Monitor className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                                     <input
                                         type="number"
                                         min="1"
                                         max="20"
                                         value={newLocation.requestedDevicesCount}
                                         onChange={e => setNewLocation({ ...newLocation, requestedDevicesCount: parseInt(e.target.value) || 1 })}
-                                        className="w-full pl-9 pr-3 py-2.5 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-amber-500"
+                                        className="w-full pl-9 pr-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                                     />
                                 </div>
                             </div>
 
                             {/* Notes */}
                             <div>
-                                <label className="block text-xs font-medium text-stone-500 mb-1.5 uppercase">
+                                <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase">
                                     Notes for Provider
                                 </label>
                                 <textarea
@@ -349,7 +349,7 @@ export default function LocationsPage() {
                                     onChange={e => setNewLocation({ ...newLocation, notes: e.target.value })}
                                     placeholder="Any special instructions..."
                                     rows={2}
-                                    className="w-full px-3 py-2.5 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500 resize-none"
+                                    className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-none"
                                 />
                             </div>
                         </div>
@@ -357,14 +357,14 @@ export default function LocationsPage() {
                         <div className="flex gap-3 mt-6">
                             <button
                                 onClick={() => setShowAddModal(false)}
-                                className="flex-1 px-4 py-2.5 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg font-medium"
+                                className="flex-1 px-4 py-2.5 border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] rounded-lg font-medium transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleAddLocation}
                                 disabled={saving || franchisees.length === 0}
-                                className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-500/50 text-stone-900 rounded-lg font-medium flex items-center justify-center gap-2"
+                                className="flex-1 px-4 py-2.5 bg-[var(--primary)] hover:bg-[var(--primary-dark)] disabled:opacity-50 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
                             >
                                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                                 {saving ? 'Creating...' : 'Create Location'}

@@ -1,3 +1,14 @@
+/**
+ * @deprecated — LEGACY CHECK-IN PAGE
+ * 
+ * This page is preserved for backward compatibility with existing QR codes
+ * that point to oronext.app/checkin/[slug].
+ * 
+ * NEW QR codes should use the brand-aware route: /qr/[slug]
+ * Generated via POST /api/qr/generate (station-authenticated).
+ * 
+ * See: src/app/qr/[slug]/page.tsx
+ */
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'

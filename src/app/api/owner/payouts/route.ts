@@ -75,7 +75,7 @@ if (!['FRANCHISOR', 'OWNER'].includes(user.role || '')) {
 // GET /api/owner/payouts - Get payout history
 export async function GET(req: Request) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!user?.franchiseId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

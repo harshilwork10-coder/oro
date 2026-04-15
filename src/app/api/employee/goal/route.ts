@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: Request) {
     const user = await getAuthUser(request)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!user?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
     try {
         const updatedUser = await prisma.user.update({
-            where: { email: user.email },
+            where: { email: authUser.email },
             data: {
                 dailyGoal: Number(dailyGoal)
             }

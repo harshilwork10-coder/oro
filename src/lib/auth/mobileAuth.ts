@@ -107,7 +107,10 @@ export async function getAuthUser(request?: NextRequest | Request): Promise<Auth
                 email: session.user.email ?? undefined,
                 name: session.user.name ?? undefined,
                 role,
-                franchiseId: resolvedFranchiseId || (isSystemRole ? '__SYSTEM__' : ''),
+                // HOTFIX: Elevated roles (FRANCHISOR/OWNER) MUST have a truthy franchiseId
+                // so downstream guards `if (!user?.franchiseId)` don't block them.
+                // Use sentinel '__FRANCHISOR__' when no franchise resolves (e.g. new franchisor with 0 locations).
+                franchiseId: resolvedFranchiseId || (isSystemRole ? '__SYSTEM__' : (isElevatedRole ? '__FRANCHISOR__' : '')),
                 locationId: session.user.locationId ?? undefined
             }
         }

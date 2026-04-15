@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: Request) {
     try {
         const authUser = await getAuthUser(request)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         if (!authUser?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
         // Get user with franchise info
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             include: { franchise: true }
         })
 

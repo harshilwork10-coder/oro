@@ -264,7 +264,7 @@ export default function UsersPage() {
                                     const isEditing = editingId === member.membershipId;
                                     const isActioning = actionLoading === member.membershipId;
                                     return (
-                                        <tr key={member.userId} className={`border-b border-[var(--border)] hover:bg-[var(--surface-hover)] transition-colors ${!member.isActive ? 'opacity-50' : ''}`}>
+                                        <tr key={member.userId} className={`group border-b border-[var(--border)] hover:bg-[var(--surface-hover)] transition-colors ${!member.isActive ? 'opacity-50' : ''}`}>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-full bg-[var(--primary)]/20 flex items-center justify-center shrink-0">

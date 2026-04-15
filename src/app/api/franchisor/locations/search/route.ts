@@ -16,7 +16,7 @@ import { getLocationScope, buildLocationWhereClause, UserRole } from '@/lib/repo
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         // Get user's allowed locations
         const scope = await getLocationScope(user.id, user.role as UserRole, user.franchiseId);
 

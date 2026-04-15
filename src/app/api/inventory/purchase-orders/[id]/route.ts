@@ -9,7 +9,7 @@ export async function PUT(
 ) {
     try {
         const user = await getAuthUser(request)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { id } = await params
         const { status } = await request.json()

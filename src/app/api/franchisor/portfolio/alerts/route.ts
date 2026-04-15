@@ -14,7 +14,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         // PROVIDER should use /provider/reports
         if (user.role === 'PROVIDER') {
             return NextResponse.json({ error: 'Use /api/provider/reports for platform admin access' }, { status: 403 });

@@ -7,7 +7,7 @@ import { resolveRevenue } from '@/lib/utils/resolveTransactionRevenue'
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user || !['OWNER', 'FRANCHISOR', 'PROVIDER'].includes(user.role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

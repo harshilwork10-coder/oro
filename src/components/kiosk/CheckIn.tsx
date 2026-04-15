@@ -56,6 +56,7 @@ export default function CheckIn({ checkinUrl }: CheckInProps) {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const [storeName, setStoreName] = useState('Our Store') // Dynamic store name
     const [showPhoneEntry, setShowPhoneEntry] = useState(false) // For fallback from QR screen
+    const [isReturningCustomer, setIsReturningCustomer] = useState(false) // Track new vs returning for personalized welcome
 
     // Generate QR code data URL from checkinUrl
     const qrDataUrl = useQRCode(checkinUrl)
@@ -109,6 +110,7 @@ export default function CheckIn({ checkinUrl }: CheckInProps) {
                     const customer = data[0]
                     setFirstName(customer.firstName)
                     setLastName(customer.lastName)
+                    setIsReturningCustomer(true)
 
                     // Check if they need to sign liability or join loyalty
                     if (!customer.liabilitySigned) {
@@ -119,6 +121,7 @@ export default function CheckIn({ checkinUrl }: CheckInProps) {
                         setStep('welcome')
                     }
                 } else {
+                    setIsReturningCustomer(false)
                     setStep('name')
                 }
             }
@@ -185,6 +188,7 @@ export default function CheckIn({ checkinUrl }: CheckInProps) {
                 setLastName('')
                 setLiabilitySigned(false)
                 setLoyaltyJoined(false)
+                setIsReturningCustomer(false)
                 setShowPhoneEntry(false) // Return to QR idle screen
             }, 30000) // 30 seconds
 
@@ -199,8 +203,10 @@ export default function CheckIn({ checkinUrl }: CheckInProps) {
                     <div className="mx-auto w-24 h-24 bg-orange-500/20 rounded-full flex items-center justify-center mb-6 border border-orange-500/30 shadow-[0_0_30px_rgba(249,115,22,0.3)]">
                         <Check className="h-12 w-12 text-orange-500" />
                     </div>
-                    <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-200">Welcome, {firstName}!</h1>
-                    <p className="text-xl text-stone-400">You're all checked in. Please have a seat, and we'll be with you shortly.</p>
+                    <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-200">
+                        {isReturningCustomer ? `Welcome back, ${firstName}!` : `Welcome, ${firstName}!`}
+                    </h1>
+                    <p className="text-xl text-stone-400">Please have a seat. Someone will be with you shortly.</p>
                     <button
                         onClick={() => {
                             setStep('phone')
@@ -209,6 +215,7 @@ export default function CheckIn({ checkinUrl }: CheckInProps) {
                             setLastName('')
                             setLiabilitySigned(false)
                             setLoyaltyJoined(false)
+                            setIsReturningCustomer(false)
                             setShowPhoneEntry(false) // Return to QR idle screen
                         }}
                         className="mt-12 px-8 py-3 bg-stone-800 hover:bg-stone-700 rounded-full text-sm font-medium transition-colors text-stone-300 border border-stone-700"
@@ -286,8 +293,8 @@ export default function CheckIn({ checkinUrl }: CheckInProps) {
                     {step === 'phone' && (
                         <form onSubmit={handlePhoneSubmit} className="space-y-8">
                             <div className="text-center mb-8">
-                                <h2 className="text-3xl font-bold text-stone-100 mb-2">Welcome! 👋</h2>
-                                <p className="text-stone-400 text-lg">Please enter your mobile number to check in.</p>
+                                <h2 className="text-3xl font-bold text-stone-100 mb-2">Welcome to {storeName} 👋</h2>
+                                <p className="text-stone-400 text-lg">Please check in below.</p>
                             </div>
 
                             <div className="space-y-4">

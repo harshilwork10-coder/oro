@@ -7,7 +7,7 @@ const PROVIDER_ROLES = ['PROVIDER'] as const
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // TODO: Integrate with Google Pointy / Surfaces across Google
         return NextResponse.json({
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // R6: Pointy credential writes are PROVIDER-only
         if (user.role !== 'PROVIDER') {

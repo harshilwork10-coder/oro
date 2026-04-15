@@ -4,7 +4,7 @@ import { getAuthUser } from '@/lib/auth/mobileAuth'
 export async function GET(req: Request) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { searchParams } = new URL(req.url)
         const locationId = searchParams.get('locationId')
@@ -51,7 +51,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const body = await req.json()
         const { productId, reorderPoint } = body

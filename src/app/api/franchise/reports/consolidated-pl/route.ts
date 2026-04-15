@@ -1,11 +1,11 @@
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 
 /** Consolidated P&L — Multi-location profit/loss report (Owner+ only) */
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
 
     const { searchParams } = new URL(req.url)

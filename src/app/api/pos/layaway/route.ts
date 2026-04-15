@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
     const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     try {
         const { id, action, paymentAmount, paymentMethod } = await req.json()
         if (!id) return NextResponse.json({ error: 'Layaway ID required' }, { status: 400 })

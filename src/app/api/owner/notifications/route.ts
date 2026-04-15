@@ -9,7 +9,7 @@ const CAN_SEND_ROLES = ['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGE
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         if (!CAN_SEND_ROLES.includes(user.role)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // R7: Only authorized roles can send
         if (!CAN_SEND_ROLES.includes(user.role)) {

@@ -90,7 +90,7 @@ function computeSuggestedAction(
 export async function GET(request: Request) {
     try {
         const user = await getAuthUser(request)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { searchParams } = new URL(request.url)
         const productId = searchParams.get('productId')

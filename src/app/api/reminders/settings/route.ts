@@ -7,14 +7,14 @@ import { encryptField, decryptField } from '@/lib/security'
 export async function GET(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         if (!authUser?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             select: { franchiseId: true }
         })
 
@@ -53,7 +53,7 @@ export async function PUT(req: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: user.email },
+            where: { email: authUser.email },
             select: { franchiseId: true, role: true }
         })
 

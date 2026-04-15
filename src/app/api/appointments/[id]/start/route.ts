@@ -10,7 +10,7 @@ export async function PATCH(
     props: { params: Promise<{ id: string }> }
 ) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const params = await props.params;
     try {

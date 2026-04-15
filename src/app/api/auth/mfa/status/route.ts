@@ -3,7 +3,7 @@
  * GET - Check if user has MFA enabled and if it's required
  */
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 import {
@@ -15,7 +15,7 @@ import {
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         if (!user?.id) {
             return NextResponse.json(

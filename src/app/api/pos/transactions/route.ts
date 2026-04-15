@@ -1,17 +1,13 @@
-import { getAuthUser } from '@/lib/auth/mobileAuth'
-import { NextRequest } from 'next/server'
+import { withPOSAuth } from '@/lib/posAuth'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parsePaginationParams } from '@/lib/pagination'
 
-export async function GET(req: NextRequest) {
-    // Support both session (web) and Bearer token (mobile)
-    const user = await getAuthUser(req)
-    if (!user?.franchiseId) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const GET = withPOSAuth(async (req, ctx) => {
+    const { franchiseId } = ctx
 
     try {
-        const searchParams = req.nextUrl.searchParams
+        const searchParams = new URL(req.url).searchParams
         const { take = 50, cursor, orderBy } = parsePaginationParams(searchParams)
 
         // Filters
@@ -23,7 +19,7 @@ export async function GET(req: NextRequest) {
 
         // Build where clause
         const whereClause: Record<string, unknown> = {
-            franchiseId: user.franchiseId
+            franchiseId
         }
 
         if (status !== 'all') {
@@ -83,4 +79,4 @@ export async function GET(req: NextRequest) {
         console.error('[POS_TRANSACTIONS_GET]', error)
         return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 })
     }
-}
+})

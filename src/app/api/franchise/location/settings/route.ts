@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { prisma } from '@/lib/prisma'
 
@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
     if (!authUser?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const user = await prisma.user.findUnique({
-        where: { email: user.email },
+        where: { email: authUser.email },
         include: {
             franchise: true,
             location: true
@@ -46,12 +46,12 @@ export async function GET(req: NextRequest) {
 export async function POST(request: Request) {
   try {
         const authUser = await getAuthUser(request)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!authUser?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const user = await prisma.user.findUnique({
-        where: { email: user.email },
+        where: { email: authUser.email },
         include: { franchise: true, location: true }
     })
 

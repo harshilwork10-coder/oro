@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const rules = await prisma.smsMarketingRule.findMany({
             where: { franchiseId: authUser.franchiseId },
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         if (!['OWNER', 'MULTI_LOCATION_OWNER', 'MANAGER', 'PROVIDER'].includes(authUser.role)) {
             return NextResponse.json({ error: 'Only owners can manage rules' }, { status: 403 })
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')

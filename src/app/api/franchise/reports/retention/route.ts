@@ -1,12 +1,12 @@
 import {NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
-import { prisma } from '@/lib/prisma'
+import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 // GET: Client Retention Report
 // Tracks returning clients and rebooking rates
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         if (!user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

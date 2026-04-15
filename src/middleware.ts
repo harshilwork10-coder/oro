@@ -23,6 +23,11 @@ export async function middleware(req: NextRequest) {
         pathname.startsWith('/staff-login') ||     // Employee Phone + PIN login page
         pathname.startsWith('/register') ||
         pathname.startsWith('/auth/magic-link') ||
+        pathname.startsWith('/checkin') ||          // Customer QR check-in (public, no auth)
+        pathname.startsWith('/qr') ||               // Brand-aware QR check-in (public, no auth)
+        pathname.startsWith('/book') ||             // Online booking (public)
+        pathname.startsWith('/kiosk') ||            // Kiosk displays (public)
+        pathname.startsWith('/customer-display') || // Customer-facing display (public)
         pathname.startsWith('/api') ||
         pathname.startsWith('/_next') ||
         pathname === '/favicon.ico'

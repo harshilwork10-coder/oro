@@ -81,9 +81,9 @@ function getNavItems(businessType: 'retail' | 'salon' | 'both') {
         { name: 'Inventory', href: '/owner/inventory', icon: Package },
     ];
 
-    // P0: Appointments and Services hidden until wired to real APIs (currently mock data)
-    // Re-add when /owner/appointments and /owner/services fetch from real DB
-    const salon: { name: string; href: string; icon: any }[] = [
+    const salon = [
+        { name: 'Appointments', href: '/owner/appointments', icon: Calendar },
+        { name: 'Services', href: '/owner/services', icon: Scissors },
     ];
 
     const both = [...retail, ...salon];

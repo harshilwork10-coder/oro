@@ -19,7 +19,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         // Return available counter services
         const services = [
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const body = await req.json()
         const { serviceId, amount, pages, recipient, notes } = body

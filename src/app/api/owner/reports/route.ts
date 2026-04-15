@@ -6,9 +6,23 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        // ═══ ROLE-BASED REPORT ACCESS ═══
+        // Store-level reports: OWNER, MANAGER, FRANCHISEE, SUB_FRANCHISEE, PROVIDER, ADMIN only
+        // Employees/Stylists/Cashiers: blocked from store analytics
+        const reportAllowedRoles = ['OWNER', 'MANAGER', 'FRANCHISEE', 'SUB_FRANCHISEE', 'PROVIDER', 'ADMIN']
+        const isReportAllowed = reportAllowedRoles.includes(user.role || '')
+        const hasReportPermission = (user as any).canViewReports === true
+
+        if (!isReportAllowed && !hasReportPermission) {
+            return NextResponse.json(
+                { error: 'Insufficient permissions. Reports are restricted to owners and managers.' },
+                { status: 403 }
+            )
         }
 
         const { searchParams } = new URL(req.url)

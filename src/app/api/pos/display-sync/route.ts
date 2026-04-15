@@ -66,12 +66,49 @@ export async function GET(request: Request) {
                     where: stationId
                         ? { stations: { some: { id: stationId } } }
                         : { id: locationId! },
-                    select: { slug: true, businessType: true }
+                    select: {
+                        id: true,
+                        slug: true,
+                        businessType: true,
+                        qrEnabled: true,
+                        qrTokenSalt: true,
+                        franchise: {
+                            select: {
+                                franchisorId: true,
+                                franchisor: {
+                                    select: {
+                                        id: true,
+                                        brandCode: true,
+                                        qrEnabled: true,
+                                    }
+                                }
+                            }
+                        }
+                    }
                 })
                 if (loc?.slug && loc.businessType === 'SALON') {
-                    const { buildCheckinUrl } = await import('@/lib/checkinToken')
-                    const origin = new URL(request.url).origin
-                    checkinUrl = buildCheckinUrl(loc.slug, origin)
+                    const franchisor = loc.franchise?.franchisor
+                    if (franchisor?.brandCode && franchisor.qrEnabled && loc.qrEnabled) {
+                        // V2: Brand-aware QR URL (no platform domain exposed)
+                        const { generateQrToken, buildBrandQrUrl } = await import('@/lib/checkinToken')
+                        const result = generateQrToken(
+                            loc.id,
+                            stationId || 'display',
+                            franchisor.id,
+                            loc.qrTokenSalt
+                        )
+                        checkinUrl = buildBrandQrUrl({
+                            brandCode: franchisor.brandCode.toLowerCase(),
+                            slug: loc.slug,
+                            token: result.token,
+                            deviceId: stationId || 'display',
+                        })
+                    } else {
+                        // V1 Fallback: Legacy platform URL for brands without brandCode
+                        const { buildCheckinUrl } = await import('@/lib/checkinToken')
+                        const origin = new URL(request.url).origin
+                        checkinUrl = buildCheckinUrl(loc.slug, origin)
+                    }
                 }
             } catch {
                 // Silent — QR is an enhancement, not critical path.

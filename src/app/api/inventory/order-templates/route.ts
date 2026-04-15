@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
     try {
         const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         if (!user?.franchiseId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

@@ -14,7 +14,7 @@ import { prisma } from '@/lib/prisma'
  */
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
     const productIds = searchParams.getAll('productIds[]')
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Only owners can update deposit settings
     if (!['OWNER', 'FRANCHISOR', 'PROVIDER'].includes(user.role)) {

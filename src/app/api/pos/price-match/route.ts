@@ -6,7 +6,7 @@ import { logActivity } from '@/lib/auditLog'
 /** Price Match — Manager approves competitive price match */
 export async function POST(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)) return NextResponse.json({ error: 'Manager+ only' }, { status: 403 })
     try {
         const { itemId, competitorName, competitorPrice, proof } = await req.json()

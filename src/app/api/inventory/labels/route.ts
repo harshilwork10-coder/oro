@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma'
  */
 export async function POST(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     try {
         const { itemIds, labelSize, showPrice, showBarcode, copies } = await req.json() as {

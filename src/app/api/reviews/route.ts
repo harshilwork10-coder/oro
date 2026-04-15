@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

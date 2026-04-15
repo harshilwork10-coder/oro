@@ -23,7 +23,7 @@ type IncidentType = typeof INCIDENT_TYPES[number]
 
 export async function POST(req: NextRequest) {
     const user = await getAuthUser(req)
-        if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     try {
         const body = await req.json()
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
-    if (!user?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Manager+ only
     if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER', 'MANAGER'].includes(user.role)) {

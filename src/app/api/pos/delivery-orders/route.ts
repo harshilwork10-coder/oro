@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
     const authUser = await getAuthUser(req)
-        if (!authUser?.franchiseId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     try {
         const { orderId, status } = await req.json()
         if (!orderId || !status) return NextResponse.json({ error: 'orderId and status required' }, { status: 400 })
