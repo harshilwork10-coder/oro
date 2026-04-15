@@ -179,7 +179,7 @@ export async function PATCH(req: NextRequest) {
 
         // Validate transition is legal
         const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-            'WAITING': ['IN_SERVICE', 'CANCELLED', 'NO_SHOW'],
+            'WAITING': ['IN_SERVICE', 'CANCELLED', 'NO_SHOW', 'SERVED'],
             'IN_SERVICE': ['SERVED', 'CANCELLED'],
         }
 
