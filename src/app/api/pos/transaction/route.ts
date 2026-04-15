@@ -220,7 +220,7 @@ export async function POST(req: NextRequest) {
             invoiceNumber,
             franchiseId: user.franchiseId,
             employeeId: user.id,
-            clientId: clientId || null,
+            clientId: (clientId && !clientId.startsWith('apt-') && !clientId.startsWith('walkin-')) ? clientId : null,
             subtotal: subtotal.toString(),
             tax: tax.toString(),
             total: total.toString(),
