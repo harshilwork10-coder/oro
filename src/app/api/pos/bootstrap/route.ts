@@ -180,12 +180,23 @@ async function buildBootstrapResponse(
     const resolvedBusinessType = rawIndustry === 'SERVICE' ? 'SALON' : rawIndustry
 
     // ═══ Pre-build QR check-in URL for Android customer display ═══
-    // Android app was constructing this URL incorrectly (producing /checkin with no slug).
-    // Server builds the complete URL so Android can use it directly.
+    // Uses brand-aware /qr/[slug] route which includes:
+    //   - Phone lookup
+    //   - Liability waiver (if not signed)
+    //   - Loyalty enrollment prompt (if not joined)
+    // The legacy /checkin/[slug] route ONLY collected first/last name.
     let checkinUrl: string | null = null
     if (resolvedBusinessType === 'SALON' && location.slug) {
-        const { buildCheckinUrl } = await import('@/lib/checkinToken')
-        checkinUrl = buildCheckinUrl(location.slug, process.env.NEXTAUTH_URL || 'http://localhost:3001')
+        const { generateQrToken, buildBrandQrUrl } = await import('@/lib/checkinToken')
+        const brandCode = franchisor?.brandCode || franchisor?.name?.toLowerCase().replace(/\s+/g, '-') || 'oro'
+        const stationId = stationName || 'pos-1'
+        const qrToken = generateQrToken(locationId, stationId, franchisor?.id || franchiseId)
+        checkinUrl = buildBrandQrUrl({
+            brandCode,
+            slug: location.slug,
+            token: qrToken.token,
+            deviceId: stationId,
+        })
     }
 
     const stationConfig = {

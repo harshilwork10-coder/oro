@@ -82,7 +82,7 @@ export async function GET(
             })
         })
 
-        const commissionRate = compPlan?.commissionSplit ? Number(compPlan.commissionSplit) : 40
+        const commissionRate = compPlan?.commissionSplit ? Number(compPlan.commissionSplit) : 0
         const estCommissions = totalRevenue * (commissionRate / 100)
 
         const topServices = Object.entries(serviceMap)

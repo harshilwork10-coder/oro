@@ -105,10 +105,22 @@ export async function GET(request: Request) {
                             platformDomain: new URL(request.url).origin,
                         })
                     } else {
-                        // V1 Fallback: Legacy platform URL for brands without brandCode
-                        const { buildCheckinUrl } = await import('@/lib/checkinToken')
+                        // V1 Fallback: Use /qr/ route (has waiver + loyalty flow)
+                        // even for brands without brandCode
+                        const { generateQrToken, buildBrandQrUrl } = await import('@/lib/checkinToken')
                         const origin = new URL(request.url).origin
-                        checkinUrl = buildCheckinUrl(loc.slug, origin)
+                        const result = generateQrToken(
+                            loc.id,
+                            stationId || 'display',
+                            loc.franchise?.franchisorId || 'unknown'
+                        )
+                        checkinUrl = buildBrandQrUrl({
+                            brandCode: 'oro',
+                            slug: loc.slug,
+                            token: result.token,
+                            deviceId: stationId || 'display',
+                            platformDomain: origin,
+                        })
                     }
                 }
             } catch {

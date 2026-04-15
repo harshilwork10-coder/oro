@@ -6,8 +6,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withPOSAuth, POSContext } from '@/lib/posAuth'
 
-// Safe fallback: if no CommissionRule exists, use 40% (industry standard default)
-const DEFAULT_COMMISSION_RATE = 0.40
+// Safe fallback: if no CommissionRule exists, use 0% (commission must be explicitly configured)
+const DEFAULT_COMMISSION_RATE = 0
 
 export const GET = withPOSAuth(async (req: Request, ctx: POSContext) => {
     const { franchiseId } = ctx

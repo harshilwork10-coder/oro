@@ -10,7 +10,7 @@
 // ============ TYPES ============
 
 export interface PayoutConfig {
-    commissionSplit: number           // Default: 50 (means 50% to barber)
+    commissionSplit: number           // Percentage to employee (0 = no commission configured)
     tipHandling: 'BARBER_KEEPS' | 'SPLIT' | 'OWNER_KEEPS'
     taxRate: number                   // Tax rate as percentage (e.g., 8.25)
 }
@@ -57,7 +57,7 @@ export interface TransactionPayoutResult {
 // ============ DEFAULT CONFIG ============
 
 export const DEFAULT_PAYOUT_CONFIG: PayoutConfig = {
-    commissionSplit: 40,              // 40% to barber by default
+    commissionSplit: 0,               // 0% default — commission must be explicitly configured per employee
     tipHandling: 'BARBER_KEEPS',      // Barber keeps tips by default
     taxRate: 0                        // No default tax, should be passed in
 }

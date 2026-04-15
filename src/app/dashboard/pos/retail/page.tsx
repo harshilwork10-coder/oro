@@ -67,7 +67,8 @@ import {
     formatReceiptFromTransaction,
     isPrintAgentAvailable
 } from '@/lib/print-agent'
-import { useOfflineMode } from '@/lib/use-offline-mode'
+import { useNetworkStatus } from '@/hooks/useNetworkStatus'
+import { useOfflineQueue } from '@/hooks/useOfflineQueue'
 import { OfflineStatusIndicator } from '@/components/pos/OfflineStatusIndicator'
 import QuickSwitchModal from '@/components/pos/QuickSwitchModal'
 import LoyaltyLookup from '@/components/pos/LoyaltyLookup'
@@ -190,8 +191,16 @@ export default function RetailPOSPage() {
     const router = useRouter()
     const [quantityInput, setQuantityInput] = useState('1')
 
-    // Offline Mode
-    const offlineMode = useOfflineMode()
+    // Offline Sync Hooks
+    const { isEffectivelyOnline, isBrowserOnline, isServerReachable, lastCheckAt } = useNetworkStatus()
+    const { queue: offlineQueue, isSyncing: isOfflineSyncing, getPendingCount, enqueueTransaction, syncPending } = useOfflineQueue()
+
+    // Auto-sync offline txs on reconnect
+    useEffect(() => {
+        if (isEffectivelyOnline && getPendingCount() > 0 && !isOfflineSyncing) {
+            syncPending().catch(console.error)
+        }
+    }, [isEffectivelyOnline, getPendingCount, isOfflineSyncing, syncPending])
 
     // Cart state
     const [cart, setCart] = useState<CartItem[]>([])
@@ -1478,6 +1487,65 @@ export default function RetailPOSPage() {
     const processPayment = async (method: string, tipAmount: number = 0, paxResponse?: any) => {
         if (cart.length === 0) return
 
+        // ===== SPRINT 1: OFFLINE GUARD =====
+        if (!isEffectivelyOnline) {
+            if (method !== 'CASH') {
+                setToast({ message: 'OFFLINE MODE: Only CASH payments are supported offline.', type: 'error' })
+                return
+            }
+            if (loyaltyDiscount > 0 || appliedPromoCode || transactionDiscount) {
+                setToast({ message: 'OFFLINE MODE: Promotions and loyalty are unsupported offline.', type: 'error' })
+                return
+            }
+            if (cart.some(item => item.ageRestricted || item.minimumAge)) {
+                setToast({ message: 'OFFLINE MODE: Age-restricted items are unsupported offline.', type: 'error' })
+                return
+            }
+
+            setIsLoading(true)
+            setShowPaymentModal(false)
+            try {
+                const { subtotalCash, taxCash, cashTotal } = calculateTotals()
+                
+                await enqueueTransaction({
+                    items: cart.map(item => ({
+                        id: item.id,
+                        type: 'PRODUCT', // All items in Sprint 1 retail are products
+                        name: item.name,
+                        price: item.price,
+                        quantity: item.quantity,
+                        discount: item.discount,
+                    })),
+                    subtotal: subtotalCash,
+                    tax: taxCash,
+                    total: cashTotal + tipAmount,
+                    paymentMethod: 'CASH',
+                    tip: tipAmount,
+                    stationId: selectedStation?.id || null,
+                    cashDrawerSessionId: shift?.id || null,
+                    customerId: selectedCustomer?.id || null,
+                })
+
+                setToast({ message: `Offline Sale Queued ($${(cashTotal + tipAmount).toFixed(2)})`, type: 'success' })
+                
+                if (pricingSettings?.openDrawerOnCash) {
+                    openCashDrawer().catch(console.error)
+                }
+
+                // Reset Cart
+                setCart([])
+                setCustomerNotes('')
+                setLoyaltyPhone(null)
+                setSelectedCustomer(null)
+            } catch (e: any) {
+                setToast({ message: 'Failed to queue transaction: ' + e.message, type: 'error' })
+            } finally {
+                setIsLoading(false)
+            }
+            return
+        }
+        // ===== END OFFLINE GUARD =====
+
         // For card payments, open PAX terminal modal instead of direct processing
         if ((method === 'CREDIT_CARD' || method === 'DEBIT_CARD') && !paxResponse) {
             setShowPaymentModal(false)
@@ -2317,13 +2385,13 @@ export default function RetailPOSPage() {
 
                 {/* Offline Status Indicator */}
                 <OfflineStatusIndicator
-                    isOnline={offlineMode.isOnline}
-                    isReady={offlineMode.isReady}
-                    isSyncing={offlineMode.isSyncing}
-                    lastSync={offlineMode.lastSync}
-                    pendingCount={offlineMode.pendingCount}
-                    productCount={offlineMode.productCount}
-                    onSync={offlineMode.sync}
+                    isOnline={isEffectivelyOnline}
+                    isReady={true}
+                    isSyncing={isOfflineSyncing}
+                    lastSync={lastCheckAt ? lastCheckAt.toLocaleTimeString() : 'Never'}
+                    pendingCount={getPendingCount()}
+                    productCount={0}
+                    onSync={() => syncPending()}
                 />
             </div>
 

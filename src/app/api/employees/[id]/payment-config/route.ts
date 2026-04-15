@@ -42,7 +42,7 @@ export async function GET(
             return NextResponse.json({
                 employeeId,
                 paymentType: 'COMMISSION',
-                defaultCommissionRate: 0.40,
+                defaultCommissionRate: 0,
                 usesTieredCommission: false,
                 tiers: [],
                 serviceOverrides: []

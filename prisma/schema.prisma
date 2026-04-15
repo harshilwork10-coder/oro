@@ -2087,7 +2087,14 @@ model Transaction {
   settlementBatch String? // Batch ID from processor
 
   status String @default("COMPLETED") // COMPLETED, REFUNDED, VOIDED, CORRECTED, PARTIALLY_REFUNDED
-  source String @default("WEB_POS") // ANDROID_POS, WEB_POS, API (POS compliance)
+  source String @default("WEB_POS") // ANDROID_POS, WEB_POS, OFFLINE_WEB_POS, API (POS compliance)
+
+  // Sprint 1: Server-computed promotion snapshot (immutable after checkout)
+  appliedPromotions String? // JSON: server-computed promo snapshot [{promotionId, name, type, discountAmount, affectedItems, ruleSnapshot}]
+  promoDiscount     Decimal? @db.Decimal(12, 2) // Server-computed total promotion discount
+
+  // Sprint 1: Server-issued age verification session consumed at checkout
+  ageVerificationSessionId String? // Links to AgeVerificationSession used for this transaction
 
   // Void Tracking (Audit Trail) — legacy fields for backward compat
   voidedById String? // User who voided this transaction
@@ -2174,6 +2181,11 @@ model TransactionLineItem {
   businessDate        DateTime? // Business date (location timezone)
   lineItemStatus      String?   @default("PAID") // PAID, REFUNDED, VOIDED
 
+  // Sprint 1: Server-set promotion evidence (immutable, never from client)
+  promotionId       String?   // Promotion that discounted this line (server-set)
+  promotionName     String?   // Snapshot of promo name at checkout (server-set)
+  promotionDiscount Decimal?  @db.Decimal(12, 2) // Promo discount allocated to this line (server-computed)
+
   createdAt DateTime @default(now())
 }
 
@@ -2245,6 +2257,97 @@ model ActiveCart {
   status       String  @default("IDLE") // IDLE, ACTIVE, REVIEW
 
   updatedAt DateTime @updatedAt
+}
+
+// ============ SPRINT 1: AGE VERIFICATION SESSION ============
+// Server-issued verification artifact. The transaction route queries this table —
+// it NEVER trusts client-sent booleans for compliance. Sessions expire after
+// creation, are consumed exactly once per transaction, and support manager override.
+//
+// Flow: cashier verifies ID → server creates session → session ID stored in component state
+//       → on checkout, transaction route validates session server-side → consumed atomically
+model AgeVerificationSession {
+  id          String   @id @default(cuid())
+  franchiseId String
+  employeeId  String   // Cashier who performed the check
+
+  // Verification details (server-validated, NOT client-submitted)
+  method      String   // DL_SCAN, MANUAL_DOB, VISUAL, MANAGER_OVERRIDE
+  minimumAge  Int      // Age threshold verified (18 for tobacco, 21 for alcohol)
+  customerAge Int?     // Computed age from DOB (null for VISUAL/MANAGER_OVERRIDE)
+  verified    Boolean  // true = passed age check, false = failed (item removed from cart)
+
+  // Scope
+  stationId   String?  // Optional: lock to specific terminal
+
+  // Expiration & consumption (prevents replay attacks)
+  expiresAt   DateTime // Created + 30 minutes (configurable)
+  consumed    Boolean  @default(false) // Set true atomically when used in a transaction
+  consumedByTransactionId String? // Links to the transaction that consumed this session
+
+  // Manager override audit trail
+  overrideByUserId String? // Manager/Owner userId who authorized override
+  overrideReason   String? // Why override was granted (required for MANAGER_OVERRIDE)
+
+  createdAt   DateTime @default(now())
+
+  @@index([franchiseId, employeeId])
+  @@index([expiresAt])
+  @@index([consumed])
+}
+
+// ============ SPRINT 1: PENDING TRANSACTION (PAX TWO-PHASE COMMIT) ============
+// Server-owned cart/pricing snapshot for card payments. Created BEFORE PAX payment,
+// finalized AFTER PAX approval. Recovery uses this snapshot — never client data.
+//
+// State machine: RESERVED → FINALIZED | EXPIRED | VOIDED
+// RESERVED: Cart validated, waiting for PAX approval + finalize call
+// FINALIZED: Transaction created from snapshot, PAX response stored
+// EXPIRED: Timed out (15 min), requires manager void or retry
+// VOIDED: Manager explicitly voided (triggers manual PAX refund if needed)
+model PendingTransaction {
+  id          String   @id @default(cuid())
+  franchiseId String
+  employeeId  String   // Cashier who initiated the checkout
+
+  // Server-validated immutable snapshot (sealed at reserve time)
+  // These are the ONLY source of truth for finalization — client cannot override
+  cartSnapshot   String  // JSON: validated items with DB-sourced prices [{id, name, price, quantity, categoryId, ageRestricted, ...}]
+  totalsSnapshot String  // JSON: { subtotal, tax, total, subtotalCash, subtotalCard, taxCash, taxCard, totalCash, totalCard, chargedMode }
+  promoSnapshot  String? // JSON: server-computed promotions [{promotionId, name, type, discountAmount, affectedItems}]
+
+  // Payment intent
+  paymentMethod  String  // CREDIT_CARD, DEBIT_CARD
+  expectedTotal  Decimal @db.Decimal(12, 2) // Exact amount PAX should charge
+
+  // PAX response (filled during finalize, Phase 3)
+  gatewayTxId    String?  // Transaction ID from PAX/processor
+  authCode       String?  // Authorization code from processor
+  cardLast4      String?  // Last 4 digits of card
+  cardType       String?  // Visa, MasterCard, etc.
+
+  // State machine
+  status         String  @default("RESERVED") // RESERVED, FINALIZED, EXPIRED, VOIDED
+  finalizedTransactionId String? // Links to the Transaction created on finalize
+
+  // Context fields (from the original checkout request)
+  stationId               String?
+  clientId                 String?
+  tip                      Decimal @default(0) @db.Decimal(12, 2)
+  cashDrawerSessionId      String?
+  ageVerificationSessionId String?  // Age session to consume on finalize
+  loyaltyPhone             String?  // For post-sale loyalty earn
+  chargedMode              String?  // CASH or CARD for dual pricing
+  idempotencyKey           String?  // Prevents duplicate finalization
+
+  expiresAt   DateTime // RESERVED + 15 minutes
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([franchiseId, status])
+  @@index([idempotencyKey])
+  @@index([expiresAt])
+  @@index([employeeId])
 }
 
 // ============ FINTECH & PAYMENTS (PAX INTEGRATION) ============

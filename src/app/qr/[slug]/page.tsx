@@ -78,6 +78,7 @@ export default function BrandQrCheckinPage() {
     const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false)
     const [errorMsg, setErrorMsg] = useState('')
     const [checkedInName, setCheckedInName] = useState('')
+    const [selectedAptId, setSelectedAptId] = useState<string | null>(null)
     const [theme, setTheme] = useState<BrandTheme>(DEFAULT_THEME)
     const [brandId, setBrandId] = useState('')
 
@@ -202,6 +203,8 @@ export default function BrandQrCheckinPage() {
                     source: opts.source,
                     appointmentId: opts.appointmentId || null,
                     stationRef: deviceParam || null,
+                    liabilitySigned,
+                    loyaltyJoined,
                     // Multi-tenant QR enrichment
                     brandId: brandId || null,
                     deviceId: deviceParam || null,
@@ -414,10 +417,15 @@ export default function BrandQrCheckinPage() {
                                 {appointments.map(appt => (
                                     <button
                                         key={appt.id}
-                                        onClick={() => performCheckIn({
-                                            appointmentId: appt.id,
-                                            source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED'
-                                        })}
+                                        onClick={() => {
+                                            setSelectedAptId(appt.id)
+                                            if (!liabilitySigned) { setStep('waiver'); return }
+                                            if (!loyaltyJoined) { setStep('loyalty'); return }
+                                            performCheckIn({
+                                                appointmentId: appt.id,
+                                                source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED'
+                                            })
+                                        }}
                                         disabled={loading}
                                         className="w-full bg-stone-900/60 border border-stone-800 hover:border-stone-600 rounded-2xl p-5 text-left transition-all hover:bg-stone-800/40 group"
                                     >
@@ -448,7 +456,10 @@ export default function BrandQrCheckinPage() {
                             </div>
 
                             <button
-                                onClick={() => setStep('walkin')}
+                                onClick={() => {
+                                    setSelectedAptId(null)
+                                    setStep('walkin')
+                                }}
                                 className="w-full text-stone-500 text-sm hover:text-stone-300 transition-colors py-2"
                             >
                                 Not your appointment? Check in as walk-in
@@ -561,7 +572,10 @@ export default function BrandQrCheckinPage() {
                                     if (!loyaltyJoined) {
                                         setStep('loyalty')
                                     } else {
-                                        performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })
+                                        performCheckIn({ 
+                                            source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED',
+                                            appointmentId: selectedAptId || undefined
+                                        })
                                     }
                                 }}
                                 className="w-full py-4 text-white rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
@@ -588,7 +602,10 @@ export default function BrandQrCheckinPage() {
                             <button
                                 onClick={() => {
                                     setLoyaltyJoined(true)
-                                    performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })
+                                    performCheckIn({ 
+                                        source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED',
+                                        appointmentId: selectedAptId || undefined
+                                    })
                                 }}
                                 disabled={loading}
                                 className="w-full py-4 text-white rounded-2xl font-bold text-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
@@ -602,7 +619,10 @@ export default function BrandQrCheckinPage() {
                             </button>
 
                             <button
-                                onClick={() => performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })}
+                                onClick={() => performCheckIn({ 
+                                    source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED',
+                                    appointmentId: selectedAptId || undefined
+                                })}
                                 disabled={loading}
                                 className="w-full text-stone-500 text-sm hover:text-stone-300 transition-colors py-2"
                             >

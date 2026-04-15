@@ -36,7 +36,7 @@ interface LookupResult {
     appointments?: AppointmentMatch[]
 }
 
-type Step = 'phone' | 'confirm' | 'walkin' | 'newclient' | 'success' | 'error'
+type Step = 'phone' | 'confirm' | 'walkin' | 'newclient' | 'waiver' | 'loyalty' | 'success' | 'error'
 
 // ─── Phone Format Helper ───
 function formatPhone(raw: string): string {
@@ -69,6 +69,7 @@ export default function QRCheckinPage() {
     const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false)
     const [errorMsg, setErrorMsg] = useState('')
     const [checkedInName, setCheckedInName] = useState('')
+    const [selectedAptId, setSelectedAptId] = useState<string | null>(null)
     const [tokenValid, setTokenValid] = useState<boolean | null>(null)
 
     // ─── Token Verification (on mount) ───
@@ -155,7 +156,14 @@ export default function QRCheckinPage() {
                 setAppointments(data.appointments)
                 setStep('confirm')
             } else {
-                setStep('walkin')
+                // Route through waiver/loyalty if not yet completed
+                if (!data.liabilitySigned) {
+                    setStep('waiver')
+                } else if (!data.loyaltyJoined) {
+                    setStep('loyalty')
+                } else {
+                    setStep('walkin')
+                }
             }
 
         } catch {
@@ -186,7 +194,9 @@ export default function QRCheckinPage() {
                     locationId,
                     source: opts.source,
                     appointmentId: opts.appointmentId || null,
-                    stationRef: null
+                    stationRef: null,
+                    liabilitySigned,
+                    loyaltyJoined
                 })
             })
 
@@ -371,10 +381,15 @@ export default function QRCheckinPage() {
                                 {appointments.map(appt => (
                                     <button
                                         key={appt.id}
-                                        onClick={() => performCheckIn({
-                                            appointmentId: appt.id,
-                                            source: 'QR_SCAN'
-                                        })}
+                                        onClick={() => {
+                                            setSelectedAptId(appt.id)
+                                            if (!liabilitySigned) { setStep('waiver'); return }
+                                            if (!loyaltyJoined) { setStep('loyalty'); return }
+                                            performCheckIn({
+                                                appointmentId: appt.id,
+                                                source: 'QR_SCAN'
+                                            })
+                                        }}
                                         disabled={loading}
                                         className="w-full bg-stone-900/60 border border-stone-800 hover:border-orange-500/40 rounded-2xl p-5 text-left transition-all hover:bg-stone-800/40 group"
                                     >
@@ -405,7 +420,10 @@ export default function QRCheckinPage() {
                             </div>
 
                             <button
-                                onClick={() => setStep('walkin')}
+                                onClick={() => {
+                                    setSelectedAptId(null)
+                                    setStep('walkin')
+                                }}
                                 className="w-full text-stone-500 text-sm hover:text-stone-300 transition-colors py-2"
                             >
                                 Not your appointment? Check in as walk-in
@@ -427,7 +445,11 @@ export default function QRCheckinPage() {
                             </div>
 
                             <button
-                                onClick={() => performCheckIn({ source: 'QR_SCAN' })}
+                                onClick={() => {
+                                    if (!liabilitySigned) { setStep('waiver'); return }
+                                    if (!loyaltyJoined) { setStep('loyalty'); return }
+                                    performCheckIn({ source: 'QR_SCAN' })
+                                }}
                                 disabled={loading}
                                 className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                             >
@@ -477,16 +499,87 @@ export default function QRCheckinPage() {
                             </div>
 
                             <button
-                                onClick={() => performCheckIn({ source: 'QR_SCAN' })}
-                                disabled={loading || !firstName.trim() || !lastName.trim()}
+                                onClick={() => setStep('waiver')}
+                                disabled={!firstName.trim() || !lastName.trim()}
                                 className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
                             >
-                                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
-                                    <>
-                                        Check In
-                                        <Check className="h-5 w-5" />
-                                    </>
-                                )}
+                                Continue
+                                <ChevronRight className="h-5 w-5" />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ─── LIABILITY WAIVER ─── */}
+                    {step === 'waiver' && (
+                        <div className="space-y-6">
+                            <button onClick={() => setStep('phone')} className="flex items-center gap-1 text-stone-500 hover:text-stone-300 transition-colors text-sm">
+                                <ArrowLeft className="h-4 w-4" /> Back
+                            </button>
+                            <div className="text-center">
+                                <h2 className="text-2xl font-bold text-stone-100 mb-1">One last thing...</h2>
+                                <p className="text-stone-400">Please review and accept our liability waiver</p>
+                            </div>
+
+                            <div className="bg-stone-900/60 border border-stone-800 rounded-2xl p-5 max-h-[240px] overflow-y-auto text-sm text-stone-400 leading-relaxed space-y-3">
+                                <p className="text-stone-200 font-bold text-xs uppercase tracking-wider">Liability Waiver and Release Form</p>
+                                <p>I hereby acknowledge that I am voluntarily participating in services provided. I understand that these services may involve risks, including but not limited to allergic reactions to products, minor cuts, or other injuries.</p>
+                                <p>I agree to release and hold harmless this establishment, its employees, and agents from any and all liability, claims, or causes of action arising out of my participation in these services.</p>
+                                <p>By tapping &quot;I Accept&quot;, I acknowledge that I have read and understood this waiver and agree to its terms.</p>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    setLiabilitySigned(true)
+                                    if (!loyaltyJoined) {
+                                        setStep('loyalty')
+                                    } else {
+                                        performCheckIn({ 
+                                            source: 'QR_SCAN',
+                                            appointmentId: selectedAptId || undefined
+                                        })
+                                    }
+                                }}
+                                className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                            >
+                                <Check className="h-5 w-5" /> I Accept
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ─── LOYALTY ENROLLMENT ─── */}
+                    {step === 'loyalty' && (
+                        <div className="space-y-6">
+                            <div className="text-center">
+                                <div className="mx-auto w-20 h-20 bg-orange-500/10 rounded-2xl flex items-center justify-center text-4xl mb-4">
+                                    🎁
+                                </div>
+                                <h2 className="text-2xl font-bold text-stone-100 mb-1">Join Our Rewards?</h2>
+                                <p className="text-stone-400">Earn points on every visit and get exclusive offers!</p>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    setLoyaltyJoined(true)
+                                    performCheckIn({ 
+                                        source: 'QR_SCAN',
+                                        appointmentId: selectedAptId || undefined
+                                    })
+                                }}
+                                disabled={loading}
+                                className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
+                            >
+                                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Yes, sign me up! ✨'}
+                            </button>
+
+                            <button
+                                onClick={() => performCheckIn({ 
+                                    source: 'QR_SCAN',
+                                    appointmentId: selectedAptId || undefined
+                                })}
+                                disabled={loading}
+                                className="w-full text-stone-500 text-sm hover:text-stone-300 transition-colors py-2"
+                            >
+                                No thanks, maybe later
                             </button>
                         </div>
                     )}

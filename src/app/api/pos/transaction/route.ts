@@ -14,10 +14,16 @@ import {
     type LineItemInput
 } from '@/lib/payoutEngine'
 import { validateBody, unauthorizedResponse, badRequestResponse } from '@/lib/validation'
+import { computePromotionsSafe } from '@/lib/pos/promotionEngine'
 import fs from 'fs'
 import path from 'path'
 
-// Request validation schema
+// ============ SPRINT 1: HARDENED REQUEST SCHEMA ============
+// Key changes:
+// - REMOVED: item-level promotionId (server computes promotions, not client)
+// - ADDED: ageVerificationSessionId (server-issued session token for age-restricted items)
+// - ADDED: promoCode (optional — client can submit a promo code for server-side validation)
+// - ADDED: source (track WEB_POS vs ANDROID_POS vs OFFLINE_WEB_POS)
 const transactionRequestSchema = z.object({
     items: z.array(z.object({
         id: z.string().optional(),
@@ -30,7 +36,7 @@ const transactionRequestSchema = z.object({
         quantity: z.union([z.number(), z.string()]).transform(v => Number(v)).refine(v => v > 0, { message: 'Quantity must be greater than 0' }),
         discount: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
         barberId: z.string().optional().nullable(), // ID of barber who performed the service
-        promotionId: z.string().optional().nullable(), // For validating auto-applied system deals
+        // Sprint 1: promotionId REMOVED from client input — server computes promotions
         itemDescription: z.string().optional().nullable(), // S4-5: Custom description for open ring items
     })).min(1, 'At least one item required'),
     subtotal: z.union([z.number(), z.string()]).transform(v => Number(v)),
@@ -54,6 +60,14 @@ const transactionRequestSchema = z.object({
     cardType: z.string().optional().nullable(),
     tip: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
     notes: z.string().optional().nullable(), // Transaction notes from cashier
+    // Sprint 1: Server-issued age verification session (replaces client-trusted booleans)
+    ageVerificationSessionId: z.string().optional().nullable(),
+    // Sprint 1: Promo code for server-side validation (server recomputes promos, not client)
+    promoCode: z.string().optional().nullable(),
+    // Sprint 1: Loyalty ID for loyalty-gated promos
+    loyaltyId: z.string().optional().nullable(),
+    // Sprint 1: Source tracking
+    source: z.enum(['WEB_POS', 'ANDROID_POS', 'OFFLINE_WEB_POS', 'API']).optional().default('WEB_POS'),
 })
 
 export async function POST(req: NextRequest) {
@@ -138,6 +152,32 @@ export async function POST(req: NextRequest) {
     }
     // ===== END IDEMPOTENCY CHECK =====
 
+    // Sprint 1: Extract new fields from validated data
+    const { ageVerificationSessionId, promoCode, loyaltyId, source: txSource } = validation.data
+
+    // ===== SPRINT 1: TENDER ROUTING GUARD =====
+    // Card payments MUST go through the two-phase reserve/finalize flow.
+    // The direct route handles: CASH, GIFT_CARD, EBT, SPLIT (cash+card already captured).
+    //
+    // LEGACY EXCEPTION: If a client sends CREDIT_CARD/DEBIT_CARD WITH gatewayTxId already
+    // present (PAX already approved before this API call), we allow the single-pass legacy
+    // path. This supports:
+    //   - Android POS (native PAX SDK captures card before calling this API)
+    //   - Any client that has not yet migrated to reserve/finalize
+    //
+    // Once all clients migrate, remove the legacy exception and reject all direct card requests.
+    const isCardPayment = ['CREDIT_CARD', 'DEBIT_CARD'].includes(paymentMethod)
+    if (isCardPayment && !gatewayTxId) {
+        // Card payment WITHOUT prior PAX approval — must use reserve/finalize
+        return badRequestResponse(
+            'Card payments must use the two-phase checkout flow. ' +
+            'Call POST /api/pos/transaction/reserve first, then POST /api/pos/transaction/finalize after PAX approval. ' +
+            'Direct card submission is only allowed with a gatewayTxId from a prior PAX approval (legacy path).'
+        )
+    }
+    const isLegacyCardPath = isCardPayment && !!gatewayTxId
+    // ===== END TENDER ROUTING GUARD =====
+
     try {
 
         // Validate split payment
@@ -179,10 +219,33 @@ export async function POST(req: NextRequest) {
             tip: (tip || 0).toString(),
             status: 'COMPLETED',
             cashDrawerSessionId: cashDrawerSessionId || null,
-            lineItems: (() => {
+            // Sprint 1: Server-computed fields (initialized here, updated after promo computation)
+            appliedPromotions: null as string | null,
+            promoDiscount: null as string | null,
+            ageVerificationSessionId: null as string | null,
+            source: (txSource || 'WEB_POS') as string,
+            lineItems: await (async () => {
                 // ===== PAYOUT ENGINE SNAPSHOT CALCULATION =====
                 // Generate immutable snapshot fields for reporting accuracy
                 const businessDate = getBusinessDate()
+
+                // ===== FETCH EMPLOYEE'S ACTUAL COMMISSION RATE =====
+                // Look up the employee's CompensationPlan to get their configured commission split.
+                // If no plan exists, commission defaults to 0% — owner must explicitly configure.
+                const employeeCompPlan = await prisma.compensationPlan.findFirst({
+                    where: { userId: user.id, effectiveTo: null },
+                    orderBy: { effectiveFrom: 'desc' },
+                    select: { commissionSplit: true }
+                })
+                const actualCommissionSplit = employeeCompPlan?.commissionSplit
+                    ? Number(employeeCompPlan.commissionSplit)
+                    : 0 // No plan = no commission (was previously hardcoded 40%)
+
+                const payoutConfig: typeof DEFAULT_PAYOUT_CONFIG = {
+                    ...DEFAULT_PAYOUT_CONFIG,
+                    commissionSplit: actualCommissionSplit,
+                    taxRate: 0 // TODO: Pass actual tax rate
+                }
 
                 // Prepare line item inputs for payout engine
                 const lineItemInputs: LineItemInput[] = items.map((item: any) => ({
@@ -197,11 +260,11 @@ export async function POST(req: NextRequest) {
                     barberId: item.barberId || null
                 }))
 
-                // Calculate payouts using central engine (40% default commission)
+                // Calculate payouts using central engine with ACTUAL employee commission rate
                 const payoutResult = calculateTransactionPayouts(
                     lineItemInputs,
                     Number(tip || 0),
-                    { ...DEFAULT_PAYOUT_CONFIG, taxRate: 0 }, // TODO: Pass actual tax rate
+                    payoutConfig,
                     businessDate
                 )
 
@@ -231,9 +294,9 @@ export async function POST(req: NextRequest) {
 
                         const lineItemData = {
                             type: item.type,
-                            // Only set IDs if they are valid CUIDs (real database records)
-                            serviceId: (item.type === 'SERVICE' && item.id && !item.id.startsWith('s') && !item.id.startsWith('custom') && !item.id.startsWith('open')) ? item.id : null,
-                            productId: (item.type === 'PRODUCT' && item.id && !item.id.startsWith('p') && !item.id.startsWith('custom') && !item.id.startsWith('open')) ? item.id : null,
+                            // Only set IDs if they are valid CUIDs (real database records) AND exist locally
+                            serviceId: (item.type === 'SERVICE' && item.id && !item.id.startsWith('s') && !item.id.startsWith('custom') && !item.id.startsWith('open') && serviceMap.has(item.id)) ? item.id : null,
+                            productId: (item.type === 'PRODUCT' && item.id && !item.id.startsWith('p') && !item.id.startsWith('custom') && !item.id.startsWith('open') && productMap.has(item.id)) ? item.id : null,
                             staffId: item.barberId || null,
                             quantity: parseInt(item.quantity.toString()),
                             price: item.price.toString(),
@@ -268,6 +331,7 @@ export async function POST(req: NextRequest) {
 
         // ===== SECURITY: VALIDATE PRICES & STOCK =====
         // Fetch authoritative data to prevent client-side price manipulation
+        // Sprint 1: Product is the CANONICAL retail inventory model
         const productIds = items
             .filter((i: any) => i.type === 'PRODUCT' && i.id && !i.id.startsWith('custom') && !i.id.startsWith('open'))
             .map((i: any) => i.id)
@@ -276,15 +340,79 @@ export async function POST(req: NextRequest) {
             .filter((i: any) => i.type === 'SERVICE' && i.id && !i.id.startsWith('custom') && !i.id.startsWith('open'))
             .map((i: any) => i.id)
 
+        // Sprint 1: Fetch products WITH category age restriction data
         const [dbProducts, dbServices] = await Promise.all([
-            productIds.length > 0 ? prisma.product.findMany({ where: { id: { in: productIds } } }) : [],
+            productIds.length > 0 ? prisma.product.findMany({
+                where: { id: { in: productIds } },
+                include: {
+                    productCategory: {
+                        select: { id: true, ageRestricted: true, minimumAge: true }
+                    }
+                }
+            }) : [],
             serviceIds.length > 0 ? prisma.service.findMany({ where: { id: { in: serviceIds } } }) : []
         ])
 
         const productMap = new Map(dbProducts.map(p => [p.id, p]))
         const serviceMap = new Map(dbServices.map(s => [s.id, s]))
 
-        // Validate each item
+        // ===== SPRINT 1: AGE VERIFICATION ENFORCEMENT =====
+        // Server-side check — NEVER trusts client booleans. Queries AgeVerificationSession table.
+        // One session covers all restricted items if the verified age meets the strictest requirement.
+        const restrictedItems = items.filter(item => {
+            if (!item.id || item.id.startsWith('custom') || item.id.startsWith('open')) return false
+            if (item.type !== 'PRODUCT') return false
+            const product = productMap.get(item.id!)
+            if (!product) return false
+            return product.ageRestricted || product.productCategory?.ageRestricted
+        })
+
+        let ageSession: { id: string; minimumAge: number } | null = null
+        if (restrictedItems.length > 0) {
+            if (!ageVerificationSessionId) {
+                return badRequestResponse(
+                    `Age verification required. ${restrictedItems.length} item(s) in cart require ID check. Complete verification before checkout.`
+                )
+            }
+
+            // Fetch the server-issued session — this is the ONLY proof we accept
+            const session = await prisma.ageVerificationSession.findFirst({
+                where: {
+                    id: ageVerificationSessionId,
+                    franchiseId: user.franchiseId,
+                    verified: true,
+                    consumed: false,
+                    expiresAt: { gt: new Date() },
+                }
+            })
+
+            if (!session) {
+                return badRequestResponse(
+                    'Age verification session expired, consumed, or invalid. Please re-verify customer ID before checkout.'
+                )
+            }
+
+            // Check the strictest age requirement across all restricted items
+            const maxRequiredAge = Math.max(
+                ...restrictedItems.map(item => {
+                    const product = productMap.get(item.id!)
+                    const productAge = product?.minimumAge || 0
+                    const categoryAge = product?.productCategory?.minimumAge || 0
+                    return Math.max(productAge, categoryAge) || 21 // Default to 21 if no age specified
+                })
+            )
+
+            if (session.minimumAge < maxRequiredAge) {
+                return badRequestResponse(
+                    `Age verification was for ${session.minimumAge}+ but cart contains items requiring ${maxRequiredAge}+. Re-verify with correct age threshold.`
+                )
+            }
+
+            ageSession = { id: session.id, minimumAge: session.minimumAge }
+        }
+        // ===== END AGE VERIFICATION ENFORCEMENT =====
+
+        // Validate each item price against DB truth
         for (const item of items) {
             if (item.id && !item.id.startsWith('custom') && !item.id.startsWith('open')) {
                 let dbPrice = 0
@@ -295,42 +423,27 @@ export async function POST(req: NextRequest) {
                         return badRequestResponse(`Product not found: ${item.name} (${item.id})`)
                     }
                     // Use cashPrice if available (dual pricing), otherwise legacy price
-                    // We treat the "price" submitted as the base price before discount
                     dbPrice = product.cashPrice ? Number(product.cashPrice) : Number(product.price)
                 } else if (item.type === 'SERVICE') {
                     const service = serviceMap.get(item.id)
                     if (!service) {
-                        return badRequestResponse(`Service not found: ${item.name} (${item.id})`)
+                        // Service was in the POS menu cache but has since been deleted from catalog.
+                        // Allow the sale to proceed — the cashier already added it when it was valid.
+                        console.warn(`[POS_TRANSACTION] Service deleted from catalog but still in POS cache: ${item.name} (${item.id}). Allowing sale with client price $${item.price}.`)
+                        continue
                     }
                     dbPrice = Number(service.price)
                 }
 
-                // Security Check: manual discounts vs System Promotions
-
-                // 1. Check if this is a System Promotion
-                if (item.promotionId) {
-                    const promotion = await prisma.promotion.findUnique({
-                        where: { id: item.promotionId, isActive: true }
-                    })
-
-                    if (!promotion) {
-                        return badRequestResponse(`Invalid or expired promotion applied to ${item.name}.`)
-                    }
-
-                    // Valid promotion - skip price validation for this item
-                    continue
-                }
-
-                // Price Validation (non-promo items): Reject if client price differs from DB by more than $0.05
+                // Sprint 1: Server computes promotions — no client promotionId to skip validation
+                // Price Validation: Reject if client price differs from DB by more than $0.05
                 if (Math.abs(item.price - dbPrice) > 0.05) {
                     console.error(`[SECURITY] Price manipulation detected for ${item.name}. Client: ${item.price}, DB: ${dbPrice}`)
                     return badRequestResponse(`Price mismatch for ${item.name}. Please refresh menu.`)
                 }
 
                 // Employee Permission Check for MANUAL discounts
-                // Employees cannot apply manual discounts unless explicitly authorized with limits
                 if (item.discount > 0 && user.role === 'EMPLOYEE') {
-                    // Fetch fresh user permissions
                     const employee = await prisma.user.findUnique({
                         where: { id: user.id },
                         select: { canApplyDiscounts: true, maxDiscountPercent: true, maxDiscountAmount: true }
@@ -340,17 +453,13 @@ export async function POST(req: NextRequest) {
                         return badRequestResponse(`Permission Denied: You are not authorized to apply discounts.`)
                     }
 
-                    // Validate Percent Limit
                     if (employee.maxDiscountPercent > 0 && item.discount > employee.maxDiscountPercent) {
                         return badRequestResponse(`Permission Denied: Discount (${item.discount}%) exceeds your limit of ${employee.maxDiscountPercent}%.`)
                     }
 
-                    // Validate Amount Limit
                     if (Number(employee.maxDiscountAmount) > 0) {
-                        // Calculate absolute discount amount
                         const originalTotal = dbPrice * item.quantity
                         const discountAmount = originalTotal * (item.discount / 100)
-
                         if (discountAmount > Number(employee.maxDiscountAmount)) {
                             return badRequestResponse(`Permission Denied: Discount amount ($${discountAmount.toFixed(2)}) exceeds your limit of $${Number(employee.maxDiscountAmount).toFixed(2)}.`)
                         }
@@ -360,8 +469,25 @@ export async function POST(req: NextRequest) {
         }
         // ===== END SECURITY CHECK =====
 
-        // ===== STOCK GUARD CHECK =====
-        // Check stock availability for all products before proceeding
+        // ===== SPRINT 1: STOCK POLICY =====
+        // STOCK CHECK happens here (before the atomic block).
+        // STOCK DECREMENT happens inside the atomic block.
+        //
+        // Policy for direct route (CASH / LEGACY CARD):
+        //   - Stock is checked AND decremented in the same request.
+        //   - No gap between check and decrement (single-pass).
+        //   - This is safe because there's no PAX wait between.
+        //
+        // Policy for two-phase reserve/finalize:
+        //   - Stock is checked at RESERVE time (in reserve/route.ts).
+        //   - Stock is decremented at FINALIZE time (in finalize/route.ts).
+        //   - There IS a gap (15-min max). A product could sell out between reserve and finalize.
+        //   - Finalize does NOT recheck stock — the PAX card is already approved.
+        //   - If stock went negative, the sale still completes. This is intentional:
+        //     we do not void an approved card charge over a stock race condition.
+        //   - The StockAdjustment audit trail records the true stock movement.
+        //   - Negative stock is flagged in reporting/drift detection.
+        // =====
         for (const item of items) {
             if (item.type === 'PRODUCT' && item.id && !item.id.startsWith('custom') && !item.id.startsWith('open')) {
                 const product = productMap.get(item.id)
@@ -375,14 +501,60 @@ export async function POST(req: NextRequest) {
         }
         // ===== END STOCK GUARD CHECK =====
 
+        // ===== SPRINT 1: SERVER-SIDE PROMOTION COMPUTATION =====
+        // Delegated to the shared promotion engine (src/lib/pos/promotionEngine.ts).
+        // Failure policy: checkout continues with zero promos (safe wrapper).
+        const promoResult = await computePromotionsSafe({
+            franchiseId: user.franchiseId,
+            cartItems: items
+                .filter(i => i.id && !i.id.startsWith('custom') && !i.id.startsWith('open'))
+                .map(i => {
+                    const product = productMap.get(i.id!)
+                    const dbPrice = product
+                        ? (product.cashPrice ? Number(product.cashPrice) : Number(product.price))
+                        : i.price
+                    return {
+                        id: i.id!,
+                        categoryId: product?.categoryId || undefined,
+                        price: dbPrice,
+                        quantity: i.quantity,
+                    }
+                }),
+            promoCode: promoCode || null,
+        })
+        const serverPromos = promoResult.appliedPromotions
+        const serverPromoDiscount = promoResult.totalPromoDiscount
+        const linePromoMap = promoResult.linePromoMap
+        // ===== END SERVER-SIDE PROMOTION COMPUTATION =====
+
+        // ===== SPRINT 1: INJECT SERVER-COMPUTED PROMO FIELDS INTO transactionData =====
+        transactionData.appliedPromotions = serverPromos.length > 0 ? JSON.stringify(serverPromos) : null
+        transactionData.promoDiscount = serverPromoDiscount > 0 ? serverPromoDiscount.toString() : null
+        transactionData.ageVerificationSessionId = ageSession?.id || null
+        transactionData.source = txSource || 'WEB_POS'
+        // ===== END PROMO FIELD INJECTION =====
+
         // ===== ATOMIC TRANSACTION BLOCK =====
         // All sale operations wrapped for rollback safety
         const transaction = await prisma.$transaction(async (tx) => {
+            // Sprint 1: Inject server-computed promo fields into line item snapshots
+            const originalLineItems = transactionData.lineItems
+            if (originalLineItems && 'create' in originalLineItems && Array.isArray(originalLineItems.create)) {
+                for (const lineItem of originalLineItems.create) {
+                    const productId = (lineItem as any).productId
+                    if (productId && linePromoMap.has(productId)) {
+                        const promoData = linePromoMap.get(productId)!
+                        ;(lineItem as any).promotionId = promoData.promotionId
+                        ;(lineItem as any).promotionName = promoData.promotionName
+                        ;(lineItem as any).promotionDiscount = promoData.promotionDiscount.toString()
+                    }
+                }
+            }
+
             // Create the transaction with line items
             const newTransaction = await tx.transaction.create({
                 data: transactionData,
                 include: {
-                    // === EXPLICIT SELECT: Ensure all fields required for printing ===
                     lineItems: {
                         select: {
                             id: true,
@@ -390,21 +562,22 @@ export async function POST(req: NextRequest) {
                             quantity: true,
                             price: true,
                             total: true,
-                            // Name snapshots (NEVER null after Phase 1 fix)
                             serviceNameSnapshot: true,
                             productNameSnapshot: true,
-                            // Dual pricing fields
                             cashUnitPrice: true,
                             cardUnitPrice: true,
                             cashLineTotal: true,
                             cardLineTotal: true,
                             lineChargedMode: true,
-                            // Additional fields for reports
                             priceCharged: true,
                             discount: true,
                             staffId: true,
                             serviceId: true,
-                            productId: true
+                            productId: true,
+                            // Sprint 1: Promo evidence fields
+                            promotionId: true,
+                            promotionName: true,
+                            promotionDiscount: true,
                         }
                     },
                     client: {
@@ -419,18 +592,42 @@ export async function POST(req: NextRequest) {
                 }
             })
 
-            // Decrement inventory for product items
+            // Sprint 1: Decrement inventory (Product model ONLY) + create StockAdjustment audit
             for (const item of items) {
                 if (item.type === 'PRODUCT' && item.id && !item.id.startsWith('p') && !item.id.startsWith('custom') && !item.id.startsWith('open')) {
-                    // Prevent selling tracking items if they don't exist (double check)
                     const product = productMap.get(item.id)
-                    if (product) {
+                    if (product && product.stock !== null && product.stock !== undefined) {
                         await tx.product.update({
                             where: { id: item.id },
                             data: { stock: { decrement: item.quantity } }
                         })
+
+                        // Sprint 1: Immutable stock movement audit record
+                        await tx.stockAdjustment.create({
+                            data: {
+                                productId: item.id,
+                                locationId: user.franchiseId, // TODO: use actual locationId from station context
+                                quantity: -item.quantity,
+                                reason: 'SALE',
+                                sourceId: newTransaction.id,
+                                previousStock: product.stock,
+                                newStock: product.stock - item.quantity,
+                                performedBy: user.id,
+                            }
+                        })
                     }
                 }
+            }
+
+            // Sprint 1: Atomically consume AgeVerificationSession (prevents replay)
+            if (ageSession) {
+                await tx.ageVerificationSession.update({
+                    where: { id: ageSession.id },
+                    data: {
+                        consumed: true,
+                        consumedByTransactionId: newTransaction.id,
+                    }
+                })
             }
 
             return newTransaction
@@ -564,6 +761,16 @@ export async function GET(req: NextRequest) {
 
         const where: any = {
             franchiseId: user.franchiseId
+        }
+
+        // ===== RECOVERY HARDENING: EMPLOYEE SCOPE =====
+        // Ordinary POS employees should NOT see every transaction in the franchise.
+        // They see only their OWN transactions unless they are MANAGER or above.
+        // This prevents a regular cashier from browsing/seeing stuck transactions
+        // created by other employees. Managers need full visibility for recovery.
+        const isManagerOrAbove = ['MANAGER', 'OWNER', 'FRANCHISOR', 'PROVIDER', 'ADMIN'].includes(user.role)
+        if (!isManagerOrAbove) {
+            where.employeeId = user.id
         }
 
         // Date range filter

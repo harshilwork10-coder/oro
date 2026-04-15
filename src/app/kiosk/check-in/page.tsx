@@ -170,10 +170,15 @@ function KioskCheckInContent() {
         }
     }
 
-    const handleWaiverSubmit = async () => {
+    const handleWaiverSubmit = () => {
+        setWaiverAccepted(true)
+        setStep('loyalty')
+    }
+
+    const handleLoyaltySubmit = async (join: boolean) => {
         setLoading(true)
         try {
-            // Execute the master Kiosk Check-In Route, passing liabilitySigned.
+            // Execute the master Kiosk Check-In Route, passing liabilitySigned and loyaltyJoined.
             // This natively creates the customer if new, updates existing, handles idempotency,
             // and actually drops them into the `CheckIn` queue model for the location!
             const res = await fetch('/api/kiosk/check-in', {
@@ -184,7 +189,7 @@ function KioskCheckInContent() {
                     phone: phone,
                     locationId: locationId,
                     liabilitySigned: true, // They confirmed the checkbox UI
-                    loyaltyJoined: false, // Stripped locally, explicitly defaulted to backend
+                    loyaltyJoined: join,
                     source: 'KIOSK' // Tags this checkin trace correctly
                 })
             })
@@ -253,9 +258,53 @@ function KioskCheckInContent() {
                             disabled={!waiverAccepted || loading}
                             className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
                         >
-                            {loading ? "Syncing..." : "Accept & Check In"}
-                            {!loading && <ChevronRight className="h-5 w-5" />}
+                            {"Accept & Continue"}
+                            {<ChevronRight className="h-5 w-5" />}
                         </button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    // Loyalty Step
+    if (step === 'loyalty') {
+        return (
+            <div className="h-screen bg-stone-950 flex flex-col relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-stone-900 to-stone-950 z-0" />
+                <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-orange-600/10 blur-[120px] rounded-full z-0" />
+                
+                <div className="relative z-10 bg-stone-900/50 backdrop-blur-md border-b border-stone-800 p-6 shadow-lg flex items-center justify-center">
+                    <div className="flex items-center gap-3">
+                        <OroLogo size={32} />
+                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent">ORO 9</span>
+                    </div>
+                </div>
+
+                <div className="flex-1 flex items-center justify-center p-6 relative z-10">
+                    <div className="max-w-xl w-full glass-panel rounded-3xl shadow-2xl p-8 border border-stone-800 text-center">
+                        <div className="mx-auto w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mb-6 border-2 border-orange-500/50">
+                            <span className="text-4xl drop-shadow-[0_0_15px_rgba(249,115,22,0.8)]">🎁</span>
+                        </div>
+                        <h2 className="text-3xl font-bold text-stone-100 mb-4">Join Oro Rewards?</h2>
+                        <p className="text-stone-400 mb-8 text-lg">Earn points on every visit. Get a free service after 10 visits. It's completely free to join!</p>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <button
+                                onClick={() => handleLoyaltySubmit(false)}
+                                disabled={loading}
+                                className="py-4 bg-stone-800 text-stone-300 rounded-xl font-bold hover:bg-stone-700 transition-all border border-stone-700 hover:border-stone-500 disabled:opacity-50"
+                            >
+                                Not Today
+                            </button>
+                            <button
+                                onClick={() => handleLoyaltySubmit(true)}
+                                disabled={loading}
+                                className="py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-xl font-bold hover:shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {loading ? "Continuing..." : "Yes, Join!"}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
