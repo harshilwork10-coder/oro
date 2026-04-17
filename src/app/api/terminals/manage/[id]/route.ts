@@ -17,7 +17,9 @@ export async function PUT(
 
         const { id } = await params
         const body = await request.json()
-        const { name, terminalIP, terminalPort, isActive, stationId } = body
+        const { name, isActive, stationId, processorMID } = body
+        const terminalIP = body.terminalIP || body.paxTerminalIP
+        const terminalPort = body.terminalPort || body.paxTerminalPort
 
         // Validate IP address format
         if (terminalIP && !/^(\d{1,3}\.){3}\d{1,3}$/.test(terminalIP)) {
@@ -30,14 +32,38 @@ export async function PUT(
         if (terminalIP !== undefined) updateData.terminalIP = terminalIP
         if (terminalPort !== undefined) updateData.terminalPort = terminalPort
         if (isActive !== undefined) updateData.isActive = isActive
+        if (processorMID !== undefined) updateData.processorMID = processorMID
 
-        const updated = await prisma.paymentTerminal.update({
-            where: { id },
-            data: updateData,
-            include: {
-                assignedStation: { select: { id: true, name: true } }
+        let updated;
+        try {
+            // Try updating PaymentTerminal first (Modern API behavior)
+            updated = await prisma.paymentTerminal.update({
+                where: { id },
+                data: updateData,
+                include: {
+                    assignedStation: { select: { id: true, name: true } }
+                }
+            })
+        } catch (e: any) {
+            // Fallback: If id is actually a Location ID (Legacy UI bug fallback)
+            if (e.code === 'P2025') {
+                const legacyUpdateData: any = {}
+                if (terminalIP !== undefined) legacyUpdateData.paxTerminalIP = terminalIP
+                if (terminalPort !== undefined) legacyUpdateData.paxTerminalPort = terminalPort
+                if (updateData.processorMID !== undefined) legacyUpdateData.processorMID = updateData.processorMID
+                
+                updated = await prisma.location.update({
+                    where: { id },
+                    data: legacyUpdateData
+                })
+                
+                // Clear the bootstrap cache for this location to propagate immediately!
+                const { CACHE_KEYS, cacheDelete } = await import('@/lib/cache')
+                await cacheDelete(CACHE_KEYS.BOOTSTRAP(id))
+            } else {
+                throw e
             }
-        })
+        }
 
         // Handle station assignment change
         if (stationId !== undefined) {
