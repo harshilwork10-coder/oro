@@ -58,6 +58,7 @@ export default function QRCheckinPage() {
     const [phone, setPhone] = useState('')
     const [firstName, setFirstName] = useState('')
     const [lastName, setLastName] = useState('')
+    const [email, setEmail] = useState('')
     const [loading, setLoading] = useState(false)
     const [locationName, setLocationName] = useState('')
     const [locationId, setLocationId] = useState('')
@@ -190,6 +191,7 @@ export default function QRCheckinPage() {
                     name: firstName && lastName
                         ? `${firstName} ${lastName}`
                         : maskedName || 'Guest',
+                    email: email.trim() || 'no-email-on-file@oronext.app',
                     phone: digits,
                     locationId,
                     source: opts.source,
@@ -496,11 +498,21 @@ export default function QRCheckinPage() {
                                         placeholder="Doe"
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-stone-500 uppercase tracking-wider mb-1.5">Email Address</label>
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={e => setEmail(e.target.value)}
+                                        className="w-full text-lg p-4 bg-stone-900/60 border-2 border-stone-800 rounded-xl focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 text-stone-100 placeholder-stone-700 transition-all outline-none"
+                                        placeholder="jane.doe@example.com"
+                                    />
+                                </div>
                             </div>
 
                             <button
                                 onClick={() => setStep('waiver')}
-                                disabled={!firstName.trim() || !lastName.trim()}
+                                disabled={!firstName.trim() || !lastName.trim() || !email.trim() || !email.includes('@')}
                                 className="w-full py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-2xl font-bold text-lg hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
                             >
                                 Continue

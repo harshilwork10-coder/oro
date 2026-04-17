@@ -13,19 +13,11 @@ export async function GET(req: NextRequest) {
         let userEmail: string | null = null
 
         // Try Android mobile auth first (Authorization header)
-        const mobileUser = await getAuthUser(request)
-        if (mobileUser) {
-            userId = mobileUser.id
-            userEmail = mobileUser.email ?? null
-            console.error('[PAX Settings] Mobile auth:', mobileUser.email)
-        } else {
-            // Fall back to web session auth
-            if (authUser?.email) {
-                userEmail = user.email
-                console.error('[PAX Settings] Session auth:', user.email)
-            }
+        if (authUser) {
+            userId = authUser.id
+            userEmail = authUser.email ?? null
+            console.error('[PAX Settings] Auth success:', userEmail)
         }
-
         if (!userId && !userEmail) {
             console.error('[PAX Settings] No auth found')
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
