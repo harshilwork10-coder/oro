@@ -17,9 +17,12 @@ export async function GET(
         if (!slug) {
             return NextResponse.json({ error: 'Slug is required' }, { status: 400 })
         }
+        
+        // Robust slug normalization to handle manual typoes and URL encoding
+        const normalizedSlug = decodeURIComponent(slug).toLowerCase().trim().replace(/[\s_]+/g, '-')
 
         const location = await prisma.location.findFirst({
-            where: { slug },
+            where: { slug: normalizedSlug },
             select: {
                 id: true,
                 name: true,

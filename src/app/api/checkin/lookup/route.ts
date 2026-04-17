@@ -40,8 +40,9 @@ export async function POST(request: Request) {
         }
 
         // Resolve slug → location → franchise
+        const normalizedSlug = decodeURIComponent(slug).toLowerCase().trim().replace(/[\s_]+/g, '-');
         const location = await prisma.location.findUnique({
-            where: { slug },
+            where: { slug: normalizedSlug },
             select: {
                 id: true,
                 name: true,
