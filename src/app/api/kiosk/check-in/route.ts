@@ -25,9 +25,11 @@ export async function POST(request: Request) {
         const deviceId = body.deviceId || null
         const qrTokenId = body.qrTokenId || null
 
-        if (!name || !phone || !email || email.trim() === '') {
-            return NextResponse.json({ error: 'Name, phone, and email are required' }, { status: 400 })
+        if (!name || !phone) {
+            return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 })
         }
+        
+        const cleanEmail = email?.trim() === '' ? null : email?.trim()
 
         // ═══ LOCATION SAFETY: Require locationId — never guess ═══
         // The old code fell back to prisma.location.findFirst() which could
@@ -75,7 +77,7 @@ export async function POST(request: Request) {
                 data: {
                     firstName,
                     lastName,
-                    email: email || existingCustomer.email,
+                    email: cleanEmail || existingCustomer.email,
                     liabilitySigned: liabilitySigned === true ? true : existingCustomer.liabilitySigned,
                     loyaltyJoined: loyaltyJoined === true ? true : existingCustomer.loyaltyJoined,
                 }
@@ -86,7 +88,7 @@ export async function POST(request: Request) {
                 data: {
                     firstName,
                     lastName,
-                    email,
+                    email: cleanEmail,
                     phone,
                     liabilitySigned: liabilitySigned || false,
                     loyaltyJoined: loyaltyJoined || false,
