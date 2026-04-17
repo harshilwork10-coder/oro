@@ -95,6 +95,12 @@ async function buildBootstrapResponse(
     const franchisor = franchise.franchisor
     const settings = franchise.settings
 
+    // Get the specific station and its dedicated payment terminal
+    const station = await prisma.station.findFirst({
+        where: { locationId, name: stationName },
+        include: { dedicatedTerminal: true }
+    })
+
     // ═══════════════════════════════════════════════════════════════════
     // 1. STAFF LIST
     // ═══════════════════════════════════════════════════════════════════
@@ -211,9 +217,11 @@ async function buildBootstrapResponse(
         dualPricingEnabled: settings?.pricingModel === 'DUAL_PRICING' && settings?.showDualPricing === true,
         cashDiscountPercent: settings?.cardSurcharge ? parseFloat(settings.cardSurcharge.toString()) : 4.0,
 
-        // PAX Terminal
-        paxTerminalIP: location.paxTerminalIP || null,
-        paxTerminalPort: location.paxTerminalPort ? parseInt(location.paxTerminalPort) : 10009,
+        // PAX Terminal - Station dedicated terminal overrides legacy Location settings
+        paxTerminalIP: station?.dedicatedTerminal?.terminalIP || location.paxTerminalIP || null,
+        paxTerminalPort: station?.dedicatedTerminal?.terminalPort 
+            ? parseInt(station.dedicatedTerminal.terminalPort) 
+            : (location.paxTerminalPort ? parseInt(location.paxTerminalPort) : 10009),
 
         // Receipt settings
         receiptHeader: settings?.storeDisplayName || franchise.name || '',

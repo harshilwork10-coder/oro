@@ -82,6 +82,10 @@ export async function PUT(
             }
         }
 
+        // Clear the bootstrap cache so Android POS gets the new dedicated terminal configuration
+        const { CACHE_KEYS, cacheDelete } = await import('@/lib/cache')
+        await cacheDelete(CACHE_KEYS.BOOTSTRAP(updated.locationId))
+
         return NextResponse.json({ success: true, terminal: updated })
     } catch (error) {
         console.error('Error updating terminal:', error)
