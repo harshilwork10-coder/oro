@@ -429,24 +429,93 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
                 <div className="flex-1 overflow-y-auto p-6">
                     {action === 'none' && (
                         <div className="space-y-4">
-                            {/* Transaction Details */}
+                            {/* Detailed Transaction View */}
                             <div className="bg-stone-950 rounded-xl p-4 border border-stone-800">
-                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                {/* Header Grid */}
+                                <div className="grid grid-cols-2 gap-4 text-sm mb-4 border-b border-stone-800 pb-4">
                                     <div>
                                         <p className="text-stone-500">Date</p>
                                         <p className="text-white">{new Date(transaction.createdAt).toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-stone-500">Total</p>
-                                        <p className="text-white text-lg font-bold">{formatCurrency(transaction.total)}</p>
-                                    </div>
-                                    <div>
                                         <p className="text-stone-500">Payment</p>
                                         <p className="text-white">{transaction.paymentMethod}</p>
+                                        {(transaction as any).splitTenders && (transaction as any).splitTenders.length > 0 && (
+                                            <div className="text-xs text-stone-400 mt-1">
+                                                {(transaction as any).splitTenders.map((t: any, i: number) => (
+                                                    <div key={i}>{t.method}: {formatCurrency(t.amount)}</div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                     <div>
                                         <p className="text-stone-500">Status</p>
-                                        <p className="text-white">{transaction.status}</p>
+                                        <p className="text-white">
+                                            {transaction.status}
+                                            {transaction.status === 'PARTIALLY_REFUNDED' && (
+                                                <span className="ml-2 text-xs bg-orange-900/50 text-orange-400 px-2 py-0.5 rounded-full inline-block">Partial Refund</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-stone-500">Customer</p>
+                                        <p className="text-white">
+                                            {transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : 'Walk-In'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Line Items */}
+                                <div className="space-y-3 mb-4">
+                                    <h4 className="text-stone-400 text-xs font-bold uppercase tracking-wider">Itemized Details</h4>
+                                    {transaction.lineItems.map(item => (
+                                        <div key={item.id} className="flex justify-between items-start text-sm">
+                                            <div>
+                                                <span className="text-white font-medium">{item.service?.name || item.product?.name || 'Item'}</span>
+                                                <div className="text-stone-500">
+                                                    {item.quantity} x {formatCurrency(item.price)}
+                                                    {item.discount > 0 && ` (-${item.discount}%)`}
+                                                </div>
+                                            </div>
+                                            <span className="text-white font-medium">{formatCurrency(item.total)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Financial Summary */}
+                                <div className="border-t border-stone-800 pt-3 space-y-1 text-sm">
+                                    <div className="flex justify-between text-stone-400">
+                                        <span>Subtotal</span>
+                                        <span>{formatCurrency(transaction.subtotal)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-stone-400">
+                                        <span>Tax</span>
+                                        <span>{formatCurrency(transaction.tax)}</span>
+                                    </div>
+                                    {((transaction as any).tipAmount || 0) > 0 && (
+                                        <div className="flex justify-between text-stone-400">
+                                            <span>Tip</span>
+                                            <span>{formatCurrency((transaction as any).tipAmount)}</span>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Dual Pricing Info Details */}
+                                    {transaction.totalCash !== undefined && transaction.totalCard !== undefined && transaction.totalCash !== transaction.totalCard && (
+                                        <div className="mt-2 pt-2 border-t border-stone-800/50">
+                                            <div className="flex justify-between text-xs text-stone-500">
+                                                <span>Cash Price (incl. tax/tip)</span>
+                                                <span>{formatCurrency(transaction.totalCash)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-xs text-stone-500">
+                                                <span>Card Price (incl. tax/tip)</span>
+                                                <span>{formatCurrency(transaction.totalCard)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between text-white font-bold text-lg pt-2 mt-2 border-t border-stone-800">
+                                        <span>Total</span>
+                                        <span>{formatCurrency(transaction.total)}</span>
                                     </div>
                                 </div>
                             </div>

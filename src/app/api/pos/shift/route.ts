@@ -2,6 +2,7 @@ import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/lib/audit'
+import { computeShiftSummary } from '@/lib/pos/shiftUtils'
 
 export async function POST(req: NextRequest) {
     // Support both session (web) and Bearer token (mobile)
@@ -110,48 +111,14 @@ export async function POST(req: NextRequest) {
             const sessionId = currentSession.id
             const startingCash = Number(currentSession.startingCash || 0)
 
-            // Cash sales during this shift
-            const cashSalesAgg = await prisma.transaction.aggregate({
-                where: { cashDrawerSessionId: sessionId, status: 'COMPLETED', paymentMethod: 'CASH' },
-                _sum: { total: true }
-            })
-            const cashSales = Number(cashSalesAgg._sum.total || 0)
-
-            // Cash refunds during this shift (negative totals, so abs)
-            const cashRefundsAgg = await prisma.transaction.aggregate({
-                where: { cashDrawerSessionId: sessionId, type: { in: ['REFUND', 'VOID', 'CORRECTION'] }, paymentMethod: 'CASH' },
-                _sum: { total: true }
-            })
-            const cashRefunds = Math.abs(Number(cashRefundsAgg._sum.total || 0))
-
-            // Cash drops
-            const cashDropsAgg = await prisma.cashDrop.aggregate({
-                where: { sessionId },
-                _sum: { amount: true }
-            })
-            const cashDrops = Number(cashDropsAgg._sum.amount || 0)
-
-            // Paid in/out
-            const paidInAgg = await prisma.drawerActivity.aggregate({
-                where: { shiftId: sessionId, type: 'PAID_IN' },
-                _sum: { amount: true }
-            })
-            const paidIn = Number(paidInAgg._sum.amount || 0)
-
-            const paidOutAgg = await prisma.drawerActivity.aggregate({
-                where: { shiftId: sessionId, type: 'PAID_OUT' },
-                _sum: { amount: true }
-            })
-            const paidOut = Number(paidOutAgg._sum.amount || 0)
-
-            // Split payment cash portions
-            const splitCashAgg = await prisma.transaction.aggregate({
-                where: { cashDrawerSessionId: sessionId, status: 'COMPLETED', paymentMethod: 'SPLIT' },
-                _sum: { cashAmount: true }
-            })
-            const splitCash = Number(splitCashAgg._sum.cashAmount || 0)
-
-            const expectedCash = Math.round((startingCash + cashSales + splitCash - cashRefunds - cashDrops - paidOut + paidIn) * 100) / 100
+            const summary = await computeShiftSummary(sessionId, startingCash)
+            const expectedCash = summary.expectedCash
+            const cashSales = summary.cashSales
+            const splitCash = summary.splitCash
+            const cashRefunds = summary.cashRefunds
+            const cashDrops = summary.cashDrops
+            const paidIn = summary.paidIn
+            const paidOut = summary.paidOut
             const endingCash = Number(amount || 0)
             const variance = Math.round((endingCash - expectedCash) * 100) / 100
 
@@ -302,32 +269,21 @@ export async function GET(req: NextRequest) {
 
     const currentSession = await prisma.cashDrawerSession.findFirst({
         where: whereClause,
-        include: {
-            transactions: {
-                where: {
-                    status: 'COMPLETED',
-                    paymentMethod: 'CASH'
-                },
-                select: { total: true }
-            }
-        }
     })
 
-    // Calculate cash sales from linked transactions
     let shiftData = null
     if (currentSession) {
-        const cashSales = currentSession.transactions?.reduce(
-            (sum: number, tx: any) => sum + Number(tx.total || 0), 0
-        ) || 0
-
         const startingCash = Number(currentSession.startingCash || 0)
+        
+        const summary = await computeShiftSummary(currentSession.id, startingCash)
 
         shiftData = {
             ...currentSession,
-            cashTotal: cashSales,
-            expectedCash: startingCash + cashSales,
+            cashTotal: summary.cashSales,
+            expectedCash: summary.expectedCash,
             openingAmount: startingCash,
-            cashSales: cashSales
+            cashSales: summary.cashSales,
+            ...summary
         }
         // Remove raw transactions array from response
         delete (shiftData as any).transactions

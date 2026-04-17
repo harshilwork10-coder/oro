@@ -440,6 +440,7 @@ model User {
   commissionRuleId      String?
   commissionRule        CommissionRule?        @relation(fields: [commissionRuleId], references: [id])
   cashDrawerSessions    CashDrawerSession[]
+  endOfDayReports       EndOfDayReport[]       @relation("ClosedEODs")
   drawerActivities      DrawerActivity[] // Fraud prevention - all drawer opens logged
   suspendedTransactions SuspendedTransaction[] @relation("SuspendedTransactions")
   paymentLogs           PaymentLog[]           @relation("PaymentLogs") // Payment attempt logs
@@ -972,6 +973,7 @@ model Location {
   stockAdjustments   StockAdjustment[]
   timeEntries        TimeEntry[]
   cashDrawerSessions CashDrawerSession[]
+  endOfDayReports    EndOfDayReport[]
   appointments       Appointment[]
   schedules          Schedule[]
   drawerActivities   DrawerActivity[] // Fraud prevention audit trail
@@ -2182,9 +2184,9 @@ model TransactionLineItem {
   lineItemStatus      String?   @default("PAID") // PAID, REFUNDED, VOIDED
 
   // Sprint 1: Server-set promotion evidence (immutable, never from client)
-  promotionId       String?   // Promotion that discounted this line (server-set)
-  promotionName     String?   // Snapshot of promo name at checkout (server-set)
-  promotionDiscount Decimal?  @db.Decimal(12, 2) // Promo discount allocated to this line (server-computed)
+  promotionId       String? // Promotion that discounted this line (server-set)
+  promotionName     String? // Snapshot of promo name at checkout (server-set)
+  promotionDiscount Decimal? @db.Decimal(12, 2) // Promo discount allocated to this line (server-computed)
 
   createdAt DateTime @default(now())
 }
@@ -2267,29 +2269,29 @@ model ActiveCart {
 // Flow: cashier verifies ID → server creates session → session ID stored in component state
 //       → on checkout, transaction route validates session server-side → consumed atomically
 model AgeVerificationSession {
-  id          String   @id @default(cuid())
+  id          String @id @default(cuid())
   franchiseId String
-  employeeId  String   // Cashier who performed the check
+  employeeId  String // Cashier who performed the check
 
   // Verification details (server-validated, NOT client-submitted)
-  method      String   // DL_SCAN, MANUAL_DOB, VISUAL, MANAGER_OVERRIDE
-  minimumAge  Int      // Age threshold verified (18 for tobacco, 21 for alcohol)
-  customerAge Int?     // Computed age from DOB (null for VISUAL/MANAGER_OVERRIDE)
-  verified    Boolean  // true = passed age check, false = failed (item removed from cart)
+  method      String // DL_SCAN, MANUAL_DOB, VISUAL, MANAGER_OVERRIDE
+  minimumAge  Int // Age threshold verified (18 for tobacco, 21 for alcohol)
+  customerAge Int? // Computed age from DOB (null for VISUAL/MANAGER_OVERRIDE)
+  verified    Boolean // true = passed age check, false = failed (item removed from cart)
 
   // Scope
-  stationId   String?  // Optional: lock to specific terminal
+  stationId String? // Optional: lock to specific terminal
 
   // Expiration & consumption (prevents replay attacks)
-  expiresAt   DateTime // Created + 30 minutes (configurable)
-  consumed    Boolean  @default(false) // Set true atomically when used in a transaction
+  expiresAt               DateTime // Created + 30 minutes (configurable)
+  consumed                Boolean  @default(false) // Set true atomically when used in a transaction
   consumedByTransactionId String? // Links to the transaction that consumed this session
 
   // Manager override audit trail
   overrideByUserId String? // Manager/Owner userId who authorized override
   overrideReason   String? // Why override was granted (required for MANAGER_OVERRIDE)
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([franchiseId, employeeId])
   @@index([expiresAt])
@@ -2306,43 +2308,43 @@ model AgeVerificationSession {
 // EXPIRED: Timed out (15 min), requires manager void or retry
 // VOIDED: Manager explicitly voided (triggers manual PAX refund if needed)
 model PendingTransaction {
-  id          String   @id @default(cuid())
+  id          String @id @default(cuid())
   franchiseId String
-  employeeId  String   // Cashier who initiated the checkout
+  employeeId  String // Cashier who initiated the checkout
 
   // Server-validated immutable snapshot (sealed at reserve time)
   // These are the ONLY source of truth for finalization — client cannot override
-  cartSnapshot   String  // JSON: validated items with DB-sourced prices [{id, name, price, quantity, categoryId, ageRestricted, ...}]
-  totalsSnapshot String  // JSON: { subtotal, tax, total, subtotalCash, subtotalCard, taxCash, taxCard, totalCash, totalCard, chargedMode }
+  cartSnapshot   String // JSON: validated items with DB-sourced prices [{id, name, price, quantity, categoryId, ageRestricted, ...}]
+  totalsSnapshot String // JSON: { subtotal, tax, total, subtotalCash, subtotalCard, taxCash, taxCard, totalCash, totalCard, chargedMode }
   promoSnapshot  String? // JSON: server-computed promotions [{promotionId, name, type, discountAmount, affectedItems}]
 
   // Payment intent
-  paymentMethod  String  // CREDIT_CARD, DEBIT_CARD
-  expectedTotal  Decimal @db.Decimal(12, 2) // Exact amount PAX should charge
+  paymentMethod String // CREDIT_CARD, DEBIT_CARD
+  expectedTotal Decimal @db.Decimal(12, 2) // Exact amount PAX should charge
 
   // PAX response (filled during finalize, Phase 3)
-  gatewayTxId    String?  // Transaction ID from PAX/processor
-  authCode       String?  // Authorization code from processor
-  cardLast4      String?  // Last 4 digits of card
-  cardType       String?  // Visa, MasterCard, etc.
+  gatewayTxId String? // Transaction ID from PAX/processor
+  authCode    String? // Authorization code from processor
+  cardLast4   String? // Last 4 digits of card
+  cardType    String? // Visa, MasterCard, etc.
 
   // State machine
-  status         String  @default("RESERVED") // RESERVED, FINALIZED, EXPIRED, VOIDED
+  status                 String  @default("RESERVED") // RESERVED, FINALIZED, EXPIRED, VOIDED
   finalizedTransactionId String? // Links to the Transaction created on finalize
 
   // Context fields (from the original checkout request)
-  stationId               String?
+  stationId                String?
   clientId                 String?
   tip                      Decimal @default(0) @db.Decimal(12, 2)
   cashDrawerSessionId      String?
-  ageVerificationSessionId String?  // Age session to consume on finalize
-  loyaltyPhone             String?  // For post-sale loyalty earn
-  chargedMode              String?  // CASH or CARD for dual pricing
-  idempotencyKey           String?  // Prevents duplicate finalization
+  ageVerificationSessionId String? // Age session to consume on finalize
+  loyaltyPhone             String? // For post-sale loyalty earn
+  chargedMode              String? // CASH or CARD for dual pricing
+  idempotencyKey           String? // Prevents duplicate finalization
 
-  expiresAt   DateTime // RESERVED + 15 minutes
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  expiresAt DateTime // RESERVED + 15 minutes
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([franchiseId, status])
   @@index([idempotencyKey])
@@ -7031,4 +7033,61 @@ model SalonTransactionLoyaltyRedemption {
   @@index([transactionId])
   @@index([membershipId])
   @@index([loyaltyProgramId])
+}
+
+model EndOfDayReport {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+  tzDate     String // e.g., "USA/New_York"
+
+  closedAt         DateTime @default(now())
+  closingManagerId String
+  closingManager   User     @relation("ClosedEODs", fields: [closingManagerId], references: [id])
+  closedByRole     String // Role of the user closing (e.g. MANAGER, OWNER)
+
+  // Aggregate Sales
+  grossSales Decimal @default(0) @db.Decimal(12, 2)
+  netSales   Decimal @default(0) @db.Decimal(12, 2)
+
+  // Tenders
+  cashSales Decimal @default(0) @db.Decimal(12, 2)
+  cardSales Decimal @default(0) @db.Decimal(12, 2)
+  splitCash Decimal @default(0) @db.Decimal(12, 2)
+  splitCard Decimal @default(0) @db.Decimal(12, 2)
+
+  // Deductions
+  tax         Decimal @default(0) @db.Decimal(12, 2)
+  tips        Decimal @default(0) @db.Decimal(12, 2)
+  cashRefunds Decimal @default(0) @db.Decimal(12, 2)
+  refunds     Decimal @default(0) @db.Decimal(12, 2)
+  voids       Decimal @default(0) @db.Decimal(12, 2)
+  discounts   Decimal @default(0) @db.Decimal(12, 2)
+
+  // Drawer
+  noSaleCount    Int     @default(0)
+  paidInTotal    Decimal @default(0) @db.Decimal(12, 2)
+  paidOutTotal   Decimal @default(0) @db.Decimal(12, 2)
+  cashDropsTotal Decimal @default(0) @db.Decimal(12, 2)
+
+  // Recon
+  openingCashTotal Decimal @default(0) @db.Decimal(12, 2)
+  expectedCash     Decimal @default(0) @db.Decimal(12, 2)
+  actualCash       Decimal @default(0) @db.Decimal(12, 2)
+  variance         Decimal @default(0) @db.Decimal(12, 2)
+
+  varianceNote       String?
+  isVarianceApproved Boolean @default(false)
+
+  transactionCount Int @default(0)
+
+  printedAt      DateTime?
+  reportPayload  Json? // Immutable snapshot of exact printed output
+  shiftBreakdown Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([locationId, tzDate])
+  @@index([locationId, closedAt])
 }

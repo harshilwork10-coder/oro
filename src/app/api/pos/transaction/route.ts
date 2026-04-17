@@ -54,6 +54,12 @@ const transactionRequestSchema = z.object({
     clientId: z.string().optional().nullable(),
     cashAmount: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
     cardAmount: z.union([z.number(), z.string()]).optional().default(0).transform(v => Number(v)),
+    splitTenders: z.array(z.object({
+        method: z.string(),
+        amount: z.union([z.number(), z.string()]).transform(v => Number(v)),
+        cardLast4: z.string().optional().nullable(),
+        brand: z.string().optional().nullable(),
+    })).optional().nullable(),
     gatewayTxId: z.string().optional().nullable(),
     authCode: z.string().optional().nullable(),
     cardLast4: z.string().optional().nullable(),
@@ -82,7 +88,7 @@ export async function POST(req: NextRequest) {
     const validation = await validateBody(req, transactionRequestSchema)
     if ('error' in validation) return validation.error
 
-    const { items, subtotal, tax, total, subtotalCash, subtotalCard, taxCash, taxCard, totalCash, totalCard, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, gatewayTxId, authCode, cardLast4, cardType, tip, notes } = validation.data
+    const { items, subtotal, tax, total, subtotalCash, subtotalCard, taxCash, taxCard, totalCash, totalCard, paymentMethod, cashDrawerSessionId, clientId, cashAmount, cardAmount, splitTenders, gatewayTxId, authCode, cardLast4, cardType, tip, notes } = validation.data
 
     // Shift validation (OWNER-CONTROLLED via BusinessConfig.shiftRequirement setting)
     // Look up through franchise -> franchisor -> businessConfig
@@ -180,12 +186,43 @@ export async function POST(req: NextRequest) {
 
     try {
 
-        // Validate split payment
-        if (paymentMethod === 'SPLIT') {
-            const splitTotal = (cashAmount || 0) + (cardAmount || 0)
-            if (Math.abs(splitTotal - total) > 0.01) {
-                return badRequestResponse(`Split payment amounts ($${cashAmount} cash + $${cardAmount} card) must equal total ($${total})`)
+        // Validate split payment or multiple tenders
+        let finalSplitTenders: Array<{method: string, amount: number, cardLast4?: string, brand?: string}> = [];
+        let finalCashAmt = cashAmount || 0;
+        let finalCardAmt = cardAmount || 0;
+
+        if (splitTenders && splitTenders.length > 0) {
+            // Source of truth is the splitTenders array
+            const tenderSum = splitTenders.reduce((sum, t) => sum + t.amount, 0);
+            // Must equal total (which includes tip in some cases, so wait: tender sum must equal total + tip if tip isn't in total)
+            // But per Change 2, tip stays at root. And wait, standard behavior: total = subtotal + tax. Handed over tenders should cover total + tip.
+            const expectedTenderTarget = total + (tip || 0);
+            if (Math.abs(tenderSum - expectedTenderTarget) > 0.05) {
+                return badRequestResponse(`Sum of multiple tenders ($${tenderSum}) must equal transaction total + tip ($${expectedTenderTarget})`);
             }
+            finalSplitTenders = splitTenders.map(t => ({
+                method: t.method.toUpperCase(),
+                amount: t.amount,
+                cardLast4: t.cardLast4 || undefined,
+                brand: t.brand || undefined
+            }));
+            finalCashAmt = splitTenders.filter(t => t.method.toUpperCase() === 'CASH').reduce((sum, t) => sum + t.amount, 0);
+            finalCardAmt = splitTenders.filter(t => ['CREDIT_CARD', 'DEBIT_CARD', 'CARD'].includes(t.method.toUpperCase())).reduce((sum, t) => sum + t.amount, 0);
+
+        } else if (paymentMethod === 'SPLIT') {
+            // Legacy SPLIT fallback
+            const splitTotal = finalCashAmt + finalCardAmt;
+            const expectedTenderTarget = total + (tip || 0);
+            if (Math.abs(splitTotal - expectedTenderTarget) > 0.05) {
+                return badRequestResponse(`Split payment amounts ($${finalCashAmt} cash + $${finalCardAmt} card) must equal total + tip ($${expectedTenderTarget})`);
+            }
+            if (finalCashAmt > 0) finalSplitTenders.push({ method: 'CASH', amount: finalCashAmt });
+            if (finalCardAmt > 0) finalSplitTenders.push({ method: 'CREDIT_CARD', amount: finalCardAmt, cardLast4: cardLast4 || undefined, brand: cardType || undefined });
+        } else {
+            // Standard single payment fallback
+            if (paymentMethod === 'CASH') finalCashAmt = total + (tip || 0);
+            else finalCardAmt = total + (tip || 0);
+            finalSplitTenders.push({ method: paymentMethod, amount: total + (tip || 0), cardLast4: cardLast4 || undefined, brand: cardType || undefined });
         }
 
         // ===== FETCH CANONICAL INVENTORY MAPS AHEAD OF TIME =====
@@ -234,8 +271,9 @@ export async function POST(req: NextRequest) {
             totalCard: (totalCard ?? total).toString(),
             chargedMode: chargedMode || 'CASH', // Default to CASH if not specified
             paymentMethod: paymentMethod,
-            cashAmount: (paymentMethod === 'SPLIT' ? cashAmount : (paymentMethod === 'CASH' ? total : 0)).toString(),
-            cardAmount: (paymentMethod === 'SPLIT' ? cardAmount : (['CREDIT_CARD', 'DEBIT_CARD', 'EBT'].includes(paymentMethod) ? total : 0)).toString(),
+            splitTenders: finalSplitTenders.length > 0 ? JSON.stringify(finalSplitTenders) : null,
+            cashAmount: finalCashAmt.toString(),
+            cardAmount: finalCardAmt.toString(),
             gatewayTxId: gatewayTxId || null,
             authCode: authCode || null,
             cardLast4: cardLast4 || null,
@@ -833,7 +871,12 @@ export async function GET(req: NextRequest) {
             where,
             include: {
                 client: true,
-                lineItems: true,
+                lineItems: {
+                    include: {
+                        service: true,
+                        product: true
+                    }
+                },
                 employee: {
                     select: {
                         id: true,

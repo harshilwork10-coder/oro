@@ -49,6 +49,7 @@ import {
 import { normalizeTransactionForPrint } from '@/lib/print-utils'
 import PaidInOutModal from '@/components/pos/PaidInOutModal'
 import NoSaleModal from '@/components/pos/NoSaleModal'
+import StoreEodModal from '@/components/pos/salon/StoreEodModal'
 import SalonLoyaltyCartTracker, { AppliedReward } from '@/components/pos/salon/SalonLoyaltyCartTracker'
 import CustomerProfileLoyaltyCard from '@/components/pos/salon/CustomerProfileLoyaltyCard'
 
@@ -167,6 +168,7 @@ function POSContent() {
     const [isLoading, setIsLoading] = useState(true)
     const [shift, setShift] = useState<any>(null)
     const [showShiftModal, setShowShiftModal] = useState(false)
+    const [showStoreEodModal, setShowStoreEodModal] = useState(false)
     const [denominations, setDenominations] = useState({
         hundreds: 0, fifties: 0, twenties: 0, tens: 0, fives: 0, ones: 0,
         quarters: 0, dimes: 0, nickels: 0, pennies: 0
@@ -975,17 +977,51 @@ function POSContent() {
         try {
             // Use override date or current filter date
             const dateStr = dateOverride || txDateFilter
-            const res = await fetch(`/api/pos/transaction?dateFrom=${dateStr}&dateTo=${dateStr}`)
-            if (!res.ok) {
-                console.error('Failed to fetch transactions:', res.status)
+            
+            const [txRes, drawerRes] = await Promise.all([
+                fetch(`/api/pos/transaction?dateFrom=${dateStr}&dateTo=${dateStr}`),
+                fetch(`/api/pos/drawer-activity?dateFrom=${dateStr}&dateTo=${dateStr}`)
+            ])
+
+            if (!txRes.ok) {
+                console.error('Failed to fetch transactions:', txRes.status)
                 setToast({ message: 'Failed to load transaction history', type: 'error' })
                 return
             }
-            const data = await res.json()
-            setTransactions(Array.isArray(data) ? data : [])
+            
+            const txData = await txRes.json()
+            let drawerData = []
+            
+            if (drawerRes.ok) {
+                drawerData = await drawerRes.json()
+            }
+
+            const transactionsList = Array.isArray(txData) ? txData : []
+            const drawerActivitiesList = Array.isArray(drawerData) ? drawerData : []
+
+            // Map drawer activities to transaction-like shape for the history feed
+            const mappedDrawerActivities = drawerActivitiesList.map((activity: any) => ({
+                id: activity.id,
+                isDrawerActivity: true, // Specific flag
+                status: 'COMPLETED',
+                type: activity.type, // PAID_IN, PAID_OUT, NO_SALE
+                total: activity.amount || 0,
+                createdAt: activity.createdAt,
+                paymentMethod: 'CASH', // Drawer activity affects cash
+                voidReason: activity.reason, // Repurpose voidReason for display
+                employee: activity.cashDrawerSession?.openedBy || { name: 'Cashier' },
+                client: null
+            }))
+
+            // Combine and sort by date descending
+            const combined = [...transactionsList, ...mappedDrawerActivities].sort((a, b) => 
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            )
+
+            setTransactions(combined)
         } catch (error) {
-            console.error('Failed to fetch transactions:', error)
-            setToast({ message: 'Failed to load transaction history', type: 'error' })
+            console.error('Failed to fetch history:', error)
+            setToast({ message: 'Failed to load history', type: 'error' })
         }
     }
 
@@ -1897,13 +1933,50 @@ function POSContent() {
                             ))}
                         </div>
 
-                        {/* Summary - Only show count, NOT expected (prevent theft) */}
-                        <div className="mt-4 p-3 bg-stone-800 rounded-xl">
-                            <div className="flex justify-between text-white font-bold text-lg">
-                                <span>Your Count:</span>
-                                <span className="text-emerald-400">${closingTotal.toFixed(2)}</span>
+                        {/* Summary Section */}
+                        <div className="mt-4 p-4 bg-stone-800 rounded-xl space-y-3">
+                            <div className="flex justify-between text-stone-300 text-sm">
+                                <span>Opening Amount:</span>
+                                <span>${(shift.startingCash || shift.openingAmount || 0).toFixed(2)}</span>
                             </div>
-                            <p className="text-stone-500 text-xs mt-2">Count all bills and submit. Manager will verify.</p>
+                            <div className="flex justify-between text-stone-300 text-sm">
+                                <span>Cash Sales:</span>
+                                <span className="text-emerald-400">+ ${(shift.cashSales || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-stone-300 text-sm">
+                                <span>Split Cash:</span>
+                                <span className="text-emerald-400">+ ${(shift.splitCash || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-stone-300 text-sm">
+                                <span>Cash Refunds:</span>
+                                <span className="text-orange-400">- ${(shift.cashRefunds || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-stone-300 text-sm">
+                                <span>Cash Drops:</span>
+                                <span className="text-orange-400">- ${(shift.cashDrops || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-stone-300 text-sm">
+                                <span>Paid In:</span>
+                                <span className="text-emerald-400">+ ${(shift.paidIn || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-stone-300 text-sm">
+                                <span>Paid Out:</span>
+                                <span className="text-orange-400">- ${(shift.paidOut || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="border-t border-stone-700 pt-2 flex justify-between text-white font-bold">
+                                <span>Expected Drawer:</span>
+                                <span>${(shift.expectedCash || expectedAmount).toFixed(2)}</span>
+                            </div>
+                            <div className="border-t border-stone-700 pt-2 flex justify-between text-emerald-400 font-bold text-lg">
+                                <span>Your Count:</span>
+                                <span>${closingTotal.toFixed(2)}</span>
+                            </div>
+                            {(closingTotal - (shift.expectedCash || expectedAmount)) !== 0 && (
+                                <div className={`flex justify-between text-sm font-bold ${isShort ? 'text-orange-400' : 'text-emerald-400'}`}>
+                                    <span>Variance:</span>
+                                    <span>{isShort ? '-' : '+'}${Math.abs(closingTotal - (shift.expectedCash || expectedAmount)).toFixed(2)}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -2174,14 +2247,27 @@ function POSContent() {
                                     </button>
                                 </div>
                             ) : (
-                                <button
-                                    onClick={() => setShowShiftModal(true)}
-                                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-colors flex items-center gap-2"
-                                    title={shift ? 'Close Shift' : 'Open Shift'}
-                                >
-                                    <DollarSign className="h-5 w-5" />
-                                    <span>{shift ? 'Close' : 'Open'}</span>
-                                </button>
+                                <>
+                                    <button
+                                        onClick={() => setShowShiftModal(true)}
+                                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-colors flex items-center gap-2"
+                                        title={shift ? 'Close Shift' : 'Open Shift'}
+                                    >
+                                        <DollarSign className="h-5 w-5" />
+                                        <span>{shift ? 'Close' : 'Open'}</span>
+                                    </button>
+                                    
+                                    {(isDrawerManager || isOwnerBypass) && (
+                                        <button
+                                            onClick={() => setShowStoreEodModal(true)}
+                                            className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold transition-colors flex items-center gap-2 shadow-lg shadow-amber-500/20"
+                                            title="Manager End of Day Z-Report"
+                                        >
+                                            <Lock className="h-5 w-5" />
+                                            <span className="hidden sm:inline">Store EOD</span>
+                                        </button>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
@@ -2358,21 +2444,41 @@ function POSContent() {
                                         const totalNum = parseFloat(String(tx.total))
                                         const isRefunded = tx.status === 'REFUNDED' || tx.status === 'PARTIALLY_REFUNDED'
                                         const isVoided = tx.status === 'VOIDED'
-                                        const isCompleted = tx.status === 'COMPLETED' && totalNum > 0
 
-                                        // Color scheme based on type
-                                        const iconBg = isRefunded ? 'bg-orange-500/10 text-orange-500'
-                                            : isVoided ? 'bg-yellow-500/10 text-yellow-500'
-                                                : 'bg-emerald-500/10 text-emerald-500'
-                                        const amountColor = isRefunded ? 'text-orange-400'
-                                            : isVoided ? 'text-yellow-400 line-through'
-                                                : 'text-emerald-400'
+                                        let iconBg = 'bg-emerald-500/10 text-emerald-500'
+                                        let amountColor = 'text-emerald-400'
+                                        let title = tx.client ? `${tx.client.firstName} ${tx.client.lastName}` : 'Walk-in Customer'
+                                        
+                                        if (tx.isDrawerActivity) {
+                                            if (tx.type === 'PAID_OUT') {
+                                                iconBg = 'bg-red-500/10 text-red-500'
+                                                amountColor = 'text-red-400'
+                                                title = 'Paid Out'
+                                            } else if (tx.type === 'PAID_IN') {
+                                                iconBg = 'bg-teal-500/10 text-teal-500'
+                                                amountColor = 'text-teal-400'
+                                                title = 'Paid In'
+                                            } else if (tx.type === 'NO_SALE') {
+                                                iconBg = 'bg-stone-500/10 text-stone-500'
+                                                amountColor = 'text-stone-400'
+                                                title = 'No Sale'
+                                            }
+                                        } else {
+                                           if (isRefunded) {
+                                                iconBg = 'bg-orange-500/10 text-orange-500'
+                                                amountColor = 'text-orange-400'
+                                           } else if (isVoided) {
+                                                iconBg = 'bg-yellow-500/10 text-yellow-500'
+                                                amountColor = 'text-yellow-400 line-through'
+                                           }
+                                        }
 
                                         return (
                                             <div
                                                 key={tx.id}
-                                                className="bg-stone-900 p-4 rounded-xl border border-stone-800 flex items-center justify-between hover:border-stone-700 transition-colors cursor-pointer"
+                                                className={`bg-stone-900 p-4 rounded-xl border border-stone-800 flex items-center justify-between hover:border-stone-700 transition-colors ${tx.isDrawerActivity ? 'cursor-default' : 'cursor-pointer'}`}
                                                 onClick={() => {
+                                                    if (tx.isDrawerActivity) return;
                                                     setSelectedTxForActions(tx)
                                                     setShowTransactionModal(true)
                                                 }}
@@ -2385,16 +2491,21 @@ function POSContent() {
                                                     </div>
                                                     <div>
                                                         <p className="font-medium text-white flex items-center gap-2">
-                                                            {tx.client ? `${tx.client.firstName} ${tx.client.lastName}` : 'Walk-in Customer'}
-                                                            {/* Status Badge */}
-                                                            {isRefunded && (
+                                                            {title}
+                                                            {/* Status Badges */}
+                                                            {isRefunded && !tx.isDrawerActivity && (
                                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-medium">
                                                                     REFUNDED
                                                                 </span>
                                                             )}
-                                                            {isVoided && (
+                                                            {isVoided && !tx.isDrawerActivity && (
                                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 font-medium">
                                                                     VOIDED
+                                                                </span>
+                                                            )}
+                                                            {tx.isDrawerActivity && (
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${tx.type === 'NO_SALE' ? 'bg-stone-500/20 text-stone-400' : 'bg-stone-800 text-stone-300'}`}>
+                                                                    DRAWER ACTIVITY
                                                                 </span>
                                                             )}
                                                         </p>
@@ -2402,8 +2513,8 @@ function POSContent() {
                                                             {new Date(tx.createdAt).toLocaleString()}
                                                             {tx.employee && <span className="ml-2 text-stone-600">• by {tx.employee.name || tx.employee.email}</span>}
                                                         </p>
-                                                        {/* Show reason for refunds/voids */}
-                                                        {(isRefunded || isVoided) && tx.voidReason && (
+                                                        {/* Show reason for refunds/voids or drawer activities */}
+                                                        {((isRefunded || isVoided || tx.isDrawerActivity) && tx.voidReason) && (
                                                             <p className="text-xs text-stone-600 mt-0.5 italic">
                                                                 Reason: {tx.voidReason}
                                                             </p>
@@ -2411,10 +2522,14 @@ function POSContent() {
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className={`font-bold ${amountColor}`}>
-                                                        {formatCurrency(Math.abs(totalNum))}
-                                                    </p>
-                                                    <p className="text-xs text-stone-500 uppercase">{tx.paymentMethod}</p>
+                                                    {tx.type !== 'NO_SALE' && (
+                                                        <>
+                                                            <p className={`font-bold ${amountColor}`}>
+                                                                {tx.type === 'PAID_OUT' ? '-' : ''}{formatCurrency(Math.abs(totalNum))}
+                                                            </p>
+                                                            <p className="text-xs text-stone-500 uppercase">{tx.paymentMethod}</p>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         )
@@ -4094,6 +4209,18 @@ function POSContent() {
                     setToast({ message: 'Transaction Complete!', type: 'success' })
                 }}
             />
+
+            {/* Manager Store End of Day */}
+            {showStoreEodModal && (
+                <StoreEodModal
+                    onClose={() => setShowStoreEodModal(false)}
+                    onComplete={(report) => {
+                        setShowStoreEodModal(false)
+                        // Trigger print in new window or UI
+                        window.open(`/api/pos/eod/print/${report.tzDate}?locationId=${report.locationId}`, '_blank')
+                    }}
+                />
+            )}
         </>
     )
 }
