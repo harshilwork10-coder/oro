@@ -17,6 +17,8 @@ interface LookupResult {
     found: boolean
     clientId?: string
     clientFirstName?: string
+    clientEmail?: string
+    hasEmail?: boolean
     liabilitySigned?: boolean
     loyaltyJoined?: boolean
     alreadyCheckedIn?: boolean
@@ -34,7 +36,7 @@ interface BrandTheme {
     bgGradient: string
 }
 
-type Step = 'phone' | 'confirm' | 'walkin' | 'newclient' | 'waiver' | 'loyalty' | 'success' | 'error'
+type Step = 'phone' | 'confirm' | 'walkin' | 'newclient' | 'email' | 'waiver' | 'loyalty' | 'success' | 'error'
 
 // ─── Phone Format Helper ───
 function formatPhone(raw: string): string {
@@ -67,6 +69,8 @@ export default function BrandQrCheckinPage() {
     const [phone, setPhone] = useState('')
     const [firstName, setFirstName] = useState('')
     const [lastName, setLastName] = useState('')
+    const [email, setEmail] = useState('')
+    const [hasEmail, setHasEmail] = useState(false)
     const [loading, setLoading] = useState(false)
     const [locationName, setLocationName] = useState('')
     const [locationId, setLocationId] = useState('')
@@ -150,6 +154,8 @@ export default function BrandQrCheckinPage() {
 
             if (data.clientId) setClientId(data.clientId)
             if (data.clientFirstName) setMaskedName(data.clientFirstName)
+            if (data.clientEmail) setEmail(data.clientEmail)
+            setHasEmail(data.hasEmail ?? false)
             setLiabilitySigned(data.liabilitySigned ?? false)
             setLoyaltyJoined(data.loyaltyJoined ?? false)
             setAlreadyCheckedIn(data.alreadyCheckedIn ?? false)
@@ -165,7 +171,9 @@ export default function BrandQrCheckinPage() {
                 setStep('confirm')
             } else {
                 // Go to waiver if not signed, otherwise loyalty, otherwise walkin
-                if (!data.liabilitySigned) {
+                if (!data.hasEmail) {
+                    setStep('email')
+                } else if (!data.liabilitySigned) {
                     setStep('waiver')
                 } else if (!data.loyaltyJoined) {
                     setStep('loyalty')
@@ -199,6 +207,7 @@ export default function BrandQrCheckinPage() {
                         ? `${firstName} ${lastName}`
                         : maskedName || 'Guest',
                     phone: digits,
+                    email,
                     locationId,
                     source: opts.source,
                     appointmentId: opts.appointmentId || null,
@@ -236,6 +245,8 @@ export default function BrandQrCheckinPage() {
                 setPhone('')
                 setFirstName('')
                 setLastName('')
+                setEmail('')
+                setHasEmail(false)
                 setAppointments([])
                 setMaskedName('')
                 setClientId('')
@@ -419,6 +430,7 @@ export default function BrandQrCheckinPage() {
                                         key={appt.id}
                                         onClick={() => {
                                             setSelectedAptId(appt.id)
+                                            if (!hasEmail) { setStep('email'); return }
                                             if (!liabilitySigned) { setStep('waiver'); return }
                                             if (!loyaltyJoined) { setStep('loyalty'); return }
                                             performCheckIn({
@@ -482,6 +494,7 @@ export default function BrandQrCheckinPage() {
 
                             <button
                                 onClick={() => {
+                                    if (!hasEmail) { setStep('email'); return }
                                     if (!liabilitySigned) { setStep('waiver'); return }
                                     if (!loyaltyJoined) { setStep('loyalty'); return }
                                     performCheckIn({ source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED' })
@@ -537,8 +550,58 @@ export default function BrandQrCheckinPage() {
                             </div>
 
                             <button
-                                onClick={() => setStep('waiver')}
+                                onClick={() => setStep('email')}
                                 disabled={!firstName.trim() || !lastName.trim()}
+                                className="w-full py-4 text-white rounded-2xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+                                style={{ background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})` }}
+                            >
+                                Continue
+                                <ChevronRight className="h-5 w-5" />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ─── EMAIL CAPTURE ─── */}
+                    {step === 'email' && (
+                        <div className="space-y-6">
+                            <button onClick={() => setStep('phone')} className="flex items-center gap-1 text-stone-500 hover:text-stone-300 transition-colors text-sm">
+                                <ArrowLeft className="h-4 w-4" /> Back
+                            </button>
+                            <div className="text-center">
+                                <h2 className="text-2xl font-bold text-stone-100 mb-1">Stay in touch</h2>
+                                <p className="text-stone-400">Please enter your email address for receipts</p>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-stone-500 uppercase tracking-wider mb-1.5">Email Address</label>
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={e => setEmail(e.target.value.trim())}
+                                        className="w-full text-lg p-4 bg-stone-900/60 border-2 border-stone-800 rounded-xl focus:ring-2 focus:border-stone-600 text-stone-100 placeholder-stone-700 transition-all outline-none"
+                                        style={{ '--tw-ring-color': theme.primaryColor } as React.CSSProperties}
+                                        placeholder="jane@example.com"
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    setHasEmail(true)
+                                    if (!liabilitySigned) {
+                                        setStep('waiver')
+                                    } else if (!loyaltyJoined) {
+                                        setStep('loyalty')
+                                    } else {
+                                        performCheckIn({ 
+                                            source: tokenParam ? 'QR_SCAN' : 'QR_SCAN_UNVERIFIED',
+                                            appointmentId: selectedAptId || undefined
+                                        })
+                                    }
+                                }}
+                                disabled={!email.includes('@') || !email.includes('.')}
                                 className="w-full py-4 text-white rounded-2xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
                                 style={{ background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})` }}
                             >

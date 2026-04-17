@@ -4,7 +4,7 @@
  * GET  /api/owner/location-settings - Get location settings (including googlePlaceId)
  * PATCH /api/owner/location-settings - Update location settings
  * 
- * Protected by session auth - requires OWNER role
+ * Protected by session auth
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -15,20 +15,25 @@ import { logActivity } from '@/lib/auditLog'
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req)
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        if (!user || !user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!user?.id) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        // Get locations
+        let franchiseId = user.franchiseId;
+        if (!franchiseId || franchiseId === '__SYSTEM__') {
+            // Need a way for Providers to know which franchise they are editing from Owner Dashboard context.
+            // If the provider is visiting /owner/settings, they should simulate a franchise context. Look for search params.
+            const url = new URL(req.url);
+            const queryFranchiseId = url.searchParams.get('franchiseId');
+            if (queryFranchiseId) {
+                franchiseId = queryFranchiseId;
+            } else {
+                // Return empty if we don't have a franchise context
+                return NextResponse.json({ locations: [] });
+            }
         }
 
-        // Get user with franchise → locations
-        if (!user?.franchiseId || !['OWNER', 'MANAGER'].includes(user.role)) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-        }
-
-        // Get the first location for this franchise
-        const location = await prisma.location.findFirst({
-            where: { franchiseId: user.franchiseId },
+        const locations = await prisma.location.findMany({
+            where: { franchiseId: franchiseId },
             select: {
                 id: true,
                 googlePlaceId: true,
@@ -37,9 +42,11 @@ export async function GET(req: NextRequest) {
         })
 
         return NextResponse.json({
-            locationId: location?.id || null,
-            locationName: location?.name || null,
-            googlePlaceId: location?.googlePlaceId || null
+            locations,
+            // Legacy fallbacks
+            locationId: locations[0]?.id || null,
+            locationName: locations[0]?.name || null,
+            googlePlaceId: locations[0]?.googlePlaceId || null
         })
     } catch (error) {
         console.error('[Location Settings GET] Error:', error)
@@ -49,24 +56,22 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: Request) {
     try {
-        if (!user?.id) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const user = await getAuthUser(req)
+        if (!user || !user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        if (!user?.franchiseId || !['OWNER', 'MANAGER'].includes(user.role)) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        if (user.role !== 'PROVIDER' && user.role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Forbidden. Only Provider can edit location settings.' }, { status: 403 })
         }
 
         const body = await req.json()
-        const { googlePlaceId } = body
+        const { googlePlaceId, locationId } = body
 
-        if (googlePlaceId !== undefined && typeof googlePlaceId !== 'string') {
-            return NextResponse.json({ error: 'Invalid googlePlaceId' }, { status: 400 })
+        if (!locationId) {
+            return NextResponse.json({ error: 'locationId is required' }, { status: 400 })
         }
 
-        // Update ALL locations for this franchise (same Place ID for the business)
-        const updated = await prisma.location.updateMany({
-            where: { franchiseId: user.franchiseId },
+        const updated = await prisma.location.update({
+            where: { id: locationId },
             data: {
                 googlePlaceId: googlePlaceId?.trim() || null
             }
@@ -75,18 +80,18 @@ export async function PATCH(req: Request) {
         // Audit log
         await logActivity({
             userId: user.id,
-            userEmail: user.email,
+            userEmail: user.email || 'unknown',
             userRole: user.role,
             action: 'LOCATION_SETTINGS_UPDATE',
             entityType: 'Location',
-            entityId: user.franchiseId,
-            metadata: { googlePlaceId: googlePlaceId?.trim() || null, locationsUpdated: updated.count }
+            entityId: locationId,
+            metadata: { googlePlaceId: googlePlaceId?.trim() || null }
         })
 
         return NextResponse.json({
             success: true,
-            updated: updated.count,
-            googlePlaceId: googlePlaceId?.trim() || null
+            locationId: updated.id,
+            googlePlaceId: updated.googlePlaceId
         })
     } catch (error) {
         console.error('[Location Settings PATCH] Error:', error)

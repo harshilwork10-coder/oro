@@ -21,6 +21,13 @@ export async function GET(req: NextRequest) {
             where: { franchiseId: user.franchiseId }
         })
 
+        const locations = await prisma.location.findMany({
+            where: { franchiseId: user.franchiseId, googlePlaceId: { not: null } },
+            select: { id: true, googlePlaceId: true }
+        })
+
+        const hasGooglePlaceId = locations.some(loc => loc.googlePlaceId && loc.googlePlaceId.trim().length > 0)
+
         if (!settings) {
             // Return defaults
             return NextResponse.json({
@@ -48,7 +55,8 @@ export async function GET(req: NextRequest) {
                 enableSmartRebooking: false,
                 // Visibility
                 enableBarberProfiles: true,
-                enableIndividualLinks: true
+                enableIndividualLinks: true,
+                hasGooglePlaceId
             })
         }
 
@@ -65,13 +73,15 @@ export async function GET(req: NextRequest) {
             noShowFeeType: settings.noShowFeeType,
             noShowFeeAmount: Number(settings.noShowFeeAmount),
             enableSmsReminders: settings.enableSmsReminders,
+            // If the provider clears the place ID, visually lock this to false and disabled in UI
             enableReviewBooster: settings.enableReviewBooster,
             enableMarketingCampaigns: settings.enableMarketingCampaigns,
             enableAutoPayroll: settings.enableAutoPayroll,
             enableRentCollection: settings.enableRentCollection,
             enableSmartRebooking: settings.enableSmartRebooking,
             enableBarberProfiles: settings.enableBarberProfiles,
-            enableIndividualLinks: settings.enableIndividualLinks
+            enableIndividualLinks: settings.enableIndividualLinks,
+            hasGooglePlaceId
         })
     } catch (error) {
         console.error('Error fetching feature settings:', error)

@@ -70,6 +70,7 @@ export async function POST(request: Request) {
                 id: true,
                 firstName: true,
                 lastName: true,
+                email: true,
                 liabilitySigned: true,
                 loyaltyJoined: true
             }
@@ -88,6 +89,15 @@ export async function POST(request: Request) {
         const maskedFirstName = client.firstName
             ? client.firstName.charAt(0) + '***'
             : '****'
+
+        // Mask email: show a***@gmail.com
+        let maskedEmail = null
+        if (client.email) {
+            const parts = client.email.split('@')
+            if (parts.length === 2) {
+                maskedEmail = `${parts[0].charAt(0)}***@${parts[1]}`
+            }
+        }
 
         // Find today's appointments at this location for this client
         const today = new Date()
@@ -143,6 +153,8 @@ export async function POST(request: Request) {
             found: true,
             clientId: client.id,
             clientFirstName: maskedFirstName,
+            clientEmail: maskedEmail,
+            hasEmail: !!client.email,
             liabilitySigned: client.liabilitySigned,
             loyaltyJoined: client.loyaltyJoined,
             alreadyCheckedIn: !!existingCheckIn,

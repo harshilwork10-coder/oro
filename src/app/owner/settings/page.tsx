@@ -25,10 +25,12 @@ export default function SettingsPage() {
     const [activeSection, setActiveSection] = useState<SettingsSection>('general');
     const router = useRouter();
     const isProvider = (session?.user as any)?.role === 'PROVIDER';
-    const [googlePlaceId, setGooglePlaceId] = useState('');
-    const [placeIdSaving, setPlaceIdSaving] = useState(false);
-    const [placeIdSaved, setPlaceIdSaved] = useState(false);
-    const [placeIdError, setPlaceIdError] = useState<string | null>(null);
+    
+    // Per-location state
+    const [locations, setLocations] = useState<any[]>([]);
+    const [savingPlaceId, setSavingPlaceId] = useState<string | null>(null);
+    const [savedPlaceId, setSavedPlaceId] = useState<string | null>(null);
+    const [placeIdErrors, setPlaceIdErrors] = useState<Record<string, string>>({});
 
     // Google Pointy state
     const [merchantId, setMerchantId] = useState('');
@@ -48,12 +50,17 @@ export default function SettingsPage() {
     const [menuSyncing, setMenuSyncing] = useState<string | null>(null);
     const [menuSyncResult, setMenuSyncResult] = useState<any>(null);
 
-    // Load existing Google Place ID
+    // Load existing Google Place IDs
     useEffect(() => {
         fetch('/api/owner/location-settings')
             .then(res => res.json())
             .then(data => {
-                if (data.googlePlaceId) setGooglePlaceId(data.googlePlaceId);
+                if (data.locations) {
+                    setLocations(data.locations);
+                } else if (data.locationId) {
+                    // Fallback to legacy single
+                    setLocations([{ id: data.locationId, name: data.locationName, googlePlaceId: data.googlePlaceId }]);
+                }
             })
             .catch(() => { });
 
@@ -115,25 +122,25 @@ export default function SettingsPage() {
         setPointySyncing(false);
     };
 
-    const handleSaveGooglePlaceId = async () => {
-        setPlaceIdSaving(true);
-        setPlaceIdError(null);
+    const handleSaveGooglePlaceId = async (locationId: string, targetPlaceId: string) => {
+        setSavingPlaceId(locationId);
+        setPlaceIdErrors(prev => ({ ...prev, [locationId]: '' }));
         try {
-            const res = await fetch('/api/owner/location-settings', {
+            const res = await fetch(isProvider ? `/api/admin/locations/${locationId}/settings` : '/api/owner/location-settings', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ googlePlaceId: googlePlaceId.trim() })
+                body: JSON.stringify({ locationId, googlePlaceId: targetPlaceId.trim() })
             });
             if (res.ok) {
-                setPlaceIdSaved(true);
-                setTimeout(() => setPlaceIdSaved(false), 3000);
+                setSavedPlaceId(locationId);
+                setTimeout(() => setSavedPlaceId(null), 3000);
             } else {
-                setPlaceIdError('Failed to save. Please try again.');
+                setPlaceIdErrors(prev => ({ ...prev, [locationId]: 'Failed to save. Please try again.' }));
             }
         } catch {
-            setPlaceIdError('Network error. Check your connection.');
+            setPlaceIdErrors(prev => ({ ...prev, [locationId]: 'Network error. Check your connection.' }));
         }
-        setPlaceIdSaving(false);
+        setSavingPlaceId(null);
     };
 
     const handleSectionClick = (sectionId: SettingsSection) => {
@@ -207,49 +214,76 @@ export default function SettingsPage() {
                                         <h3 className="font-semibold text-[var(--text-primary)]">Google Reviews</h3>
                                     </div>
                                     <p className="text-sm text-[var(--text-muted)] mb-3">
-                                        Enter your Google Place ID to enable review prompts on POS after checkout.
+                                        Google Place ID enables review prompts on POS after checkout.
                                         Customers who rate 4-5 stars will be guided to leave a Google Review.
                                     </p>
-                                    <div className="flex gap-2 items-start max-w-md">
-                                        <div className="flex-1">
-                                            <input
-                                                type="text"
-                                                value={googlePlaceId}
-                                                onChange={(e) => setGooglePlaceId(e.target.value)}
-                                                placeholder="e.g. ChIJN1t_tDeuEmsRUsoyG83frY4"
-                                                className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] text-sm"
-                                            />
-                                            {placeIdError && (
-                                                <p className="text-xs text-red-400 mt-1">{placeIdError}</p>
-                                            )}
-                                        </div>
-                                        <button
-                                            onClick={handleSaveGooglePlaceId}
-                                            disabled={placeIdSaving}
-                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${placeIdSaved
-                                                ? 'bg-green-600 text-white'
-                                                : 'bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white'
-                                                }`}
-                                        >
-                                            {placeIdSaving ? (
-                                                <><Loader2 size={14} className="animate-spin" /> Saving</>
-                                            ) : placeIdSaved ? (
-                                                <><Check size={14} /> Saved!</>
-                                            ) : (
-                                                'Save'
-                                            )}
-                                        </button>
+                                    
+                                    <div className="space-y-4 max-w-xl">
+                                        {locations.map(loc => (
+                                            <div key={loc.id} className="flex flex-col gap-1">
+                                                <div className="flex justify-between items-center px-1">
+                                                    <span className="text-sm font-medium text-[var(--text-primary)]">{loc.name}</span>
+                                                    {placeIdErrors[loc.id] && <span className="text-xs text-red-400">{placeIdErrors[loc.id]}</span>}
+                                                </div>
+                                                
+                                                {isProvider ? (
+                                                    <div className="flex gap-2 items-start">
+                                                        <input
+                                                            type="text"
+                                                            value={loc.googlePlaceId || ''}
+                                                            onChange={(e) => {
+                                                                const newLocs = [...locations];
+                                                                const idx = newLocs.findIndex(l => l.id === loc.id);
+                                                                newLocs[idx].googlePlaceId = e.target.value;
+                                                                setLocations(newLocs);
+                                                            }}
+                                                            placeholder="e.g. ChIJN1t_tDeuEmsRUsoyG83frY4"
+                                                            className="flex-1 bg-[var(--surface)] border border-[var(--border)] rounded-lg py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] text-sm"
+                                                        />
+                                                        <button
+                                                            onClick={() => handleSaveGooglePlaceId(loc.id, loc.googlePlaceId || '')}
+                                                            disabled={savingPlaceId === loc.id}
+                                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${savedPlaceId === loc.id
+                                                                ? 'bg-green-600 text-white'
+                                                                : 'bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white'
+                                                                }`}
+                                                        >
+                                                            {savingPlaceId === loc.id ? (
+                                                                <><Loader2 size={14} className="animate-spin" /> Saving</>
+                                                            ) : savedPlaceId === loc.id ? (
+                                                                <><Check size={14} /> Saved!</>
+                                                            ) : (
+                                                                'Save'
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
+                                                        <div>
+                                                            <p className="text-sm text-[var(--text-primary)]">
+                                                                {loc.googlePlaceId ? `Configured (ID: ${loc.googlePlaceId})` : "Not configured"}
+                                                            </p>
+                                                            <p className="text-xs text-[var(--text-muted)] mt-0.5">Managed by Provider</p>
+                                                        </div>
+                                                        <Lock size={16} className="text-stone-500" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                    <p className="text-xs text-[var(--text-muted)] mt-2">
-                                        <a
-                                            href="https://developers.google.com/maps/documentation/places/web-service/place-id"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-[var(--primary)] hover:underline"
-                                        >
-                                            How to find your Google Place ID →
-                                        </a>
-                                    </p>
+                                    
+                                    {isProvider && (
+                                        <p className="text-xs text-[var(--text-muted)] mt-4">
+                                            <a
+                                                href="https://developers.google.com/maps/documentation/places/web-service/place-id"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-[var(--primary)] hover:underline"
+                                            >
+                                                How to find Google Place IDs →
+                                            </a>
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         )}

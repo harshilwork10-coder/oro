@@ -25,8 +25,8 @@ export async function POST(request: Request) {
         const deviceId = body.deviceId || null
         const qrTokenId = body.qrTokenId || null
 
-        if (!name || !phone) {
-            return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 })
+        if (!name || !phone || !email || email.trim() === '') {
+            return NextResponse.json({ error: 'Name, phone, and email are required' }, { status: 400 })
         }
 
         // ═══ LOCATION SAFETY: Require locationId — never guess ═══

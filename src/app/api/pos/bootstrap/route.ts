@@ -241,7 +241,8 @@ async function buildBootstrapResponse(
         highContrast: location.highContrast || false,
 
         // Google Reviews
-        googlePlaceId: location.googlePlaceId || null
+        googlePlaceId: location.googlePlaceId || null,
+        enableReviewBooster: !!location.googlePlaceId && (location.franchise?.settings?.enableReviewBooster || false)
     }
 
     // ═══════════════════════════════════════════════════════════════════

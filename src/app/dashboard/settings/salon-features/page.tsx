@@ -279,10 +279,11 @@ export default function SalonFeaturesPage() {
                         <FeatureToggle
                             title="Google Reviews Booster"
                             description="Auto-request 5-star reviews from happy clients"
-                            enabled={false}
-                            onChange={() => {}}
+                            enabled={(settings as any).hasGooglePlaceId ? settings.enableReviewBooster : false}
+                            onChange={(v) => updateSetting('enableReviewBooster', v)}
                             icon={<Star className="h-5 w-5" />}
-                            comingSoon
+                            disabled={!(settings as any).hasGooglePlaceId}
+                            badge={!(settings as any).hasGooglePlaceId ? "Needs Place ID" : undefined}
                         />
                         <FeatureToggle
                             title="Marketing Campaigns"

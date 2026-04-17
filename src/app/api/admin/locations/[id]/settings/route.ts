@@ -38,12 +38,15 @@ export async function GET(
     }
 }
 
-// PUT - Update location-specific settings
-export async function PUT(
+// PATCH - Update location-specific settings
+export async function PATCH(
     request: NextRequest,
     { params }: { params: { id: string } }
 ) {
     try {
+        const user = await getAuthUser(request)
+        if (!user || !user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
         const body = await request.json()
         const location = await prisma.location.update({
             where: { id: params.id },
@@ -53,7 +56,7 @@ export async function PUT(
         // Audit log
         await logActivity({
             userId: user.id,
-            userEmail: user.email!,
+            userEmail: user.email || 'unknown',
             userRole: user.role || 'PROVIDER',
             action: 'LOCATION_SETTINGS_UPDATE',
             entityType: 'Location',
