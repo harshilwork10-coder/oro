@@ -234,6 +234,31 @@ export async function PUT(request: Request) {
         })
 
         if (service.count === 0) {
+            // Check if they are editing a GlobalService
+            const globalCheck = await prisma.globalService.findUnique({ where: { id }})
+            if (globalCheck) {
+                // Apply update as LocationServiceOverrides for all locations in this franchise
+                const locations = await prisma.location.findMany({ where: { franchiseId: user.franchiseId }})
+                for (const loc of locations) {
+                    if (!loc.canCustomizePricing) continue // Enforce store-level lock dynamically
+
+                    const overrideData = {
+                        globalServiceId: id,
+                        locationId: loc.id,
+                        price: baseCashPrice,
+                        cashPrice: baseCashPrice,
+                        cardPrice: calculatedCardPrice
+                    }
+
+                    await prisma.locationServiceOverride.upsert({
+                        where: { globalServiceId_locationId: { globalServiceId: id, locationId: loc.id } },
+                        create: overrideData,
+                        update: overrideData
+                    })
+                }
+                return NextResponse.json({ success: true, message: 'Updated global overrides for franchise locations' })
+            }
+
             return NextResponse.json({ error: 'Service not found' }, { status: 404 })
         }
 

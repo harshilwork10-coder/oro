@@ -195,16 +195,6 @@ export default function ServicesPage() {
 
     return (
         <div className="p-8 bg-stone-950 min-h-screen">
-            {/* Franchise vs Multi-Store Badge */}
-            {isFranchise && (
-                <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3">
-                    <Lock className="h-5 w-5 text-amber-400" />
-                    <div>
-                        <p className="text-amber-200 font-semibold">Managed by {franchiseName || 'Franchisor'}</p>
-                        <p className="text-amber-400/70 text-sm">Menu is controlled by headquarters. Contact your franchisor for changes.</p>
-                    </div>
-                </div>
-            )}
 
             <div className="flex items-center justify-between mb-6">
                 <div>
@@ -267,16 +257,16 @@ export default function ServicesPage() {
                                     {service.serviceCategory?.name || service.category || 'UNCATEGORIZED'}
                                 </p>
                             </div>
-                            {!isFranchise && (
-                                <div className="flex gap-2">
-                                    <button onClick={() => openEdit(service)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-orange-400">
-                                        <Edit className="h-4 w-4" />
-                                    </button>
+                            <div className="flex gap-2">
+                                <button onClick={() => openEdit(service)} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-orange-400">
+                                    <Edit className="h-4 w-4" />
+                                </button>
+                                {!isFranchise && (
                                     <button onClick={() => setDeleteConfirm({ type: 'service', id: service.id, name: service.name })} className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-red-400">
                                         <Trash2 className="h-4 w-4" />
                                     </button>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                         {service.description && <p className="text-sm text-stone-400 mb-4">{service.description}</p>}
                         <div className="flex justify-between items-center">
