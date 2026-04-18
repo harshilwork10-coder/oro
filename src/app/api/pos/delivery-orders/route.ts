@@ -18,7 +18,8 @@ export async function POST(req: NextRequest) {
         const total = items.reduce((s: number, i: any) => s + (i.price * i.quantity), 0)
         const order = await prisma.transaction.create({
             data: {
-                locationId: user.locationId, employeeId: user.id,
+                franchiseId: user.franchiseId, stationId: user.stationId || undefined,
+                locationId: user.locationId || undefined, employeeId: user.id,
                 type: type === 'DELIVERY' ? 'DELIVERY' : 'PICKUP', status: 'ORDER_PLACED',
                 subtotal: total, total, paymentMethod: 'PENDING',
                 notes: JSON.stringify({ customerName, customerPhone, customerAddress, scheduledTime, notes, orderType: type, statusHistory: [{ status: 'ORDER_PLACED', time: new Date(), by: user.name }] }),

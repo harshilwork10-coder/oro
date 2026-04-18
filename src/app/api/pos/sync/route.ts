@@ -7,6 +7,7 @@ import {
     DEFAULT_PAYOUT_CONFIG
 } from '@/lib/payoutEngine'
 import { computePromotionsSafe } from '@/lib/pos/promotionEngine'
+import { resolveTransactionLocation } from '@/lib/transactions/locationResolver'
 import { z } from 'zod'
 
 // Shared type for queue sync result
@@ -199,9 +200,18 @@ export async function POST(req: NextRequest) {
 
                     const payoutResult = calculateTransactionPayouts(lineItemInputs, tx.tip, payoutConfig, getBusinessDate())
 
+                    const { locationId: resolvedLocationId, stationId: resolvedStationId } = await resolveTransactionLocation({
+                        franchiseId: user.franchiseId,
+                        employeeId: user.id,
+                        stationId: tx.stationId || undefined,
+                        cashDrawerSessionId: tx.cashDrawerSessionId || undefined,
+                    })
+
                     const newTx = await db.transaction.create({
                         data: {
                             franchiseId: user.franchiseId,
+                            locationId: resolvedLocationId,
+                            stationId: resolvedStationId,
                             invoiceNumber: invoiceNum,
                             employeeId: user.id,
                             clientId: tx.customerId || null,

@@ -25,6 +25,7 @@ import {
     ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
+import { LocationSwitcher } from '@/components/reports/LocationSwitcher'
 
 interface ReportLink {
     name: string
@@ -459,6 +460,7 @@ export default function ReportsPage() {
                     </h1>
                     <p className="text-stone-500 mt-1 ml-14">Click any category to see all reports</p>
                 </div>
+                <div className="hidden sm:block"><LocationSwitcher /></div>
             </div>
 
             {/* Quick Access */}

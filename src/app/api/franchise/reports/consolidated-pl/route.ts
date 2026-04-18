@@ -1,19 +1,22 @@
+import { getReportScope } from '@/lib/reporting/report-scope'
 import { getAuthUser } from '@/lib/auth/mobileAuth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 
 /** Consolidated P&L — Multi-location profit/loss report (Owner+ only) */
 export async function GET(req: NextRequest) {
-    const user = await getAuthUser(req)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!['PROVIDER', 'FRANCHISOR', 'FRANCHISEE', 'OWNER'].includes(user.role)) return NextResponse.json({ error: 'Owner+ only' }, { status: 403 })
+    let scope;
+    try {
+        scope = await getReportScope(req);
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message || 'Unauthorized' }, { status: 401 })
+    }
 
-    const { searchParams } = new URL(req.url)
-    const days = parseInt(searchParams.get('days') || '30')
-    const since = new Date(Date.now() - days * 86400000)
+    const { franchiseId, locationFilter, startDate: since } = scope;
+    const days = 30; // Legacy param compat handled in UI if needed, for P&L we want exact
 
     try {
-        const locations = await prisma.location.findMany({ where: { franchiseId: user.franchiseId }, select: { id: true, name: true } })
+        const locations = await prisma.location.findMany({ where: { franchiseId, ...locationFilter }, select: { id: true, name: true } })
         const locationResults = []
 
         for (const location of locations) {

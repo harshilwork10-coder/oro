@@ -20,7 +20,8 @@ export async function POST(req: NextRequest) {
 
         const layaway = await prisma.transaction.create({
             data: {
-                locationId: user.locationId, employeeId: user.id, type: 'LAYAWAY', status: 'LAYAWAY_ACTIVE',
+                franchiseId: user.franchiseId, stationId: user.stationId || undefined,
+                locationId: user.locationId || undefined, employeeId: user.id, type: 'LAYAWAY', status: 'LAYAWAY_ACTIVE',
                 subtotal: totalPrice, total: totalPrice, paymentMethod: 'LAYAWAY',
                 notes: JSON.stringify({ customerName, customerPhone, depositAmount, balance, dueDate, notes, payments: [{ date: new Date(), amount: depositAmount, method: 'CASH' }] }),
                 items: { create: items.map((item: any) => ({ itemId: item.id, name: item.name, quantity: item.quantity || 1, unitPrice: item.price, total: item.price * (item.quantity || 1) })) }

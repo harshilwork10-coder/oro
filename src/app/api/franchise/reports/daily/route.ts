@@ -1,66 +1,25 @@
 import { NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/mobileAuth'
+import { getReportScope } from '@/lib/reporting/report-scope'
 import { prismaReadonly as prisma } from '@/lib/prisma-readonly'
 
 export async function GET(request: Request) {
-    const authUser = await getAuthUser(request)
-        if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    if (!authUser?.email) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    let scope;
+    try {
+        scope = await getReportScope(request);
+    } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 401 })
     }
-
-    const user = await prisma.user.findUnique({
-        where: { email: authUser.email },
-        include: { franchise: true }
-    })
-
-    if (!user?.franchiseId) {
-        return NextResponse.json({ error: 'Franchise not found' }, { status: 404 })
-    }
-
-    const { searchParams } = new URL(request.url)
-
-    // Support date range (startDate, endDate) or single date
-    const startDateParam = searchParams.get('startDate')
-    const endDateParam = searchParams.get('endDate')
-    const dateParam = searchParams.get('date')
-
-    let startOfDay: Date
-    let endOfDay: Date
-
-    if (startDateParam && endDateParam) {
-        // Date range mode
-        startOfDay = new Date(startDateParam)
-        startOfDay.setHours(0, 0, 0, 0)
-        endOfDay = new Date(endDateParam)
-        endOfDay.setHours(23, 59, 59, 999)
-    } else {
-        // Single date mode (backwards compatible)
-        const date = dateParam ? new Date(dateParam) : new Date()
-        startOfDay = new Date(date)
-        startOfDay.setHours(0, 0, 0, 0)
-        endOfDay = new Date(date)
-        endOfDay.setHours(23, 59, 59, 999)
-    }
-
-    // Optional location filter
-    const locationId = searchParams.get('locationId')
 
     try {
         // Build where clause
         const whereClause: any = {
-            franchiseId: user.franchiseId,
+            franchiseId: scope.franchiseId,
+            ...scope.locationFilter,
             createdAt: {
-                gte: startOfDay,
-                lte: endOfDay
+                gte: scope.startDate,
+                lte: scope.endDate
             },
             status: 'COMPLETED'
-        }
-
-        // Add location filter if specified
-        if (locationId) {
-            whereClause.locationId = locationId
         }
 
         // Fetch all transactions for the date range
