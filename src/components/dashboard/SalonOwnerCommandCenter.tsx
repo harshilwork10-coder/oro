@@ -1,383 +1,473 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
-    Store, DollarSign, AlertTriangle, Users, BookOpen,
-    TrendingUp, TrendingDown, RefreshCw, BarChart3,
-    ArrowRight, MapPin, Sparkles, AlertCircle, Scissors, UserPlus,
-    Calendar, Trophy, Lock
+    Sparkles, DollarSign, Store, BookOpen, Users, Scissors,
+    Calendar, Trophy, UserPlus, BarChart3, MapPin,
+    TrendingUp, TrendingDown, Heart, Star, Repeat, PieChart
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
-interface LocationSummary {
-    id: string
-    name: string
-    todaySales: number
-    transactions: number
-    cash: number
-    card: number
-    appointments: number // Added for salon
-    activeStaff: number
-    status: 'active' | 'warning' | 'idle'
-}
+import DashboardShell from './command-center/DashboardShell'
+import CommandHeader from './command-center/CommandHeader'
+import KpiStrip from './command-center/KpiStrip'
+import AlertRail from './command-center/AlertRail'
+import type { ExceptionItem } from './command-center/AlertRail'
+import QuickActionsPanel from './command-center/QuickActionsPanel'
+import WorkspaceTabs from './command-center/WorkspaceTabs'
+import LocationPerformanceGrid from './command-center/LocationPerformanceGrid'
+import type { LocationRow } from './command-center/LocationPerformanceGrid'
+import DrawerPanel from './command-center/DrawerPanel'
 
-interface Exception {
-    id: string
-    type: string
-    severity: string
-    title: string
-    description: string
-    locationName: string
-    createdAt: string
-}
-
+// ─── Types ──────────────────────────────────────────────
 interface DashboardData {
-    locations: LocationSummary[]
+    locations: LocationRow[]
     summary: {
         totalLocations: number
         todaySales: number
         yesterdaySales: number
         weekSales: number
         todayTransactions: number
-        appointmentsToday: number // Added for salon
+        appointmentsToday: number
         topLocation: string | null
+        avgTicket: number
     }
-    exceptions: Exception[]
-    exceptionCounts: {
-        critical: number
-        warning: number
-        info: number
-        total: number
-    }
+    exceptions: ExceptionItem[]
+    exceptionCounts: { critical: number; warning: number; info: number; total: number }
 }
+
+// ─── Inline Financial Report ────────────────────────────
+function FinancialSnapshot({ data }: { data: DashboardData | null }) {
+    const locs = data?.locations || []
+    const totalCash = locs.reduce((s, l) => s + l.cash, 0)
+    const totalCard = locs.reduce((s, l) => s + l.card, 0)
+    const totalSales = data?.summary?.todaySales || 0
+    const txns = data?.summary?.todayTransactions || 0
+    const avgTicket = txns > 0 ? totalSales / txns : 0
+    const cashPct = totalSales > 0 ? (totalCash / totalSales * 100) : 0
+
+    return (
+        <div className="space-y-5">
+            {/* Revenue breakdown */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Total Revenue</p>
+                    <p className="text-2xl font-black text-emerald-400">{formatCurrency(totalSales)}</p>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Avg Ticket</p>
+                    <p className="text-2xl font-black text-white">{formatCurrency(avgTicket)}</p>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Cash</p>
+                    <p className="text-2xl font-black text-emerald-400">{formatCurrency(totalCash)}</p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">{cashPct.toFixed(0)}% of total</p>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Card</p>
+                    <p className="text-2xl font-black text-blue-400">{formatCurrency(totalCard)}</p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">{(100 - cashPct).toFixed(0)}% of total</p>
+                </div>
+            </div>
+
+            {/* Cash vs Card bar */}
+            <div>
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-stone-400">Payment Mix</span>
+                    <span className="text-xs text-stone-500">{txns} transactions today</span>
+                </div>
+                <div className="h-3 rounded-full bg-stone-800 overflow-hidden flex">
+                    <div className="h-full bg-emerald-500 rounded-l-full transition-all" style={{ width: `${cashPct}%` }} />
+                    <div className="h-full bg-blue-500 rounded-r-full transition-all" style={{ width: `${100 - cashPct}%` }} />
+                </div>
+                <div className="flex justify-between mt-1.5">
+                    <span className="text-[10px] text-emerald-400 font-medium">Cash {cashPct.toFixed(0)}%</span>
+                    <span className="text-[10px] text-blue-400 font-medium">Card {(100 - cashPct).toFixed(0)}%</span>
+                </div>
+            </div>
+
+            {/* Per-location revenue table */}
+            <div>
+                <h4 className="text-sm font-bold text-stone-300 mb-3">Revenue by Location</h4>
+                <div className="space-y-2">
+                    {(data?.locations || [])
+                        .sort((a, b) => b.todaySales - a.todaySales)
+                        .map(loc => {
+                            const pct = totalSales > 0 ? (loc.todaySales / totalSales * 100) : 0
+                            return (
+                                <div key={loc.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-white truncate">{loc.name}</p>
+                                        <div className="mt-1 h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                                            <div className="h-full rounded-full bg-gradient-to-r from-[var(--theme-accent)] to-[var(--theme-accent-light)] transition-all"
+                                                 style={{ width: `${pct}%` }} />
+                                        </div>
+                                    </div>
+                                    <div className="text-right flex-shrink-0">
+                                        <p className="text-sm font-bold text-emerald-400">{formatCurrency(loc.todaySales)}</p>
+                                        <p className="text-[10px] text-stone-500">{pct.toFixed(0)}%</p>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                </div>
+            </div>
+
+            {/* Week comparison */}
+            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">This Week</p>
+                        <p className="text-xl font-black text-white">{formatCurrency(data?.summary?.weekSales || 0)}</p>
+                    </div>
+                    <Link href="/dashboard/reports" className="text-xs font-semibold text-[var(--theme-accent)] hover:underline">
+                        Full Reports →
+                    </Link>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─── Client Retention Tab ──────────────────────────────
+function ClientRetentionTab() {
+    return (
+        <div className="space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Rebook Rate</p>
+                    <p className="text-2xl font-black text-white">—</p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">Coming soon</p>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">30d Retention</p>
+                    <p className="text-2xl font-black text-white">—</p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">Coming soon</p>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">At-Risk Clients</p>
+                    <p className="text-2xl font-black text-amber-400">—</p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">No visit in 60d+</p>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">New Clients</p>
+                    <p className="text-2xl font-black text-emerald-400">—</p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">This week</p>
+                </div>
+            </div>
+            <div className="bg-white/[0.03] rounded-xl p-6 border border-white/[0.06] text-center">
+                <Heart className="h-10 w-10 mx-auto mb-3 text-stone-600" />
+                <p className="font-semibold text-stone-300">Client Retention Analytics</p>
+                <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
+                    Rebooking rates, at-risk client alerts, and retention campaigns will be populated as client history data grows.
+                </p>
+                <Link href="/dashboard/customers" className="inline-block mt-4 text-sm font-semibold text-[var(--theme-accent)] hover:underline">
+                    View Client Roster →
+                </Link>
+            </div>
+        </div>
+    )
+}
+
+// ─── Staff Talent Tab ──────────────────────────────────
+function StaffTalentTab({ locations }: { locations: LocationRow[] }) {
+    const totalStaff = locations.reduce((s, l) => s + l.activeStaff, 0)
+
+    return (
+        <div className="space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Total On Floor</p>
+                    <p className="text-2xl font-black text-white">{totalStaff}</p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">Across all studios</p>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Revenue / Staff</p>
+                    <p className="text-2xl font-black text-emerald-400">
+                        {totalStaff > 0
+                            ? formatCurrency(locations.reduce((s, l) => s + l.todaySales, 0) / totalStaff)
+                            : '$0'}
+                    </p>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Locations</p>
+                    <p className="text-2xl font-black text-white">{locations.length}</p>
+                </div>
+            </div>
+
+            {/* Per-location staff */}
+            <div>
+                <h4 className="text-sm font-bold text-stone-300 mb-3">Staff Distribution</h4>
+                <div className="space-y-2">
+                    {locations.map(loc => (
+                        <div key={loc.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                            <div className="flex items-center gap-3">
+                                <Users className="h-4 w-4 text-stone-500" />
+                                <span className="text-sm font-semibold text-white">{loc.name}</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm font-bold text-white">{loc.activeStaff} staff</span>
+                                <span className="text-xs text-stone-500">
+                                    {loc.activeStaff > 0 ? formatCurrency(loc.todaySales / loc.activeStaff) : '$0'}/person
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <Link href="/dashboard/employees" className="block text-center text-sm font-semibold text-[var(--theme-accent)] hover:underline py-3">
+                Manage All Talent & Commissions →
+            </Link>
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════
 
 export default function SalonOwnerCommandCenter() {
     const { data: session } = useSession()
     const [data, setData] = useState<DashboardData | null>(null)
     const [loading, setLoading] = useState(true)
-    const [lastRefresh, setLastRefresh] = useState(new Date())
+    const [drawerLocation, setDrawerLocation] = useState<string | null>(null)
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true)
         try {
-            // Fetch multi-store data
-            const storeRes = await fetch('/api/dashboard/multi-store')
+            const [storeRes, exRes] = await Promise.all([
+                fetch('/api/dashboard/multi-store'),
+                fetch('/api/owner/exceptions'),
+            ])
             const storeData = await storeRes.json()
-
-            // Fetch exceptions
-            const exRes = await fetch('/api/owner/exceptions')
             const exData = await exRes.json()
 
-            // Transform data for Salon View
-            const locations = storeData.locations?.map((loc: any) => {
-                const hasSales = (loc.today.sales || 0) > 0 || (loc.today.transactions || 0) > 0
-                const hasStaffIssues = (loc.staff.count || 0) === 0
-                const status: 'active' | 'warning' | 'idle' =
-                    hasSales ? 'active'
-                    : hasStaffIssues ? 'warning'
-                    : 'idle'
+            const locations: LocationRow[] = (storeData.locations || []).map((loc: any) => {
+                const hasSales = (loc.today?.sales || 0) > 0 || (loc.today?.transactions || 0) > 0
+                const hasStaffIssues = (loc.staff?.count || 0) === 0
                 return {
                     id: loc.location.id,
                     name: loc.location.name,
-                    todaySales: loc.today.sales,
-                    transactions: loc.today.transactions,
-                    appointments: Math.floor((loc.today.transactions || 0) * 1.5), // Simulated if missing from backend
-                    cash: loc.today.cash,
-                    card: loc.today.card,
-                    activeStaff: loc.staff.count,
-                    status,
+                    todaySales: loc.today?.sales || 0,
+                    transactions: loc.today?.transactions || 0,
+                    appointments: Math.floor((loc.today?.transactions || 0) * 1.5),
+                    cash: loc.today?.cash || 0,
+                    card: loc.today?.card || 0,
+                    activeStaff: loc.staff?.count || 0,
+                    status: hasSales ? 'active' as const : hasStaffIssues ? 'warning' as const : 'idle' as const,
                 }
-            }) || []
+            })
+
+            const totalSales = storeData.summary?.todaySales || 0
+            const txns = storeData.summary?.todayTransactions || 0
 
             setData({
                 locations,
                 summary: {
                     totalLocations: storeData.summary?.totalLocations || locations.length,
-                    todaySales: storeData.summary?.todaySales || 0,
+                    todaySales: totalSales,
                     yesterdaySales: storeData.summary?.yesterdaySales || 0,
                     weekSales: storeData.summary?.mtdSales || 0,
-                    todayTransactions: storeData.summary?.todayTransactions || 0,
-                    appointmentsToday: locations.reduce((sum: number, loc: any) => sum + (loc.appointments || 0), 0),
-                    topLocation: storeData.summary?.topLocation
+                    todayTransactions: txns,
+                    appointmentsToday: locations.reduce((s, l) => s + (l.appointments || 0), 0),
+                    topLocation: storeData.summary?.topLocation,
+                    avgTicket: txns > 0 ? totalSales / txns : 0,
                 },
-                exceptions: exData.exceptions?.slice(0, 5) || [],
-                exceptionCounts: exData.counts || { critical: 0, warning: 0, info: 0, total: 0 }
+                exceptions: (exData.exceptions || []).slice(0, 10).map((ex: any) => ({
+                    ...ex,
+                    severity: ex.severity || 'WARNING',
+                })),
+                exceptionCounts: exData.counts || { critical: 0, warning: 0, info: 0, total: 0 },
             })
         } catch (error) {
-            console.error('Failed to fetch dashboard data:', error)
+            console.error('Failed to fetch dashboard:', error)
         } finally {
             setLoading(false)
-            setLastRefresh(new Date())
         }
-    }
+    }, [])
 
     useEffect(() => {
         fetchData()
-        const interval = setInterval(fetchData, 60000) // Refresh every minute
+        const interval = setInterval(fetchData, 60000)
         return () => clearInterval(interval)
-    }, [])
+    }, [fetchData])
 
     const vsYesterday = data?.summary?.yesterdaySales
         ? ((data.summary.todaySales - data.summary.yesterdaySales) / data.summary.yesterdaySales * 100)
         : 0
-    const isUp = vsYesterday >= 0
+
+    const selectedLocation = data?.locations.find(l => l.id === drawerLocation)
+
+    // ─── Loading ──────────
+    if (loading && !data) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: 'var(--theme-accent)' }} />
+            </div>
+        )
+    }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#0a0a0c] via-[#120f1a] to-[#0a0a0c] text-white p-6 relative overflow-hidden">
-            {/* Ambient Background Glows */}
-            <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-violet-600/10 blur-[120px] rounded-full pointer-events-none"></div>
-            <div className="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-fuchsia-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+        <>
+            <DashboardShell
+                header={
+                    <CommandHeader
+                        title="Salon Command Center"
+                        subtitle={`${data?.summary?.totalLocations || 0} studios · ${session?.user?.name?.split(' ')[0] || ''}`}
+                        icon={Sparkles}
+                        roleBadge="Independent Owner"
+                        onRefresh={fetchData}
+                        refreshing={loading}
+                    />
+                }
+                kpiStrip={
+                    <KpiStrip
+                        columns={5}
+                        kpis={[
+                            {
+                                title: 'Services Revenue',
+                                value: formatCurrency(data?.summary?.todaySales || 0),
+                                icon: DollarSign,
+                                variant: 'success',
+                                trend: { value: vsYesterday, label: 'vs yesterday' },
+                                pulse: true,
+                            },
+                            {
+                                title: 'Active Studios',
+                                value: data?.summary?.totalLocations || 0,
+                                subtitle: `${(data?.locations || []).filter(l => l.status === 'active').length} booking now`,
+                                icon: Store,
+                                variant: 'accent',
+                            },
+                            {
+                                title: 'Appointments Today',
+                                value: data?.summary?.appointmentsToday || 0,
+                                subtitle: `Avg ${formatCurrency(data?.summary?.avgTicket || 0)} ticket`,
+                                icon: BookOpen,
+                            },
+                            {
+                                title: 'Talent On Floor',
+                                value: data?.locations?.reduce((s, l) => s + l.activeStaff, 0) || 0,
+                                subtitle: 'Across all locations',
+                                icon: Users,
+                            },
+                            {
+                                title: 'Open Alerts',
+                                value: data?.exceptionCounts?.total || 0,
+                                subtitle: data?.exceptionCounts?.critical
+                                    ? `${data.exceptionCounts.critical} critical`
+                                    : 'All clear',
+                                icon: Sparkles,
+                                variant: (data?.exceptionCounts?.critical || 0) > 0 ? 'danger'
+                                    : (data?.exceptionCounts?.warning || 0) > 0 ? 'warning'
+                                    : 'success',
+                            },
+                        ]}
+                    />
+                }
+                alertRail={
+                    <AlertRail
+                        exceptions={data?.exceptions || []}
+                        emptyTitle="All studios running smoothly"
+                        emptySubtitle="No voids, no-shows, or critical overrides detected"
+                        onViewAll={() => window.location.href = '/dashboard/owner/exceptions'}
+                    />
+                }
+                quickActions={
+                    <QuickActionsPanel
+                        title="Growth Hub"
+                        actions={[
+                            { label: 'Salon POS', sublabel: 'New sale', icon: DollarSign, href: '/dashboard/pos/salon', color: 'bg-emerald-500/15', iconColor: 'text-emerald-400' },
+                            { label: 'Beauty Loop', sublabel: 'Loyalty setup', icon: Trophy, href: '/dashboard/owner/salon-loyalty', color: 'bg-violet-500/15', iconColor: 'text-violet-400' },
+                            { label: 'Client Roster', sublabel: 'View history', icon: UserPlus, href: '/dashboard/customers', color: 'bg-blue-500/15', iconColor: 'text-blue-400' },
+                            { label: 'Service Menu', sublabel: 'Update pricing', icon: Scissors, href: '/dashboard/services', color: 'bg-emerald-500/15', iconColor: 'text-emerald-400' },
+                            { label: 'Commissions', sublabel: 'Approve cuts', icon: DollarSign, href: '/dashboard/commissions', color: 'bg-amber-500/15', iconColor: 'text-amber-400' },
+                            { label: 'Reports', sublabel: 'Full financials', icon: BarChart3, href: '/dashboard/reports', color: 'bg-purple-500/15', iconColor: 'text-purple-400' },
+                        ]}
+                        columns={3}
+                    />
+                }
+                workspace={
+                    <WorkspaceTabs
+                        tabs={[
+                            {
+                                id: 'studios',
+                                label: 'Studio Performance',
+                                icon: MapPin,
+                                content: (
+                                    <LocationPerformanceGrid
+                                        locations={data?.locations || []}
+                                        showAppointments
+                                        onSelectLocation={setDrawerLocation}
+                                    />
+                                ),
+                            },
+                            {
+                                id: 'talent',
+                                label: 'Talent',
+                                icon: Users,
+                                content: <StaffTalentTab locations={data?.locations || []} />,
+                            },
+                            {
+                                id: 'financials',
+                                label: 'Financials',
+                                icon: PieChart,
+                                content: <FinancialSnapshot data={data} />,
+                            },
+                            {
+                                id: 'retention',
+                                label: 'Client Retention',
+                                icon: Heart,
+                                badge: 0,
+                                content: <ClientRetentionTab />,
+                            },
+                        ]}
+                    />
+                }
+            />
 
-            {/* Header */}
-            <div className="flex items-center justify-between mb-8 relative z-10">
-                <div>
-                    <h1 className="text-3xl font-bold flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
-                            <Sparkles className="h-6 w-6 text-violet-400" />
-                        </div>
-                        Salon Command Center
-                    </h1>
-                    <p className="text-stone-400 mt-1 pl-[3.25rem]">All studios and talent at a glance</p>
-                </div>
-                <button
-                    onClick={fetchData}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-stone-900/80 hover:bg-stone-800 text-stone-200 rounded-xl border border-stone-800 transition-all font-medium"
-                >
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    Refresh
-                </button>
-            </div>
-
-            {/* Persistent subnav — Salon Focus */}
-            <nav className="flex items-center gap-1 mb-8 overflow-x-auto pb-1 border-b border-stone-800/50 scrollbar-hide relative z-10">
-                {[
-                    { href: '/dashboard/owner', label: 'Overview', icon: Store },
-                    { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
-                    { href: '/dashboard/services', label: 'Services Menu', icon: Scissors },
-                    { href: '/dashboard/employees', label: 'Talent & Commission', icon: Users },
-                    { href: '/dashboard/reports', label: 'Financials', icon: BarChart3 },
-                ].map(({ href, label, icon: Icon }) => (
-                    <Link
-                        key={href}
-                        href={href}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-stone-400 hover:text-white hover:bg-white/5 transition-colors whitespace-nowrap flex-shrink-0"
-                    >
-                        <Icon className="h-4 w-4" />
-                        {label}
-                    </Link>
-                ))}
-            </nav>
-
-            {/* Hero Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 relative z-10">
-                {/* Total Services Revenue */}
-                <div className="bg-stone-900/50 backdrop-blur-md border border-stone-800/80 hover:border-violet-500/30 rounded-2xl p-6 transition-all group">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-                            <DollarSign className="h-5 w-5" />
-                        </div>
-                        <span className="text-sm font-medium text-stone-400">Services Revenue</span>
-                    </div>
-                    <p className="text-4xl font-black text-white tracking-tight">{formatCurrency(data?.summary?.todaySales || 0)}</p>
-                    <div className={`flex items-center gap-1.5 mt-3 text-sm font-medium ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {isUp ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                        <span>{isUp ? '+' : ''}{vsYesterday.toFixed(1)}% vs yesterday</span>
-                    </div>
-                </div>
-
-                {/* Studios / Capacity */}
-                <div className="bg-stone-900/50 backdrop-blur-md border border-stone-800/80 hover:border-violet-500/30 rounded-2xl p-6 transition-all group">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                            <Store className="h-5 w-5" />
-                        </div>
-                        <span className="text-sm font-medium text-stone-400">Active Studios</span>
-                    </div>
-                    <p className="text-4xl font-black text-white tracking-tight">{data?.summary?.totalLocations || 0}</p>
-                    <p className="text-sm text-blue-400 mt-3 font-medium">
-                        {(data?.locations || []).filter(l => l.status === 'active').length} locations actively booking
-                    </p>
-                </div>
-
-                {/* Appointments Today */}
-                <div className="bg-stone-900/50 backdrop-blur-md border border-stone-800/80 hover:border-violet-500/30 rounded-2xl p-6 transition-all group">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="p-2 rounded-lg bg-fuchsia-500/10 text-fuchsia-400">
-                            <BookOpen className="h-5 w-5" />
-                        </div>
-                        <span className="text-sm font-medium text-stone-400">Appointments Today</span>
-                    </div>
-                    <p className="text-4xl font-black text-white tracking-tight">{data?.summary?.appointmentsToday || 0}</p>
-                    <p className="text-sm text-fuchsia-400 mt-3 font-medium">
-                        Avg Ticket: {formatCurrency((data?.summary?.todaySales || 0) / Math.max(data?.summary?.appointmentsToday || 1, 1))}
-                    </p>
-                </div>
-
-                {/* Talent On Floor */}
-                <div className="bg-stone-900/50 backdrop-blur-md border border-stone-800/80 hover:border-violet-500/30 rounded-2xl p-6 transition-all group">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
-                            <Users className="h-5 w-5" />
-                        </div>
-                        <span className="text-sm font-medium text-stone-400">Talent On Floor</span>
-                    </div>
-                    <p className="text-4xl font-black text-white tracking-tight">
-                        {data?.locations?.reduce((acc: number, loc) => acc + (loc.activeStaff || 0), 0) || 0}
-                    </p>
-                    <p className="text-sm text-amber-400 mt-3 font-medium">
-                        Across all locations
-                    </p>
-                </div>
-            </div>
-
-            {/* Middle Section: Quick Actions & Beauty Loop */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 relative z-10">
-                {/* Exception Feed */}
-                <div className="lg:col-span-2 bg-stone-900/50 backdrop-blur-md border border-stone-800/80 rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-lg font-bold flex items-center gap-2 text-white">
-                            <AlertCircle className="h-5 w-5 text-amber-400" />
-                            Studio Exceptions
-                        </h3>
-                        {data?.exceptions?.length ? (
-                            <Link href="/dashboard/owner/exceptions" className="text-sm text-violet-400 hover:text-violet-300 font-medium">
-                                View Full Log &rarr;
-                            </Link>
-                        ) : null}
-                    </div>
-
-                    {(data?.exceptions?.length || 0) === 0 ? (
-                        <div className="text-center py-10 text-stone-500">
-                            <div className="w-16 h-16 rounded-full bg-stone-800/50 flex items-center justify-center mx-auto mb-4 border border-stone-700/50">
-                                <AlertCircle className="h-8 w-8 text-stone-600" />
+            {/* Location Drawer */}
+            <DrawerPanel
+                open={!!drawerLocation}
+                onClose={() => setDrawerLocation(null)}
+                title={selectedLocation?.name || 'Location Details'}
+                subtitle="Today's performance"
+            >
+                {selectedLocation && (
+                    <div className="space-y-5">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Revenue</p>
+                                <p className="text-2xl font-black text-emerald-400">{formatCurrency(selectedLocation.todaySales)}</p>
                             </div>
-                            <p className="font-medium text-stone-300">All studios running smoothly</p>
-                            <p className="text-sm mt-1">No voids, no-shows, or critical overrides detected.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {data?.exceptions?.map(ex => (
-                                <div key={ex.id} className={`flex items-start gap-4 p-4 rounded-xl backdrop-blur-md transition-colors ${
-                                    ex.severity === 'CRITICAL' ? 'bg-red-500/10 border border-red-500/20 hover:bg-red-500/20' :
-                                    ex.severity === 'WARNING' ? 'bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20' :
-                                    'bg-white/5 border border-white/10 hover:bg-white/10'
-                                }`}>
-                                    <div className={`mt-1 p-1.5 rounded-full ${
-                                        ex.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' :
-                                        ex.severity === 'WARNING' ? 'bg-amber-500/20 text-amber-400' : 
-                                        'bg-blue-500/20 text-blue-400'
-                                    }`}>
-                                        <AlertTriangle size={14} />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex justify-between items-start">
-                                            <p className="font-bold text-white text-sm">{ex.title}</p>
-                                            <span className="text-xs font-medium text-stone-400 bg-black/20 px-2 py-0.5 rounded-full">{ex.locationName}</span>
-                                        </div>
-                                        <p className="text-sm text-stone-300 mt-1">{ex.description}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Growth Hub & Quick Actions */}
-                <div className="bg-stone-900/50 backdrop-blur-md border border-stone-800/80 rounded-2xl p-6 flex flex-col">
-                    <h3 className="text-lg font-bold text-white mb-6">Growth Hub</h3>
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                        <Link href="/dashboard/owner/salon-loyalty" className="p-4 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 hover:from-violet-600/30 hover:to-fuchsia-600/30 border border-violet-500/30 rounded-xl transition-all group flex flex-col items-center text-center">
-                            <Trophy className="h-6 w-6 text-violet-400 mb-2 group-hover:scale-110 transition-transform" />
-                            <span className="text-sm font-bold text-white">Beauty Loop</span>
-                            <span className="text-xs text-violet-300 mt-1">Configure retention</span>
-                        </Link>
-                        <Link href="/dashboard/customers" className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all group flex flex-col items-center text-center">
-                            <UserPlus className="h-6 w-6 text-blue-400 mb-2 group-hover:scale-110 transition-transform" />
-                            <span className="text-sm font-bold text-white">Client Roster</span>
-                            <span className="text-xs text-stone-400 mt-1">View history</span>
-                        </Link>
-                        <Link href="/dashboard/services" className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all group flex flex-col items-center text-center">
-                            <Scissors className="h-6 w-6 text-emerald-400 mb-2 group-hover:scale-110 transition-transform" />
-                            <span className="text-sm font-bold text-white">Service Menu</span>
-                            <span className="text-xs text-stone-400 mt-1">Update pricing</span>
-                        </Link>
-                        <Link href="/dashboard/employees" className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all group flex flex-col items-center text-center">
-                            <DollarSign className="h-6 w-6 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
-                            <span className="text-sm font-bold text-white">Payroll Process</span>
-                            <span className="text-xs text-stone-400 mt-1">Approve cuts</span>
-                        </Link>
-                    </div>
-                </div>
-            </div>
-
-            {/* Studio Breakdown */}
-            <div className="relative z-10">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
-                    <MapPin className="h-5 w-5 text-fuchsia-400" />
-                    Studio Performance
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {(data?.locations || []).map(loc => (
-                        <div key={loc.id} className="bg-stone-900/50 backdrop-blur-md border border-stone-800/80 hover:border-violet-500/50 rounded-2xl overflow-hidden transition-all group">
-                            {/* Card Header */}
-                            <div className="p-5 border-b border-stone-800/50 bg-white/[0.02]">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1 min-w-0 pr-4">
-                                        <h4 className="font-bold text-lg text-white truncate">{loc.name}</h4>
-                                        <div className="flex items-center gap-2 mt-1.5">
-                                            <span className={`w-2 h-2 rounded-full ${
-                                                loc.status === 'active' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' :
-                                                loc.status === 'warning' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' : 
-                                                'bg-stone-600'
-                                            }`} />
-                                            <span className={`text-xs font-bold uppercase tracking-wider ${
-                                                loc.status === 'active' ? 'text-emerald-400' :
-                                                loc.status === 'warning' ? 'text-amber-400' : 
-                                                'text-stone-500'
-                                            }`}>
-                                                {loc.status === 'active' ? 'Booking' : loc.status === 'warning' ? 'Check Schedule' : 'Offline'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Appointments</p>
+                                <p className="text-2xl font-black text-white">{selectedLocation.appointments}</p>
                             </div>
-
-                            {/* Card Body */}
-                            <div className="p-5">
-                                <div className="grid grid-cols-2 gap-4 mb-5">
-                                    <div>
-                                        <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">Revenue</p>
-                                        <p className="text-2xl font-black text-emerald-400">{formatCurrency(loc.todaySales)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">Appointments</p>
-                                        <p className="text-2xl font-black text-white">{loc.appointments}</p>
-                                    </div>
-                                </div>
-
-                                <div className="bg-black/30 rounded-xl p-3 flex items-center justify-between border border-white/5">
-                                    <div className="flex items-center gap-2">
-                                        <Users className="h-4 w-4 text-stone-400" />
-                                        <span className="text-sm font-medium text-stone-300">Staff On Floor</span>
-                                    </div>
-                                    <span className="font-bold text-white">{loc.activeStaff}</span>
-                                </div>
+                            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Staff</p>
+                                <p className="text-2xl font-black text-white">{selectedLocation.activeStaff}</p>
+                            </div>
+                            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Transactions</p>
+                                <p className="text-2xl font-black text-white">{selectedLocation.transactions}</p>
                             </div>
                         </div>
-                    ))}
-
-                    {(data?.locations?.length || 0) === 0 && !loading && (
-                        <div className="col-span-full bg-stone-900/50 backdrop-blur-md rounded-3xl border border-stone-800/80 p-12 text-center text-stone-500">
-                            <Store className="h-16 w-16 mx-auto mb-4 opacity-50 text-stone-600" />
-                            <p className="text-xl font-bold text-white">No studios provisioned yet</p>
-                            <p className="text-sm mt-2 text-stone-400 max-w-sm mx-auto">Once your POS units are paired and locations are live, performance data will appear here.</p>
+                        <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-stone-400">Payment Split</span>
+                            </div>
+                            <div className="flex gap-4">
+                                <div><span className="text-sm font-bold text-emerald-400">{formatCurrency(selectedLocation.cash)}</span> <span className="text-xs text-stone-500">cash</span></div>
+                                <div><span className="text-sm font-bold text-blue-400">{formatCurrency(selectedLocation.card)}</span> <span className="text-xs text-stone-500">card</span></div>
+                            </div>
                         </div>
-                    )}
-                </div>
-            </div>
-        </div>
+                    </div>
+                )}
+            </DrawerPanel>
+        </>
     )
 }

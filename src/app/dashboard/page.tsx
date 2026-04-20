@@ -24,6 +24,7 @@ import TodayAppointments from "@/components/dashboard/employee/TodayAppointments
 import NextClientSpotlight from "@/components/dashboard/employee/NextClientSpotlight"
 import EmployeePerformanceStats from "@/components/dashboard/employee/EmployeePerformanceStats"
 import { useState, useEffect } from "react"
+import FranchiseeCommandCenter from "@/components/dashboard/FranchiseeCommandCenter"
 
 // ——————————————————————————————————————————————————————
 // Each gets its own hooks at the top level (Rules of Hooks compliant)
@@ -955,7 +956,7 @@ export default function DashboardPage() {
     }
 
     if (role === 'FRANCHISOR' && businessType === 'MULTI_LOCATION_OWNER') {
-        return <MultiLocationOwnerDashboard session={session!} />
+        return <FranchiseeCommandCenter />
     }
 
     if (role === 'FRANCHISOR') {
@@ -963,7 +964,7 @@ export default function DashboardPage() {
     }
 
     if (role === 'FRANCHISEE') {
-        return <FranchiseeDashboard session={session!} />
+        return <FranchiseeCommandCenter />
     }
 
     if (role === 'EMPLOYEE' || role === 'USER') {
