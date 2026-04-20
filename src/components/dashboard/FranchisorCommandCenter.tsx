@@ -268,13 +268,7 @@ export default function FranchisorCommandCenter() {
                             subtitle: 'System employees',
                             icon: Users,
                         },
-                        {
-                            title: 'Compliance',
-                            value: '100%',
-                            subtitle: 'Network health',
-                            icon: Shield,
-                            variant: 'success',
-                        },
+                        // [Omitted mock Compliance KPI due to operational truth policy]
                     ]}
                 />
             }
@@ -311,12 +305,7 @@ export default function FranchisorCommandCenter() {
                             icon: PieChart,
                             content: <NetworkFinancials stats={stats} />,
                         },
-                        {
-                            id: 'compliance',
-                            label: 'Compliance',
-                            icon: Shield,
-                            content: <BrandComplianceTab />,
-                        },
+                        // [Omitted BrandComplianceTab due to mock data policy]
                     ]}
                 />
             }

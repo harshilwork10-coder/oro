@@ -2,8 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, TrendingUp, Store, DollarSign, ShoppingCart, AlertTriangle, Users, RefreshCw, Package, ChevronRight } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Store, DollarSign, ShoppingCart, AlertTriangle, Users, RefreshCw, Package, ChevronRight, Zap } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+
+import DashboardShell from '@/components/dashboard/command-center/DashboardShell'
+import CommandHeader from '@/components/dashboard/command-center/CommandHeader'
+import KpiStrip from '@/components/dashboard/command-center/KpiStrip'
+import AlertRail from '@/components/dashboard/command-center/AlertRail'
+import type { ExceptionItem } from '@/components/dashboard/command-center/AlertRail'
+import QuickActionsPanel from '@/components/dashboard/command-center/QuickActionsPanel'
+import WorkspaceTabs from '@/components/dashboard/command-center/WorkspaceTabs'
 
 interface LocationData {
     location: {
@@ -43,6 +51,160 @@ interface DashboardData {
     }
 }
 
+// ─── Location Cards Grid Component ─────────────────────
+function LocationPerformanceGrid({ locations, topLocation }: { locations: LocationData[], topLocation: string | null }) {
+    if (locations.length === 0) {
+        return (
+            <div className="text-center py-16 text-stone-400">
+                <Store className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <p className="text-xl">No locations found</p>
+                <p className="text-sm">Add locations to see performance data</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Top Performer Badge */}
+            {topLocation && (
+                <div className="bg-gradient-to-r from-yellow-600/20 to-amber-600/20 border border-yellow-500/30 rounded-xl p-4 flex items-center gap-4">
+                    <span className="text-3xl">🏆</span>
+                    <div>
+                        <p className="text-sm text-stone-400">Today&apos;s Top Performer</p>
+                        <p className="text-xl font-bold text-yellow-400">{topLocation}</p>
+                    </div>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {locations.map((loc) => (
+                    <div
+                        key={loc.location.id}
+                        className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-5 hover:border-indigo-500/50 transition-colors"
+                    >
+                        <div className="flex items-start justify-between mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-white">{loc.location.name}</h3>
+                                <p className="text-sm text-stone-500">{loc.location.address || 'No address'}</p>
+                            </div>
+                            <div className="flex items-center gap-1 text-stone-400">
+                                <Users className="h-4 w-4" />
+                                <span className="text-sm">{loc.staff.count}</span>
+                            </div>
+                        </div>
+
+                        {/* Today's Stats */}
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                            <div className="bg-white/[0.03] rounded-xl p-3">
+                                <p className="text-xs text-stone-500 mb-1 font-semibold uppercase tracking-wider">Today Sales</p>
+                                <p className="text-xl font-bold text-emerald-400">{formatCurrency(loc.today.sales)}</p>
+                            </div>
+                            <div className="bg-white/[0.03] rounded-xl p-3">
+                                <p className="text-xs text-stone-500 mb-1 font-semibold uppercase tracking-wider">Transactions</p>
+                                <p className="text-xl font-bold text-white">{loc.today.transactions}</p>
+                            </div>
+                        </div>
+
+                        {/* Payment Split */}
+                        <div className="flex gap-2 mb-4">
+                            <div className="flex-1 bg-emerald-500/10 rounded-lg p-2 text-center border border-emerald-500/10">
+                                <p className="text-xs text-emerald-400 font-medium">Cash</p>
+                                <p className="font-bold text-emerald-400">{formatCurrency(loc.today.cash)}</p>
+                            </div>
+                            <div className="flex-1 bg-blue-500/10 rounded-lg p-2 text-center border border-blue-500/10">
+                                <p className="text-xs text-blue-400 font-medium">Card</p>
+                                <p className="font-bold text-blue-400">{formatCurrency(loc.today.card)}</p>
+                            </div>
+                        </div>
+
+                        {/* Bottom Stats */}
+                        <div className="flex justify-between text-sm border-t border-white/[0.05] pt-3">
+                            <div>
+                                <span className="text-stone-500 font-medium tracking-wide">AVG TICKET:</span>
+                                <span className="ml-2 font-bold text-stone-200">{formatCurrency(loc.today.avgTicket)}</span>
+                            </div>
+                            <div>
+                                <span className="text-stone-500 font-medium tracking-wide">MTD:</span>
+                                <span className="ml-2 font-bold text-amber-400">{formatCurrency(loc.mtd.sales)}</span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// ─── Inventory Hub Component ─────────────────────────────
+function InventoryHub({ locations }: { locations: LocationData[] }) {
+    if (locations.length === 0) return null;
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-3 text-white">
+                    <Package className="h-5 w-5 text-orange-400" />
+                    Store Inventory Status
+                </h2>
+                <div className="flex gap-3">
+                    <Link href="/dashboard/owner/transfers" className="text-xs font-semibold px-3 py-1.5 bg-white/[0.03] hover:bg-white/[0.08] rounded-md transition-colors border border-white/[0.06] flex items-center gap-2">
+                        <Package className="h-3 w-3 text-stone-400" /> Stock Transfers
+                    </Link>
+                    <Link href="/dashboard/multi-store/inventory" className="text-xs font-semibold px-3 py-1.5 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 rounded-md transition-colors border border-orange-500/20 flex items-center gap-2">
+                        Overview <ChevronRight className="h-3 w-3" />
+                    </Link>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {locations.map((loc) => (
+                    <div
+                        key={`inv-${loc.location.id}`}
+                        className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-4 hover:border-orange-500/30 transition-colors flex flex-col"
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-stone-200">{loc.location.name}</h3>
+                            {loc.inventory.lowStock > 0 && (
+                                <span className="bg-red-500/15 text-red-400 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-red-500/20">
+                                    {loc.inventory.lowStock} Low Stock
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center justify-between text-sm mb-4 bg-white/[0.02] p-2.5 rounded-lg border border-white/[0.02]">
+                            <span className="text-stone-400 font-medium">Total Products</span>
+                            <span className="font-bold text-white text-lg">{loc.inventory.totalProducts}</span>
+                        </div>
+                        <div className="mt-auto pt-2 grid grid-cols-2 gap-2">
+                            <Link
+                                href={`/dashboard/inventory/retail?locationId=${loc.location.id}`}
+                                className="bg-white/[0.05] hover:bg-white/[0.1] text-stone-300 text-center py-2 rounded-lg text-xs font-bold transition-colors"
+                            >
+                                Manage Store
+                            </Link>
+                            {loc.inventory.lowStock > 0 ? (
+                                <Link
+                                    href={`/dashboard/inventory/alerts?locationId=${loc.location.id}`}
+                                    className="bg-red-500/15 hover:bg-red-500/25 text-red-400 text-center py-2 rounded-lg text-xs font-bold transition-colors border border-red-500/20"
+                                >
+                                    Resolve Alert
+                                </Link>
+                            ) : (
+                                <div className="bg-emerald-500/10 text-emerald-500/50 text-center py-2 rounded-lg text-xs font-bold border border-emerald-500/10 cursor-not-allowed">
+                                    Stock OK
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════
+
 export default function MultiStoreDashboard() {
     const [data, setData] = useState<DashboardData | null>(null)
     const [loading, setLoading] = useState(true)
@@ -70,238 +232,118 @@ export default function MultiStoreDashboard() {
         return () => clearInterval(interval)
     }, [])
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950 text-white p-6">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-4">
-                    <Link href="/dashboard" className="p-2 hover:bg-stone-800 rounded-lg">
-                        <ArrowLeft className="h-6 w-6" />
-                    </Link>
-                    <div>
-                        <h1 className="text-3xl font-bold">Multi-Store Dashboard</h1>
-                        <p className="text-stone-400">Compare all locations at a glance</p>
-                    </div>
-                </div>
-                <button
-                    onClick={fetchData}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium"
-                >
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    Refresh
-                </button>
+    if (loading && !data) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
             </div>
+        )
+    }
 
-            {error && (
-                <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 mb-6 text-red-400">
-                    {error}
-                </div>
-            )}
+    // Build the Alert Rail items from low stock exceptions
+    const alertRailItems: ExceptionItem[] = data?.locations
+        .filter(loc => loc.inventory.lowStock > 0)
+        .map(loc => ({
+            id: `low-stock-${loc.location.id}`,
+            title: `${loc.inventory.lowStock} items low in stock`,
+            description: `Store: ${loc.location.name}`,
+            severity: 'medium',
+            timeAgo: 'Just now', // Standard operational truth would use real time delta here
+            icon: AlertTriangle,
+            actionLabel: 'Resolve'
+        })) || []
 
-            {data && data.summary && (
-                <>
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-                        <div className="bg-gradient-to-br from-emerald-600/30 to-emerald-900/30 border border-emerald-500/30 rounded-2xl p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Store className="h-5 w-5 text-emerald-400" />
-                                <span className="text-sm text-stone-400">Locations</span>
-                            </div>
-                            <p className="text-3xl font-bold">{data.summary.totalLocations}</p>
-                        </div>
-                        <div className="bg-gradient-to-br from-blue-600/30 to-blue-900/30 border border-blue-500/30 rounded-2xl p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <DollarSign className="h-5 w-5 text-blue-400" />
-                                <span className="text-sm text-stone-400">Today Sales</span>
-                            </div>
-                            <p className="text-3xl font-bold">{formatCurrency(data.summary.todaySales)}</p>
-                        </div>
-                        <div className="bg-gradient-to-br from-purple-600/30 to-purple-900/30 border border-purple-500/30 rounded-2xl p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <ShoppingCart className="h-5 w-5 text-purple-400" />
-                                <span className="text-sm text-stone-400">Today Txns</span>
-                            </div>
-                            <p className="text-3xl font-bold">{data.summary.todayTransactions}</p>
-                        </div>
-                        <div className="bg-gradient-to-br from-amber-600/30 to-amber-900/30 border border-amber-500/30 rounded-2xl p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <TrendingUp className="h-5 w-5 text-amber-400" />
-                                <span className="text-sm text-stone-400">MTD Sales</span>
-                            </div>
-                            <p className="text-3xl font-bold">{formatCurrency(data.summary.mtdSales)}</p>
-                        </div>
-                        <div className="bg-gradient-to-br from-red-600/30 to-red-900/30 border border-red-500/30 rounded-2xl p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <AlertTriangle className="h-5 w-5 text-red-400" />
-                                <span className="text-sm text-stone-400">Low Stock</span>
-                            </div>
-                            <p className="text-3xl font-bold">{data.summary.lowStockTotal}</p>
-                        </div>
-                    </div>
-
-                    {/* Top Performer Badge */}
-                    {data.summary.topLocation && (
-                        <div className="bg-gradient-to-r from-yellow-600/20 to-amber-600/20 border border-yellow-500/30 rounded-xl p-4 mb-8 flex items-center gap-4">
-                            <span className="text-3xl">🏆</span>
-                            <div>
-                                <p className="text-sm text-stone-400">Today&apos;s Top Performer</p>
-                                <p className="text-xl font-bold text-yellow-400">{data.summary.topLocation}</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Location Cards Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {data.locations.map((loc) => (
-                            <div
-                                key={loc.location.id}
-                                className="bg-stone-900/80 border border-stone-700 rounded-2xl p-5 hover:border-indigo-500/50 transition-colors"
-                            >
-                                <div className="flex items-start justify-between mb-4">
-                                    <div>
-                                        <h3 className="text-lg font-bold">{loc.location.name}</h3>
-                                        <p className="text-sm text-stone-500">{loc.location.address || 'No address'}</p>
-                                    </div>
-                                    <div className="flex items-center gap-1 text-stone-400">
-                                        <Users className="h-4 w-4" />
-                                        <span className="text-sm">{loc.staff.count}</span>
-                                    </div>
-                                </div>
-
-                                {/* Today's Stats */}
-                                <div className="grid grid-cols-2 gap-3 mb-4">
-                                    <div className="bg-stone-800/50 rounded-xl p-3">
-                                        <p className="text-xs text-stone-500 mb-1">Today Sales</p>
-                                        <p className="text-xl font-bold text-emerald-400">{formatCurrency(loc.today.sales)}</p>
-                                    </div>
-                                    <div className="bg-stone-800/50 rounded-xl p-3">
-                                        <p className="text-xs text-stone-500 mb-1">Transactions</p>
-                                        <p className="text-xl font-bold">{loc.today.transactions}</p>
-                                    </div>
-                                </div>
-
-                                {/* Payment Split */}
-                                <div className="flex gap-2 mb-4">
-                                    <div className="flex-1 bg-green-500/10 rounded-lg p-2 text-center">
-                                        <p className="text-xs text-green-400">Cash</p>
-                                        <p className="font-bold text-green-400">{formatCurrency(loc.today.cash)}</p>
-                                    </div>
-                                    <div className="flex-1 bg-blue-500/10 rounded-lg p-2 text-center">
-                                        <p className="text-xs text-blue-400">Card</p>
-                                        <p className="font-bold text-blue-400">{formatCurrency(loc.today.card)}</p>
-                                    </div>
-                                </div>
-
-                                {/* Bottom Stats */}
-                                <div className="flex justify-between text-sm border-t border-stone-700 pt-3">
-                                    <div>
-                                        <span className="text-stone-500">Avg Ticket:</span>
-                                        <span className="ml-2 font-medium">{formatCurrency(loc.today.avgTicket)}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-stone-500">MTD:</span>
-                                        <span className="ml-2 font-medium text-amber-400">{formatCurrency(loc.mtd.sales)}</span>
-                                    </div>
-                                </div>
-
-                                {/* Low Stock Alert */}
-                                {loc.inventory.lowStock > 0 && (
-                                    <div className="mt-3 flex items-center gap-2 text-red-400 text-sm bg-red-500/10 rounded-lg p-2">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        <span>{loc.inventory.lowStock} items low in stock</span>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-
-                    {data.locations.length === 0 && (
-                        <div className="text-center py-16 text-stone-400">
-                            <Store className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                            <p className="text-xl">No locations found</p>
-                            <p className="text-sm">Add locations to see performance data</p>
-                        </div>
-                    )}
-
-                    {/* Inventory Management Section */}
-                    {data.locations.length > 0 && (
-                        <div className="mt-8">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-2xl font-bold flex items-center gap-3">
-                                    <Package className="h-6 w-6 text-orange-400" />
-                                    Inventory Management
-                                </h2>
-                                <div className="flex items-center gap-3">
-                                    <Link
-                                        href="/dashboard/multi-store/pricing"
-                                        className="text-green-400 hover:text-green-300 flex items-center gap-1 text-sm"
-                                    >
-                                        Store Pricing <ChevronRight className="h-4 w-4" />
-                                    </Link>
-                                    <Link
-                                        href="/dashboard/owner/transfers"
-                                        className="text-purple-400 hover:text-purple-300 flex items-center gap-1 text-sm"
-                                    >
-                                        Stock Transfers <ChevronRight className="h-4 w-4" />
-                                    </Link>
-                                    <Link
-                                        href="/dashboard/multi-store/inventory"
-                                        className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium"
-                                    >
-                                        Centralized View <ChevronRight className="h-4 w-4" />
-                                    </Link>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {data.locations.map((loc) => (
-                                    <div
-                                        key={`inv-${loc.location.id}`}
-                                        className="bg-stone-900/80 border border-stone-700 rounded-xl p-4 hover:border-orange-500/50 transition-colors"
-                                    >
-                                        <div className="flex items-center justify-between mb-3">
-                                            <h3 className="font-semibold">{loc.location.name}</h3>
-                                            {loc.inventory.lowStock > 0 && (
-                                                <span className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded-full">
-                                                    {loc.inventory.lowStock} Low
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center justify-between text-sm text-stone-400 mb-3">
-                                            <span>Total Products</span>
-                                            <span className="font-medium text-white">{loc.inventory.totalProducts}</span>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <Link
-                                                href={`/dashboard/inventory/retail?locationId=${loc.location.id}`}
-                                                className="flex-1 bg-orange-600 hover:bg-orange-500 text-center py-2 rounded-lg text-sm font-medium transition-colors"
-                                            >
-                                                Manage Inventory
-                                            </Link>
-                                            {loc.inventory.lowStock > 0 && (
-                                                <Link
-                                                    href={`/dashboard/inventory/alerts?locationId=${loc.location.id}`}
-                                                    className="bg-red-600/30 hover:bg-red-600/50 text-red-400 px-3 py-2 rounded-lg text-sm transition-colors"
-                                                    title="View Low Stock"
-                                                >
-                                                    <AlertTriangle className="h-4 w-4" />
-                                                </Link>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </>
-            )}
-
-            {loading && !data && (
-                <div className="flex items-center justify-center py-16">
-                    <RefreshCw className="h-8 w-8 animate-spin text-indigo-400" />
-                </div>
-            )}
-        </div>
+    return (
+        <DashboardShell
+            header={
+                <CommandHeader
+                    title="Owner Command Center"
+                    subtitle={`${data?.summary?.totalLocations || 0} locations · Cross-store performance`}
+                    icon={Store}
+                    roleBadge="Multi-Store Owner"
+                    roleBadgeColor="bg-blue-500/15 text-blue-400 border-blue-500/20"
+                    onRefresh={fetchData}
+                    refreshing={loading}
+                />
+            }
+            kpiStrip={
+                <KpiStrip
+                    columns={5}
+                    kpis={[
+                        {
+                            title: 'Locations',
+                            value: data?.summary?.totalLocations || 0,
+                            subtitle: 'Active stores',
+                            icon: Store,
+                            variant: 'default',
+                        },
+                        {
+                            title: 'Today Sales',
+                            value: data?.summary ? formatCurrency(data.summary.todaySales) : '$0',
+                            subtitle: 'Gross cross-store',
+                            icon: DollarSign,
+                            variant: 'success',
+                        },
+                        {
+                            title: 'Today Txns',
+                            value: data?.summary?.todayTransactions || 0,
+                            subtitle: 'Total volume',
+                            icon: ShoppingCart,
+                            variant: 'default',
+                        },
+                        {
+                            title: 'MTD Sales',
+                            value: data?.summary ? formatCurrency(data.summary.mtdSales) : '$0',
+                            subtitle: 'Month tracking',
+                            icon: TrendingUp,
+                            variant: 'accent',
+                        },
+                        {
+                            title: 'Low Stock',
+                            value: data?.summary?.lowStockTotal || 0,
+                            subtitle: 'Across network',
+                            icon: AlertTriangle,
+                            variant: (data?.summary?.lowStockTotal || 0) > 0 ? 'warning' : 'default',
+                        },
+                    ]}
+                />
+            }
+            alertRail={
+                <AlertRail
+                    exceptions={alertRailItems}
+                    emptyTitle="All Clear"
+                    emptySubtitle="No exceptions or low stock alerts at this time."
+                />
+            }
+            quickActions={
+                <QuickActionsPanel
+                    title="Owner Intervention Queue"
+                    actions={[
+                        { label: 'Store Pricing', sublabel: 'Manage rules', icon: DollarSign, href: '/dashboard/multi-store/pricing', color: 'bg-emerald-500/15', iconColor: 'text-emerald-400' },
+                        { label: 'Stock Transfers', sublabel: 'Move items', icon: Package, href: '/dashboard/owner/transfers', color: 'bg-purple-500/15', iconColor: 'text-purple-400' },
+                        { label: 'Overrides', sublabel: 'Pending voids', icon: Zap, href: '/dashboard/owner/approvals', color: 'bg-amber-500/15', iconColor: 'text-amber-400' },
+                    ]}
+                />
+            }
+            workspace={
+                <WorkspaceTabs
+                    tabs={[
+                        {
+                            id: 'performance',
+                            label: 'Store Performance',
+                            icon: TrendingUp,
+                            content: <LocationPerformanceGrid locations={data?.locations || []} topLocation={data?.summary?.topLocation || null} />,
+                        },
+                        {
+                            id: 'inventory',
+                            label: 'Inventory Status',
+                            icon: Package,
+                            content: <InventoryHub locations={data?.locations || []} />,
+                        },
+                    ]}
+                />
+            }
+        />
     )
 }
 
