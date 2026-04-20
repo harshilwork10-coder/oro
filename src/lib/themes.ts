@@ -9,6 +9,7 @@ export type ThemeId =
     | 'lavender_night'   // Modern, trendy
     | 'mint_clean'       // Fresh, spa-like
     | 'ocean_blue'       // Cool, professional
+    | 'obsidian_gold'    // Pitch Black with Gold
 
 export interface ThemeTokens {
     // Background colors
@@ -190,6 +191,26 @@ export const THEME_PRESETS: Record<ThemeId, ThemePreset> = {
             textPrimary: '#F0FDFF',
             textSecondary: '#C0E4F0',
             textMuted: '#70A8C0',
+            ...FIXED_COLORS,
+        },
+    },
+
+    obsidian_gold: {
+        id: 'obsidian_gold',
+        name: 'Obsidian Gold',
+        description: 'Premium pitch black with obsidian gold',
+        preview: { accent: '#E5B55C', bg: '#0A0A0A' },
+        tokens: {
+            bg: '#0D0D0D',
+            surface: '#1A1A1A',
+            surface2: '#262626',
+            accent: '#E5B55C',
+            accentLight: '#FDE68A',
+            accentDark: '#B8860B',
+            accentMuted: 'rgba(229, 181, 92, 0.20)',
+            textPrimary: '#FFFFFF',
+            textSecondary: '#B3B3B3',
+            textMuted: '#808080',
             ...FIXED_COLORS,
         },
     },

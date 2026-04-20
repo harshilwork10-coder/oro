@@ -30,7 +30,9 @@ import {
     Maximize2,
     Minimize2,
     Calendar,
-    Loader2
+    Loader2,
+    Clock,
+    Settings
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import PaxPaymentModal from '@/components/modals/PaxPaymentModal'
@@ -1646,7 +1648,7 @@ function POSContent() {
         // CLOCK_IN_ONLY mode - Simple clock in button without cash counting
         if (shiftRequirement === 'CLOCK_IN_ONLY') {
             return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="p-8 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl w-full max-w-md">
                         <div className="text-center mb-8">
                             <div className="h-20 w-20 bg-emerald-600/20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-emerald-500/50">
@@ -1676,7 +1678,7 @@ function POSContent() {
 
         // CASH_COUNT_ONLY or BOTH mode - Full denomination counting UI
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 overflow-y-auto">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
                 <div className={`p-6 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl my-8 flex gap-6 ${usesVirtualKeypad ? 'w-full max-w-4xl' : 'w-[600px] flex-col'}`}>
                     <div className="flex-1">
                         <div className="text-center mb-6">
@@ -1907,7 +1909,7 @@ function POSContent() {
         }
 
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 overflow-y-auto">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
                 <div className="w-full max-w-4xl p-6 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl my-8 flex gap-6">
                     {/* Left: Denominations */}
                     <div className="flex-1">
@@ -2064,7 +2066,7 @@ function POSContent() {
     return (
         <>
             {showDebug && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-stone-900 border-2 border-red-500 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
                         <h3 className="text-xl font-bold text-red-500 flex items-center gap-2">
                             🐞 DEBUG MODE
@@ -2108,214 +2110,173 @@ function POSContent() {
             <div className="flex h-screen bg-stone-950 overflow-hidden">
                 {/* Left Side: Content Area */}
                 <div className="flex-1 flex flex-col border-r border-stone-800 min-w-0">
-                    {/* Header - Clean Touch-Friendly Design */}
-                    <div className="h-16 border-b border-white/10 flex items-center px-3 gap-2 bg-stone-900">
-                        {/* Left - Menu + View Toggle */}
-                        <div className="flex items-center gap-2">
-                            {/* Menu Button */}
-                            <button
-                                onClick={() => {
-                                    const event = new CustomEvent('toggleSidebar')
-                                    window.dispatchEvent(event)
-                                }}
-                                className="p-3 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white transition-all border border-stone-700"
-                                title="Menu"
-                            >
-                                <Menu className="h-5 w-5" />
-                            </button>
+                    ﻿{/* ========================================================
+    PREMIUM TOP RAIL / HEADER
+    ======================================================== */}
+<header className="px-3 py-3 bg-[#0a0a0a]">
+  <div className="top-rail">
+    
+    {/* 1. LEFT GROUP: Navigation & Views */}
+    <div className="top-rail-group top-rail-left">
+      <button 
+        className="rail-icon-btn"
+        onClick={() => {
+            const event = new CustomEvent('toggleSidebar')
+            window.dispatchEvent(event)
+        }}
+        aria-label="Menu"
+      >
+        <Menu size={20} />
+      </button>
 
-                            {/* Register/History Toggle */}
-                            <div className="flex bg-stone-800 rounded-xl p-1 border border-stone-700">
-                                <button
-                                    onClick={() => setView('POS')}
-                                    className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${view === 'POS' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'text-stone-400 hover:text-white'}`}
-                                >
-                                    Register
-                                </button>
-                                <button
-                                    onClick={() => setView('HISTORY')}
-                                    className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${view === 'HISTORY' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'text-stone-400 hover:text-white'}`}
-                                >
-                                    History
-                                </button>
-                            </div>
-                        </div>
+      <div className="top-rail-divider" />
 
-                        {/* Center - Staff Selector (prominent) */}
-                        <div className="flex-1 flex justify-center">
-                            <select
-                                value={selectedBarber?.id || ''}
-                                onChange={(e) => {
-                                    const barber = barberList.find(b => b.id === e.target.value)
-                                    setSelectedBarber(barber || null)
-                                    if (barber) setSelectedCategory('BARBER_SERVICE')
-                                }}
-                                className="min-w-[180px] bg-stone-800 border-2 border-amber-500/50 rounded-xl px-4 py-2.5 text-sm text-white font-medium focus:ring-2 focus:ring-amber-500 appearance-none cursor-pointer"
-                                style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em", paddingRight: "2.5rem" }}
-                            >
-                                <option value="">👤 Select Staff</option>
-                                {barberList.map(barber => (
-                                    <option key={barber.id} value={barber.id}>
-                                        {barber.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+      <div className="rail-segment">
+        <button 
+          className={`rail-btn ${view === 'POS' ? 'active' : ''}`}
+          onClick={() => { setView('POS'); setSelectedCategory(null); }}
+        >
+          <Grid size={16} />
+          <span>Register</span>
+        </button>
+        <button 
+          className={`rail-btn ${view === 'HISTORY' ? 'active' : ''}`}
+          onClick={() => { setView('HISTORY'); fetchTransactions(); }}
+        >
+          <History size={16} />
+          <span>History</span>
+        </button>
+      </div>
+    </div>
 
-                        {/* Right - Action Buttons */}
-                        <div className="flex items-center gap-2">
-                            {/* Search (POS only) */}
-                            {view === 'POS' && (
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-32 bg-stone-800 border border-stone-700 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder:text-stone-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                    />
-                                </div>
-                            )}
+    {/* 2. CENTER GROUP: Active Employee Area */}
+    <div className="top-rail-group top-rail-center ml-auto mr-auto">
+      <button 
+        className="staff-selector"
+        title="Selecting staff"
+      >
+        <User size={16} className="text-[#f3dfab]" />
+        <select
+            value={selectedBarber?.id || ''}
+            onChange={(e) => {
+                const barber = barberList.find(b => b.id === e.target.value)
+                setSelectedBarber(barber || null)
+                if (barber) setSelectedCategory('BARBER_SERVICE')
+            }}
+            className="bg-transparent border-none outline-none appearance-none cursor-pointer absolute inset-0 opacity-0"
+        >
+            <option value="">Select Staff</option>
+            {barberList.map(barber => (
+                <option key={barber.id} value={barber.id}>
+                    {barber.name}
+                </option>
+            ))}
+        </select>
+        <span>{selectedBarber?.name || 'SELECT STAFF'}</span>
+      </button>
+    </div>
 
-                            {/* Drawer Action Buttons for Managers */}
-                            {isDrawerManager && (
-                                <>
-                                    <button
-                                        onClick={() => setShowNoSaleModal(true)}
-                                        className="p-3 bg-stone-800 hover:bg-amber-600/30 rounded-xl text-amber-500 transition-all border border-stone-700 hover:border-amber-500/50"
-                                        title="No Sale"
-                                    >
-                                        <Unlock className="h-5 w-5" />
-                                    </button>
-                                    <button
-                                        onClick={() => setShowPaidInOutModal(true)}
-                                        className="p-3 bg-stone-800 hover:bg-teal-600/30 rounded-xl text-teal-400 transition-all border border-stone-700 hover:border-teal-500/50"
-                                        title="Paid In / Out"
-                                    >
-                                        <Banknote className="h-5 w-5" />
-                                    </button>
-                                </>
-                            )}
+    {/* 3. RIGHT GROUP: Primary Actions & Utilities */}
+    <div className="top-rail-group top-rail-right">
+      <button 
+        className="new-action-btn"
+        onClick={() => {
+            if (!shift) setShowShiftModal(true)
+            else setShowCheckInModal(true)
+        }}
+      >
+        <Plus size={16} className="text-[#d4a94d]" />
+        <span>New Guest</span>
+      </button>
 
-                            {/* Time Clock */}
-                            <TimeClockButton
-                                isClockedIn={isClockedIn}
-                                shiftRequirement={shiftRequirement}
-                                locationId={user?.locationId}
-                                onStatusChange={(newStatus, entryId) => {
-                                    setIsClockedIn(newStatus)
-                                    setActiveTimeEntryId(entryId || null)
-                                }}
-                            />
+      <div className="top-rail-divider" />
 
-                            {/* Fullscreen */}
-                            <button
-                                onClick={() => {
-                                    if (!document.fullscreenElement) {
-                                        document.documentElement.requestFullscreen()
-                                    } else {
-                                        document.exitFullscreen()
-                                    }
-                                }}
-                                className="p-3 bg-stone-800 hover:bg-purple-600/30 rounded-xl text-purple-400 transition-all border border-stone-700 hover:border-purple-500/50"
-                                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                            >
-                                {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
-                            </button>
+      <button 
+        className="rail-icon-btn gold"
+        onClick={() => {
+            if (isDrawerManager) setShowPaidInOutModal(true)
+            else setToast({ message: 'Drawer management unavailable', type: 'error' })
+        }}
+        title="Drawer Options"
+      >
+        <Banknote size={18} />
+      </button>
+      
+      <button 
+        className={`rail-icon-btn ${shift ? 'text-emerald-400' : 'text-stone-400'}`}
+        onClick={() => setShowShiftModal(true)} 
+        title="Shift Management"
+      >
+        <Clock size={18} />
+      </button>
 
-                            {/* New Customer / Check-In / Shift Button */}
-                            {view === 'POS' ? (
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setShowCheckInModal(true)}
-                                        className="px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white rounded-xl font-bold transition-all shadow-lg flex items-center gap-2"
-                                        title="Check In Customer"
-                                    >
-                                        <UserPlus className="h-5 w-5" />
-                                        <span className="hidden sm:inline">Check In</span>
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            if (!shift) setShowShiftModal(true)
-                                        }}
-                                        className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white rounded-xl font-bold transition-all shadow-lg flex items-center gap-2"
-                                        title="New Customer"
-                                    >
-                                        <UserPlus className="h-5 w-5" />
-                                        <span className="hidden sm:inline">New</span>
-                                    </button>
-                                </div>
-                            ) : (
-                                <>
-                                    <button
-                                        onClick={() => setShowShiftModal(true)}
-                                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-colors flex items-center gap-2"
-                                        title={shift ? 'Close Shift' : 'Open Shift'}
-                                    >
-                                        <DollarSign className="h-5 w-5" />
-                                        <span>{shift ? 'Close' : 'Open'}</span>
-                                    </button>
-                                    
-                                    {(isDrawerManager || isOwnerBypass) && (
-                                        <button
-                                            onClick={() => setShowStoreEodModal(true)}
-                                            className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold transition-colors flex items-center gap-2 shadow-lg shadow-amber-500/20"
-                                            title="Manager End of Day Z-Report"
-                                        >
-                                            <Lock className="h-5 w-5" />
-                                            <span className="hidden sm:inline">Store EOD</span>
-                                        </button>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    </div>
+      <button 
+        className="rail-icon-btn"
+        onClick={() => setShowStoreEodModal(true)}
+        title="Z-Report / End of Day"
+      >
+        <Monitor size={18} />
+      </button>
+    </div>
+    
+  </div>
+</header>
+
                     {/* Main Content Area - Responsive padding */}
                     <div className="flex-1 overflow-y-auto p-3 xl:p-6">
-                        {view === 'POS' ? (
-                            <>
-                                {!selectedCategory && !searchQuery ? (
-                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 xl:gap-5">
-                                        {serviceCategories.map(cat => (
-                                            <button
-                                                key={cat}
-                                                onClick={() => setSelectedCategory(cat)}
-                                                className="h-32 xl:h-40 bg-gradient-to-br from-stone-800/80 to-stone-900/80 backdrop-blur-sm rounded-2xl border border-white/10 hover:border-orange-500/50 transition-all duration-300 flex flex-col items-center justify-center gap-3 group hover:scale-[1.02] hover:shadow-xl hover:shadow-orange-500/10 active:scale-[0.98]"
-                                            >
-                                                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center group-hover:from-orange-500/30 group-hover:to-amber-500/30 transition-all">
-                                                    <span className="text-2xl">✨</span>
-                                                </div>
-                                                <span className="font-bold text-base xl:text-lg text-stone-300 group-hover:text-white transition-colors">{cat}</span>
-                                            </button>
-                                        ))}
+                        {/* === PERSISTENT CATEGORY TAB BAR === */}
+                        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+                            {serviceCategories.map(cat => (
+                                <button
+                                    key={cat}
+                                    onClick={() => { setView('POS'); setSelectedCategory(cat); }}
+                                    className={`px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200 border ${
+                                        view === 'POS' && selectedCategory === cat
+                                            ? 'bg-orange-500/20 text-orange-400 border-orange-500/40 shadow-lg shadow-orange-500/10'
+                                            : 'bg-stone-800/60 text-stone-400 border-stone-700/50 hover:bg-stone-800 hover:text-white hover:border-stone-600'
+                                    }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => {
+                                    setOpenItemPrice('')
+                                    setShowOpenItemModal(true)
+                                }}
+                                className="px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200 border border-dashed border-amber-500/30 bg-amber-500/5 text-amber-500 hover:bg-amber-500/15 hover:border-amber-500/50"
+                            >
+                                + Open Item
+                            </button>
+                            <div className="w-px h-6 bg-stone-700/50 mx-1 shrink-0" />
+                            <button
+                                onClick={() => { setView('HISTORY'); setSelectedCategory(null); fetchTransactions(); }}
+                                className={`px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200 border flex items-center gap-2 ${
+                                    view === 'HISTORY'
+                                        ? 'bg-violet-500/20 text-violet-400 border-violet-500/40 shadow-lg shadow-violet-500/10'
+                                        : 'bg-stone-800/60 text-stone-400 border-stone-700/50 hover:bg-stone-800 hover:text-white hover:border-stone-600'
+                                }`}
+                            >
+                                <History size={14} />
+                                Transactions
+                            </button>
+                        </div>
 
-                                        {/* Open Item Tile */}
-                                        <button
-                                            onClick={() => {
-                                                setOpenItemPrice('')
-                                                setShowOpenItemModal(true)
-                                            }}
-                                            className="h-32 xl:h-40 bg-stone-900/50 hover:bg-stone-800 rounded-2xl border border-dashed border-stone-700 hover:border-amber-500/50 transition-all duration-300 flex flex-col items-center justify-center gap-3 group hover:scale-[1.02] active:scale-[0.98]"
-                                        >
-                                            <div className="w-14 h-14 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-all">
-                                                <span className="text-2xl font-bold text-amber-500">+</span>
-                                            </div>
-                                            <span className="font-bold text-base xl:text-lg text-stone-400 group-hover:text-amber-500 transition-colors">Open Item</span>
-                                        </button>
-                                    </div>
-                                ) : (
+                        {/* === CONTENT AREA BELOW TABS === */}
+                        {view !== 'HISTORY' ? (
+                            /* ---- POS CONTENT ---- */
+                            <>
+                                {selectedCategory ? (
+                                    /* ---- ITEMS VIEW (category selected) ---- */
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-4">
-                                            {selectedCategory && (
-                                                <button
-                                                    onClick={() => setSelectedCategory(null)}
-                                                    className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 transition-colors"
-                                                >
-                                                    <ChevronRight className="h-6 w-6 rotate-180" />
-                                                </button>
-                                            )}
-                                            <h2 className="text-xl font-bold text-white">{selectedCategory || 'Search Results'}</h2>
+                                            <button
+                                                onClick={() => setSelectedCategory(null)}
+                                                className="p-2 hover:bg-stone-800 rounded-lg text-stone-400 transition-colors"
+                                            >
+                                                <ChevronRight className="h-6 w-6 rotate-180" />
+                                            </button>
+                                            <h2 className="text-xl font-bold text-white">{selectedCategory}</h2>
                                         </div>
 
                                         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -2336,7 +2297,7 @@ function POSContent() {
                                                         <img src={item.image} alt={item.name} className="h-20 w-20 object-cover rounded-xl mb-1 group-hover:scale-110 transition-transform duration-300 shadow-lg" />
                                                     ) : (
                                                         <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center mb-1 group-hover:from-orange-500/30 group-hover:to-amber-500/30 transition-all">
-                                                            <span className="text-2xl">💇</span>
+                                                            <span className="text-2xl">{String.fromCodePoint(0x1F487)}</span>
                                                         </div>
                                                     )}
                                                     <p className="font-semibold text-white text-center text-sm leading-tight line-clamp-2 min-h-[2.5em] flex items-center">{item.name}</p>
@@ -2357,10 +2318,73 @@ function POSContent() {
                                             ))}
                                         </div>
                                     </div>
+                                ) : searchQuery ? (
+                                    /* ---- SEARCH RESULTS ---- */
+                                    <div className="space-y-4">
+                                        <h2 className="text-xl font-bold text-white">Search Results</h2>
+                                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                            {filteredItems.map(item => (
+                                                <div
+                                                    key={item.id}
+                                                    onClick={() => {
+                                                        if (item.name === 'Open Item') {
+                                                            setShowOpenItemModal(true)
+                                                            setOpenItemPrice('')
+                                                        } else {
+                                                            addToCart(item, item.category === 'PRODUCTS' ? 'PRODUCT' : 'SERVICE')
+                                                        }
+                                                    }}
+                                                    className="bg-gradient-to-br from-stone-800/60 to-stone-900/60 backdrop-blur-sm rounded-2xl border border-white/10 p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-500/10 transition-all duration-300 group hover:scale-[1.02] active:scale-[0.98]"
+                                                >
+                                                    {item.image ? (
+                                                        <img src={item.image} alt={item.name} className="h-20 w-20 object-cover rounded-xl mb-1 group-hover:scale-110 transition-transform duration-300 shadow-lg" />
+                                                    ) : (
+                                                        <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center mb-1 group-hover:from-orange-500/30 group-hover:to-amber-500/30 transition-all">
+                                                            <span className="text-2xl">{String.fromCodePoint(0x1F487)}</span>
+                                                        </div>
+                                                    )}
+                                                    <p className="font-semibold text-white text-center text-sm leading-tight line-clamp-2 min-h-[2.5em] flex items-center">{item.name}</p>
+                                                    <div className="flex flex-wrap items-center justify-center gap-2 mt-1 w-full font-mono">
+                                                        <div className="bg-emerald-500/20 border border-emerald-500/30 px-2 py-1 rounded-lg shrink-0">
+                                                            <span className="text-xs font-bold text-emerald-400 block">${item.price.toFixed(2)}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    /* ---- CATEGORY TILES HOME ---- */
+                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 xl:gap-5">
+                                        {serviceCategories.map(cat => (
+                                            <button
+                                                key={cat}
+                                                onClick={() => { setView('POS'); setSelectedCategory(cat); }}
+                                                className="h-32 xl:h-40 bg-gradient-to-br from-stone-800/80 to-stone-900/80 backdrop-blur-sm rounded-2xl border border-white/10 hover:border-orange-500/50 transition-all duration-300 flex flex-col items-center justify-center gap-3 group hover:scale-[1.02] hover:shadow-xl hover:shadow-orange-500/10 active:scale-[0.98]"
+                                            >
+                                                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center group-hover:from-orange-500/30 group-hover:to-amber-500/30 transition-all">
+                                                    <span className="text-2xl">{String.fromCodePoint(0x2728)}</span>
+                                                </div>
+                                                <span className="font-bold text-base xl:text-lg text-stone-300 group-hover:text-white transition-colors">{cat}</span>
+                                            </button>
+                                        ))}
+                                        <button
+                                            onClick={() => {
+                                                setOpenItemPrice('')
+                                                setShowOpenItemModal(true)
+                                            }}
+                                            className="h-32 xl:h-40 bg-stone-900/50 hover:bg-stone-800 rounded-2xl border border-dashed border-stone-700 hover:border-amber-500/50 transition-all duration-300 flex flex-col items-center justify-center gap-3 group hover:scale-[1.02] active:scale-[0.98]"
+                                        >
+                                            <div className="w-14 h-14 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-all">
+                                                <span className="text-2xl font-bold text-amber-500">+</span>
+                                            </div>
+                                            <span className="font-bold text-base xl:text-lg text-stone-400 group-hover:text-amber-500 transition-colors">Open Item</span>
+                                        </button>
+                                    </div>
                                 )}
                             </>
                         ) : (
-                            /* Transaction History */
+                            /* ---- INLINE TRANSACTION HISTORY ---- */
                             <div className="space-y-4">
                                 {/* Search and Filter Bar */}
                                 <div className="bg-stone-900 rounded-xl p-3 border border-stone-800 space-y-3">
@@ -2413,11 +2437,8 @@ function POSContent() {
                                 </div>
 
                                 {transactions
-                                    // Filter out refund accounting entries (negative totals) - they're internal records
                                     .filter((tx: any) => parseFloat(String(tx.total)) >= 0)
-                                    // Filter by status
                                     .filter((tx: any) => txFilterStatus === 'ALL' || tx.status === txFilterStatus)
-                                    // Smart search filter
                                     .filter((tx: any) => {
                                         if (!txSearchQuery.trim()) return true
                                         const query = txSearchQuery.toLowerCase().trim()
@@ -2428,8 +2449,7 @@ function POSContent() {
                                         const amount = String(tx.total)
                                         const paymentMethod = tx.paymentMethod?.toLowerCase() || ''
                                         const date = new Date(tx.createdAt).toLocaleDateString().toLowerCase()
-                                        const cardLast4 = tx.cardLast4 || '' // Search by last 4 of card
-
+                                        const cardLast4 = tx.cardLast4 || ''
                                         return (
                                             customerName.includes(query) ||
                                             invoiceId.includes(query) ||
@@ -2440,7 +2460,6 @@ function POSContent() {
                                         )
                                     })
                                     .map((tx: any) => {
-                                        // Determine transaction status
                                         const totalNum = parseFloat(String(tx.total))
                                         const isRefunded = tx.status === 'REFUNDED' || tx.status === 'PARTIALLY_REFUNDED'
                                         const isVoided = tx.status === 'VOIDED'
@@ -2492,7 +2511,6 @@ function POSContent() {
                                                     <div>
                                                         <p className="font-medium text-white flex items-center gap-2">
                                                             {title}
-                                                            {/* Status Badges */}
                                                             {isRefunded && !tx.isDrawerActivity && (
                                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-medium">
                                                                     REFUNDED
@@ -2511,9 +2529,8 @@ function POSContent() {
                                                         </p>
                                                         <p className="text-sm text-stone-500">
                                                             {new Date(tx.createdAt).toLocaleString()}
-                                                            {tx.employee && <span className="ml-2 text-stone-600">• by {tx.employee.name || tx.employee.email}</span>}
+                                                            {tx.employee && <span className="ml-2 text-stone-600">{String.fromCodePoint(0x2022)} by {tx.employee.name || tx.employee.email}</span>}
                                                         </p>
-                                                        {/* Show reason for refunds/voids or drawer activities */}
                                                         {((isRefunded || isVoided || tx.isDrawerActivity) && tx.voidReason) && (
                                                             <p className="text-xs text-stone-600 mt-0.5 italic">
                                                                 Reason: {tx.voidReason}
@@ -2571,7 +2588,7 @@ function POSContent() {
 
                 {/* Right Side: Cart or Transaction Details - Premium Glass Design */}
                 <div className="w-[340px] xl:w-[400px] 2xl:w-[440px] shrink-0 flex flex-col bg-gradient-to-b from-stone-900/95 to-stone-950/95 backdrop-blur-xl border-l border-white/5 shadow-2xl shadow-black/50">
-                    {view === 'POS' ? (
+                    {/* Right panel - ALWAYS shows cart */}
                         <>
                             {/* Queue Panel (Wave B) */}
                             <div className="max-h-[280px] border-b border-white/10 overflow-hidden">
@@ -2834,96 +2851,10 @@ function POSContent() {
                                 </button>
                             </div>
                         </>
-                    ) : (
-                        /* Transaction Details */
-                        selectedTx ? (
-                            <div className="flex flex-col h-full">
-                                <div className="h-20 border-b border-stone-800 flex items-center justify-between px-6">
-                                    <h2 className="text-xl font-bold text-white">Order Details</h2>
-                                    <button onClick={() => setSelectedTx(null)} className="text-stone-400 hover:text-white">Close</button>
-                                </div>
-                                <div className="flex-1 p-6 overflow-y-auto">
-                                    <div className="text-center mb-6">
-                                        <p className="text-stone-400 text-sm">Transaction ID</p>
-                                        <p className="text-xs text-stone-500 font-mono">{selectedTx.id}</p>
-                                        <h3 className="text-3xl font-bold text-white mt-2">{formatCurrency(selectedTx.total)}</h3>
-                                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium mt-2 ${selectedTx.status === 'REFUNDED' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                                            {selectedTx.status}
-                                        </span>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        {selectedTx.lineItems.map((item: any, idx: number) => (
-                                            <div key={idx} className="flex justify-between text-sm">
-                                                <span className="text-stone-300">{item.quantity}x {item.serviceNameSnapshot || item.productNameSnapshot || item.name || 'Item'}</span>
-                                                <span className="text-white">{formatCurrency(Number(item.priceCharged || item.price || 0) * (item.quantity || 1))}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Loyalty History Block */}
-                                    {(selectedTx.salonLoyaltyLedgerEntries?.length > 0 || selectedTx.salonLoyaltyRedemptions?.length > 0) && (
-                                        <div className="mt-6 pt-6 border-t border-stone-800 space-y-3">
-                                            <h4 className="text-sm font-bold text-stone-400 uppercase tracking-wider flex items-center gap-2">
-                                                <Sparkles className="w-4 h-4 text-violet-400" />
-                                                Loyalty Impact
-                                            </h4>
-                                            
-                                            {/* Earned Points */}
-                                            {selectedTx.salonLoyaltyLedgerEntries?.map((entry: any) => (
-                                                <div key={entry.id} className="bg-violet-900/10 border border-violet-500/20 rounded-lg p-3 flex items-center justify-between">
-                                                    <div>
-                                                        <p className="text-sm font-medium text-violet-200">{entry.loyaltyProgram?.name}</p>
-                                                        <p className="text-xs text-stone-500">Points Earned</p>
-                                                    </div>
-                                                    <div className="text-violet-400 font-bold text-lg">
-                                                        +{entry.pointsAmount}
-                                                    </div>
-                                                </div>
-                                            ))}
-
-                                            {/* Rewards Used */}
-                                            {selectedTx.salonLoyaltyRedemptions?.map((redemption: any) => (
-                                                <div key={redemption.id} className="bg-emerald-900/10 border border-emerald-500/20 rounded-lg p-3 flex items-center justify-between">
-                                                    <div>
-                                                        <p className="text-sm font-medium text-emerald-200">{redemption.loyaltyProgram?.name}</p>
-                                                        <p className="text-xs text-stone-500">Reward Redeemed</p>
-                                                    </div>
-                                                    <div className="text-emerald-400 font-bold text-sm bg-emerald-900/30 px-2 py-1 rounded border border-emerald-500/20">
-                                                        Applied
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                </div>
-                                <div className="p-6 border-t border-stone-800">
-                                    {selectedTx.status === 'COMPLETED' && (
-                                        <button
-                                            onClick={() => {
-                                                setSelectedTxForActions(selectedTx)
-                                                setShowTransactionModal(true)
-                                                setSelectedTx(null)
-                                            }}
-                                            className="w-full py-3 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded-xl font-medium transition-all flex items-center justify-center gap-2"
-                                        >
-                                            <RotateCcw className="h-4 w-4" />
-                                            Refund / Void
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-stone-500">
-                                <p>Select an order to view details</p>
-                            </div>
-                        )
-                    )}
 
                     {/* Checkout Modal */}
                     {showCheckoutModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                             <div className="w-full max-w-2xl bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                                 <div className="p-6 border-b border-stone-800 flex items-center justify-between">
                                     <h2 className="text-2xl font-bold text-white">Payment Method</h2>
@@ -3007,7 +2938,7 @@ function POSContent() {
 
                     {/* Cash Tendering Modal */}
                     {showCashTendering && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                             <div className="w-full max-w-sm bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                                 <div className="p-3 border-b border-stone-800 flex items-center justify-between shrink-0">
                                     <h2 className="text-lg font-bold text-white">Cash Payment</h2>
@@ -3245,7 +3176,7 @@ function POSContent() {
                         const isValidSplit = cashAmt > 0 && cashAmt < splitTotal && cashReceivedAmt >= cashAmt
 
                         return (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                                 <div className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                                     <div className="p-4 border-b border-stone-800 flex items-center justify-between">
                                         <h2 className="text-xl font-bold text-white">Split Payment</h2>
@@ -3393,7 +3324,7 @@ function POSContent() {
 
                     {/* Discount Modal */}
                     {showDiscountModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                             <div className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                                 <div className="p-6 border-b border-stone-800 flex justify-between items-center">
                                     <h3 className="text-xl font-bold text-white">Apply Discount</h3>
@@ -3497,7 +3428,7 @@ function POSContent() {
 
                     {/* Tip Waiting Modal */}
                     {showTipWaiting && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                             <div className="bg-stone-900 rounded-2xl border border-stone-700 p-8 max-w-md w-full text-center">
                                 <div className="mb-6">
                                     <div className="w-16 h-16 mx-auto bg-orange-500/20 rounded-full flex items-center justify-center mb-4">
@@ -3554,7 +3485,7 @@ function POSContent() {
 
                     {/* Clear Cart Confirmation Modal */}
                     {showClearCartConfirm && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                             <div className="bg-stone-900 rounded-2xl border border-stone-700 p-6 w-[360px] shadow-2xl">
                                 <div className="text-center mb-6">
                                     <div className="h-16 w-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -3591,7 +3522,7 @@ function POSContent() {
 
                     {/* Custom Item Modal with Pin Pad */}
                     {showOpenItemModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                             <div className="bg-stone-900 rounded-2xl border border-stone-700 p-6 w-[400px] shadow-2xl">
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-xl font-bold text-white">Custom Item</h3>
@@ -3700,7 +3631,7 @@ function POSContent() {
 
                     {/* Customer Discounts Modal */}
                     {showDiscounts && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                             <CustomerDiscounts
                                 franchiseId={user?.franchiseId || ''}
                                 customerPhone={selectedCustomer?.phone}
@@ -3718,7 +3649,7 @@ function POSContent() {
 
                     {/* Customer Display Modal */}
                     {showDisplayModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                             <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-stone-700">
                                 <h2 className="text-xl font-bold text-white text-center mb-2">Customer Display</h2>
                                 <p className="text-stone-400 text-center text-sm mb-6">Open this URL on your second tablet</p>
@@ -3797,7 +3728,7 @@ function POSContent() {
 
                     {/* Customer Selection Modal */}
                     {showCustomerModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                             <div className="bg-stone-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-stone-700 max-h-[80vh] flex flex-col">
                                 <h2 className="text-xl font-bold text-white text-center mb-2">Select Customer</h2>
                                 <p className="text-stone-400 text-center text-sm mb-4">Choose a customer or search by name/phone</p>
@@ -4058,7 +3989,7 @@ function POSContent() {
             {/* Shift Report Modal - Auto prints */}
             {
                 shiftReport && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 print:bg-white print:p-0">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 print:bg-white print:p-0">
                         <div className="w-full max-w-md bg-white text-black p-6 rounded-xl shadow-2xl print:shadow-none print:max-w-full">
                             <div className="text-center mb-4 border-b pb-4">
                                 <h2 className="text-xl font-bold">SHIFT REPORT</h2>

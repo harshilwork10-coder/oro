@@ -191,7 +191,7 @@ export default function PaxPaymentModal({ isOpen, onClose, onSuccess, amount, in
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <div className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl overflow-hidden">
                 <div className="p-6 border-b border-stone-800 flex items-center justify-between">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">

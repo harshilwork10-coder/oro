@@ -179,7 +179,7 @@ export default function ReceiptModal({ isOpen, onClose, transactionData, onCompl
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-stone-900 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-stone-800">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-orange-600 to-amber-600 px-6 py-5">

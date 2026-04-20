@@ -395,7 +395,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             {/* Toast Notification */}
             {toast && (
                 <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${toast.type === 'success'
@@ -900,7 +900,7 @@ export default function TransactionActionsModal({ transaction, onClose, onSucces
 
             {/* Manager PIN Prompt Overlay */}
             {showManagerPinPrompt && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 rounded-2xl">
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 rounded-2xl">
                     <div className="bg-stone-900 border border-amber-500/30 rounded-xl p-6 w-80 space-y-4">
                         <div className="text-center">
                             <div className="w-12 h-12 rounded-full bg-amber-500/20 mx-auto flex items-center justify-center mb-3">

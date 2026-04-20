@@ -6,7 +6,25 @@ import { useRouter } from 'next/navigation'
 import OroLogo from '@/components/ui/OroLogo'
 import EmployeeTiles from '@/components/pos/EmployeeTiles'
 import { DeviceTrust } from '@/lib/device-trust'
-import { Building2, ArrowLeft, Key, Loader2, Settings, X } from 'lucide-react'
+import { Building2, ArrowLeft, Key, Loader2, Settings, X, RefreshCw } from 'lucide-react'
+
+const LargeClock = () => {
+    const [time, setTime] = useState(new Date())
+    useEffect(() => {
+        const timer = setInterval(() => setTime(new Date()), 1000)
+        return () => clearInterval(timer)
+    }, [])
+    return (
+        <div className="flex flex-col items-center justify-center">
+            <h2 className="text-7xl xl:text-8xl font-light text-white tracking-tighter mb-2">
+                {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </h2>
+            <p className="text-xl xl:text-2xl text-stone-400 font-medium tracking-wide">
+                {time.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+            </p>
+        </div>
+    )
+}
 
 interface TerminalConfig {
     business: { id: string; name: string; industryType: string; logo?: string | null }
@@ -395,43 +413,25 @@ export default function EmployeeLoginPage() {
         const stationToken = typeof window !== 'undefined' ? localStorage.getItem('station_token') : null
 
         return (
-            <div className="min-h-screen bg-stone-950 flex items-center justify-center p-4">
-                <div className="w-full max-w-2xl">
-                    {/* Header with store info and settings */}
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-3">
-                            {terminalConfig?.business.logo ? (
-                                <img
-                                    src={terminalConfig.business.logo}
-                                    alt={terminalConfig.business.name}
-                                    className="h-10 w-auto object-contain"
-                                />
-                            ) : (
-                                <OroLogo className="h-8 w-auto" />
-                            )}
-                            <div>
-                                <p className="text-white font-medium">{terminalConfig?.business.name}</p>
-                                <p className="text-stone-500 text-sm">
-                                    {terminalConfig?.location.name}
-                                    {terminalConfig?.station && ` • ${terminalConfig.station.name}`}
-                                </p>
-                            </div>
-                        </div>
+            <div className="min-h-screen bg-stone-950 flex p-4 xl:p-8 gap-4 xl:gap-8">
+                {/* LEFT PANEL: Employee Grid */}
+                <div className="w-1/3 min-w-[320px] max-w-md h-full flex flex-col bg-stone-900/40 backdrop-blur-3xl border border-stone-800 rounded-3xl p-6 xl:p-8 shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-amber-400" />
+                    
+                    <div className="flex items-center justify-between mb-8">
+                        <h1 className="text-2xl xl:text-3xl font-bold text-white tracking-tight">
+                            Who's clocking in?
+                        </h1>
                         <button
                             onClick={() => setShowAdminUnlock(true)}
-                            className="p-2 text-stone-500 hover:text-orange-400 rounded-lg hover:bg-stone-800"
-                            title="Reconfigure Terminal"
+                            className="p-2.5 bg-stone-800/50 text-stone-400 hover:text-orange-400 hover:bg-stone-800 rounded-full transition-all"
+                            title="Admin Reconfigure"
                         >
                             <Settings className="h-5 w-5" />
                         </button>
                     </div>
 
-                    {/* Employee Tiles */}
-                    <div className="bg-stone-900/50 border border-stone-800 rounded-2xl p-6">
-                        <h1 className="text-2xl font-bold text-white text-center mb-2">
-                            Who's clocking in?
-                        </h1>
-
+                    <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-700">
                         <EmployeeTiles
                             stationToken={stationToken}
                             onEmployeeSelect={(employee) => {
@@ -441,10 +441,61 @@ export default function EmployeeLoginPage() {
                             isLoading={loading}
                         />
                     </div>
+                </div>
 
-                    <div className="mt-6 text-center">
-                        <a href="/login" className="text-stone-500 text-sm hover:text-stone-400">
-                            Owner/Admin Login →
+                {/* CENTER & RIGHT PANELS: Visual Branding and Clock */}
+                <div className="flex-1 flex flex-col h-full bg-stone-900/20 backdrop-blur-lg border border-stone-800/50 rounded-3xl relative overflow-hidden">
+                    
+                    {/* CENTER: Massive Store Branding */}
+                    <div className="flex-1 flex flex-col items-center justify-center p-8">
+                        <div className="relative mb-8">
+                            <div className="absolute inset-0 bg-orange-500/20 blur-[100px] rounded-full" />
+                            {terminalConfig?.business.logo ? (
+                                <img
+                                    src={terminalConfig.business.logo}
+                                    alt={terminalConfig.business.name}
+                                    className="h-32 xl:h-48 w-auto object-contain relative z-10 drop-shadow-2xl"
+                                />
+                            ) : (
+                                <OroLogo className="h-28 xl:h-36 w-auto relative z-10 drop-shadow-2xl" />
+                            )}
+                        </div>
+                        
+                        <h2 className="text-4xl xl:text-5xl font-black text-white tracking-tight text-center mb-3">
+                            {terminalConfig?.business.name}
+                        </h2>
+                        <div className="flex items-center gap-3 bg-stone-900/60 px-5 py-2.5 rounded-full border border-stone-800">
+                            <Building2 className="h-4 w-4 text-orange-500" />
+                            <p className="text-stone-300 text-lg">
+                                {terminalConfig?.location.name}
+                            </p>
+                            <span className="text-stone-600">•</span>
+                            <p className="text-stone-400">
+                                {terminalConfig?.station?.name || 'POS Terminal'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* BOTTOM: Massive Clock */}
+                    <div className="flex-1 flex items-center justify-center pb-12 border-t border-stone-800/30 mx-12">
+                        <LargeClock />
+                    </div>
+
+                    {/* BOTTOM RIGHT: Sync Updates Button */}
+                    <div className="absolute bottom-6 right-6 lg:bottom-8 lg:right-8">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="flex items-center gap-3 bg-stone-800/80 hover:bg-stone-700/80 text-white px-6 py-3.5 rounded-full backdrop-blur-xl border border-stone-700 transition-all active:scale-95 shadow-xl group"
+                        >
+                            <RefreshCw className="h-5 w-5 text-stone-400 group-hover:text-white group-hover:rotate-180 transition-all duration-500" />
+                            <span className="font-semibold text-sm xl:text-base">Sync Updates</span>
+                        </button>
+                    </div>
+
+                    {/* BOTTOM LEFT: Admin Portal Link */}
+                    <div className="absolute bottom-6 left-6 lg:bottom-8 lg:right-auto lg:left-8">
+                        <a href="/login" className="flex items-center gap-2 text-stone-500 text-sm font-medium hover:text-white transition-colors bg-stone-900/50 px-5 py-3 rounded-full border border-stone-800/50">
+                            Owner Portal <ArrowLeft className="h-4 w-4 rotate-180" />
                         </a>
                     </div>
                 </div>
