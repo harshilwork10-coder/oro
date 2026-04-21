@@ -82,6 +82,7 @@ function getNavItems(businessType: 'retail' | 'salon' | 'both') {
     ];
 
     const salon = [
+        { name: 'Salon HQ', href: '/owner/salon', icon: Scissors },
         { name: 'Appointments', href: '/owner/appointments', icon: Calendar },
         { name: 'Services', href: '/owner/services', icon: Scissors },
     ];
