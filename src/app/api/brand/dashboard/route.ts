@@ -288,6 +288,15 @@ export async function GET(req: NextRequest) {
             if (employeeCount === 0 && f.locations.length > 0) health -= 10
             health = Math.max(0, Math.min(100, health))
 
+            // Compute franchisee's weak stores count and top issue
+            const fStores = stores.filter(s => s.franchiseId === f.id)
+            const fWeakStores = fStores.filter(s => s.health < 60).length
+            let topIssue: string | null = null
+            if (status === 'critical') topIssue = 'Zero revenue with active locations'
+            else if (growth < -25 && priorRevenue > 0) topIssue = `Revenue declined ${Math.abs(growth).toFixed(0)}% period-over-period`
+            else if (fWeakStores > 0) topIssue = `${fWeakStores} store(s) below health threshold`
+            else if (royaltiesDue > 0 && royaltiesCollected === 0) topIssue = 'Royalties due with $0 collected'
+
             return {
                 id: f.id,
                 name: f.owner?.name || f.name || `Franchisee ${f.id.slice(0, 6)}`,
@@ -303,6 +312,8 @@ export async function GET(req: NextRequest) {
                 royaltiesCollected,
                 status,
                 health,
+                weakStores: fWeakStores,
+                topIssue,
             }
         })
 
@@ -493,6 +504,83 @@ export async function GET(req: NextRequest) {
             })
         }
 
+        // ═══════════════════════════════════════════
+        // RECENT MOVERS (with 'why' explanations)
+        // ═══════════════════════════════════════════
+
+        const movers: any[] = []
+
+        // Franchisee movers
+        franchiseeData
+            .filter(f => f.priorRevenue > 0 && Math.abs(f.growth) > 5)
+            .sort((a, b) => Math.abs(b.growth) - Math.abs(a.growth))
+            .slice(0, 6)
+            .forEach(f => {
+                const fStores = stores.filter(s => s.franchiseId === f.id)
+                const avgTicketPrior = f.priorRevenue > 0 && priorByFranchise.get(f.id)
+                    ? f.priorRevenue / (priorByFranchise.get(f.id)?.length || 1) : 0
+                const ticketDelta = avgTicketPrior > 0
+                    ? ((f.avgTicket - avgTicketPrior) / avgTicketPrior * 100) : 0
+
+                // Determine 'why'
+                let why = ''
+                if (f.growth < -20) {
+                    const worstStore = fStores.sort((a, b) => a.growth - b.growth)[0]
+                    if (worstStore && worstStore.topIssue) why = worstStore.topIssue
+                    else if (ticketDelta < -10) why = `Avg ticket down ${Math.abs(ticketDelta).toFixed(0)}%`
+                    else if (f.transactionCount === 0) why = 'No transactions this period'
+                    else why = `Revenue dropped ${Math.abs(f.growth).toFixed(0)}% — volume and/or ticket decline`
+                } else if (f.growth > 20) {
+                    if (ticketDelta > 10) why = `Avg ticket up ${ticketDelta.toFixed(0)}%`
+                    else if (f.transactionCount > (priorByFranchise.get(f.id)?.length || 0) * 1.2) why = 'Transaction volume increase'
+                    else why = `Revenue grew ${f.growth.toFixed(0)}% — strong demand`
+                } else {
+                    why = f.growth > 0 ? 'Steady growth' : 'Moderate decline'
+                }
+
+                movers.push({
+                    type: 'franchisee', id: f.id, name: f.name,
+                    delta: f.growth, direction: f.growth >= 0 ? 'up' : 'down',
+                    region: f.region, why,
+                })
+            })
+
+        // Region movers
+        regions
+            .filter(r => r.priorRevenue > 0 && Math.abs(r.growth) > 5)
+            .sort((a, b) => Math.abs(b.growth) - Math.abs(a.growth))
+            .slice(0, 4)
+            .forEach(r => {
+                let why = ''
+                if (r.weakStores > 0) why = `${r.weakStores} weak store(s) in region`
+                else if (r.growth > 0) why = 'Strong performance across stores'
+                else why = 'Multiple stores declining'
+
+                movers.push({
+                    type: 'region', id: r.region, name: r.region,
+                    delta: r.growth, direction: r.growth >= 0 ? 'up' : 'down',
+                    region: r.region, why,
+                })
+            })
+
+        // Store movers (top 4 biggest swings)
+        stores
+            .filter(s => s.priorRevenue > 0 && Math.abs(s.growth) > 15)
+            .sort((a, b) => Math.abs(b.growth) - Math.abs(a.growth))
+            .slice(0, 4)
+            .forEach(s => {
+                movers.push({
+                    type: 'store', id: s.id, name: s.name,
+                    delta: s.growth, direction: s.growth >= 0 ? 'up' : 'down',
+                    region: s.region, why: s.topIssue || (s.growth > 0 ? 'Strong growth' : 'Revenue decline'),
+                })
+            })
+
+        // Health tier breakdown
+        const healthGreen = franchiseeData.filter(f => f.health >= 80).length
+        const healthYellow = franchiseeData.filter(f => f.health >= 60 && f.health < 80).length
+        const healthRed = franchiseeData.filter(f => f.health < 60).length
+
         return NextResponse.json({
             name: franchisor.name || 'Brand HQ',
             brandCode: franchisor.brandCode || null,
@@ -504,13 +592,17 @@ export async function GET(req: NextRequest) {
                 activeLocations: locationBreakdown.active,
                 totalLocations: allLocations.length,
                 pendingOpenings: locationBreakdown.pending,
+                offlineLocations: locationBreakdown.offline,
                 royaltiesCollected,
                 royaltiesDue,
                 royaltiesOverdue,
                 franchiseeHealthScore: avgHealth,
+                healthBreakdown: { green: healthGreen, yellow: healthYellow, red: healthRed },
                 totalFranchisees: franchises.length,
                 totalEmployees,
                 totalTransactions: currentTx.length,
+                attentionCount: attentionItems.length,
+                attentionCritical: attentionItems.filter(a => a.severity === 'critical').length,
             },
             franchisees: franchiseeData,
             stores,
@@ -533,6 +625,7 @@ export async function GET(req: NextRequest) {
                 avgDaysToGoLive: Math.round(avgDaysToGoLive),
             },
             attentionItems,
+            recentMovers: movers.sort((a: any, b: any) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 10),
             fetchedAt: fetchedAt.toISOString(),
         })
     } catch (error) {
