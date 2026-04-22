@@ -104,9 +104,17 @@ export async function GET(req: NextRequest) {
         const locationData = await Promise.all(
             locations.map(async (location) => {
                 // Today's transactions
+                // Query by locationId directly (if set), OR by franchiseId for
+                // transactions that predate the locationId fix (null locationId).
+                // This ensures transactions are counted even without a cashDrawerSession.
                 const todayTransactions = await prisma.transaction.findMany({
                     where: {
-                        cashDrawerSession: { locationId: location.id },
+                        OR: [
+                            { locationId: location.id },
+                            // Fallback: transactions with no locationId but matching franchise
+                            // (only safe for single-location franchises to avoid double-counting)
+                            { locationId: null, franchiseId: location.franchiseId },
+                        ],
                         createdAt: { gte: startOfToday },
                         status: 'COMPLETED',
                     },
@@ -116,7 +124,10 @@ export async function GET(req: NextRequest) {
                 // Yesterday's transactions
                 const yesterdayTransactions = await prisma.transaction.findMany({
                     where: {
-                        cashDrawerSession: { locationId: location.id },
+                        OR: [
+                            { locationId: location.id },
+                            { locationId: null, franchiseId: location.franchiseId },
+                        ],
                         createdAt: { gte: startOfYesterday, lte: endOfYesterday },
                         status: 'COMPLETED',
                     },
@@ -126,7 +137,10 @@ export async function GET(req: NextRequest) {
                 // MTD transactions
                 const mtdTransactions = await prisma.transaction.findMany({
                     where: {
-                        cashDrawerSession: { locationId: location.id },
+                        OR: [
+                            { locationId: location.id },
+                            { locationId: null, franchiseId: location.franchiseId },
+                        ],
                         createdAt: { gte: startOfMonth },
                         status: 'COMPLETED',
                     },

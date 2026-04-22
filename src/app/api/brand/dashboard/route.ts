@@ -155,17 +155,35 @@ export async function GET(req: NextRequest) {
         // ═══════════════════════════════════════════
 
         // Group transactions by location
+        // For transactions with null locationId (pre-fix POS sales), attribute to
+        // the franchise's single location if the franchise has exactly one location.
+        // Multi-location franchises with null locationId go to '_none' to avoid double-counting.
+        const franchiseSingleLocation = new Map<string, string>()
+        for (const f of franchises) {
+            if (f.locations.length === 1) {
+                franchiseSingleLocation.set(f.id, f.locations[0].id)
+            }
+        }
+
         const txByLocation = new Map<string, typeof currentTx>()
         const priorTxByLocation = new Map<string, typeof priorTx>()
         for (const tx of currentTx) {
-            const lid = tx.locationId || '_none'
-            if (!txByLocation.has(lid)) txByLocation.set(lid, [])
-            txByLocation.get(lid)!.push(tx)
+            let lid = tx.locationId
+            if (!lid && tx.franchiseId) {
+                lid = franchiseSingleLocation.get(tx.franchiseId) || null
+            }
+            const key = lid || '_none'
+            if (!txByLocation.has(key)) txByLocation.set(key, [])
+            txByLocation.get(key)!.push(tx)
         }
         for (const tx of priorTx) {
-            const lid = tx.locationId || '_none'
-            if (!priorTxByLocation.has(lid)) priorTxByLocation.set(lid, [])
-            priorTxByLocation.get(lid)!.push(tx)
+            let lid = tx.locationId
+            if (!lid && tx.franchiseId) {
+                lid = franchiseSingleLocation.get(tx.franchiseId) || null
+            }
+            const key = lid || '_none'
+            if (!priorTxByLocation.has(key)) priorTxByLocation.set(key, [])
+            priorTxByLocation.get(key)!.push(tx)
         }
 
         // Group appointments by location

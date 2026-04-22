@@ -252,11 +252,19 @@ export async function POST(req: NextRequest) {
         // Generate sequential invoice number
         const invoiceNumber = await generateInvoiceNumber(user.franchiseId)
 
+        // ===== LOCATION ATTRIBUTION (dashboard-critical) =====
+        // Resolve locationId from the authenticated user's profile.
+        // This is essential: without locationId, transactions are invisible to
+        // owner dashboard (multi-store) and franchisor dashboard (brand) rollups.
+        // The user's locationId is set during pairing/onboarding and travels in the JWT.
+        const resolvedLocationId = user.locationId || null
+
         // Ensure numeric values are converted to strings for Prisma Decimal type
         const transactionData = {
             invoiceNumber,
             franchiseId: user.franchiseId,
             employeeId: user.id,
+            locationId: resolvedLocationId,
             clientId: (clientId && !clientId.startsWith('apt-') && !clientId.startsWith('walkin-')) ? clientId : null,
             subtotal: subtotal.toString(),
             tax: tax.toString(),

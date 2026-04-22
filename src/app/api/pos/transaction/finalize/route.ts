@@ -348,11 +348,15 @@ export async function POST(req: NextRequest) {
             })
 
             // ── Create the final Transaction ──
+            // Resolve locationId from the authenticated user (set during pairing/onboarding)
+            const resolvedLocationId = user.locationId || null
+
             const newTransaction = await tx.transaction.create({
                 data: {
                     invoiceNumber,
                     franchiseId: pendingTx.franchiseId,
                     employeeId: pendingTx.employeeId,
+                    locationId: resolvedLocationId,
                     clientId: pendingTx.clientId || null,
                     subtotal: serverSubtotal.toString(),
                     tax: '0', // TODO: Compute from tax config
@@ -420,7 +424,7 @@ export async function POST(req: NextRequest) {
                         await tx.stockAdjustment.create({
                             data: {
                                 productId: item.id,
-                                locationId: pendingTx.franchiseId, // TODO: actual locationId
+                                locationId: resolvedLocationId || pendingTx.franchiseId,
                                 quantity: -item.quantity,
                                 reason: 'SALE',
                                 sourceId: newTransaction.id,
