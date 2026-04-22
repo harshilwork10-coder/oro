@@ -2,330 +2,378 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import Link from 'next/link'
-import {
-    MapPin, DollarSign, Users, CreditCard, AlertCircle,
-    BarChart3, Calendar, Scissors, Building2, Shield,
-    TrendingUp, PieChart, ClipboardList
-} from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import {
+    DollarSign, TrendingUp, Users, Calendar, AlertTriangle, ShoppingCart,
+    BarChart3, Clock, HeartPulse, Package, CreditCard, Scissors,
+    Activity, Store, Star,
+} from 'lucide-react'
 
-import DashboardShell from './command-center/DashboardShell'
-import CommandHeader from './command-center/CommandHeader'
-import KpiStrip from './command-center/KpiStrip'
-import AlertRail from './command-center/AlertRail'
-import type { ExceptionItem } from './command-center/AlertRail'
-import QuickActionsPanel from './command-center/QuickActionsPanel'
-import WorkspaceTabs from './command-center/WorkspaceTabs'
-import LocationPerformanceGrid from './command-center/LocationPerformanceGrid'
-import type { LocationRow } from './command-center/LocationPerformanceGrid'
-import DrawerPanel from './command-center/DrawerPanel'
+import {
+    OwnerPageShell, OwnerTopBar, OwnerKpiStrip, OwnerActionCenter,
+    OwnerExceptionRail, OwnerDrawer, OwnerLoading,
+    Card, SectionHead, MetricCard, HealthBadge, Delta, StatusBadge,
+    TabBar, DataFresh,
+    type OwnerKpiDef, type ActionItem, type ExceptionItem,
+} from '@/components/dashboard/owner-os/OwnerPrimitives'
 
-// ─── Financial Snapshot ─────────────────────────────────
-function FinancialReport({ locations, totalSales, todayTxns, weekSales }: {
-    locations: LocationRow[], totalSales: number, todayTxns: number, weekSales: number
-}) {
-    const totalCash = locations.reduce((s, l) => s + l.cash, 0)
-    const totalCard = locations.reduce((s, l) => s + l.card, 0)
-    const avgTicket = todayTxns > 0 ? totalSales / todayTxns : 0
-    const cashPct = totalSales > 0 ? (totalCash / totalSales * 100) : 0
+// ── Helpers ─────────────────────────────────────────────────────
+function fmt(n: number) { return formatCurrency(n) }
+function fmtK(n: number) { return n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}` }
 
-    return (
-        <div className="space-y-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Total Revenue</p>
-                    <p className="text-2xl font-black text-emerald-400">{formatCurrency(totalSales)}</p>
-                </div>
-                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Avg Ticket</p>
-                    <p className="text-2xl font-black text-white">{formatCurrency(avgTicket)}</p>
-                </div>
-                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Cash</p>
-                    <p className="text-2xl font-black text-emerald-400">{formatCurrency(totalCash)}</p>
-                    <p className="text-[11px] text-stone-500 mt-0.5">{cashPct.toFixed(0)}%</p>
-                </div>
-                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Card</p>
-                    <p className="text-2xl font-black text-blue-400">{formatCurrency(totalCard)}</p>
-                    <p className="text-[11px] text-stone-500 mt-0.5">{(100 - cashPct).toFixed(0)}%</p>
-                </div>
-            </div>
-            <div>
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-stone-400">Payment Mix</span>
-                    <span className="text-xs text-stone-500">{todayTxns} txns today</span>
-                </div>
-                <div className="h-3 rounded-full bg-stone-800 overflow-hidden flex">
-                    <div className="h-full bg-emerald-500 rounded-l-full" style={{ width: `${cashPct}%` }} />
-                    <div className="h-full bg-blue-500 rounded-r-full" style={{ width: `${100 - cashPct}%` }} />
-                </div>
-            </div>
-            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">This Week</p>
-                        <p className="text-xl font-black text-white">{formatCurrency(weekSales)}</p>
-                    </div>
-                    <Link href="/dashboard/reports" className="text-xs font-semibold text-[var(--theme-accent)] hover:underline">
-                        Full Reports →
-                    </Link>
-                </div>
-            </div>
-        </div>
-    )
+// ═══════════════════════════════════════════════════════════════
+// SINGLE-LOCATION FRANCHISEE OWNER — ONE-PAGE OPERATING SYSTEM
+// ═══════════════════════════════════════════════════════════════
+
+interface StoreData {
+    location: { id: string; name: string; address?: string }
+    today: { sales: number; transactions: number; cash: number; card: number; avgTicket: number; appointments: number }
+    yesterday: { sales: number; transactions: number }
+    mtd: { sales: number; transactions: number }
+    inventory: { lowStock: number }
+    staff: { total: number; onClock: number; count: number }
+    appointments: { today: number; noShowPct: number }
+    retention: { repeatPct: number; uniqueClients: number }
+    health: number
+    topIssue: string
+    recommendedAction: string
+    status: string
+    growth: number
+    exceptions: number
 }
-
-// ─── Compliance Tab ─────────────────────────────────────
-function ComplianceTab() {
-    return (
-        <div className="space-y-5">
-            <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Compliance Score</p>
-                    <p className="text-2xl font-black text-emerald-400">100%</p>
-                </div>
-                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Service Menu</p>
-                    <p className="text-2xl font-black text-emerald-400">✓</p>
-                    <p className="text-[11px] text-stone-500 mt-0.5">In sync with brand</p>
-                </div>
-                <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Training</p>
-                    <p className="text-2xl font-black text-emerald-400">✓</p>
-                    <p className="text-[11px] text-stone-500 mt-0.5">All current</p>
-                </div>
-            </div>
-            <div className="bg-white/[0.03] rounded-xl p-6 border border-white/[0.06] text-center">
-                <Shield className="h-10 w-10 mx-auto mb-3 text-stone-600" />
-                <p className="font-semibold text-stone-300">Franchise Compliance</p>
-                <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
-                    Your franchise is in good standing. Compliance items from your franchisor will appear here.
-                </p>
-            </div>
-        </div>
-    )
-}
-
-// ═══════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════════
 
 export default function FranchiseeCommandCenter() {
     const { data: session } = useSession()
-    const [locations, setLocations] = useState<LocationRow[]>([])
-    const [exceptions, setExceptions] = useState<ExceptionItem[]>([])
-    const [exceptionCounts, setExceptionCounts] = useState({ critical: 0, warning: 0, info: 0, total: 0 })
-    const [summary, setSummary] = useState({ todaySales: 0, yesterdaySales: 0, weekSales: 0, todayTxns: 0, appointments: 0 })
+    const [store, setStore] = useState<StoreData | null>(null)
     const [loading, setLoading] = useState(true)
-    const [drawerLocation, setDrawerLocation] = useState<string | null>(null)
+    const [refreshing, setRefreshing] = useState(false)
+    const [attentionItems, setAttentionItems] = useState<ActionItem[]>([])
+    const [exceptionItems, setExceptionItems] = useState<ExceptionItem[]>([])
+    const [meta, setMeta] = useState<any>(null)
+    const [reportTab, setReportTab] = useState('overview')
+    const [drawerOpen, setDrawerOpen] = useState<string | null>(null) // 'sales' | 'staff' | 'customer' | null
 
-    const fetchData = useCallback(async () => {
-        setLoading(true)
+    // ── Fetch ───────────────────────────────────────────────────────
+    const fetchData = useCallback(async (isRefresh = false) => {
+        if (isRefresh) setRefreshing(true)
+        else setLoading(true)
         try {
-            const [storeRes, exRes] = await Promise.all([
-                fetch('/api/dashboard/multi-store'),
-                fetch('/api/owner/exceptions'),
-            ])
-            const storeData = await storeRes.json()
-            const exData = await exRes.json()
-
-            const locs: LocationRow[] = (storeData.locations || []).map((loc: any) => {
-                const hasSales = (loc.today?.sales || 0) > 0
-                const noStaff = (loc.staff?.count || 0) === 0
-                return {
-                    id: loc.location.id,
-                    name: loc.location.name,
-                    todaySales: loc.today?.sales || 0,
-                    transactions: loc.today?.transactions || 0,
-                    appointments: Math.floor((loc.today?.transactions || 0) * 1.5),
-                    cash: loc.today?.cash || 0,
-                    card: loc.today?.card || 0,
-                    activeStaff: loc.staff?.count || 0,
-                    status: hasSales ? 'active' as const : noStaff ? 'warning' as const : 'idle' as const,
-                }
-            })
-
-            setLocations(locs)
-            setSummary({
-                todaySales: storeData.summary?.todaySales || 0,
-                yesterdaySales: storeData.summary?.yesterdaySales || 0,
-                weekSales: storeData.summary?.mtdSales || 0,
-                todayTxns: storeData.summary?.todayTransactions || 0,
-                appointments: locs.reduce((s, l) => s + (l.appointments || 0), 0),
-            })
-            setExceptions((exData.exceptions || []).slice(0, 10))
-            setExceptionCounts(exData.counts || { critical: 0, warning: 0, info: 0, total: 0 })
-        } catch (e) {
-            console.error('Franchisee dashboard fetch error:', e)
-        } finally {
-            setLoading(false)
-        }
+            const res = await fetch('/api/dashboard/multi-store')
+            if (res.ok) {
+                const payload = await res.json()
+                // Single-location: take first location
+                const loc = payload.locations?.[0] || null
+                setStore(loc)
+                setAttentionItems(payload.attentionItems || [])
+                setExceptionItems(payload.exceptions || [])
+                setMeta(payload._meta)
+            }
+        } catch (e) { console.error('[SINGLE_OWNER_OS] Fetch error:', e) }
+        setLoading(false)
+        setRefreshing(false)
     }, [])
 
     useEffect(() => {
         fetchData()
-        const iv = setInterval(fetchData, 60000)
+        const iv = setInterval(() => fetchData(true), 60000)
         return () => clearInterval(iv)
     }, [fetchData])
 
-    const vsYesterday = summary.yesterdaySales > 0
-        ? ((summary.todaySales - summary.yesterdaySales) / summary.yesterdaySales * 100)
-        : 0
+    // ── Loading ─────────────────────────────────────────────────────
+    if (loading) return <OwnerLoading label="Loading your store…" />
 
-    const selectedLoc = locations.find(l => l.id === drawerLocation)
+    const d = store
+    const salesDelta = d && d.yesterday.sales > 0
+        ? ((d.today.sales - d.yesterday.sales) / d.yesterday.sales * 100) : 0
+    const totalPayments = (d?.today.cash || 0) + (d?.today.card || 0)
+    const cashPct = totalPayments > 0 ? ((d?.today.cash || 0) / totalPayments * 100) : 0
 
-    if (loading && locations.length === 0) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: 'var(--theme-accent)' }} />
-            </div>
-        )
-    }
+    // ═════════════════════════════════════════════════════════════════
+    // RENDER — SINGLE-STORE ONE-PAGE OS
+    // ═════════════════════════════════════════════════════════════════
 
     return (
         <>
-            <DashboardShell
-                header={
-                    <CommandHeader
-                        title="Franchise Operations"
-                        subtitle={`${locations.length} locations · ${session?.user?.name?.split(' ')[0] || ''}`}
-                        icon={Building2}
-                        roleBadge="Franchisee"
-                        roleBadgeColor="bg-blue-500/15 text-blue-400 border-blue-500/20"
-                        onRefresh={fetchData}
-                        refreshing={loading}
-                    />
-                }
-                kpiStrip={
-                    <KpiStrip
-                        columns={5}
-                        kpis={[
-                            {
-                                title: "Today's Revenue",
-                                value: formatCurrency(summary.todaySales),
-                                icon: DollarSign,
-                                variant: 'success',
-                                trend: { value: vsYesterday, label: 'vs yesterday' },
-                                pulse: true,
-                            },
-                            {
-                                title: 'My Locations',
-                                value: locations.length,
-                                subtitle: `${locations.filter(l => l.status === 'active').length} active now`,
-                                icon: MapPin,
-                                variant: 'accent',
-                            },
-                            {
-                                title: 'Appointments',
-                                value: summary.appointments,
-                                icon: Calendar,
-                            },
-                            {
-                                title: 'Staff on Floor',
-                                value: locations.reduce((s, l) => s + l.activeStaff, 0),
-                                subtitle: 'All locations',
-                                icon: Users,
-                            },
-                            {
-                                title: 'Alerts',
-                                value: exceptionCounts.total,
-                                subtitle: exceptionCounts.critical > 0 ? `${exceptionCounts.critical} critical` : 'All clear',
-                                icon: AlertCircle,
-                                variant: exceptionCounts.critical > 0 ? 'danger' : exceptionCounts.warning > 0 ? 'warning' : 'success',
-                            },
-                        ]}
-                    />
-                }
-                alertRail={
-                    <AlertRail
-                        exceptions={exceptions}
-                        emptyTitle="All locations running smoothly"
-                        emptySubtitle="No voids, no-shows, or compliance issues detected"
-                    />
-                }
-                quickActions={
-                    <QuickActionsPanel
-                        actions={[
-                            { label: 'Open POS', sublabel: 'New sale', icon: CreditCard, href: '/dashboard/pos/salon', color: 'bg-emerald-500/15', iconColor: 'text-emerald-400' },
-                            { label: 'My Locations', sublabel: 'All stores', icon: MapPin, href: '/dashboard/my-locations', color: 'bg-orange-500/15', iconColor: 'text-orange-400' },
-                            { label: 'Team', sublabel: 'Employees', icon: Users, href: '/dashboard/employees', color: 'bg-blue-500/15', iconColor: 'text-blue-400' },
-                            { label: 'Reports', sublabel: 'Financials', icon: BarChart3, href: '/dashboard/reports', color: 'bg-purple-500/15', iconColor: 'text-purple-400' },
-                            { label: 'Expansion', sublabel: 'Request', icon: TrendingUp, href: '/dashboard/expansion-requests', color: 'bg-teal-500/15', iconColor: 'text-teal-400' },
-                            { label: 'Services', sublabel: 'Menu', icon: Scissors, href: '/dashboard/services', color: 'bg-pink-500/15', iconColor: 'text-pink-400' },
-                        ]}
-                        columns={3}
-                    />
-                }
-                workspace={
-                    <WorkspaceTabs
-                        tabs={[
-                            {
-                                id: 'performance',
-                                label: 'Store Performance',
-                                icon: MapPin,
-                                content: (
-                                    <LocationPerformanceGrid
-                                        locations={locations}
-                                        showAppointments
-                                        onSelectLocation={setDrawerLocation}
-                                    />
-                                ),
-                            },
-                            {
-                                id: 'financials',
-                                label: 'Financials',
-                                icon: PieChart,
-                                content: (
-                                    <FinancialReport
-                                        locations={locations}
-                                        totalSales={summary.todaySales}
-                                        todayTxns={summary.todayTxns}
-                                        weekSales={summary.weekSales}
-                                    />
-                                ),
-                            },
-                            {
-                                id: 'compliance',
-                                label: 'Compliance',
-                                icon: Shield,
-                                content: <ComplianceTab />,
-                            },
-                        ]}
-                    />
-                }
-            />
+            <OwnerPageShell>
+                {/* ─── ROW 0: TOP BAR ─── */}
+                <OwnerTopBar
+                    title={d?.location.name || 'My Store'}
+                    subtitle={`${meta?.businessDate || 'Today'} · ${session?.user?.name?.split(' ')[0] || 'Owner'}`}
+                    badge="Franchisee"
+                    badgeColor="bg-blue-500/15 text-blue-400 border-blue-500/20"
+                    icon={Store}
+                    fetchedAt={meta?.lastUpdatedAt}
+                    onRefresh={() => fetchData(true)}
+                    refreshing={refreshing}
+                >
+                    {d && <HealthBadge score={d.health} size="md" />}
+                </OwnerTopBar>
 
-            <DrawerPanel
-                open={!!drawerLocation}
-                onClose={() => setDrawerLocation(null)}
-                title={selectedLoc?.name || 'Location'}
-                subtitle="Today's performance"
-            >
-                {selectedLoc && (
-                    <div className="space-y-5">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Revenue</p>
-                                <p className="text-2xl font-black text-emerald-400">{formatCurrency(selectedLoc.todaySales)}</p>
+                {/* ─── ROW 1: KPI STRIP ─── */}
+                <OwnerKpiStrip
+                    fetchedAt={meta?.lastUpdatedAt}
+                    kpis={[
+                        {
+                            title: "Today's Revenue", value: fmt(d?.today.sales || 0),
+                            delta: salesDelta, sub: `Yesterday: ${fmt(d?.yesterday.sales || 0)}`,
+                            variant: 'success', icon: DollarSign, pulse: true,
+                        },
+                        {
+                            title: 'Transactions', value: String(d?.today.transactions || 0),
+                            sub: `Avg ticket ${fmt(d?.today.avgTicket || 0)}`,
+                            variant: 'muted', icon: ShoppingCart,
+                        },
+                        {
+                            title: 'Appointments', value: String(d?.appointments?.today || 0),
+                            sub: d?.appointments?.noShowPct ? `${d.appointments.noShowPct.toFixed(1)}% no-show` : 'Today',
+                            variant: (d?.appointments?.noShowPct || 0) > 15 ? 'warning' : 'muted', icon: Calendar,
+                        },
+                        {
+                            title: 'Staff On Floor', value: `${d?.staff.onClock || 0} / ${d?.staff.total || 0}`,
+                            sub: (d?.staff.onClock || 0) === 0 ? 'No one clocked in' : 'Checked in now',
+                            variant: (d?.staff.onClock || 0) === 0 ? 'warning' : 'muted', icon: Users,
+                        },
+                        {
+                            title: 'Repeat Clients', value: `${(d?.retention?.repeatPct || 0).toFixed(0)}%`,
+                            sub: `${d?.retention?.uniqueClients || 0} unique (30d)`,
+                            variant: 'accent', icon: HeartPulse,
+                        },
+                        {
+                            title: 'MTD Revenue', value: fmtK(d?.mtd.sales || 0),
+                            sub: `${d?.mtd.transactions || 0} transactions`,
+                            variant: 'muted', icon: TrendingUp,
+                        },
+                    ]}
+                />
+
+                {/* ─── ROW 2: ACTION CENTER + EXCEPTION RAIL ─── */}
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-5" style={{ minHeight: 300 }}>
+                    <div className="lg:col-span-3">
+                        <OwnerActionCenter
+                            items={attentionItems}
+                            title="Needs Attention"
+                            fetchedAt={meta?.lastUpdatedAt}
+                        />
+                    </div>
+                    <div className="lg:col-span-2">
+                        <OwnerExceptionRail
+                            items={exceptionItems}
+                            title="Exceptions"
+                            fetchedAt={meta?.lastUpdatedAt}
+                            emptyTitle="Store running smoothly"
+                            emptySubtitle="No voids, no-shows, or overrides detected"
+                        />
+                    </div>
+                </div>
+
+                {/* ─── ROW 3: TODAY'S BUSINESS PERFORMANCE ─── */}
+                <Card className="p-5">
+                    <SectionHead title="Today's Business" icon={BarChart3}
+                        right={<DataFresh at={meta?.lastUpdatedAt} />}
+                    />
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="border-b border-white/[0.04]">
+                                    <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-stone-500">Metric</th>
+                                    <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-stone-500">Today</th>
+                                    <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-stone-500">Yesterday</th>
+                                    <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-stone-500">MTD</th>
+                                    <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-stone-500">Change</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {[
+                                    { metric: 'Revenue', today: fmt(d?.today.sales || 0), yesterday: fmt(d?.yesterday.sales || 0), mtd: fmtK(d?.mtd.sales || 0), delta: salesDelta },
+                                    { metric: 'Transactions', today: String(d?.today.transactions || 0), yesterday: String(d?.yesterday.transactions || 0), mtd: String(d?.mtd.transactions || 0), delta: d && d.yesterday.transactions > 0 ? ((d.today.transactions - d.yesterday.transactions) / d.yesterday.transactions * 100) : 0 },
+                                    { metric: 'Avg Ticket', today: fmt(d?.today.avgTicket || 0), yesterday: d && d.yesterday.transactions > 0 ? fmt(d.yesterday.sales / d.yesterday.transactions) : '—', mtd: d && d.mtd.transactions > 0 ? fmt(d.mtd.sales / d.mtd.transactions) : '—', delta: 0 },
+                                    { metric: 'Cash', today: fmt(d?.today.cash || 0), yesterday: '—', mtd: '—', delta: 0 },
+                                    { metric: 'Card', today: fmt(d?.today.card || 0), yesterday: '—', mtd: '—', delta: 0 },
+                                ].map(row => (
+                                    <tr key={row.metric} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                                        <td className="px-3 py-3 text-sm font-semibold text-white">{row.metric}</td>
+                                        <td className="px-3 py-3 text-sm font-bold text-emerald-400">{row.today}</td>
+                                        <td className="px-3 py-3 text-sm text-stone-400">{row.yesterday}</td>
+                                        <td className="px-3 py-3 text-sm text-stone-400">{row.mtd}</td>
+                                        <td className="px-3 py-3">{row.delta !== 0 ? <Delta value={row.delta} /> : <span className="text-xs text-stone-600">—</span>}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+
+                {/* ─── ROW 4: STAFF + CUSTOMER RETENTION ─── */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {/* Staff Panel */}
+                    <Card className="p-5">
+                        <SectionHead title="Team Status" icon={Users} />
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                            <MetricCard label="Total" value={d?.staff.total || 0} />
+                            <MetricCard label="On Clock" value={d?.staff.onClock || 0} color={d?.staff.onClock ? 'text-emerald-400' : 'text-amber-400'} />
+                            <MetricCard label="Rev / Staff" value={d?.staff.onClock ? fmt(d.today.sales / d.staff.onClock) : '—'} color="text-violet-400" />
+                        </div>
+                        {(d?.staff.onClock || 0) === 0 && d?.staff.total ? (
+                            <div className="p-3 rounded-lg bg-amber-500/[0.05] border border-amber-500/15 text-center">
+                                <p className="text-xs font-semibold text-amber-400">No staff clocked in</p>
+                                <p className="text-[10px] text-stone-500 mt-0.5">Check schedule or time-clock</p>
                             </div>
-                            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Transactions</p>
-                                <p className="text-2xl font-black text-white">{selectedLoc.transactions}</p>
+                        ) : (
+                            <div className="p-3 rounded-lg bg-emerald-500/[0.05] border border-emerald-500/15 text-center">
+                                <p className="text-xs font-semibold text-emerald-400">{d?.staff.onClock || 0} staff on floor</p>
+                                <p className="text-[10px] text-stone-500 mt-0.5">Coverage {d?.staff.total ? `${Math.round((d.staff.onClock / d.staff.total) * 100)}%` : '—'}</p>
                             </div>
-                            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Appointments</p>
-                                <p className="text-2xl font-black text-white">{selectedLoc.appointments}</p>
-                            </div>
-                            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.06]">
-                                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Staff</p>
-                                <p className="text-2xl font-black text-white">{selectedLoc.activeStaff}</p>
+                        )}
+                    </Card>
+
+                    {/* Customer Retention */}
+                    <Card className="p-5">
+                        <SectionHead title="Customer Retention" icon={HeartPulse} />
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                            <MetricCard label="Unique (30d)" value={d?.retention?.uniqueClients || 0} />
+                            <MetricCard label="Repeat %" value={`${(d?.retention?.repeatPct || 0).toFixed(0)}%`} color="text-emerald-400" />
+                            <MetricCard label="No-Show %" value={`${(d?.appointments?.noShowPct || 0).toFixed(1)}%`}
+                                color={(d?.appointments?.noShowPct || 0) > 15 ? 'text-red-400' : 'text-stone-300'} />
+                        </div>
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02]">
+                                <span className="text-xs text-stone-400">Appointments Today</span>
+                                <span className="text-sm font-bold text-white">{d?.appointments?.today || 0}</span>
                             </div>
                         </div>
+                    </Card>
+                </div>
+
+                {/* ─── ROW 5: FINANCIALS + INVENTORY + PAYMENTS ─── */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {/* Payment Breakdown */}
+                    <Card className="p-5">
+                        <SectionHead title="Payment Split" icon={CreditCard} />
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                            <MetricCard label="Cash" value={fmt(d?.today.cash || 0)} color="text-emerald-400" sub={`${cashPct.toFixed(0)}%`} />
+                            <MetricCard label="Card" value={fmt(d?.today.card || 0)} color="text-blue-400" sub={`${(100 - cashPct).toFixed(0)}%`} />
+                        </div>
+                        <div className="h-2.5 rounded-full bg-stone-800 overflow-hidden flex">
+                            <div className="h-full bg-emerald-500 rounded-l-full transition-all" style={{ width: `${cashPct}%` }} />
+                            <div className="h-full bg-blue-500 rounded-r-full transition-all" style={{ width: `${100 - cashPct}%` }} />
+                        </div>
+                    </Card>
+
+                    {/* Inventory */}
+                    <Card className="p-5">
+                        <SectionHead title="Inventory" icon={Package} badge={d?.inventory.lowStock || 0} />
+                        {(d?.inventory.lowStock || 0) === 0 ? (
+                            <div className="text-center py-6">
+                                <Package className="h-7 w-7 mx-auto text-stone-700 mb-2" />
+                                <p className="text-sm text-stone-400">All stocked</p>
+                                <p className="text-[10px] text-stone-600 mt-0.5">No low-stock alerts</p>
+                            </div>
+                        ) : (
+                            <div className="p-4 rounded-lg bg-amber-500/[0.05] border border-amber-500/15">
+                                <p className="text-sm font-bold text-amber-400">{d?.inventory.lowStock} items low</p>
+                                <p className="text-[10px] text-stone-500 mt-0.5">Below reorder point</p>
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Store Health */}
+                    <Card className="p-5">
+                        <SectionHead title="Store Health" icon={HeartPulse} />
+                        <div className="flex items-center justify-center py-4">
+                            <div className="text-center">
+                                <HealthBadge score={d?.health || 0} size="lg" />
+                                <p className="text-xs text-stone-500 mt-2">{d?.status === 'active' ? 'Operating normally' : d?.status === 'idle' ? 'Idle — no sales yet' : 'Needs attention'}</p>
+                            </div>
+                        </div>
+                        {d?.topIssue && (
+                            <div className="mt-3 p-3 rounded-lg bg-amber-500/[0.05] border border-amber-500/15">
+                                <p className="text-[10px] font-bold text-amber-400 uppercase">Top Issue</p>
+                                <p className="text-xs text-white mt-0.5">{d.topIssue}</p>
+                                {d.recommendedAction && (
+                                    <p className="text-[10px] text-violet-400 mt-1">→ {d.recommendedAction}</p>
+                                )}
+                            </div>
+                        )}
+                    </Card>
+                </div>
+
+                {/* ─── ROW 6: REPORTING CENTER ─── */}
+                <Card>
+                    <div className="px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between">
+                        <SectionHead title="Reports" icon={BarChart3} />
+                        <TabBar tabs={[
+                            { id: 'overview', label: 'Overview' },
+                            { id: 'sales', label: 'Sales' },
+                            { id: 'payments', label: 'Payments' },
+                        ]} active={reportTab} onChange={setReportTab} />
                     </div>
-                )}
-            </DrawerPanel>
+                    <div className="p-5 min-h-[200px]">
+                        {reportTab === 'overview' && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <MetricCard label="Today" value={fmt(d?.today.sales || 0)} color="text-emerald-400" />
+                                <MetricCard label="Yesterday" value={fmt(d?.yesterday.sales || 0)} />
+                                <MetricCard label="MTD" value={fmtK(d?.mtd.sales || 0)} />
+                                <MetricCard label="Health" value={String(d?.health || 0)} color={d?.health && d.health >= 70 ? 'text-emerald-400' : 'text-amber-400'} />
+                            </div>
+                        )}
+                        {reportTab === 'sales' && (
+                            <div className="space-y-3">
+                                {[
+                                    { label: "Today's Revenue", value: fmt(d?.today.sales || 0), color: 'text-emerald-400' },
+                                    { label: 'Avg Ticket', value: fmt(d?.today.avgTicket || 0), color: 'text-white' },
+                                    { label: 'Transactions', value: String(d?.today.transactions || 0), color: 'text-white' },
+                                    { label: 'MTD Revenue', value: fmtK(d?.mtd.sales || 0), color: 'text-white' },
+                                    { label: 'MTD Transactions', value: String(d?.mtd.transactions || 0), color: 'text-white' },
+                                ].map(row => (
+                                    <div key={row.label} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+                                        <span className="text-xs text-stone-400">{row.label}</span>
+                                        <span className={`text-sm font-bold ${row.color}`}>{row.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {reportTab === 'payments' && (
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <MetricCard label="Cash" value={fmt(d?.today.cash || 0)} color="text-emerald-400" />
+                                    <MetricCard label="Card" value={fmt(d?.today.card || 0)} color="text-blue-400" />
+                                </div>
+                                <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.02]">
+                                    <span className="text-xs text-stone-400">Cash %</span>
+                                    <span className="text-sm font-bold text-emerald-400">{cashPct.toFixed(0)}%</span>
+                                </div>
+                                <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.02]">
+                                    <span className="text-xs text-stone-400">Card %</span>
+                                    <span className="text-sm font-bold text-blue-400">{(100 - cashPct).toFixed(0)}%</span>
+                                </div>
+                                <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.02]">
+                                    <span className="text-xs text-stone-400">Total</span>
+                                    <span className="text-sm font-bold text-white">{fmt(d?.today.sales || 0)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </Card>
+
+                {/* ─── TREND FOOTER ─── */}
+                <div className="flex items-center justify-between px-5 py-3 bg-stone-900/30 backdrop-blur-md border border-white/[0.04] rounded-xl">
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2 text-xs text-stone-500">
+                            <Store className="h-3.5 w-3.5" />
+                            <span>{d?.location.name || 'My Store'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-stone-500">
+                            <BarChart3 className="h-3.5 w-3.5" />
+                            <span>Health: <strong className="text-stone-300">{d?.health || 0}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-stone-500">
+                            <Users className="h-3.5 w-3.5" />
+                            <span>{d?.staff.onClock || 0} on floor</span>
+                        </div>
+                    </div>
+                    <DataFresh at={meta?.lastUpdatedAt} />
+                </div>
+            </OwnerPageShell>
         </>
     )
 }
