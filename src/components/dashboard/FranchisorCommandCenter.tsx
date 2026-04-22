@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
+import Link from 'next/link'
 import {
     DollarSign, Users, MapPin, TrendingUp,
     AlertCircle, BarChart3, ChevronRight, Copy,
     Crown, Rocket, ArrowUpDown, AlertTriangle,
     CheckCircle, Zap, Flag, Activity, Layers,
     TrendingDown, Globe, Store, Download,
-    ChevronDown, X, Heart, Clock,
+    ChevronDown, X, Heart, Clock, Plus, Package,
     Briefcase, ArrowDown, ArrowUp, Gauge, Search,
     ExternalLink, FileText, Table2, ChevronUp
 } from 'lucide-react'
@@ -629,22 +630,37 @@ function FinancialRoyaltySplit({ data, fetchedAt }: { data: DashboardData | null
 }
 
 // ═══════════════════════════════════════════════════════
-// ROW 7 — BRAND OPERATIONS (gated)
+// ROW 7 — BRAND OPERATIONS (derivable metrics + quick links)
 // ═══════════════════════════════════════════════════════
 
-function BrandOperationsRow() {
+function BrandOperationsRow({ data }: { data: DashboardData | null }) {
+    if (!data) return null
+    const k = data.kpis
+    const avgPerStore = k.activeLocations > 0 ? Math.round(k.totalEmployees / k.activeLocations) : 0
     const items = [
-        { icon: FileText, title: 'Training Completion', state: 'unavailable', desc: 'Employee training and certification tracking. Requires LMS integration.' },
-        { icon: BarChart3, title: 'Campaign Adoption', state: 'unavailable', desc: 'Promotion adoption rate across franchise network. Requires campaign engine.' },
-        { icon: Table2, title: 'Catalog Consistency', state: 'unavailable', desc: 'Brand catalog sync and pricing compliance. Requires catalog admin data.' },
-        { icon: Layers, title: 'Readiness Status', state: 'unavailable', desc: 'Document and operational readiness tracking. Requires compliance engine.' },
+        { icon: Users, title: 'Staff Coverage', value: `${k.totalEmployees}`, sub: `${avgPerStore} avg per store · ${k.activeLocations} locations`, color: 'text-violet-400', link: '/franchisor/franchisees' },
+        { icon: Gauge, title: 'Avg Setup Time', value: `${data.rollout.avgDaysToGoLive}d`, sub: `${data.rollout.pending} pending go-live`, color: 'text-amber-400', link: '/franchisor/rollout' },
+        { icon: Store, title: 'Station Requests', value: `${data.rollout.stationRequests}`, sub: 'Pending device provisioning', color: data.rollout.stationRequests > 0 ? 'text-blue-400' : 'text-stone-500', link: '/franchisor/requests' },
+        { icon: Globe, title: 'Franchise Network', value: `${k.totalFranchisees}`, sub: `${k.healthBreakdown?.green || 0} healthy · ${k.healthBreakdown?.red || 0} need attention`, color: 'text-emerald-400', link: '/franchisor/franchisees' },
     ]
-    return <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {items.map(item => <Card key={item.title} className="p-4 opacity-60">
-            <div className="flex items-center gap-2 mb-2"><item.icon className="h-4 w-4 text-stone-500" /><h4 className="text-xs font-bold text-stone-300">{item.title}</h4></div>
-            <p className="text-[10px] text-stone-500 leading-relaxed mb-2">{item.desc}</p>
-            <span className="text-[9px] font-bold uppercase text-stone-600 bg-stone-800 px-1.5 py-0.5 rounded">Unavailable — no live data</span>
-        </Card>)}
+    return <div className="space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {items.map(item => <Link key={item.title} href={item.link}>
+                <Card className="p-4 hover:bg-white/[0.03] transition-colors cursor-pointer group">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2"><item.icon className={`h-4 w-4 ${item.color}`} /><h4 className="text-xs font-bold text-stone-300">{item.title}</h4></div>
+                        <ChevronRight className="h-3 w-3 text-stone-700 group-hover:text-violet-400 transition-colors" />
+                    </div>
+                    <p className={`text-2xl font-black ${item.color} mb-0.5`}>{item.value}</p>
+                    <p className="text-[10px] text-stone-500 leading-relaxed">{item.sub}</p>
+                </Card>
+            </Link>)}
+        </div>
+        {/* Gated integrations — subtle, not trust-breaking */}
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+            <Layers className="h-3.5 w-3.5 text-stone-600 flex-shrink-0" />
+            <p className="text-[11px] text-stone-600"><span className="font-medium text-stone-500">Training Completion</span> and <span className="font-medium text-stone-500">Campaign Adoption</span> tracking available when LMS or campaign system is connected.</p>
+        </div>
     </div>
 }
 
@@ -882,7 +898,17 @@ export default function FranchisorCommandCenter() {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            {data?.brandCode && <span className="px-2 py-1 rounded-md bg-violet-500/15 border border-violet-500/20 text-violet-300 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer hover:bg-violet-500/25 transition-colors"
+                            {/* Quick Actions — key franchisor workflows */}
+                            <Link href="/franchisor/franchisees" className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500/15 hover:bg-violet-500/25 text-violet-300 rounded-lg border border-violet-500/20 transition-all text-xs font-medium">
+                                <Plus className="h-3 w-3" />Add Franchisee
+                            </Link>
+                            <Link href="/franchisor/locations" className="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 rounded-lg border border-white/[0.06] transition-all text-xs font-medium hidden lg:flex">
+                                <MapPin className="h-3 w-3" />Locations
+                            </Link>
+                            <Link href="/franchisor/requests/new" className="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 rounded-lg border border-white/[0.06] transition-all text-xs font-medium hidden xl:flex">
+                                <Package className="h-3 w-3" />Station Request
+                            </Link>
+                            {data?.brandCode && <span className="px-2 py-1 rounded-md bg-violet-500/15 border border-violet-500/20 text-violet-300 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer hover:bg-violet-500/25 transition-colors hidden lg:flex"
                                 onClick={() => navigator.clipboard.writeText(data.brandCode!)}>{data.brandCode} <Copy className="h-3 w-3 opacity-50" /></span>}
                             <button onClick={fetchData} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 rounded-lg border border-white/[0.06] transition-all text-xs font-medium">
                                 <Activity className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />Refresh
@@ -927,10 +953,10 @@ export default function FranchisorCommandCenter() {
                     <FinancialRoyaltySplit data={data} fetchedAt={data?.fetchedAt} />
                 </section>
 
-                {/* ═══ ROW 7 — BRAND OPERATIONS (gated) ═══ */}
+                {/* ═══ ROW 7 — BRAND OPERATIONS ═══ */}
                 <section id="operations" className="scroll-mt-28">
                     <SectionHead title="Brand Operations" icon={Layers} />
-                    <BrandOperationsRow />
+                    <BrandOperationsRow data={data} />
                 </section>
 
                 <div className="h-8" />
